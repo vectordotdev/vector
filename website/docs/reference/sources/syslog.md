@@ -127,7 +127,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
 
 ### host_key
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host. This can also be globally set via the [global [`host_key`](#host_key) option][docs.reference.global-options#host-key]. See [Context](#context) for more info.
 
 
 </Field>
@@ -465,6 +465,7 @@ requesting support for your specific format.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.global-options#host-key]: /docs/reference/global-options/#host-key
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature

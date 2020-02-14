@@ -64,7 +64,7 @@ impl File {
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
             Encoding::Text => log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes())
                 .unwrap_or_default(),
         }

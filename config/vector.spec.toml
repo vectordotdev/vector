@@ -23,6 +23,10 @@
 # ------------------------------------------------------------------------------
 # Global options are relevant to Vector as a whole and apply to global behavior.
 
+#
+# General
+#
+
 # The directory used for persisting Vector state, such as on-disk buffers, file
 # checkpoints, and more. Please make sure the Vector project has write
 # permissions to this dir.
@@ -41,6 +45,41 @@ data_dir = "/var/lib/vector"
 # * no default
 # * type: [string]
 dns_servers = ["0.0.0.0:53"]
+
+#
+# Log schema
+#
+
+[.log_schema]
+  # The key used to hold the log host. See the log data model page for more info.
+  #
+  # * optional
+  # * default: "host"
+  # * type: string
+  host_key = "host"
+  host_key = "@host"
+  host_key = "instance"
+  host_key = "machine"
+
+  # The key used to hold the log message. See the log data model page for more
+  # info.
+  #
+  # * optional
+  # * default: "message"
+  # * type: string
+  message_key = "message"
+  message_key = "@message"
+  message_key = "msg"
+
+  # The key used to represent when the log was generated. See the log data model
+  # page for more info.
+  #
+  # * optional
+  # * default: "timestamp"
+  # * type: string
+  timestamp_key = "timestamp"
+  timestamp_key = "@timestamp"
+  timestamp_key = "datetime"
 
 # ------------------------------------------------------------------------------
 # Sources
@@ -185,7 +224,8 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   file_key = "file"
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
@@ -489,7 +529,8 @@ dns_servers = ["0.0.0.0:53"]
   # Context
   #
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
@@ -565,7 +606,8 @@ dns_servers = ["0.0.0.0:53"]
   # Context
   #
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
@@ -626,7 +668,8 @@ dns_servers = ["0.0.0.0:53"]
   # Context
   #
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"

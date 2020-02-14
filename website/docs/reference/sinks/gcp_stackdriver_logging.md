@@ -681,30 +681,6 @@ Options for describing the logging resource.
 
 
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"projectId":"vector-123456"},{"zone":"Twilight"}]}
-  name={"`[label]`"}
-  path={"resource"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### `[label]`
-
-Values for all of the labels listed in the associated monitored resource descriptor.
-
-For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`.
-
-
-</Field>
-
-
-<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -723,6 +699,30 @@ For example, Compute Engine VM instances use the labels `projectId`, `instanceId
 The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.
 
 See the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"projectId":"vector-123456"},{"zone":"Twilight"}]}
+  name={"`[label]`"}
+  path={"resource"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[label]`
+
+Values for all of the labels listed in the associated monitored resource descriptor.
+
+For example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`.
 
 
 </Field>

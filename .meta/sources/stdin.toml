@@ -21,7 +21,9 @@ category = "Context"
 required = true
 default = "host"
 description = """\
-The key name added to each event representing the current host.\
+The key name added to each event representing the current host. This can also \
+be globally set via the \
+[global `host_key` option][docs.reference.global-options#host-key].\
 """
 
 [[sources.stdin.output.log.examples]]

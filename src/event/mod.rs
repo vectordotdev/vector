@@ -1,9 +1,11 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use getset::{Getters, Setters};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
-use serde::{Serialize, Serializer};
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{hash_map::Drain, HashMap};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
@@ -22,10 +24,9 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
+pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
+
 lazy_static! {
-    pub static ref MESSAGE: Atom = Atom::from("message");
-    pub static ref HOST: Atom = Atom::from("host");
-    pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
     pub static ref PARTIAL: Atom = Atom::from("_partial");
 }
 
@@ -156,6 +157,40 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
         let mut log_event = Event::new_empty_log().into_log();
         log_event.extend(iter);
         log_event
+    }
+}
+
+pub fn log_schema() -> &'static LogSchema {
+    // TODO: Help Rust project support before_each
+    // Support uninitialized schemas in tests to help our contributors.
+    // Don't do it in release because that is scary.
+    #[cfg(debug_assertions)]
+    {
+        if LOG_SCHEMA.get().is_none() {
+            error!("You are not initializing a schema in this test -- This could fail in release");
+            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
+        }
+    }
+    LOG_SCHEMA.get().expect("Schema was not initialized")
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
+pub struct LogSchema {
+    #[getset(get = "pub", set = "pub(crate)")]
+    message_key: Atom,
+    #[getset(get = "pub", set = "pub(crate)")]
+    timestamp_key: Atom,
+    #[getset(get = "pub", set = "pub(crate)")]
+    host_key: Atom,
+}
+
+impl Default for LogSchema {
+    fn default() -> Self {
+        LogSchema {
+            message_key: Atom::from("message"),
+            timestamp_key: Atom::from("timestamp"),
+            host_key: Atom::from("host"),
+        }
     }
 }
 
@@ -483,7 +518,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .remove(&MESSAGE)
+            .remove(&log_schema().message_key())
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -496,8 +531,12 @@ impl From<Bytes> for Event {
             fields: HashMap::new(),
         });
 
-        event.as_mut_log().insert(MESSAGE.clone(), message);
-        event.as_mut_log().insert(TIMESTAMP.clone(), Utc::now());
+        event
+            .as_mut_log()
+            .insert(log_schema().message_key().clone(), message);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
 
         event
     }
@@ -565,7 +604,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&super::TIMESTAMP),
+            "timestamp": event.as_log().get(&super::log_schema().timestamp_key()),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
