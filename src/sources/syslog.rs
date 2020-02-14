@@ -249,12 +249,16 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         log.insert("procid", value);
     }
 
-    for element in parsed.structured_data.iter() {
-        let mut map: HashMap<Atom, Value> = HashMap::new();
-        for (name, value) in element.params.iter() {
-            map.insert(Atom::from(name.clone()), Value::from(value.clone()));
+    for element in parsed.structured_data.into_iter() {
+        if element.params.len() == 0 {
+            continue;
         }
-        log.insert(element.id.clone(), Value::from(map));
+        let map: HashMap<Atom, Value> = element
+            .params
+            .into_iter()
+            .map(|(name, value)| (Atom::from(name), Value::from(value)))
+            .collect();
+        log.insert(element.id, Value::from(map));
     }
 }
 
