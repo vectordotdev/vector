@@ -21,25 +21,15 @@ pub struct ClientConfig {
     token: Option<String>,
     server: Uri,
     tls_settings: TlsSettings,
+    node_name: Option<String>,
 }
 
 impl ClientConfig {
     /// Creates new watcher who will call updater function with freshest Pod data.
-    /// Request to API server is made with given WatchOptional.
-    pub fn build_pod_watch(
+    pub fn build(
         self,
-        request_optional: WatchOptional<'static>,
         mut updater: impl FnMut(&Pod) + Send + 'static,
-    ) -> Result<WatchClient<WatchPodForAllNamespacesResponse>, BuildError> {
-        let request_builder = move |version: Option<&Version>| {
-            Pod::watch_pod_for_all_namespaces(WatchOptional {
-                resource_version: version.map(|v| v.0.as_str()),
-                ..request_optional.clone()
-            })
-            .map(|(req, _)| req)
-            .context(K8SOpenapiError)
-        };
-
+    ) -> Result<WatchClient, BuildError> {
         let updater = move |response| {
             let pod = Self::event_to_data(Self::response_to_event(response)?)?;
             updater(&pod);
@@ -49,24 +39,10 @@ impl ClientConfig {
                 .and_then(|metadata| metadata.resource_version.clone().map(Version)))
         };
 
-        self.build(request_builder, updater)
-    }
-
-    /// Should be used by other build_* functions which hide request_builder, and
-    /// simplify updater function.
-    fn build<T: Response>(
-        self,
-        request_builder: impl Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError>
-            + Send
-            + Sync
-            + 'static,
-        updater: impl FnMut(T) -> Result<Option<Version>, RuntimeError> + Send + 'static,
-    ) -> Result<WatchClient<T>, BuildError> {
         let client =
             https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
 
-        let client = WatchClient::<T> {
-            request_builder: Box::new(request_builder) as Box<_>,
+        let client = WatchClient {
             updater: Box::new(updater) as Box<_>,
             client,
             config: self,
@@ -130,23 +106,19 @@ impl ClientConfig {
 }
 
 /// Kubernetes client which watches for changes of T on one Kubernetes API endpoint.
-pub struct WatchClient<T: Response> {
-    /// Must add:
-    ///  - uri
-    ///  - resource_version
-    ///  - watch field
-    /// This can be achieved with for example `Pod::watch_pod_for_all_namespaces`.
-    request_builder: Box<
-        dyn Fn(Option<&Version>) -> Result<Request<Vec<u8>>, BuildError> + Send + Sync + 'static,
+pub struct WatchClient {
+    updater: Box<
+        dyn FnMut(WatchPodForAllNamespacesResponse) -> Result<Option<Version>, RuntimeError>
+            + Send
+            + 'static,
     >,
-    updater: Box<dyn FnMut(T) -> Result<Option<Version>, RuntimeError> + Send + 'static>,
     config: ClientConfig,
     client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
     /// Most recent watched resource version.
     version: Option<Version>,
 }
 
-impl<T: Response> WatchClient<T> {
+impl WatchClient {
     /// Watches for data changes and propagates them to updater.
     /// Never returns
     pub async fn run(&mut self) {
@@ -161,10 +133,7 @@ impl<T: Response> WatchClient<T> {
                 Err(RuntimeError::WatchEventError { status }) if status.code == Some(410) => {
                     // 410 Gone, restart with new list.
                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#410-gone-responses
-                    info!(
-                        message = "Watch list desynced for Kubernetes Object. Restarting watch.",
-                        object = std::any::type_name::<T>()
-                    );
+                    info!("Watch list desynced for Kubernetes Pod list. Restarting watch.");
                     self.version = None;
                 }
                 Err(error) => debug!(%error),
@@ -225,7 +194,7 @@ impl<T: Response> WatchClient<T> {
     fn process_unused(&mut self, unused: &mut Vec<u8>) -> Result<(), RuntimeError> {
         // Parse then process recieved data.
         loop {
-            match T::try_from_parts(StatusCode::OK, &unused) {
+            match WatchPodForAllNamespacesResponse::try_from_parts(StatusCode::OK, &unused) {
                 Ok((data, used_bytes)) => {
                     assert!(used_bytes > 0, "Parser must consume some data");
                     // Remove used data.
@@ -242,7 +211,7 @@ impl<T: Response> WatchClient<T> {
                 Err(ResponseError::NeedMoreData) => return Ok(()),
                 Err(error) => {
                     return Err(RuntimeError::ParseResponseError {
-                        name: std::any::type_name::<T>().to_owned(),
+                        name: "WatchPodForAllNamespacesResponse".to_owned(),
                         error,
                     })
                 }
@@ -253,7 +222,17 @@ impl<T: Response> WatchClient<T> {
     // Builds request to watch data.
     fn build_request(&self) -> Result<Request<Body>, BuildError> {
         // Prepare request
-        let mut request = (self.request_builder)(self.version.as_ref())?;
+        let field_selector = self
+            .config
+            .node_name
+            .as_ref()
+            .map(|node_name| format!("spec.nodeName={}", node_name));
+        let (mut request, _) = Pod::watch_pod_for_all_namespaces(WatchOptional {
+            resource_version: self.version.as_ref().map(|v| v.0.as_str()),
+            field_selector: field_selector.as_ref().map(|selector| selector.as_str()),
+            ..WatchOptional::default()
+        })
+        .context(K8SOpenapiError)?;
 
         self.config.authorize(&mut request)?;
         self.config.fill_uri(&mut request)?;
@@ -315,7 +294,6 @@ mod tests {
     use super::ClientConfig;
     use crate::{dns::Resolver, sinks::util::tls::TlsSettings};
     use http::Uri;
-    use k8s_openapi::WatchOptional;
 
     #[test]
     fn buildable() {
@@ -325,8 +303,9 @@ mod tests {
             token: None,
             server: Uri::from_static("https://localhost:8001"),
             tls_settings: TlsSettings::from_options(&None).unwrap(),
+            node_name: None,
         }
-        .build_pod_watch(WatchOptional::default(), |_| ())
+        .build(|_| ())
         .unwrap();
     }
 }
@@ -345,7 +324,6 @@ mod kube_tests {
         transforms::kubernetes::kube_config,
     };
     use http::Uri;
-    use k8s_openapi::WatchOptional;
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::{path::PathBuf, str::FromStr, sync::mpsc::channel, time::Duration};
@@ -417,6 +395,7 @@ mod kube_tests {
             // Construction
             Some(ClientConfig {
                 resolver,
+                node_name: None,
                 token: user.token.clone(),
                 server: Uri::from_str(&cluster.server).unwrap(),
                 tls_settings: TlsSettings::from_options(&Some(TlsOptions {
@@ -444,7 +423,7 @@ mod kube_tests {
         let mut client =
             ClientConfig::load_kube_config(Resolver::new(Vec::new(), rt.executor()).unwrap())
                 .expect("Kubernetes configuration file not present.")
-                .build_pod_watch(WatchOptional::default(), move |_| {
+                .build(move |_| {
                     let _ = sender.send(());
                 })
                 .unwrap();
