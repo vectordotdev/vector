@@ -258,7 +258,7 @@ pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, Error> {
 mod tests {
     use super::parse_bool;
     #[cfg(unix)]
-    use super::parse_time_stamp;
+    use super::parse_timestamp;
     #[cfg(unix)]
     use super::{Conversion, Error};
     #[cfg(unix)]
