@@ -502,6 +502,8 @@ mod tests {
         compression: Compression,
     ) -> RequestSettings {
         RequestSettings::new(&GcsSinkConfig {
+            key_prefix: Some("key/".into()),
+            filename_time_format: Some("date".into()),
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
             compression: compression,
