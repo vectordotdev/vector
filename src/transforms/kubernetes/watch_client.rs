@@ -312,16 +312,6 @@ mod kube_tests {
     /// Enviorment variable that can containa path to kubernetes config file.
     const CONFIG_PATH: &str = "KUBECONFIG";
 
-    fn store_to_file(data: &[u8]) -> Result<PathBuf, std::io::Error> {
-        let path = temp_file();
-
-        let mut file = OpenOptions::new().write(true).open(path.clone())?;
-        file.write_all(data)?;
-        file.sync_all()?;
-
-        Ok(path)
-    }
-
     /// Loads configuration from local kubeconfig file, the same
     /// one that kubectl uses.
     /// None if such file doesn't exist.
