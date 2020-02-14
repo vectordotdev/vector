@@ -1,5 +1,5 @@
 use crate::{
-    config_paths,
+    config_paths, event,
     topology::{config::Config, unit_test::UnitTest},
 };
 use colored::*;
@@ -14,7 +14,7 @@ pub struct Opts {
     paths: Vec<PathBuf>,
 }
 
-fn build_tests(path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
+fn build_tests(i: usize, path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     let file = match File::open(path) {
         Ok(f) => f,
         Err(error) => {
@@ -39,6 +39,11 @@ fn build_tests(path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
         }
         Ok(c) => c,
     };
+    if i == 0 {
+        event::LOG_SCHEMA
+            .set(config.global.log_schema.clone())
+            .expect("Couldn't set schema");
+    }
 
     crate::topology::unit_test::build_unit_tests(&config)
 }
@@ -57,7 +62,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             println!();
         }
         println!("Running {} tests", path_str);
-        match build_tests(p) {
+        match build_tests(i, p) {
             Ok(mut tests) => {
                 let mut aggregated_test_errors = Vec::new();
                 let mut aggregated_test_inspections = Vec::new();
