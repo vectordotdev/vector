@@ -125,6 +125,7 @@ Given the following configuration:
     field6 = ["item 1", "item 2"]
     field7.nested = "nested value",
     field8 = "#{HOSTNAME}"
+    field9 = "{{field1}} {{field2}}"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
