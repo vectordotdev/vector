@@ -180,6 +180,8 @@ module.exports = {
             
               "reference/transforms/remove_tags",
             
+              "reference/transforms/rename_fields",
+            
               "reference/transforms/sampler",
             
               "reference/transforms/split",
