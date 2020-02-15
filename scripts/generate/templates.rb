@@ -216,7 +216,7 @@ class Templates
     description = option.description.strip
 
     if option.templateable?
-      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#field-interpolation]."
+      description << " This option supports dynamic values via [Vector's template syntax][docs.reference.templating]."
     end
 
     if option.relevant_when
@@ -395,9 +395,15 @@ class Templates
     EOF
   end
 
-  def subpages
-    dirname = File.basename(@_template_path).split(".").first
-    dir = @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+  def subpages(link_name = nil)
+    dir =
+      if link_name
+        docs_dir = metadata.links.fetch(link_name).gsub(/\/$/, "")
+        "#{WEBSITE_ROOT}#{docs_dir}"
+      else
+        dirname = File.basename(@_template_path).split(".").first
+        @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+      end
 
     Dir.glob("#{dir}/*.md").
       to_a.
