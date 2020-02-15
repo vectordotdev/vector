@@ -9,7 +9,7 @@ import SVG from 'react-inlinesvg';
 
 Vector is a _highly reliable_ observability data router built for demanding
 production environments. Vector is designed on the following principles:
-  
+
 * **High reliability** - Vector is designed first and foremost to be reliabile. Built in [Rust][urls.rust], Vector is [memory safe][urls.rust_memory_safety], [correct][pages.index#correctness], and [performant][pages.index#performance].
 * **Operator safety** - Designed for humans, Vector's is pragmatic and hard to break. It avoids the common pitfalls in similar tools.
 * **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], traces (coming soon), and exceptions (coming soon). A [sophisticated data model][docs.data-model] enables _correct_ interoperability between systems.
