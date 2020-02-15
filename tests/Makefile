@@ -1,7 +1,7 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
 # run all tests, checks, and verifications
-all: check build-all package-all test-docker verify
+all: check build-all package-all test-docker test-behavior verify
 
 # default target, build the project in debug mode
 build: build-x86_64
@@ -25,6 +25,10 @@ bench: build
 # run tests which do not require additional services to be present
 test: build
 	$(RUN) test
+
+# run behaviorial tests
+test-behavior: build
+	$(RUN) test-behavior
 
 # run tests which use Docker
 test-docker: build

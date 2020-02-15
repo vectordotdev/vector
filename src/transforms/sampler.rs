@@ -57,7 +57,7 @@ impl Transform for Sampler {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
-            .get(&event::MESSAGE)
+            .get(&event::log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 
@@ -146,7 +146,11 @@ mod tests {
         let mut sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| {
+                !s.as_log()[&event::log_schema().message_key()]
+                    .to_string_lossy()
+                    .contains("na")
+            })
             .find_map(|event| sampler.transform(event))
             .unwrap();
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
@@ -155,7 +159,11 @@ mod tests {
         let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| {
+                !s.as_log()[&event::log_schema().message_key()]
+                    .to_string_lossy()
+                    .contains("na")
+            })
             .find_map(|event| sampler.transform(event))
             .unwrap();
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());

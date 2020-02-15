@@ -77,9 +77,11 @@ impl HttpSink for LogdnaConfig {
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
 
-        let line = log.remove(&event::MESSAGE).unwrap_or_else(|| "".into());
+        let line = log
+            .remove(&event::log_schema().message_key())
+            .unwrap_or_else(|| "".into());
         let timestamp = log
-            .remove(&event::TIMESTAMP)
+            .remove(&event::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();

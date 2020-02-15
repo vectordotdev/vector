@@ -63,6 +63,14 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
+<Alert type="info">
+
+The following fields are the _default_ schema. All of these field names can be
+changed via the
+[global `log_schema` options][docs.reference.global-options#log_schema].
+
+</Alert>
+
 <%= fields(metadata.log_fields_list, heading_depth: 3) %>
 
 ## Components
@@ -71,14 +79,34 @@ import TabItem from '@theme/TabItem';
 
 ## How It Works
 
+### Changing The Default Schema
+
+Vectur is unique in that you can change the default schema. Vector does not
+require you to use specific field names. This makes integrating Vector into
+existing pipelines much easier. The `message`, `host`, and `timestamp` field
+names can all be changed via the
+[global `log_schema` options][docs.reference.global-options#log_schema].
+
+#### Field name collisions
+
+When you send structured data to Vector your field names always take precedence.
+For example, if you send a JSON object with a `timestamp` key, Vector will
+_not_ override the value of that field. Vector will only set that field if it
+is not present.
+
 ### Time Zones
 
 If Vector receives a timestamp that does not contain timezone information
 Vector assumes the timestamp is in local time, and will convert the timestamp
-to UTC from the local time. It is important that the host system contain
-time zone data files to properly determine the local time zone. This is
-typically installed through the `tzdata` package. See [issue 551][urls.issue_551]
-for more info.
+to UTC from the local time.
+
+<Alert type="warning">
+
+It is important that the host system contain time zone data files to properly
+determine the local time zone. This is typically installed through the `tzdata`
+package. See [issue 551][urls.issue_551] for more info.
+
+</Alert>
 
 ### Timestamp Coercion
 

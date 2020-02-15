@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     conditions,
     dns::Resolver,
-    event::{Event, Metric},
+    event::{self, Event, Metric},
     runtime::TaskExecutor,
     sinks, sources, transforms,
 };
@@ -40,6 +40,8 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
+    #[serde(default)]
+    pub log_schema: event::LogSchema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -260,6 +262,7 @@ impl Config {
             global: GlobalOptions {
                 data_dir: None,
                 dns_servers: Vec::new(),
+                log_schema: event::LogSchema::default(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
@@ -331,6 +334,40 @@ impl Config {
         self.global.dns_servers.append(&mut with.global.dns_servers);
         self.global.dns_servers.sort();
         self.global.dns_servers.dedup();
+
+        // If the user has multiple config files, we must *merge* log schemas until we meet a
+        // conflict, then we are allowed to error.
+        let default_schema = event::LogSchema::default();
+        if with.global.log_schema != default_schema {
+            // If the set value is the default, override it. If it's already overridden, error.
+            if self.global.log_schema.host_key() != default_schema.host_key()
+                && self.global.log_schema.host_key() != with.global.log_schema.host_key()
+            {
+                errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_host_key(with.global.log_schema.host_key().clone());
+            }
+            if self.global.log_schema.message_key() != default_schema.message_key()
+                && self.global.log_schema.message_key() != with.global.log_schema.message_key()
+            {
+                errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_message_key(with.global.log_schema.message_key().clone());
+            }
+            if self.global.log_schema.timestamp_key() != default_schema.timestamp_key()
+                && self.global.log_schema.timestamp_key() != with.global.log_schema.timestamp_key()
+            {
+                errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_timestamp_key(with.global.log_schema.timestamp_key().clone());
+            }
+        }
 
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {
@@ -410,6 +447,59 @@ mod test {
             Some(PathBuf::from("/var/lib/vector")),
             config.global.data_dir
         )
+    }
+
+    #[test]
+    fn default_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!("host", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "message",
+            config.global.log_schema.message_key().to_string()
+        );
+        assert_eq!(
+            "timestamp",
+            config.global.log_schema.timestamp_key().to_string()
+        );
+    }
+
+    #[test]
+    fn custom_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [log_schema]
+      host_key = "this"
+      message_key = "that"
+      timestamp_key = "then"
+
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!("this", config.global.log_schema.host_key().to_string());
+        assert_eq!("that", config.global.log_schema.message_key().to_string());
+        assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
     }
 
     #[test]

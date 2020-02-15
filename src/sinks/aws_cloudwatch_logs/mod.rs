@@ -247,11 +247,12 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
-            ts.timestamp_millis()
-        } else {
-            chrono::Utc::now().timestamp_millis()
-        };
+        let timestamp =
+            if let Some(Value::Timestamp(ts)) = log.remove(&event::log_schema().timestamp_key()) {
+                ts.timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
 
         match self.encoding {
             Encoding::Json => {
@@ -260,7 +261,7 @@ impl CloudwatchLogsSvc {
             }
             Encoding::Text => {
                 let message = log
-                    .get(&event::MESSAGE)
+                    .get(&event::log_schema().message_key())
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 InputLogEvent { message, timestamp }
@@ -688,7 +689,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(Default::default()).encode_log(event.clone());
 
-        let ts = if let Value::Timestamp(ts) = event[&event::TIMESTAMP] {
+        let ts = if let Value::Timestamp(ts) = event[&event::log_schema().timestamp_key()] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -707,7 +708,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&event::TIMESTAMP).is_none());
+        assert!(map.get(&event::log_schema().timestamp_key()).is_none());
     }
 
     #[test]

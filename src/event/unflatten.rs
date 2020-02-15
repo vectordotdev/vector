@@ -398,7 +398,7 @@ mod tests {
         fn unflatten_abirtrary(json in prop::json()) {
             let s = serde_json::to_string(&json).unwrap();
             let mut event = Event::new_empty_log();
-            event.as_mut_log().insert(event::MESSAGE.clone(), s);
+            event.as_mut_log().insert(event::log_schema().message_key().clone(), s);
 
             let mut parser = JsonParser::from(JsonParserConfig::default());
             let event = parser.transform(event).unwrap().into_log();
