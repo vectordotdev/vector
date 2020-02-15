@@ -16,7 +16,7 @@ production environments. Vector is designed on the following principles:
 * **One tool** - Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service]. One tool gets your data from A to B.
 
 Vector is **deployed over 100,000 times per day**, and is trusted by Fortune 500
-comapanies and forward thinking engineering teams.
+companies and engineering teams trying to tame observability pipelines.
 
 import Jump from '@site/src/components/Jump';
 

@@ -38,7 +38,7 @@ class Templates
     @metadata = metadata
   end
 
-  def common_component_links(type, limit = 6)
+  def common_component_links(type, limit = 5)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
     links =

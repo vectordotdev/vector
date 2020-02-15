@@ -20,7 +20,7 @@ production environments. Vector is designed on the following principles:
 * **One tool** - Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service]. One tool gets your data from A to B.
 
 Vector is **deployed over 100,000 times per day**, and is trusted by Fortune 500
-comapanies and forward thinking engineering teams.
+companies and engineering teams trying to tame observability pipelines.
 
 
 <!--
@@ -49,8 +49,8 @@ comapanies and forward thinking engineering teams.
 #### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [6 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [13 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [gcp_stackdriver_logging][docs.sinks.gcp_stackdriver_logging], [http][docs.sinks.http], and [17 more...][docs.sinks]
+* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [14 more...][docs.transforms]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [gcp_stackdriver_logging][docs.sinks.gcp_stackdriver_logging], and [18 more...][docs.sinks]
 
 #### Administration
 
@@ -110,7 +110,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Merge split logs** - Easily merge multi-line logs into one event.
 * **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Rate-limited logging** - Vector's internal logging is rate-limited and noise-free.
-* **Fully static binary** - MUSL static binaries mean zero dependencies required when installing Vector.
+* **Optionally fully static binary** - Optional MUSL static binaries mean zero dependencies required when installing Vector.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs.
 * **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
@@ -179,7 +179,6 @@ Or use your own [preferred method][docs.installation].
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch/
 [docs.sinks.gcp_pubsub]: https://vector.dev/docs/reference/sinks/gcp_pubsub/
 [docs.sinks.gcp_stackdriver_logging]: https://vector.dev/docs/reference/sinks/gcp_stackdriver_logging/
-[docs.sinks.http]: https://vector.dev/docs/reference/sinks/http/
 [docs.sinks]: https://vector.dev/docs/reference/sinks/
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker/
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file/
@@ -195,7 +194,6 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
 [docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
 [docs.transforms.sampler]: https://vector.dev/docs/reference/transforms/sampler/
-[docs.transforms.tokenizer]: https://vector.dev/docs/reference/transforms/tokenizer/
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [docs.updating]: https://vector.dev/docs/administration/updating/
 [docs.validating]: https://vector.dev/docs/administration/validating/
