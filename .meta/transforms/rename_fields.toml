@@ -25,7 +25,7 @@ examples = [
   {"old field name" = "new field name"},
 ]
 description = """\
-The name of the field to move. . Use `.` for adding nested fields.\
+The name of the field to move. Use `.` for adding nested fields.\
 """
 
 

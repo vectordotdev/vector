@@ -125,6 +125,33 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+### Nested Fields
+
+The `rename_fields` transform will support dotted keys or [TOML
+tables][urls.toml_table]. We recommend the dotted key syntax since it is less
+verbose for this usecase:
+
+```
+[transforms.<transform-id>]
+  # ...
+
+  [transforms.<transform-id>.fields]
+    parent.child.grandchild = "other_parent.child"
+```
+
+Results in:
+
+```json
+{
+  "parent.child.grandchild": "other_parent.child"
+}
+```
+
+Learn more about how [`log` events][docs.data-model.log] are structured.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
