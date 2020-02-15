@@ -1111,8 +1111,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 ### Template Syntax
 
 The [`index`](#index) options
-support [Vector's template syntax][docs.configuration#field-interpolation],
-enabling dynamic values derived from the event's data. This syntax accepts
+support [Vector's template syntax][docs.reference.templating], enabling dynamic
+values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
@@ -1126,17 +1126,17 @@ enabling dynamic values derived from the event's data. This syntax accepts
   # ...
 ```
 
-You can read more about the complete syntax in the
-[template syntax section][docs.configuration#field-interpolation].
+You can learn more about the complete syntax in the
+[templating reference][docs.reference.templating].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.data_model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.reference.templating]: /docs/reference/templating/
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html

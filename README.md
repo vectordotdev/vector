@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.7.2<a/>
+    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.7.2<a/>
   </strong>
 </p>
 
@@ -11,17 +11,16 @@
 </p>
 
 
-Vector is an [open-source][urls.vector_repo] utility for building observability
-pipelines. [Collect][docs.sources], [transform][docs.transforms], and
-[route][docs.sinks] log, metrics and events with one simple tool.
+Vector is a _highly reliable_ observability data router built for demanding
+production environments. Vector is designed on the following principles:
 
-Built in [Rust][urls.rust], Vector places high-value on
-[performance][pages.index#performance], [correctness][pages.index#correctness],
-and [operator friendliness][docs.administration]. It compiles to a single static
-binary and is designed to be [deployed][docs.deployment] across your entire
-infrastructure, serving both as a light-weight [agent][docs.roles.agent] and a
-highly efficient [service][docs.roles.service]. Take back ownership and control
-of your observability data with Vector.
+* **High reliability** - Built in [Rust][urls.rust], Vector is [memory safe][urls.rust_memory_safety], [correct][pages.index#correctness], and [performant][pages.index#performance].
+* **Operator safety** - Vector is pragmatic and hard to break. It avoids the common pitfalls in similar tools.
+* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). A [sophisticated data model][docs.data-model] enables _correct_ interoperability.
+* **One tool** - Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service]. One tool gets your data from A to B.
+
+Vector is **deployed over 100,000 times per day**, and is trusted by Fortune 500
+comapanies and forward thinking engineering teams.
 
 
 <!--
@@ -45,7 +44,7 @@ of your observability data with Vector.
 * [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
-* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started]
+* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
 
 #### Reference
 
@@ -67,19 +66,6 @@ of your observability data with Vector.
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
-## Features
-
-* ***Fast*** - Built in [Rust][urls.rust], Vector is [fast and memory efficient][pages.index#performance]. No runtime. No garbage collector.
-* **Correct** - Obsessed with [getting the details right][pages.index#correctness].
-* **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
-* **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service].
-* **Logs, Metrics, or Events** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
-* **Correlate Logs & Metrics** - [Derive metrics from logs][docs.transforms.log_to_metric], add shared context with [transforms][docs.transforms].
-* **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
-* **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
-* **Hot Reload** - [Reload configuration on the fly][docs.process-management#reloading], without skipping a beat.
-
-
 ## Performance
 
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | SplunkUF | SplunkHF |
@@ -95,6 +81,9 @@ To learn more about our performance tests, please see the [Vector test harness][
 
 ## Correctness
 
+The following correctness tests are not exhaustive, but they demonstrate
+fundamental differences in quality and design:
+
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | ✅ | ✅ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
@@ -104,7 +93,28 @@ To learn more about our performance tests, please see the [Vector test harness][
 | [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
 | [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-To learn more about our performance tests, please see the [Vector test harness][urls.vector_test_harness].
+To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
+
+
+## The Little Details Make All Of The Difference
+
+* **Zero delay start** - Starts and restarts without a delay.
+* **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
+* **Configurable concurrency** - All CPU cores (service) or just one (agent) via the [`--threads` flag][docs.process-management#starting].
+* **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802].
+* **Templating** - [Use event fields to create dynamic values][docs.reference.templating], enabling dynamic partitioning and more.
+* **Sink healthchecks** - Protection against downstream disruptions make Vector a good citizen.
+* **Customizable schema** - A schema is not forced on you. [Change Vector's schema][docs.global-options#log_schema] to anything you like.
+* **Decoupled buffer design** - Buffers are coupled with sinks; a bad sink won't bring the entire pipeline to a halt.
+* **Thoughtful disk buffering** - Transfers data to operating system memory to reduce the risk of data loss.
+* **Merge split logs** - Easily merge multi-line logs into one event.
+* **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
+* **Rate-limited logging** - Vector's internal logging is rate-limited and noise-free.
+* **Fully static binary** - MUSL static binaries mean zero dependencies required when installing Vector.
+* **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
+* **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs.
+* **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
+* **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 
 
 ## Installation
@@ -135,26 +145,31 @@ Or use your own [preferred method][docs.installation].
 </p>
 
 
-[docs.administration]: https://vector.dev/docs/administration/
-[docs.archives]: https://vector.dev/docs/setup/installation/manual/from-archives/
+[docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.concepts]: https://vector.dev/docs/about/concepts/
 [docs.configuration]: https://vector.dev/docs/setup/configuration/
 [docs.containers]: https://vector.dev/docs/setup/installation/containers/
 [docs.data-model.log]: https://vector.dev/docs/about/data-model/log/
 [docs.data-model.metric]: https://vector.dev/docs/about/data-model/metric/
+[docs.data-model]: https://vector.dev/docs/about/data-model/
 [docs.data_model]: https://vector.dev/docs/about/data-model/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
 [docs.from-archives]: https://vector.dev/docs/setup/installation/manual/from-archives/
 [docs.from-source]: https://vector.dev/docs/setup/installation/manual/from-source/
+[docs.global-options#dns_servers]: https://vector.dev/docs/reference/global-options/#dns_servers
+[docs.global-options#log_schema]: https://vector.dev/docs/reference/global-options/#log_schema
 [docs.guarantees]: https://vector.dev/docs/about/guarantees/
 [docs.guides.getting_started]: https://vector.dev/docs/setup/guides/getting-started/
+[docs.guides.unit-testing]: https://vector.dev/docs/setup/guides/unit-testing/
 [docs.guides]: https://vector.dev/docs/setup/guides/
 [docs.installation]: https://vector.dev/docs/setup/installation/
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems/
 [docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
 [docs.process-management#reloading]: https://vector.dev/docs/administration/process-management/#reloading
+[docs.process-management#starting]: https://vector.dev/docs/administration/process-management/#starting
 [docs.process-management]: https://vector.dev/docs/administration/process-management/
+[docs.reference.templating]: https://vector.dev/docs/reference/templating/
 [docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent/
 [docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service/
 [docs.roles]: https://vector.dev/docs/setup/deployment/roles/
@@ -184,16 +199,19 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [docs.updating]: https://vector.dev/docs/administration/updating/
 [docs.validating]: https://vector.dev/docs/administration/validating/
+[docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
 [pages.index#correctness]: https://vector.dev/#correctness
 [pages.index#performance]: https://vector.dev/#performance
+[urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.mailing_list]: https://vector.dev/community/
+[urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
+[urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
 [urls.v0.7.2]: https://vector.dev/releases/0.7.2/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_releases]: https://vector.dev/releases/latest
-[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev

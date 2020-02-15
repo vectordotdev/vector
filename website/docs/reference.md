@@ -11,9 +11,13 @@ and more.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/docs/reference/sources">Sources</Jump>
-<Jump to="/docs/reference/transforms">Transforms</Jump>
-<Jump to="/docs/reference/sinks">Sinks</Jump>
+<Jump to="/docs/reference/env-vars/">Env Vars</Jump>
+<Jump to="/docs/reference/global-options/">Global options</Jump>
+<Jump to="/docs/reference/sinks/">Sinks</Jump>
+<Jump to="/docs/reference/sources/">Sources</Jump>
+<Jump to="/docs/reference/templating/">Templating</Jump>
+<Jump to="/docs/reference/tests/">Tests</Jump>
+<Jump to="/docs/reference/transforms/">Transforms</Jump>
 
 
 

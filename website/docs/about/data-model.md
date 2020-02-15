@@ -8,7 +8,7 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/data-model-event.svg" />
 
-The individual pieces of data flowing through Vector are known as "events".
+The individual pieces of data flowing through Vector are known as **events**.
 Events are arbitrarily wide, and deep, structured pieces of data. They have no
 requirements or limitations. Ideally, events contain enough rich information
 to derive any type of monitoring data from it.
@@ -21,7 +21,7 @@ to derive any type of monitoring data from it.
      website/docs/about/data-model.md.erb
 -->
 
-## Subtypes
+## Event Types
 
 Vector defines subtypes for events. This is necessary to establish domain
 specific requriements enabling interoperability with existing monitoring and
@@ -38,10 +38,16 @@ import Jump from '@site/src/components/Jump';
 
 We, _very much_, like the idea of an event only world, one where every service
 is perfectly instrumented with events that contain rich data and context.
-Unfortunately, that is not the case; exisiting services emit metrics, traces,
-and logs of varying quality. By designing Vector to meet services where they are
-(current state), we serve as a bridge to newer standards. This is why we place
-"events" at the top of our data model, where logs and metrics are derived.
+Unfortunately, that is not the case; exisiting services usually emit metrics,
+traces, and logs of varying quality. By designing Vector to meet services where
+they are (current state), we serve as a bridge to newer standards. This is why
+we place "events" at the top of our data model, where logs and metrics are
+derived.
+
+Finally, a sophisticated data model that accounts for the various data types
+allows for _correct_ interoperability between observability systems. For
+example, a pipeline with a `statsd` source and a `prometheus` sink would not
+be possible without the correct internal metrics data types.
 
 
 

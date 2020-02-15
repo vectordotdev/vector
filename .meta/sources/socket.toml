@@ -49,7 +49,7 @@ default = "host"
 description = """\
 The key name added to each event representing the current host. This can also \
 be globally set via the \
-[global `host_key` option][docs.reference.global-options#host-key].\
+[global `host_key` option][docs.reference.global-options#host_key].\
 """
 
 [sources.socket.options.max_length]
