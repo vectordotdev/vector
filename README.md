@@ -15,7 +15,7 @@ Vector is a _highly reliable_ observability data router built for demanding
 production environments. Vector is designed on the following principles:
 
 * **High reliability** - Built in [Rust][urls.rust], Vector is [memory safe][urls.rust_memory_safety], [correct][pages.index#correctness], and [performant][pages.index#performance].
-* **Operator safety** - Vector is pragmatic and hard to break. It avoids the common pitfalls in similar tools.
+* **Operator safety** - Vector is pragmatic and hard to break. It [avoids the common pitfalls](#the-little-details-make-all-of-the-difference) in similar tools.
 * **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). A [sophisticated data model][docs.data-model] enables _correct_ interoperability.
 * **One tool** - Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service]. One tool gets your data from A to B.
 
