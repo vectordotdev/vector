@@ -75,6 +75,9 @@ test: ## Spins up Docker resources and runs _every_ test
 	@docker-compose up -d test-runtime-deps
 	@cargo test --all --features docker -- --test-threads 4
 
+test-behavior: ## Runs behavioral tests
+	@cargo run -- test tests/behavior/**/*.toml
+
 clean: ## Remove build artifacts
 	@cargo clean
 

@@ -2,9 +2,10 @@
 type = "string"
 examples = ["my.host.com"]
 description = """\
-Represents the originating host of the log. This is commonly used in \
-[sources][docs.sources] but can be overridden via the `host_key` option for \
-relevant sources.\
+Represents the originating host of the log. This is automatically set within \
+select [sources][docs.sources] if the key does not exist. Change this field \
+name via the [global `host_key` option][docs.reference.global-options#host-key] \
+or the source-level `host_key` option for relevant sources.\
 """
 
 [log_fields.message]
@@ -12,7 +13,9 @@ type = "string"
 examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
 required = true
 description = """\
-Represents the log message. This is the key used when ingesting raw string data.\
+Represents the log message. Change this field name via the \
+[global `message_key` option][docs.reference.global-options#message-key] or the \
+source-level `message_key` option for relevant sources.
 """
 
 [log_fields.timestamp]
@@ -20,14 +23,19 @@ type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
 description = """\
-A normalized [Rust DateTime struct][urls.rust_date_time] in UTC.\
+A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this \
+field name via the \
+[global `timestamp_key` option][docs.reference.global-options#message-key] or \
+the source-level `timestamp_key` option for relevant sources.
 """
 
-[log_fields."`[key]`"]
+[log_fields."`[custom-key]`"]
 type = "*"
 examples = [
-  {my-key = "my-value"}
+  {my-key = "my-value"},
+  {parent.child = "child-value"}
 ]
 description = """\
-In addition to the defined fields, you are welcome to add your own fields.\
+In addition to the defined fields, a log event can have any number of \
+additional fields. This includes nested fields.
 """

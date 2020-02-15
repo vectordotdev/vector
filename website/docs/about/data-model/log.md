@@ -73,33 +73,21 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
+import Alert from '@site/src/components/Alert';
+
+<Alert type="info">
+
+The following fields are the _default_ schema. All of these field names can be
+changed via the
+[global `log_schema` options][docs.reference.global-options#log_schema].
+
+</Alert>
+
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"my-key":"my-value"}]}
-  name={"`[key]`"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"*"}
-  unit={null}
-  >
-
-### `[key]`
-
-In addition to the defined fields, you are welcome to add your own fields.
-
-
-</Field>
 
 
 <Field
@@ -118,7 +106,7 @@ In addition to the defined fields, you are welcome to add your own fields.
 
 ### host
 
-Represents the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_key` option for relevant sources.
+Represents the originating host of the log. This is automatically set within select [sources][docs.sources] if the key does not exist. Change this field name via the [global `host_key` option][docs.reference.global-options#host-key] or the source-level `host_key` option for relevant sources. See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
 </Field>
@@ -140,7 +128,8 @@ Represents the originating host of the log. This is commonly used in [sources][d
 
 ### message
 
-Represents the log message. This is the key used when ingesting raw string data.
+Represents the log message. Change this field name via the [global `message_key` option][docs.reference.global-options#message-key] or the source-level `message_key` option for relevant sources.
+ See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
 </Field>
@@ -162,7 +151,31 @@ Represents the log message. This is the key used when ingesting raw string data.
 
 ### timestamp
 
-A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. See [Timestamp Coercion](#timestamp-coercion) for more info.
+A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this field name via the [global `timestamp_key` option][docs.reference.global-options#message-key] or the source-level `timestamp_key` option for relevant sources.
+ See [Changing The Default Schema](#changing-the-default-schema) and [Timestamp Coercion](#timestamp-coercion) for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"my-key":"my-value"},{"parent":{"child":"child-value"}}]}
+  name={"`[custom-key]`"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  >
+
+### `[custom-key]`
+
+In addition to the defined fields, a log event can have any number of additional fields. This includes nested fields.
+
 
 
 </Field>
@@ -178,14 +191,34 @@ import Jump from '@site/src/components/Jump';
 
 ## How It Works
 
+### Changing The Default Schema
+
+Vectur is unique in that you can change the default schema. Vector does not
+require you to use specific field names. This makes integrating Vector into
+existing pipelines much easier. The [`message`](#message), [`host`](#host), and [`timestamp`](#timestamp) field
+names can all be changed via the
+[global `log_schema` options][docs.reference.global-options#log_schema].
+
+#### Field name collisions
+
+When you send structured data to Vector your field names always take precedence.
+For example, if you send a JSON object with a [`timestamp`](#timestamp) key, Vector will
+_not_ override the value of that field. Vector will only set that field if it
+is not present.
+
 ### Time Zones
 
 If Vector receives a timestamp that does not contain timezone information
 Vector assumes the timestamp is in local time, and will convert the timestamp
-to UTC from the local time. It is important that the host system contain
-time zone data files to properly determine the local time zone. This is
-typically installed through the `tzdata` package. See [issue 551][urls.issue_551]
-for more info.
+to UTC from the local time.
+
+<Alert type="warning">
+
+It is important that the host system contain time zone data files to properly
+determine the local time zone. This is typically installed through the `tzdata`
+package. See [issue 551][urls.issue_551] for more info.
+
+</Alert>
 
 ### Timestamp Coercion
 
@@ -222,6 +255,9 @@ Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
 stored as UTC.
 
 
+[docs.reference.global-options#host-key]: /docs/reference/global-options/#host-key
+[docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
+[docs.reference.global-options#message-key]: /docs/reference/global-options/#message-key
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.issue_551]: https://github.com/timberio/vector/issues/551

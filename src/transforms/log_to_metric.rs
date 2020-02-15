@@ -141,7 +141,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&event::TIMESTAMP)
+        .get(&event::log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -284,7 +284,8 @@ mod tests {
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
-        log.as_mut_log().insert(event::TIMESTAMP.clone(), ts());
+        log.as_mut_log()
+            .insert(event::log_schema().timestamp_key().clone(), ts());
         log
     }
 
@@ -504,7 +505,9 @@ mod tests {
         );
 
         let mut event = Event::from("i am a log");
-        event.as_mut_log().insert(event::TIMESTAMP.clone(), ts());
+        event
+            .as_mut_log()
+            .insert(event::log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
@@ -552,7 +555,9 @@ mod tests {
         );
 
         let mut event = Event::from("i am a log");
-        event.as_mut_log().insert(event::TIMESTAMP.clone(), ts());
+        event
+            .as_mut_log()
+            .insert(event::log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");

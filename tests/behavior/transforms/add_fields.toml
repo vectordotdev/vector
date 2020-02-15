@@ -1,0 +1,86 @@
+[transforms.add_fields_nested]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_nested.fields]
+    "a.b" = 123
+    x.y = 456
+    "x.z" = 789
+[[tests]]
+  name = "add_fields_nested"
+  [tests.input]
+    insert_at = "add_fields_nested"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_nested"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "a.b.equals" = 123
+      "x.y.equals" = 456
+      "x.z.equals" = 789
+
+[transforms.add_fields_scalar_then_nested_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_nested_1.fields]
+    a = "initial value"
+[transforms.add_fields_scalar_then_nested_2]
+  inputs = ["add_fields_scalar_then_nested_1"]
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_nested_2.fields]
+    "a.b" = "new value"
+[[tests]]
+  name = "add_fields_scalar_then_nested"
+  [tests.input]
+    insert_at = "add_fields_scalar_then_nested_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_scalar_then_nested_2"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "a.b.equals" = "new value"
+
+[transforms.add_fields_nested_then_scalar_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_nested_then_scalar_1.fields]
+    a.b = "initial value"
+[transforms.add_fields_nested_then_scalar_2]
+  inputs = ["add_fields_nested_then_scalar_1"]
+  type = "add_fields"
+  [transforms.add_fields_nested_then_scalar_2.fields]
+    a = "new value"
+[[tests]]
+  name = "add_fields_nested_then_scalar"
+  [tests.input]
+    insert_at = "add_fields_nested_then_scalar_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_nested_then_scalar_2"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "a.equals" = "new value"
+
+[transforms.add_fields_scalar_then_scalar_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_scalar_1.fields]
+    a = "initial value"
+[transforms.add_fields_scalar_then_scalar_2]
+  inputs = ["add_fields_scalar_then_scalar_1"]
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_scalar_2.fields]
+    a = "new value"
+[[tests]]
+  name = "add_fields_scalar_then_scalar"
+  [tests.input]
+    insert_at = "add_fields_scalar_then_scalar_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_scalar_then_scalar_2"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "a.equals" = "new value"

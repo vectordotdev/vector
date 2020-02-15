@@ -100,6 +100,7 @@ mod tests {
     use std::time::{Duration, Instant};
     use std::{fs::File, io::Write};
     use tokio::timer::Delay;
+    #[cfg(unix)]
     use tokio_signal::unix::{Signal, SIGHUP};
 
     #[cfg(unix)]

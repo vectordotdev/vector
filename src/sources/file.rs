@@ -178,7 +178,10 @@ pub fn file_source(
     };
 
     let file_key = config.file_key.clone();
-    let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+    let host_key = config
+        .host_key
+        .clone()
+        .unwrap_or(event::log_schema().host_key().to_string());
     let hostname = hostname::get_hostname();
 
     let include = config.include.clone();
@@ -468,7 +471,10 @@ mod tests {
 
         assert_eq!(log[&"file".into()], "some_file.rs".into());
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(log[&event::MESSAGE], "hello world".into());
+        assert_eq!(
+            log[&event::log_schema().message_key()],
+            "hello world".into()
+        );
     }
 
     #[test]
@@ -512,7 +518,7 @@ mod tests {
         let mut goodbye_i = 0;
 
         for event in received {
-            let line = event.as_log()[&event::MESSAGE].to_string_lossy();
+            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
@@ -586,7 +592,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&event::MESSAGE].to_string_lossy();
+            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
 
             if pre_trunc {
                 assert_eq!(line, format!("pretrunc {}", i));
@@ -656,7 +662,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&event::MESSAGE].to_string_lossy();
+            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
 
             if pre_rot {
                 assert_eq!(line, format!("prerot {}", i));
@@ -719,7 +725,7 @@ mod tests {
         let mut is = [0; 3];
 
         for event in received {
-            let line = event.as_log()[&event::MESSAGE].to_string_lossy();
+            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
             let mut split = line.split(" ");
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -824,9 +830,9 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().cloned().collect::<HashSet<_>>(),
                 vec![
-                    event::HOST.clone(),
-                    event::MESSAGE.clone(),
-                    event::TIMESTAMP.clone()
+                    event::log_schema().host_key().clone(),
+                    event::log_schema().message_key().clone(),
+                    event::log_schema().timestamp_key().clone()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()
@@ -868,7 +874,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect());
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
@@ -890,7 +896,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect());
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -917,7 +923,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect());
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(
                 lines,
@@ -954,7 +960,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect());
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["first line"]);
         }
@@ -980,7 +986,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect());
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -1061,7 +1067,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+            .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
@@ -1070,7 +1076,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+            .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
@@ -1120,8 +1126,14 @@ mod tests {
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
-            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
-                .collect(),
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
         );
 
         assert_eq!(
@@ -1178,8 +1190,14 @@ mod tests {
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
-            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
-                .collect(),
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
         );
 
         assert_eq!(
@@ -1239,8 +1257,14 @@ mod tests {
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
-            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
-                .collect(),
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
         );
 
         assert_eq!(
@@ -1298,8 +1322,14 @@ mod tests {
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
-            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
-                .collect(),
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
         );
 
         assert_eq!(
@@ -1336,8 +1366,14 @@ mod tests {
         shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
-            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
-                .collect(),
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
         );
 
         assert_eq!(
