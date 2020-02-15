@@ -201,7 +201,7 @@ The `add_fields` transform will support dotted keys or [TOML
 tables][urls.toml_table]. We recommend the dotted key syntax since it is less
 verbose for this usecase:
 
-```
+```toml
 [transforms.<transform-id>]
   # ...
 
@@ -228,6 +228,21 @@ See the [`remove_fields` transform][docs.transforms.remove_fields].
 All supported [configuration value types][docs.configuration#types] are accepted.
 This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
+
+
+
+### Value Templating
+
+It is possible to use template values in the field. If an input lacks one of the keys needed for a templated field it
+will drop that field from the output.
+
+```toml
+[transforms.<transform-id>]
+  # ...
+
+  [transforms.<transform-id>.fields]
+    my_field = "{{timestamp}} {{message}}"
+```
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
