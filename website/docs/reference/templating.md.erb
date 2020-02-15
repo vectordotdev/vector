@@ -4,8 +4,6 @@ description: Learn Vector's templating syntax used to creat dynamic values in Ve
 status: beta
 ---
 
-# Templating
-
 Vector supports a template syntax for select configuration options. This allows
 you to use event fields when configuring Vector:
 

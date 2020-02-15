@@ -458,7 +458,7 @@ function Home() {
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
           <p className="hero--subsubtitle">
-            Trusted by forward-thinking companies. Vector is <strong><em>deployed over 100,000 times per day</em></strong>!
+            Vector is <strong><em>deployed over 100,000 times per day</em></strong> by Fortune 500 companies and startups.
           </p>
         </div>
       </header>
