@@ -1,3 +1,9 @@
+---
+title: Templating
+description: Learn Vector's templating syntax used to creat dynamic values in Vector's configuration.
+status: beta
+---
+
 # Templating
 
 Vector supports a template syntax for select configuration options. This allows
