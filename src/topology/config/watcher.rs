@@ -1,10 +1,11 @@
 use crate::Error;
+#[cfg(unix)]
 use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use std::{path::PathBuf, time::Duration};
+#[cfg(unix)]
 use std::{
-    path::PathBuf,
     sync::mpsc::{channel, Receiver},
     thread,
-    time::Duration,
 };
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
@@ -16,6 +17,7 @@ use std::{
 /// so we can use smaller, more responsive delay.
 pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
+#[cfg(unix)]
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Triggers SIGHUP when file on config_path changes.
@@ -78,7 +80,7 @@ fn raise_sighup() {
         error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = ?error)
     });
 }
-
+#[cfg(unix)]
 fn create_watcher(
     config_paths: &Vec<PathBuf>,
 ) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
@@ -91,6 +93,7 @@ fn create_watcher(
     Ok((watcher, receiver))
 }
 
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,7 +106,6 @@ mod tests {
     #[cfg(unix)]
     use tokio_signal::unix::{Signal, SIGHUP};
 
-    #[cfg(unix)]
     #[test]
     fn file_update() {
         crate::test_util::trace_init();

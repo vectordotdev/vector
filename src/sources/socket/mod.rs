@@ -118,13 +118,17 @@ mod test {
     use crate::test_util::{block_on, collect_n, next_addr, send_lines, wait_for_tcp};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
-    use futures::{Future, Sink, Stream};
+    use futures::Stream;
+    #[cfg(unix)]
+    use futures::{Future, Sink};
+    #[cfg(unix)]
+    use std::path::PathBuf;
     use std::{
         net::{SocketAddr, UdpSocket},
-        path::PathBuf,
         thread,
         time::Duration,
     };
+    #[cfg(unix)]
     use tokio::codec::{FramedWrite, LinesCodec};
     #[cfg(unix)]
     use tokio_uds::UnixStream;
