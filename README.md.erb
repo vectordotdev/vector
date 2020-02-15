@@ -25,13 +25,13 @@
 Vector is a _highly reliable_ observability data router built for demanding
 production environments. Vector is designed on the following principles:
   
-* **High reliability** - Vector is designed first and foremost to be reliabile. Built in [Rust][urls.rust], Vector is [memory safe][urls.rust_memory_safety], [correct][pages.index#correctness], and [performant][pages.index#performance].
-* **Operator safety** - Designed for humans, Vector's is pragmatic and hard to break. It avoids the common pitfalls in similar tools.
-* **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], traces (coming soon), and exceptions (coming soon). A [sophisticated data model][docs.data-model] enables _correct_ interoperability between systems.
+* **High reliability** - Built in [Rust][urls.rust], Vector is [memory safe][urls.rust_memory_safety], [correct][pages.index#correctness], and [performant][pages.index#performance].
+* **Operator safety** - Vector is pragmatic and hard to break. It avoids the common pitfalls in similar tools.
+* **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). A [sophisticated data model][docs.data-model] enables _correct_ interoperability between systems.
 * **One tool** - Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service]. One tool gets your data from A to B.
 
-Vector is **deployed over 100,000 deployments per day**, and is trusted by
-Fortune 500 comapnies and forward thinking engineering teams.
+Vector is **deployed over 100,000 per day**, and is trusted by Fortune 500
+comapnies and forward thinking engineering teams.
 
 
 ## [Documentation](https://vector.dev/docs/)
@@ -99,12 +99,12 @@ fundamental differences in quality and design:
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
 
-## The Little Details
+## The Little Details Make All Of The Difference
 
 * **Zero delay start** - Starts and restarts without a delay.
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Configurable concurrency** - All CPU cores (service) or just one (agent) via the [`--threads` flag][docs.process-management#starting].
-* **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] make Vector fully programmable.
+* **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802].
 * **Templating** - Use event fields to create dynamic values, enabling dynamic partitioning and more.
 * **Sink healthchecks** - Protection against downstream disruptions make Vector a good citizen.
 * **Customizable schema** - A schema is not forced on you. [Change Vector's schema][docs.global-options#log_schema] to anything you like.
@@ -116,7 +116,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Fully static binary** - MUSL static binaries mean zero dependencies required when installing Vector.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs.
-* **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating and repetitive development style required by other tools.
+* **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating development style required by other tools.
 * **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 
 
