@@ -782,7 +782,7 @@ dns_servers = ["0.0.0.0:53"]
     static_tag = "my value"
     env_tag = "${ENV_VAR}"
 
-# Accepts `log` events and allows you to strips ANSI characters from the specified field.
+# Accepts `log` events and allows you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -798,7 +798,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The target field to strip ANSI characters from.
+  # The target field to strip ANSI escape sequences from.
   #
   # * required
   # * default: "message"
