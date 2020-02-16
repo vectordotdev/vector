@@ -920,7 +920,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  items = ["fist[..3]", "second[-5..]", "third[3..6]"]
+  items = ["first[..3]", "second[-5..]", "third[3..6]"]
 
   # The string that is used to join all items.
   #
