@@ -80,6 +80,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   message_timeout_ms = 300000 # default
   socket_timeout_ms = 60000 # default
 
+  # OPTIONAL - Advanced
+  [sinks.my_sink_id.librdkafka_options]
+    "client.id" = "${ENV_VAR}" # example
+    "socket.send.buffer.bytes" = "100" # example
+
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     # OPTIONAL
@@ -310,6 +315,56 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### librdkafka_options
+
+Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"socket.send.buffer.bytes":"100"}]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -595,3 +650,4 @@ event-by-event basis. It does not batch data.
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
+[urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

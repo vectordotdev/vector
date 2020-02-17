@@ -69,13 +69,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   auto_offset_reset = "largest" # default
+  fetch_wait_max_ms = 100 # default, milliseconds
   key_field = "user_id" # example, no default
   session_timeout_ms = 10000 # default, milliseconds
+  socket_timeout_ms = 60000 # default, milliseconds
 
   # OPTIONAL - Advanced
   [sources.my_source_id.librdkafka_options]
     "client.id" = "${ENV_VAR}" # example
-    "socket.send.buffer.bytes" = "100" # example
+    "fetch.error.backoff.ms" = "1000" # example
 ```
 
 </TabItem>
@@ -130,6 +132,29 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
 ### bootstrap_servers
 
 A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={100}
+  enumValues={null}
+  examples={[50,100]}
+  name={"fetch_wait_max_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"milliseconds"}
+  >
+
+### fetch_wait_max_ms
+
+Maximum time the broker may wait to fill the response.
+
 
 
 </Field>
@@ -196,7 +221,7 @@ The log field name to use for the topic key. If unspecified, the key would not b
 
 ### librdkafka_options
 
-Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
 
 
 <Fields filters={false}>
@@ -206,7 +231,7 @@ Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"socket.send.buffer.bytes":"100"}]}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"}]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}
   relevantWhen={null}
@@ -247,6 +272,29 @@ The options and their values. Accepts `string` values.
 ### session_timeout_ms
 
 The Kafka session timeout in milliseconds.
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={60000}
+  enumValues={null}
+  examples={[30000,60000]}
+  name={"socket_timeout_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"milliseconds"}
+  >
+
+### socket_timeout_ms
+
+Default timeout for network requests.
 
 
 
