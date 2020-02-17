@@ -368,6 +368,10 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through Kafka 0.9 or later and outputs `log` events.
 [sources.kafka]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -428,6 +432,19 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: milliseconds
   session_timeout_ms = 5000
   session_timeout_ms = 10000
+
+  #
+  # Librdkafka options
+  #
+
+  [sources.kafka.librdkafka_options]
+    # The options and their values. Accepts `string` values.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    "client.id" = "${ENV_VAR}"
+    "socket.send.buffer.bytes" = "100"
 
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
@@ -4520,6 +4537,22 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # Local message timeout.
+  #
+  # * optional
+  # * default: 300000
+  # * type: int
+  message_timeout_ms = 150000
+  message_timeout_ms = 450000
+
+  # Default timeout for network requests.
+  #
+  # * optional
+  # * default: 60000
+  # * type: int
+  socket_timeout_ms = 30000
+  socket_timeout_ms = 90000
 
   #
   # requests

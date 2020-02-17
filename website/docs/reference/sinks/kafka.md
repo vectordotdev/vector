@@ -77,6 +77,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   healthcheck = true # default
+  message_timeout_ms = 300000 # default
+  socket_timeout_ms = 60000 # default
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -249,7 +251,7 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
   examples={["json","text"]}
   name={"encoding"}
   path={null}
@@ -307,6 +309,50 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 ### key_field
 
 The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={300000}
+  enumValues={null}
+  examples={[150000,450000]}
+  name={"message_timeout_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### message_timeout_ms
+
+Local message timeout.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={60000}
+  enumValues={null}
+  examples={[30000,90000]}
+  name={"socket_timeout_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### socket_timeout_ms
+
+Default timeout for network requests.
 
 
 </Field>

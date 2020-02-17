@@ -61,16 +61,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
 
-  # OPTIONAL
+  # OPTIONAL - General
   auto_offset_reset = "largest" # default
   key_field = "user_id" # example, no default
   session_timeout_ms = 10000 # default, milliseconds
+
+  # OPTIONAL - Librdkafka options
+  [sources.my_source_id.librdkafka_options]
+    "client.id" = "${ENV_VAR}" # example
+    "socket.send.buffer.bytes" = "100" # example
 ```
 
 </TabItem>
@@ -171,6 +176,56 @@ The consumer group name to be used to consume events from Kafka.
 
 The log field name to use for the topic key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### librdkafka_options
+
+Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"socket.send.buffer.bytes":"100"}]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
