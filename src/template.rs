@@ -80,6 +80,21 @@ impl Template {
             .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
     }
 
+    pub fn get_fields(&self) -> Option<Vec<Atom>> {
+        if self.has_fields {
+            RE.captures_iter(&self.src)
+                .map(|c| {
+                    c.get(1)
+                        .map(|s| Atom::from(s.as_str().trim()))
+                        .expect("src should match regex")
+                })
+                .collect::<Vec<_>>()
+                .into()
+        } else {
+            None
+        }
+    }
+
     pub fn is_dynamic(&self) -> bool {
         self.has_fields || self.has_ts
     }
@@ -167,6 +182,19 @@ impl Serialize for Template {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    #[test]
+    fn get_fields() {
+        let f1 = Template::from("{{ foo }}").get_fields().unwrap();
+        let f2 = Template::from("{{ foo }}-{{ bar }}").get_fields().unwrap();
+        let f3 = Template::from("nofield").get_fields();
+        let f4 = Template::from("%F").get_fields();
+
+        assert_eq!(f1, vec![Atom::from("foo")]);
+        assert_eq!(f2, vec![Atom::from("foo"), Atom::from("bar")]);
+        assert_eq!(f3, None);
+        assert_eq!(f4, None);
+    }
 
     #[test]
     fn is_dynamic() {

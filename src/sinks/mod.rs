@@ -18,6 +18,7 @@ pub mod humio_logs;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod logdna;
+pub mod loki;
 pub mod new_relic_logs;
 pub mod prometheus;
 pub mod sematext;

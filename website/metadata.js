@@ -17418,6 +17418,30 @@ module.exports = {
 
       ]
     },
+    "loki": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Loki][urls.loki].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "loki_sink",
+      "name": "loki",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "new_relic_logs": {
       "beta": true,
       "delivery_guarantee": "at_least_once",

@@ -1,0 +1,138 @@
+[sinks.loki]
+title = "loki"
+beta = true
+common = true
+delivery_guarantee = "best_effort"
+egress_method = "batching"
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+write_to_description = "[Loki][urls.loki]"
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "loki") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.loki.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.loki.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.loki.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
+
+<%= render("_partials/_tls_options.toml", namespace: "sinks.loki.options", can_enable: false, can_verify: true) %>
+
+[sinks.loki.options.endpoint]
+type = "string"
+required = true
+examples = ["http://localhost:3100", "http://127.0.0.1:8080"]
+description = "The endpoint used to ship logs to."
+
+[sinks.loki.options.encoding]
+type = "string"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.loki.options.encoding.enum]
+json = "Each event is encoded into JSON"
+text = "Each event is encoded into text via the `message` key."
+
+[sinks.loki.options.tenant_id]
+type = "string"
+required = false
+examples = ["some_tenant_id"]
+description = """\
+The tenant id that will be sent with every request, by default this is not \
+required since a proxy should set this header. When running loki locally a \
+tenant id is not required either.
+
+You can read more about tenant id's [here][urls.loki_multi_tenancy]\
+"""
+
+[sinks.loki.options.labels]
+type = "table"
+required = true
+examples = [{label = "value"}]
+description = """\
+A set of labels that will be attached to each batch of events. These values\
+are also templateable to allow events to provide dynamic label values.\
+
+Note: If the set of label values has high cardinality this can cause drastic\
+performance issues with Loki. To ensure this does not happen one should try\
+to reduce the amount of unique label values.\
+"""
+
+[sinks.loki.options.labels.children."`[label-name`"]
+type = "string"
+required = true
+templateable = true
+examples = [ {key = "value"}, {key = "{{ event_field }}"}]
+description = "A key-value pair for labels."
+
+[sinks.loki.options.remove_label_fields]
+type = "bool"
+required = false
+default = false
+description = """\
+If this is set to `true` then when labels are collected from events those \
+fields will also get removed from the event.\
+"""
+
+[sinks.loki.options.remove_timestamp]
+type = "bool"
+required = false
+default = true
+description = """\
+If this is set to `true` then the timestamp will be removed from the event. \
+This is useful because loki uses the timestamp to index the event.\
+"""
+
+[sinks.loki.options.auth]
+type = "table"
+common = false
+required = false
+description = "Options for the authentication strategy."
+
+[sinks.loki.options.auth.children.strategy]
+type = "string"
+prioritize = true
+required = true
+description = "The authentication strategy to use."
+
+[sinks.loki.options.auth.children.strategy.enum]
+basic = "The [basic authentication strategy][urls.basic_auth]."
+
+[sinks.loki.options.auth.children.password]
+type = "string"
+examples = ["${PASSWORD_ENV_VAR}", "password"]
+required = true
+relevant_when = {strategy = "basic"}
+description = """\
+The basic authentication password.\
+
+If using GrafanaLab's hosted Loki then this must be set\
+to your `instanceId`.\
+"""
+
+[sinks.loki.options.auth.children.user]
+type = "string"
+examples = ["${USERNAME_ENV_VAR}", "username"]
+required = true
+relevant_when = {strategy = "basic"}
+description = """\
+The basic authentication user name.\
+
+If using GrafanaLab's hosted Loki then this must be set\
+to your Grafana.com api key.\
+"""

@@ -322,6 +322,9 @@
 - name: "sink: logdna"
   description: Anything `logdna` sink related
   color: 4ddbfb
+- name: "sink: loki"
+  description: Anything `loki` sink related
+  color: 4ddbfb
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related
   color: 4ddbfb
