@@ -200,6 +200,39 @@ mod tests {
     }
 
     #[test]
+    fn map_values_key_order() {
+        let mut event_1 = new_log_event();
+        event_1.insert("nested.a", "a");
+        event_1.insert("nested.b", "b");
+        let mut event_2 = new_log_event();
+        event_2.insert("nested.b", "b");
+        event_2.insert("nested.a", "a");
+
+        let discriminant_fields = vec![Atom::from("nested")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_eq!(discriminant_1, discriminant_2);
+        assert_eq!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn map_values_matter() {
+        let mut event_1 = new_log_event();
+        event_1.insert("nested.a", "a");
+        let event_2 = new_log_event(); // empty event
+
+        let discriminant_fields = vec![Atom::from("nested")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_ne!(discriminant_1, discriminant_2);
+        assert_ne!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
     fn with_hash_map() {
         let mut map: HashMap<Discriminant, usize> = HashMap::new();
 
