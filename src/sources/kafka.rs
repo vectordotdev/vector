@@ -23,7 +23,7 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
@@ -202,7 +202,9 @@ mod test {
             commit_interval_ms: 5000,
             host_key: None,
             key_field: Some("message_key".to_string()),
-            ..Default::default()
+            socket_timeout_ms: 60000,
+            fetch_wait_max_ms: 100,
+            librdkafka_options: None,
         }
     }
 
@@ -271,7 +273,9 @@ mod integration_test {
             commit_interval_ms: 5000,
             host_key: None,
             key_field: Some("message_key".to_string()),
-            ..Default::default()
+            socket_timeout_ms: 60000,
+            fetch_wait_max_ms: 100,
+            librdkafka_options: None,
         };
 
         let mut rt = runtime();
