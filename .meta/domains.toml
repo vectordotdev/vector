@@ -47,6 +47,9 @@ name = "sinks"
 name = "sources"
 
 [[domains]]
+name = "templating"
+
+[[domains]]
 name = "testing"
 
 [[domains]]

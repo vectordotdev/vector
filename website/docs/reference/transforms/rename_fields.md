@@ -81,7 +81,7 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 #### `[field-name]`
 
-The name of the field to move. . Use `.` for adding nested fields.
+The name of the field to move. Use `.` for adding nested fields.
 
 
 </Field>
@@ -125,6 +125,8 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+
+
 ### Key Conflicts
 
 Keys specified in this transform will replace existing keys.
@@ -153,5 +155,7 @@ Results in:
 
 Learn more about how [`log` events][docs.data-model.log] are structured.
 
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.toml_table]: https://github.com/toml-lang/toml#table

@@ -205,8 +205,8 @@ event-by-event basis. It does not batch data.
 ### Template Syntax
 
 The [`path`](#path) options
-support [Vector's template syntax][docs.configuration#field-interpolation],
-enabling dynamic values derived from the event's data. This syntax accepts
+support [Vector's template syntax][docs.reference.templating], enabling dynamic
+values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
@@ -220,11 +220,11 @@ enabling dynamic values derived from the event's data. This syntax accepts
   # ...
 ```
 
-You can read more about the complete syntax in the
-[template syntax section][docs.configuration#field-interpolation].
+You can learn more about the complete syntax in the
+[templating reference][docs.reference.templating].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.templating]: /docs/reference/templating/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

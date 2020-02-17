@@ -32,6 +32,7 @@ scopes:
   - setup
   - sinks
   - sources
+  - templating
   - testing
   - topology
   - transforms

@@ -17992,7 +17992,7 @@ module.exports = {
     "ansi_stripper": {
       "beta": false,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to strips ANSI characters from the specified field.",
+      "description": "Accepts log events and allows you to strips ANSI escape sequences from the specified field.",
       "event_types": [
         "log"
       ],

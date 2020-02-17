@@ -856,8 +856,8 @@ If you'd like to disable health checks for this sink you can set the
 
 Partitioning is controlled via the [`group_name`](#group_name) and [`stream_name`](#stream_name)
 options and allows you to dynamically partition data on the fly.
-You'll notice that Vector's [template sytax](#field-interpolation) is supported
-for these options, enabling you to use field values as the partition's key.
+You'll notice that Vector's [template sytax][docs.reference.templating] is
+supported for these options, enabling you to use field values as partition keys.
 
 ### Rate Limits
 
@@ -883,8 +883,8 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 ### Template Syntax
 
 The [`group_name`](#group_name) and [`stream_name`](#stream_name) options
-support [Vector's template syntax][docs.configuration#field-interpolation],
-enabling dynamic values derived from the event's data. This syntax accepts
+support [Vector's template syntax][docs.reference.templating], enabling dynamic
+values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
@@ -899,16 +899,16 @@ enabling dynamic values derived from the event's data. This syntax accepts
   # ...
 ```
 
-You can read more about the complete syntax in the
-[template syntax section][docs.configuration#field-interpolation].
+You can learn more about the complete syntax in the
+[templating reference][docs.reference.templating].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.reference.templating]: /docs/reference/templating/
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html

@@ -14,7 +14,7 @@ module.exports = {
       hideOnScroll: true,
       logo: {
         alt: 'Vector',
-        src: 'img/logo-light.svg',
+        src: 'img/logo-light.svg'
       },
       links: [
         {to: 'components/', label: 'Components', position: 'left'},

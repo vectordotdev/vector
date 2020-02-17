@@ -46,6 +46,9 @@
 - name: "domain: sources"
   description: Anything sources related
   color: 212f3e
+- name: "domain: templating"
+  description: Anything templating related
+  color: 212f3e
 - name: "domain: testing"
   description: Anything testing related
   color: 212f3e

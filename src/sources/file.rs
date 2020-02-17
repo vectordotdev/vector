@@ -637,7 +637,7 @@ mod tests {
 
         sleep(); // The writes must be observed before rotating
 
-        fs::rename(&path, archive_path).unwrap();
+        fs::rename(&path, archive_path).expect("could not rename");
         let mut file = File::create(&path).unwrap();
 
         sleep(); // The rotation must be observed before writing again
@@ -965,7 +965,7 @@ mod tests {
             assert_eq!(lines, vec!["first line"]);
         }
         // Perform 'file rotation' to archive old lines.
-        fs::rename(&path, &path_for_old_file).unwrap();
+        fs::rename(&path, &path_for_old_file).expect("could not rename");
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {

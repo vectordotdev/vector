@@ -4,7 +4,7 @@ examples = ["my.host.com"]
 description = """\
 Represents the originating host of the log. This is automatically set within \
 select [sources][docs.sources] if the key does not exist. Change this field \
-name via the [global `host_key` option][docs.reference.global-options#host-key] \
+name via the [global `host_key` option][docs.reference.global-options#host_key] \
 or the source-level `host_key` option for relevant sources.\
 """
 

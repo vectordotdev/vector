@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "concat" # must be: "concat"
   inputs = ["my-source-id"] # example
-  items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
+  items = ["first[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
 
   # OPTIONAL
@@ -49,7 +49,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["fist[..3]","second[-5..]","third[3..6]"]]}
+  examples={[["first[..3]","second[-5..]","third[3..6]"]]}
   name={"items"}
   path={null}
   relevantWhen={null}
