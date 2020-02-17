@@ -138,9 +138,8 @@ impl Transform for JsonParser {
 #[cfg(test)]
 mod test {
     use super::{JsonParser, JsonParserConfig};
-    use crate::event::{self, Event};
+    use crate::event::{self, Atom, Event, Value};
     use crate::transforms::Transform;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn json_parser_drop_field() {
@@ -387,12 +386,23 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("bool false")], false.into());
         assert_eq!(event.as_log()[&Atom::from("array[0]")], "z".into());
         assert_eq!(event.as_log()[&Atom::from("array[1]")], 7.into());
-        assert_eq!(event.as_log()[&Atom::from("object.nested")], "data".into());
-        assert_eq!(event.as_log()[&Atom::from("object.more")], "values".into());
-        assert_eq!(
-            event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
-            1234.into()
-        );
+        match &event.as_log()[&Atom::from("object")] {
+            Value::Map(map) => {
+                assert_eq!(map[&Atom::from("nested")], "data".into());
+                assert_eq!(map[&Atom::from("more")], "values".into());
+            }
+            _ => unreachable!(),
+        }
+        match &event.as_log()[&Atom::from("deep[0][0][0]")] {
+            Value::Map(map) => match &map[&"a".into()] {
+                Value::Map(map) => match &map[&"b".into()] {
+                    Value::Map(map) => assert_eq!(map[&"c[0][0][0]".into()], 1234.into()),
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
     }
 
     #[test]
@@ -427,8 +437,13 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event[&Atom::from("that.greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("that.name")], "bob".into());
+        match &event[&Atom::from("that")] {
+            Value::Map(map) => {
+                assert_eq!(map[&Atom::from("greeting")], "hello".into());
+                assert_eq!(map[&Atom::from("name")], "bob".into());
+            }
+            _ => unreachable!(),
+        }
     }
 
     #[test]
@@ -463,8 +478,12 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event.get(&"message".into()), None);
-        assert_eq!(event[&Atom::from("message.greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("message.name")], "bob".into());
+        match &event[&"message".into()] {
+            Value::Map(map) => {
+                assert_eq!(map[&"greeting".into()], "hello".into());
+                assert_eq!(map[&"name".into()], "bob".into());
+            }
+            _ => unreachable!(),
+        }
     }
 }

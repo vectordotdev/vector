@@ -101,7 +101,10 @@ fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, Va
 #[cfg(test)]
 mod tests {
     use super::AddFields;
-    use crate::{event::Event, transforms::Transform};
+    use crate::{
+        event::{Event, Value},
+        transforms::Transform,
+    };
     use indexmap::IndexMap;
     use std::collections::HashMap;
     use string_cache::DefaultAtom as Atom;
@@ -123,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn add_fields_preseves_types() {
+    fn add_fields_preserves_types() {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
@@ -149,6 +152,9 @@ mod tests {
         assert_eq!(event[&"array[0]".into()], 1.into());
         assert_eq!(event[&"array[1]".into()], 2.into());
         assert_eq!(event[&"array[2]".into()], 3.into());
-        assert_eq!(event[&"table.key".into()], "value".into());
+        match &event[&"table".into()] {
+            Value::Map(map) => assert_eq!(map[&"key".into()], "value".into()),
+            _ => unreachable!(),
+        }
     }
 }

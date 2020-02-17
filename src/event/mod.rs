@@ -105,16 +105,16 @@ impl LogEvent {
         self.fields.contains_key(key)
     }
 
-    pub fn insert_dotted<K, V>(&mut self, key: K, value: V)
+    pub fn insert<K, V>(&mut self, key: K, value: V)
     where
         K: Into<Atom>,
         V: Into<Value>,
     {
         let (key, value) = unflatten_dotted(key.into(), value.into());
-        self.insert(key, value);
+        self.insert_flat(key, value);
     }
 
-    pub fn insert<K, V>(&mut self, key: K, value: V)
+    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where
         K: Into<Atom>,
         V: Into<Value>,
@@ -694,11 +694,17 @@ mod test {
         let mut event = Event::from("raw log line");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("bar", "baz");
+        event.as_mut_log().insert("a.b.c", "hello");
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
+            "a": {
+                "b": {
+                    "c": "hello"
+                }
+            },
             "timestamp": event.as_log().get(&super::log_schema().timestamp_key()),
         });
 

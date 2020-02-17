@@ -268,10 +268,9 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 #[cfg(test)]
 mod test {
     use super::{event_from_str, SyslogConfig};
-    use crate::event::{self, Atom, Event, Value};
+    use crate::event::{self, Event};
     use chrono::TimeZone;
     use pretty_assertions::assert_eq;
-    use std::collections::HashMap;
 
     #[test]
     fn config_tcp() {
@@ -331,18 +330,11 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert("host", "74794bfb6795");
-
-            let mut meta: HashMap<Atom, Value> = HashMap::new();
-            meta.insert(Atom::from("sequenceId"), Value::from("1"));
-            meta.insert(Atom::from("sysUpTime"), Value::from("37"));
-            meta.insert(Atom::from("language"), Value::from("EN"));
-            expected.insert(Atom::from("meta"), Value::from(meta));
-
-            let mut origin: HashMap<Atom, Value> = HashMap::new();
-            origin.insert(Atom::from("software"), Value::from("test"));
-            origin.insert(Atom::from("ip"), Value::from("192.168.0.1"));
-            expected.insert(Atom::from("origin"), Value::from(origin));
-
+            expected.insert("meta.sequenceId", "1");
+            expected.insert("meta.sysUpTime", "37");
+            expected.insert("meta.language", "EN");
+            expected.insert("origin.software", "test");
+            expected.insert("origin.ip", "192.168.0.1");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -492,10 +484,10 @@ mod test {
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
             expected.insert("appname", "liblogging-stdlog");
-            expected.insert_dotted("origin.software", "rsyslogd");
-            expected.insert_dotted("origin.swVersion", "8.24.0");
-            expected.insert_dotted("origin.x-pid", "8979");
-            expected.insert_dotted("origin.x-info", "http://www.rsyslog.com");
+            expected.insert("origin.software", "rsyslogd");
+            expected.insert("origin.swVersion", "8.24.0");
+            expected.insert("origin.x-pid", "8979");
+            expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
         assert_eq!(
@@ -525,12 +517,10 @@ mod test {
             expected.insert("severity", "info");
             expected.insert("facility", "local7");
             expected.insert("appname", "liblogging-stdlog");
-            let mut origin = HashMap::new();
-            origin.insert(Atom::from("software"), Value::from("rsyslogd"));
-            origin.insert(Atom::from("swVersion"), Value::from("8.24.0"));
-            origin.insert(Atom::from("x-pid"), Value::from("9043"));
-            origin.insert(Atom::from("x-info"), Value::from("http://www.rsyslog.com"));
-            expected.insert(Atom::from("origin"), Value::Map(origin));
+            expected.insert("origin.software", "rsyslogd");
+            expected.insert("origin.swVersion", "8.24.0");
+            expected.insert("origin.x-pid", "9043");
+            expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
         assert_eq!(
