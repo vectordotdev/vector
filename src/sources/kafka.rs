@@ -23,7 +23,7 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
@@ -202,6 +202,7 @@ mod test {
             commit_interval_ms: 5000,
             host_key: None,
             key_field: Some("message_key".to_string()),
+            ..Default::default()
         }
     }
 
