@@ -13,7 +13,7 @@ use structopt::{clap::AppSettings, StructOpt};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{config_paths, generate, list, metrics, runtime, topology, trace, unit_test};
+use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -247,6 +247,9 @@ fn main() {
     let config = config.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
+    event::LOG_SCHEMA
+        .set(config.global.log_schema.clone())
+        .expect("Couldn't set schema");
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
@@ -290,7 +293,7 @@ fn main() {
     }
 
     let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
-    let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
+    let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -301,6 +304,7 @@ fn main() {
 
     #[cfg(unix)]
     {
+        let mut topology = topology;
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
         let sigquit = Signal::new(SIGQUIT).flatten_stream();

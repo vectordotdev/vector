@@ -114,7 +114,9 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
-        Event::Log(log) => log.get(&event::TIMESTAMP).and_then(Value::as_timestamp),
+        Event::Log(log) => log
+            .get(&event::log_schema().timestamp_key())
+            .and_then(Value::as_timestamp),
         _ => None,
     };
     if let Some(ts) = timestamp {
@@ -253,7 +255,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("abcd-%F");
 
@@ -267,7 +269,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("abcd-%F_%T");
 
@@ -285,7 +287,7 @@ mod tests {
         event.as_mut_log().insert("foo", "butts");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("{{ foo }}-%F_%T");
 
@@ -303,7 +305,7 @@ mod tests {
         event.as_mut_log().insert("format", "%F");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("nested {{ format }} %T");
 
@@ -321,7 +323,7 @@ mod tests {
         event.as_mut_log().insert("%F", "foo");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("nested {{ %F }} %T");
 

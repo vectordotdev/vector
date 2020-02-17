@@ -106,10 +106,10 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(event::TIMESTAMP.clone(), ts);
+            log.insert(event::log_schema().timestamp_key().clone(), ts);
         }
 
-        log.insert(event::HOST.clone(), hostname);
+        log.insert(event::log_schema().host_key().clone(), hostname);
 
         log.insert("app_name", app_name);
         log.insert("proc_id", proc_id);
@@ -179,17 +179,17 @@ mod tests {
         let log = event.as_log();
 
         assert_eq!(
-            log[&event::MESSAGE],
+            log[&event::log_schema().message_key()],
             r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
         );
         assert_eq!(
-            log[&event::TIMESTAMP],
+            log[&event::log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&event::HOST], "host".into());
+        assert_eq!(log[&event::log_schema().host_key()], "host".into());
     }
 
     #[test]
@@ -198,15 +198,18 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(log[&event::MESSAGE], "foo bar baz".into());
         assert_eq!(
-            log[&event::TIMESTAMP],
+            log[&event::log_schema().message_key()],
+            "foo bar baz".into()
+        );
+        assert_eq!(
+            log[&event::log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&event::HOST], "host".into());
+        assert_eq!(log[&event::log_schema().host_key()], "host".into());
     }
 
     #[test]
@@ -215,8 +218,11 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(log[&event::MESSAGE], "what am i doing here".into());
-        assert!(log.get(&event::TIMESTAMP).is_some());
+        assert_eq!(
+            log[&event::log_schema().message_key()],
+            "what am i doing here".into()
+        );
+        assert!(log.get(&event::log_schema().timestamp_key()).is_some());
     }
 
     #[test]
@@ -225,14 +231,17 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(log[&event::MESSAGE], "i'm not that long".into());
         assert_eq!(
-            log[&event::TIMESTAMP],
+            log[&event::log_schema().message_key()],
+            "i'm not that long".into()
+        );
+        assert_eq!(
+            log[&event::log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&event::HOST], "host".into());
+        assert_eq!(log[&event::log_schema().host_key()], "host".into());
     }
 }

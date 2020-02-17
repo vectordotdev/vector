@@ -28,7 +28,7 @@ The string that is used to join all items.\
 
 [transforms.concat.options.items]
 type = "[string]"
-examples = [["fist[..3]", "second[-5..]", "third[3..6]"]]
+examples = [["first[..3]", "second[-5..]", "third[3..6]"]]
 required = true
 description = """\
 A list of substring definitons in the format of source_field[start..end]. \

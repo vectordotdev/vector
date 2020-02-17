@@ -3,7 +3,9 @@ use crate::event::{self, Event};
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
-use std::{ffi, fmt, io, path};
+#[cfg(unix)]
+use std::ffi;
+use std::{fmt, io, path};
 use tokio::{
     codec::Encoder,
     fs::{self, file},
@@ -64,7 +66,7 @@ impl File {
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
             Encoding::Text => log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes())
                 .unwrap_or_default(),
         }

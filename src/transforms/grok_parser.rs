@@ -36,7 +36,10 @@ inventory::submit! {
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+        let field = self
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -184,9 +187,14 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("help i'm stuck in an http server"),
-            event[&event::MESSAGE]
+            event[&event::log_schema().message_key()]
         );
-        assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
+        assert!(
+            event[&event::log_schema().timestamp_key()]
+                .to_string_lossy()
+                .len()
+                > 0
+        );
     }
 
     #[test]
@@ -229,9 +237,14 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&event::MESSAGE]
+            event[&event::log_schema().message_key()]
         );
-        assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
+        assert!(
+            event[&event::log_schema().timestamp_key()]
+                .to_string_lossy()
+                .len()
+                > 0
+        );
     }
 
     #[test]

@@ -77,7 +77,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
             }
             Encoding::Text => {
                 let s = log
-                    .get(&event::MESSAGE)
+                    .get(&event::log_schema().message_key())
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)

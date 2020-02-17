@@ -54,7 +54,7 @@ impl TcpSource for RawTcpSource {
         let host_key = if let Some(key) = &self.config.host_key {
             key
         } else {
-            &event::HOST
+            &event::log_schema().host_key()
         };
 
         if let Some(host) = host {

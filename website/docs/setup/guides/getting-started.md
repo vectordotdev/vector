@@ -7,6 +7,11 @@ description: Getting started with Vector
 Vector is a simple beast to tame, in this guide we'll send an
 [event][docs.data-model] through it and touch on some basic concepts.
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## 1. Install Vector
 
 If you haven't already, install Vector. Here's a script for the lazy:
@@ -24,18 +29,16 @@ components to run and how they should interact. Let's create one that simply
 pipes a [`stdin` source][docs.sources.stdin] to a
 [`stdout` sink][docs.sinks.console]:
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader fileName="vector.toml" />
 
 ```toml
 [sources.foo]
-    type = "stdin"
+  type = "stdin"
 
 [sinks.bar]
-    inputs = ["foo"]
-    type = "console"
-    encoding = "text"
+  inputs = ["foo"]
+  type = "console"
+  encoding = "text"
 ```
 
 Every component within a Vector config has an identifier chosen by you. This
@@ -63,8 +66,6 @@ If you expected something interesting to happen then that's on you. The text
 came out unchanged because we didn't ask Vector to change it, let's remedy that.
 Exit Vector by pressing `ctrl+c`.
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="info">
 
 Hey, kid, if you want to see something cool try setting `encoding = "json"` in
@@ -91,24 +92,62 @@ Let's place our new transform in between our existing source and sink. We are
 also going to change the [encoding][docs.sinks.console#encoding] of our sink in
 order to print the full event structure:
 
+<Tabs
+  block={true}
+  defaultValue="diff"
+  values={[
+    { label: 'Diff', value: 'diff', },
+    { label: 'New Result', value: 'new_result', },
+  ]
+}>
+
+<TabItem value="diff">
+
+<CodeHeader fileName="vector.toml" />
+
+```diff
+[sources.foo]
+  type = "stdin"
++
++ # Structure the data
++ [transforms.apache_parser]
++   inputs = ["foo"]
++   type = "regex_parser"
++   field = "message"
++   regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
++
+[sinks.bar]
+  type = "console"
+-    inputs = ["foo"]
++    inputs = ["apache_parser"]
+-    encoding = "text"
++    encoding = "json"
+```
+
+</TabItem>
+<TabItem value="new_result">
+
 <CodeHeader fileName="vector.toml" />
 
 ```toml
 [sources.foo]
-    type = "stdin"
+  type = "stdin"
 
-# Structure the data
-[transforms.apache_parser]
-    inputs = ["foo"]
-    type = "regex_parser"
-    field = "message"
-    regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+ # Structure the data
+ [transforms.apache_parser]
+   inputs = ["foo"]
+   type = "regex_parser"
+   field = "message"
+   regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 
 [sinks.bar]
+  type = "console"
     inputs = ["apache_parser"]
-    type = "console"
     encoding = "json"
 ```
+</TabItem>
+</Tabs>
+
 
 And pipe the same event again through it:
 
@@ -118,14 +157,20 @@ echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 
 
 Oh snap! This time we get something like:
 
-```text
-... some logs ...
+```json
 {"status":"406", "bytes_out":"10272", "path":"/mesh", "method":"PUT", "host":"172.128.80.109", "user":"Bins5273", "bytes_in":"656", "timestamp":"2019-05-03T13:11:48-04:00"}
 ```
 
 Firstly, our `message` field has been parsed out into structured fields.
 Secondly, we now see every field of the event printed to `stdout` by our sink in
 JSON format because we set `encoding = "json"`.
+
+<Alert type="info">
+
+Pro-tip: These field names can be controlled via the
+[global `log_schema` options][docs.reference.global-options#log_schema].
+
+</Alert>
 
 Exit Vector again by pressing `ctrl+c`. Next, try experimenting by adding more
 [transforms][docs.transforms] to your pipeline before moving onto the next
@@ -138,6 +183,7 @@ misfits trying to recruit you as their hacker.
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model]: /docs/about/data-model/
 [docs.installation]: /docs/setup/installation/
+[docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.console#encoding]: /docs/reference/sinks/console/#encoding
 [docs.sinks.console]: /docs/reference/sinks/console/
 [docs.sources.stdin]: /docs/reference/sources/stdin/

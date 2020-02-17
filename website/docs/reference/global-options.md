@@ -22,8 +22,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-data_dir = "/var/lib/vector" # example, no default
+# OPTIONAL - General
+  data_dir = "/var/lib/vector" # example, no default
   dns_servers = ["0.0.0.0:53"] # example, no default
+
+  # OPTIONAL - Log schema
+  [log_schema]
+    host_key = "host" # default
+    message_key = "message" # default
+    timestamp_key = "timestamp" # default
 ```
 
 ## Options
@@ -79,6 +86,99 @@ The list of DNS servers Vector will use to resolve DNS requests. When set Vector
 </Field>
 
 
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"log_schema"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### log_schema
+
+The default log schema that all Vector components operate on. See the [log data model page][docs.data-model.log] for more info.
+
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host","@host","instance","machine"]}
+  name={"host_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### host_key
+
+The key used to hold the log host. See the [log data model page][docs.data-model.log#host] for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"message"}
+  enumValues={null}
+  examples={["message","@message","msg"]}
+  name={"message_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### message_key
+
+The key used to hold the log message. See the [log data model page][docs.data-model.log#message] for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"timestamp"}
+  enumValues={null}
+  examples={["timestamp","@timestamp","datetime"]}
+  name={"timestamp_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_key
+
+The key used to represent when the log was generated. See the [log data model page][docs.data-model.log#timestamp] for more info.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
 </Fields>
 
 ## How It Works
@@ -91,6 +191,10 @@ default, are memory-based, but if you switch them to disk-based you'll need to
 specify a [`data_dir`](#data_dir).
 
 
+[docs.data-model.log#host]: /docs/about/data-model/log/#host
+[docs.data-model.log#message]: /docs/about/data-model/log/#message
+[docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
+[docs.data-model.log]: /docs/about/data-model/log/
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms]: /docs/reference/transforms/

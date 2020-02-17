@@ -76,11 +76,11 @@ impl SinkConfig for SematextConfig {
 fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
     let log = event.as_mut_log();
 
-    if let Some(ts) = log.remove(&crate::event::TIMESTAMP) {
+    if let Some(ts) = log.remove(&crate::event::log_schema().timestamp_key()) {
         log.insert("@timestamp", ts);
     }
 
-    if let Some(host) = log.remove(&crate::event::HOST) {
+    if let Some(host) = log.remove(&crate::event::log_schema().host_key()) {
         log.insert("os.host", host);
     }
 
