@@ -13,9 +13,7 @@ use structopt::{clap::AppSettings, StructOpt};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing_futures::Instrument;
-use vector::{
-    generate, list, metrics, runtime, topology, trace, types::DEFAULT_CONFIG_PATHS, unit_test,
-};
+use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -30,15 +28,11 @@ struct Opts {
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 struct RootOpts {
-    /// Read configuration from the specified file
-    #[structopt(
-        name = "config",
-        value_name = "FILE",
-        short,
-        long,
-        default_value = "/etc/vector/vector.toml"
-    )]
-    config_path: PathBuf,
+    /// Read configuration from one or more files. Wildcard paths are supported.
+    /// If zero files are specified the default config path
+    /// `/etc/vector/vector.toml` will be targeted.
+    #[structopt(name = "config", short, long)]
+    config_paths: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long)]
@@ -75,6 +69,10 @@ struct RootOpts {
     /// Options: `auto`, `always` or `never`
     #[structopt(long)]
     color: Option<Color>,
+
+    /// Watch for changes in configuration file, and reload accordingly.
+    #[structopt(short, long)]
+    watch_config: bool,
 }
 
 #[derive(StructOpt, Debug)]
@@ -90,6 +88,7 @@ enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
+    /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
 }
 
@@ -220,27 +219,37 @@ fn main() {
         }
     }
 
-    info!(
-        message = "Loading config.",
-        path = ?opts.config_path
-    );
-
-    let file = if let Some(file) = open_config(&opts.config_path) {
-        file
-    } else {
+    let mut config_paths = config_paths::expand(opts.config_paths.clone()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
-    };
+    });
+    config_paths.sort();
+    config_paths.dedup();
 
-    trace!(
-        message = "Parsing config.",
-        path = ?opts.config_path
+    if opts.watch_config {
+        // Start listening for config changes immediately.
+        vector::topology::config::watcher::config_watcher(
+            config_paths.clone(),
+            vector::topology::config::watcher::CONFIG_WATCH_DELAY,
+        )
+        .unwrap_or_else(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            std::process::exit(exitcode::CONFIG);
+        });
+    }
+
+    info!(
+        message = "Loading configs.",
+        path = ?config_paths
     );
 
-    let config = vector::topology::Config::load(file);
+    let config = read_configs(&config_paths);
     let config = handle_config_errors(config);
     let config = config.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
+    event::LOG_SCHEMA
+        .set(config.global.log_schema.clone())
+        .expect("Couldn't set schema");
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
@@ -284,7 +293,7 @@ fn main() {
     }
 
     let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
-    let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
+    let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -295,6 +304,7 @@ fn main() {
 
     #[cfg(unix)]
     {
+        let mut topology = topology;
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
         let sigquit = Signal::new(SIGQUIT).flatten_stream();
@@ -323,18 +333,12 @@ fn main() {
 
             // Reload config
             info!(
-                message = "Reloading config.",
-                path = ?opts.config_path
+                message = "Reloading configs.",
+                path = ?config_paths
             );
-
-            let file = if let Some(file) = open_config(&opts.config_path) {
-                file
-            } else {
-                continue;
-            };
+            let config = read_configs(&config_paths);
 
             trace!("Parsing config");
-            let config = vector::topology::Config::load(file);
             let config = handle_config_errors(config);
             if let Some(config) = config {
                 let success =
@@ -415,6 +419,36 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
     }
 }
 
+fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
+    let mut config = vector::topology::Config::empty();
+    let mut errors = Vec::new();
+
+    config_paths.iter().for_each(|p| {
+        let file = if let Some(file) = open_config(&p) {
+            file
+        } else {
+            errors.push(format!("Config file not found in path: {:?}.", p));
+            return;
+        };
+
+        trace!(
+            message = "Parsing config.",
+            path = ?p
+        );
+
+        match Config::load(file).and_then(|n| config.append(n)) {
+            Err(errs) => errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e))),
+            _ => (),
+        };
+    });
+
+    if !errors.is_empty() {
+        Err(errors)
+    } else {
+        Ok(config)
+    }
+}
+
 fn open_config(path: &Path) -> Option<File> {
     match File::open(path) {
         Ok(f) => Some(f),
@@ -431,11 +465,9 @@ fn open_config(path: &Path) -> Option<File> {
 }
 
 fn validate(opts: &Validate) -> exitcode::ExitCode {
-    let paths = if opts.paths.len() > 0 {
-        &opts.paths
-    } else {
-        &DEFAULT_CONFIG_PATHS
-    };
+    let paths = config_paths::expand(opts.paths.clone()).unwrap_or_else(|| {
+        std::process::exit(exitcode::CONFIG);
+    });
 
     for config_path in paths {
         let file = if let Some(file) = open_config(&config_path) {

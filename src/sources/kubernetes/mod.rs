@@ -107,7 +107,8 @@ impl TimeFilter {
 
     fn filter(&self, event: Event) -> Option<Event> {
         // Only logs created at, or after now are logged.
-        if let Some(Value::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
+        if let Some(Value::Timestamp(ts)) = event.as_log().get(&event::log_schema().timestamp_key())
+        {
             if ts < &self.start {
                 trace!(message = "Recieved older log.", from = %ts.to_rfc3339());
                 return None;
@@ -118,7 +119,10 @@ impl TimeFilter {
 }
 
 fn remove_ending_newline(mut event: Event) -> Event {
-    if let Some(Value::Bytes(msg)) = event.as_mut_log().get_mut(&event::MESSAGE) {
+    if let Some(Value::Bytes(msg)) = event
+        .as_mut_log()
+        .get_mut(&event::log_schema().timestamp_key())
+    {
         if msg.ends_with(&['\n' as u8]) {
             msg.truncate(msg.len() - 1);
         }

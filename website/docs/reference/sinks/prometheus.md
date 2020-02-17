@@ -23,21 +23,6 @@ The Vector `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -53,30 +38,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
   flush_period_secs = 60 # default, seconds
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sinks.my_sink_id]
-  # REQUIRED
-  type = "prometheus" # must be: "prometheus"
-  inputs = ["my-source-id"] # example
-  address = "0.0.0.0:9598" # example
-  namespace = "service" # example
-
-  # OPTIONAL
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
-  flush_period_secs = 60 # default, seconds
   healthcheck = true # default
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -154,7 +117,7 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -206,10 +169,14 @@ The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.
 For example:
 
 
+import Tabs from '@theme/Tabs';
+
 <Tabs
   block={true}
   defaultValue="histograms"
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
+
+import TabItem from '@theme/TabItem';
 
 <TabItem value="histograms">
 

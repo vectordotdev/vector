@@ -7,6 +7,8 @@ function_category = "collect"
 output_types = ["log"]
 through_description = "Kafka 0.9 or later"
 
+<%= render("_partials/_component_options.toml", type: "source", name: "kafka") %>
+
 [sources.kafka.options.bootstrap_servers]
 type = "string"
 common = true
@@ -66,6 +68,41 @@ default = 10000
 unit = "milliseconds"
 description = """\
 The Kafka session timeout in milliseconds.
+"""
+
+[sources.kafka.options.socket_timeout_ms]
+type = "int"
+examples = [30000, 60000]
+default = 60000
+unit = "milliseconds"
+description = """\
+Default timeout for network requests.
+"""
+
+[sources.kafka.options.fetch_wait_max_ms]
+type = "int"
+examples = [50, 100]
+default = 100
+unit = "milliseconds"
+description = """\
+Maximum time the broker may wait to fill the response.
+"""
+
+[sources.kafka.options.librdkafka_options]
+type = "table"
+category = "Advanced"
+description = """\
+Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+"""
+
+[sources.kafka.options.librdkafka_options.children."`[field-name]`"]
+type = "string"
+examples = [
+  {"client.id" = "${ENV_VAR}"},
+  {"fetch.error.backoff.ms" = "1000"},
+]
+description = """\
+The options and their values. Accepts `string` values.
 """
 
 [sources.kafka.output.log.fields.message]

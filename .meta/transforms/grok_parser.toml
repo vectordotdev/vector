@@ -1,10 +1,13 @@
 [transforms.grok_parser]
 title = "Grok Parser"
 allow_you_to_description = "parse a log field value with [Grok][urls.grok]"
+beta = false
 common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "grok_parser") %>
 
 [transforms.grok_parser.options.drop_field]
 type = "bool"

@@ -32,6 +32,7 @@ scopes:
   - setup
   - sinks
   - sources
+  - templating
   - testing
   - topology
   - transforms
@@ -51,6 +52,15 @@ scopes:
   - homebrew platform
   - rpm platform
   - msi platform
+
+  # providers
+  - aws provider
+  - datadog provider
+  - elastic provider
+  - google provider
+  - confluent provider
+  - new relic provider
+  - splunk provider
 
   # sources
   - docker source
@@ -103,6 +113,7 @@ scopes:
   - gcp_pubsub sink
   - gcp_stackdriver_logging sink
   - http sink
+  - humio_logs sink
   - kafka sink
   - logdna sink
   - new_relic_logs sink

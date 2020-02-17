@@ -1,7 +1,15 @@
 #!/bin/bash
-set -eu
+
+# docker-compose-run.sh
+#
+# SUMMARY
+#
+#   Runs a job from `docker-compose.yml` file.
+
+set -euo pipefail
+
+cd $(dirname $0)/..
 
 export USER=$(id -u):$(id -g)
-DC_FILE=docker-compose.test.yml
-docker-compose -f $DC_FILE rm -svf $1 2>/dev/null || true
-docker-compose -f $DC_FILE up --build --abort-on-container-exit --exit-code-from $1 $1 | sed $'s/^.*container exit...$/\033[0m\033[1A/'
+docker-compose rm -svf $1 2>/dev/null || true
+docker-compose up --build --abort-on-container-exit --exit-code-from $1 $1 | sed $'s/^.*container exit...$/\033[0m\033[1A/'

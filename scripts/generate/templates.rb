@@ -38,7 +38,7 @@ class Templates
     @metadata = metadata
   end
 
-  def common_component_links(type, limit = 6)
+  def common_component_links(type, limit = 5)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
     links =
@@ -182,8 +182,8 @@ class Templates
     hash = {}
 
     fields.each do |field|
-      if field.fields_list.any?
-        hash[field.name] = fields_hash(field.fields_list)
+      if field.children?
+        hash[field.name] = fields_hash(field.children_list)
       else
         example = field.examples.first
 
@@ -216,7 +216,7 @@ class Templates
     description = option.description.strip
 
     if option.templateable?
-      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#field-interpolation]."
+      description << " This option supports dynamic values via [Vector's template syntax][docs.reference.templating]."
     end
 
     if option.relevant_when
@@ -298,14 +298,6 @@ class Templates
 
   def option_names(options)
     options.collect { |option| "`#{option.name}`" }
-  end
-
-  def options(options, filters: true, heading_depth: 1, level: 1, path: nil)
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-    render("#{partials_path}/_options.md", binding).strip
   end
 
   def partial?(template_path)
@@ -403,9 +395,15 @@ class Templates
     EOF
   end
 
-  def subpages
-    dirname = File.basename(@_template_path).split(".").first
-    dir = @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+  def subpages(link_name = nil)
+    dir =
+      if link_name
+        docs_dir = metadata.links.fetch(link_name).gsub(/\/$/, "")
+        "#{WEBSITE_ROOT}#{docs_dir}"
+      else
+        dirname = File.basename(@_template_path).split(".").first
+        @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+      end
 
     Dir.glob("#{dir}/*.md").
       to_a.

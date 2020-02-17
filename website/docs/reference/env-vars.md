@@ -1,6 +1,6 @@
 ---
 title: Environment Variables
-description: "A full list of Vector's supported environment variables."
+description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
 ---
 
@@ -21,7 +21,7 @@ options][docs.global-options] as well.
      website/docs/reference/env-vars.md.erb
 -->
 
-## Variables
+## Special Variables
 
 import Fields from '@site/src/components/Fields';
 
@@ -186,8 +186,44 @@ Enables backtraces when errors are logged. Use this when debugging only since it
 
 </Fields>
 
+## Custom Variables
 
+As noticed in the [configuration document][docs.configuration#environment-variables],
+Vector supports custom environment variables via the `${...}` syntax:
+
+```toml
+option = "${ENV_VAR}"
+```
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="info">
+
+Interpolation is done before parsing the configuration file. This is done when
+[starting][docs.process-management#starting] and
+[reloading][docs.process-management#reloading] Vector.
+
+</Alert>
+
+### Default Values
+
+Default values can be supplied via the `:-` syntax:
+
+```toml
+option = "${ENV_VAR:-default}"
+```
+
+### Escaping
+
+You can escape environment variable by preceding them with a `$` character. For
+example `$${HOSTNAME}` will be treated _literally_ in the above environment
+variable example.
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.global-options]: /docs/reference/global-options/
 [docs.monitoring#levels]: /docs/administration/monitoring/#levels
+[docs.process-management#reloading]: /docs/administration/process-management/#reloading
+[docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys

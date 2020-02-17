@@ -6,8 +6,9 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer,
-        SinkExt, TowerRequestConfig, TowerRequestSettings,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
@@ -16,14 +17,12 @@ use bytes::Bytes;
 use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
-use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
-use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use std::{collections::HashMap, convert::TryInto, fmt};
 use tower::{
     buffer::Buffer,
@@ -248,11 +247,12 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
-            ts.timestamp_millis()
-        } else {
-            chrono::Utc::now().timestamp_millis()
-        };
+        let timestamp =
+            if let Some(Value::Timestamp(ts)) = log.remove(&event::log_schema().timestamp_key()) {
+                ts.timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
 
         match self.encoding {
             Encoding::Json => {
@@ -261,7 +261,7 @@ impl CloudwatchLogsSvc {
             }
             Encoding::Text => {
                 let message = log
-                    .get(&event::MESSAGE)
+                    .get(&event::log_schema().message_key())
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 InputLogEvent { message, timestamp }
@@ -443,27 +443,8 @@ fn create_client(
     resolver: Resolver,
 ) -> crate::Result<CloudWatchLogsClient> {
     let http = rusoto::client(resolver)?;
-
-    if let Some(role) = assume_role {
-        let sts = StsClient::new(region.clone());
-
-        let provider = StsAssumeRoleSessionCredentialsProvider::new(
-            sts,
-            role,
-            "default".to_owned(),
-            None,
-            None,
-            None,
-            None,
-        );
-
-        let creds = rusoto_credential::AutoRefreshingProvider::new(provider)
-            .context(InvalidCloudwatchCredentials)?;
-        Ok(CloudWatchLogsClient::new_with(http, creds, region))
-    } else {
-        let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
-        Ok(CloudWatchLogsClient::new_with(http, creds, region))
-    }
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    Ok(CloudWatchLogsClient::new_with(http, creds, region))
 }
 
 #[derive(Debug, Clone)]
@@ -708,7 +689,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(Default::default()).encode_log(event.clone());
 
-        let ts = if let Value::Timestamp(ts) = event[&event::TIMESTAMP] {
+        let ts = if let Value::Timestamp(ts) = event[&event::log_schema().timestamp_key()] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -727,7 +708,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&event::TIMESTAMP).is_none());
+        assert!(map.get(&event::log_schema().timestamp_key()).is_none());
     }
 
     #[test]

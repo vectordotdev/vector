@@ -7,6 +7,8 @@ function_category = "collect"
 output_types = ["log"]
 through_description = "one or more local files"
 
+<%= render("_partials/_component_options.toml", type: "source", name: "file") %>
+
 [sources.file.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
@@ -58,7 +60,9 @@ category = "Context"
 default = "host"
 required = true
 description = """\
-The key name added to each event representing the current host.\
+The key name added to each event representing the current host. This can also \
+be globally set via the \
+[global `host_key` option][docs.reference.global-options#host_key].\
 """
 
 [sources.file.options.ignore_older]
@@ -97,7 +101,7 @@ description = """\
 Configuration for how the file source should identify files.\
 """
 
-[sources.file.options.fingerprinting.options.strategy]
+[sources.file.options.fingerprinting.children.strategy]
 type = "string"
 default = "checksum"
 prioritize = true
@@ -106,11 +110,11 @@ The strategy used to uniquely identify files. This is important for \
 [checkpointing](#checkpointing) when file rotation is used.\
 """
 
-[sources.file.options.fingerprinting.options.strategy.enum]
+[sources.file.options.fingerprinting.children.strategy.enum]
 checksum = "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."
 device_and_inode = "Uses the [device and inode][urls.inode] to unique identify files."
 
-[sources.file.options.fingerprinting.options.fingerprint_bytes]
+[sources.file.options.fingerprinting.children.fingerprint_bytes]
 type = "int"
 default = 256
 required = true
@@ -121,7 +125,7 @@ The number of bytes read off the head of the file to generate a unique \
 fingerprint.\
 """
 
-[sources.file.options.fingerprinting.options.ignored_header_bytes]
+[sources.file.options.fingerprinting.children.ignored_header_bytes]
 type = "int"
 default = 0
 required = true
@@ -177,19 +181,19 @@ draining the oldest files before moving on to read data from younger files.\
 [sources.file.output.log.fields.file]
 type = "string"
 examples = ["/var/log/nginx.log"]
-key_name_option = "file_key"
 required = true
 description = """\
-The _full_ path of the file tha the log originated from.\
+The _full_ path of the file tha the log originated from. This can be renamed \
+via the `file_key` option.\
 """
 
 [sources.file.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-key_name_option = "host_key"
 required = true
 description = """\
-The current hostname, equivalent to the `gethostname` command.\
+The current hostname, equivalent to the `gethostname` command. This can be \
+renamed via the `host_key` option.\
 """
 
 [sources.file.output.log.fields.message]

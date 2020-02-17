@@ -58,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # REQUIRED - General
     extract_from = "foo" # example
 
-    # REQUIRED - Conditions
+    # OPTIONAL - Conditions
     [[tests.outputs.conditions]]
       # REQUIRED
       type = "check_fields" # example
@@ -97,7 +97,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # REQUIRED - General
     extract_from = "foo" # example
 
-    # REQUIRED - Conditions
+    # OPTIONAL - Conditions
     [[tests.outputs.conditions]]
       # REQUIRED
       type = "check_fields" # example
@@ -551,7 +551,7 @@ A table that defines a unit test expected output.
   name={"conditions"}
   path={"outputs"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[table]"}
   unit={null}
@@ -559,7 +559,7 @@ A table that defines a unit test expected output.
 
 #### conditions
 
-A table that defines a collection of conditions to check against the output of a transform. A test is considered to have passed when each condition has resolved true for one or more events extracted from the target transform.
+A table that defines a collection of conditions to check against the output of a transform. A test is considered to have passed when each condition has resolved true for one or more events extracted from the target transform.An expected output without conditions instead prints the input and output of a target without checking its values.
 
 <Fields filters={false}>
 

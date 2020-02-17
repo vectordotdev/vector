@@ -46,6 +46,9 @@
 - name: "domain: sources"
   description: Anything sources related
   color: 212f3e
+- name: "domain: templating"
+  description: Anything templating related
+  color: 212f3e
 - name: "domain: testing"
   description: Anything testing related
   color: 212f3e
@@ -147,6 +150,28 @@
 - name: "platform: msi"
   description: Anything MSI related
   color: ff9ff3
+
+- name: "provider: aws"
+  description: Anything AWS related
+  color: ff9f43
+- name: "provider: datadog"
+  description: Anything Datadog related
+  color: ff9f43
+- name: "provider: elastic"
+  description: Anything Elastic related
+  color: ff9f43
+- name: "provider: google"
+  description: Anything Google related
+  color: ff9f43
+- name: "provider: confluent"
+  description: Anything Confluent related
+  color: ff9f43
+- name: "provider: new relic"
+  description: Anything New Relic related
+  color: ff9f43
+- name: "provider: splunk"
+  description: Anything Splunk related
+  color: ff9f43
 
 - name: "source: docker"
   description: Anything `docker` source realted
@@ -287,6 +312,9 @@
   color: 4ddbfb
 - name: "sink: http"
   description: Anything `http` sink related
+  color: 4ddbfb
+- name: "sink: humio_logs"
+  description: Anything `humio_logs` sink related
   color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related

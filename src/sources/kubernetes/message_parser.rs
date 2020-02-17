@@ -57,9 +57,10 @@ impl Transform for DockerMessageTransformer {
             match DateTime::parse_from_rfc3339(
                 String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
             ) {
-                Ok(timestamp) => {
-                    log.insert(event::TIMESTAMP.clone(), timestamp.with_timezone(&Utc))
-                }
+                Ok(timestamp) => log.insert(
+                    event::log_schema().timestamp_key(),
+                    timestamp.with_timezone(&Utc),
+                ),
                 Err(error) => {
                     debug!(message = "Non rfc3339 timestamp.", %error, rate_limit_secs = 10);
                     return None;
@@ -72,7 +73,7 @@ impl Transform for DockerMessageTransformer {
 
         // log -> message
         if let Some(message) = log.remove(&self.atom_log) {
-            log.insert(event::MESSAGE.clone(), message);
+            log.insert(event::log_schema().message_key(), message);
         } else {
             debug!(message = "Missing field.", field = %self.atom_log, rate_limit_secs = 10);
             return None;
@@ -90,9 +91,10 @@ fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
         r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$"
             .to_owned();
     // drop field
-    rp_config
-        .types
-        .insert(event::TIMESTAMP.clone(), "timestamp|%+".to_owned());
+    rp_config.types.insert(
+        event::log_schema().timestamp_key().clone(),
+        "timestamp|%+".to_owned(),
+    );
     // stream is a string
     // message is a string
     RegexParser::build(&rp_config).map_err(|e| {
@@ -130,12 +132,12 @@ mod tests {
 
         let event = transform.transform(event).expect("Transformed");
 
-        has(&event, event::MESSAGE.as_ref(), "12");
+        has(&event, event::log_schema().message_key(), "12");
         has(&event, "multiline_tag", "F");
         has(&event, "stream", "stdout");
         has(
             &event,
-            event::TIMESTAMP.as_ref(),
+            event::log_schema().timestamp_key(),
             DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
                 .unwrap()
                 .with_timezone(&Utc),
@@ -155,11 +157,11 @@ mod tests {
 
         let event = transform.transform(event).expect("Transformed");
 
-        has(&event, event::MESSAGE.as_ref(), "12");
+        has(&event, event::log_schema().message_key(), "12");
         has(&event, "stream", "stdout");
         has(
             &event,
-            event::TIMESTAMP.as_ref(),
+            event::log_schema().message_key(),
             DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
                 .unwrap()
                 .with_timezone(&Utc),

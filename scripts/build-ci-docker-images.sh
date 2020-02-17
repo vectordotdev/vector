@@ -17,7 +17,7 @@ function build_image() {
   docker build \
     -t timberiodev/vector-$tag:latest \
     -f scripts/ci-docker-images/$tag/Dockerfile \
-    scripts
+    .
 
   docker push timberiodev/vector-$tag:latest
 }

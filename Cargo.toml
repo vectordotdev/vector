@@ -107,7 +107,7 @@ indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
-syslog_rfc5424 = "0.6.1"
+syslog_loose = "0.2.0"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
@@ -121,6 +121,7 @@ lazy_static = "1.3.0"
 rlua = { git = "https://github.com/timberio/rlua" }
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
+glob = "0.2.11"
 grok = "~1.0.1"
 nom = "5.0.0"
 uuid = { version = "0.7", features = ["serde", "v4"] }
@@ -140,9 +141,13 @@ colored = "1.9"
 warp = "0.1.20"
 evmap = { version = "7", features = ["bytes"] }
 logfmt = "0.0.2"
+notify = "4.0.14"
+once_cell = "1.3"
+getset = "0.1.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
+nix = "0.16.1"
 
 [build-dependencies]
 prost-build = "0.5.0"

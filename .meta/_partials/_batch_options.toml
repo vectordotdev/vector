@@ -1,0 +1,32 @@
+[<%= namespace %>.batch]
+type = "table"
+common = <%= common %>
+description = "Configures the sink batching behavior."
+
+<%- if max_events -%>
+[<%= namespace %>.batch.children.max_events]
+type = "int"
+common = <%= common %>
+default = <%= max_events %>
+required = true
+unit = "events"
+description = "The maximum size of a batch, in events, before it is flushed."
+<%- end -%>
+
+<%- if max_size -%>
+[<%= namespace %>.batch.children.max_size]
+type = "int"
+common = <%= common %>
+default = <%= max_size %>
+required = true
+unit = "bytes"
+description = "The maximum size of a batch, in bytes, before it is flushed."
+<%- end -%>
+
+[<%= namespace %>.batch.children.timeout_secs]
+type = "int"
+common = <%= common %>
+default = <%= timeout_secs %>
+required = true
+unit = "seconds"
+description = "The maximum age of a batch before it is flushed."

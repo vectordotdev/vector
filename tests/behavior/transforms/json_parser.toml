@@ -1,0 +1,32 @@
+[transforms.json_parser_nested]
+  inputs = []
+  type = "json_parser"
+[[tests]]
+  name = "json_parser_nested"
+  [tests.input]
+    insert_at = "json_parser_nested"
+    type = "raw"
+    value = "{\"a\": 3, \"b\": {\"c\": 4}}"
+  [[tests.outputs]]
+    extract_from = "json_parser_nested"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "a.equals" = 3
+      "b.c.equals" = 4
+
+[transforms.json_parser_target_field]
+  inputs = []
+  type = "json_parser"
+  target_field = "target_field"
+[[tests]]
+  name = "json_parser_target_field"
+  [tests.input]
+    insert_at = "json_parser_target_field"
+    type = "raw"
+    value = "{\"a\": 3, \"b\": {\"c\": 4}}"
+  [[tests.outputs]]
+    extract_from = "json_parser_target_field"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "target_field.a.equals" = 3
+      "target_field.b.c.equals" = 4

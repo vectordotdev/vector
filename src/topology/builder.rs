@@ -70,16 +70,14 @@ pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
                 .any(|(_, sink)| sink.inputs.contains(&name))
         {
             warnings.push(format!(
-                "{} {:?} has no outputs",
+                "{} {:?} has no consumers",
                 capitalize(input_type),
                 name
             ));
         }
     }
 
-    if config.contains_cycle() {
-        errors.push("Configured topology contains a cycle".to_string());
-    } else if let Err(type_errors) = config.typecheck() {
+    if let Err(type_errors) = config.typecheck() {
         errors.extend(type_errors);
     }
 

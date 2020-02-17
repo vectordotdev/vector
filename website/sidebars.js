@@ -9,7 +9,7 @@ module.exports = {
         "about/concepts",
         {
           type: 'category',
-          label: 'Data Model (Event)',
+          label: 'Data Model',
           items: [
             "about/data-model",
             "about/data-model/log",
@@ -222,6 +222,8 @@ module.exports = {
             
               "reference/sinks/http",
             
+              "reference/sinks/humio_logs",
+            
               "reference/sinks/kafka",
             
               "reference/sinks/logdna",
@@ -248,6 +250,7 @@ module.exports = {
           items: [
             "reference/env-vars",
             "reference/global-options",
+            "reference/templating",
             "reference/tests",
           ]
         },

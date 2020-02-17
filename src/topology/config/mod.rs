@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     conditions,
     dns::Resolver,
-    event::{Event, Metric},
+    event::{self, Event, Metric},
     runtime::TaskExecutor,
     sinks, sources, transforms,
 };
@@ -17,6 +17,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub mod component;
 mod validation;
 mod vars;
+pub mod watcher;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -39,6 +40,8 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
+    #[serde(default)]
+    pub log_schema: event::LogSchema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -242,7 +245,7 @@ fn default_test_input_type() -> String {
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
     pub extract_from: String,
-    pub conditions: Vec<TestCondition>,
+    pub conditions: Option<Vec<TestCondition>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -259,6 +262,7 @@ impl Config {
             global: GlobalOptions {
                 data_dir: None,
                 dns_servers: Vec::new(),
+                log_schema: event::LogSchema::default(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
@@ -315,8 +319,86 @@ impl Config {
         toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
-    pub fn contains_cycle(&self) -> bool {
-        validation::contains_cycle(self)
+    pub fn append(&mut self, mut with: Self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
+            self.global.data_dir = with.global.data_dir;
+        } else if with.global.data_dir != default_data_dir()
+            && self.global.data_dir != with.global.data_dir
+        {
+            // If two configs both set 'data_dir' and have conflicting values
+            // we consider this an error.
+            errors.push("conflicting values for 'data_dir' found".to_owned());
+        }
+        self.global.dns_servers.append(&mut with.global.dns_servers);
+        self.global.dns_servers.sort();
+        self.global.dns_servers.dedup();
+
+        // If the user has multiple config files, we must *merge* log schemas until we meet a
+        // conflict, then we are allowed to error.
+        let default_schema = event::LogSchema::default();
+        if with.global.log_schema != default_schema {
+            // If the set value is the default, override it. If it's already overridden, error.
+            if self.global.log_schema.host_key() != default_schema.host_key()
+                && self.global.log_schema.host_key() != with.global.log_schema.host_key()
+            {
+                errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_host_key(with.global.log_schema.host_key().clone());
+            }
+            if self.global.log_schema.message_key() != default_schema.message_key()
+                && self.global.log_schema.message_key() != with.global.log_schema.message_key()
+            {
+                errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_message_key(with.global.log_schema.message_key().clone());
+            }
+            if self.global.log_schema.timestamp_key() != default_schema.timestamp_key()
+                && self.global.log_schema.timestamp_key() != with.global.log_schema.timestamp_key()
+            {
+                errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_timestamp_key(with.global.log_schema.timestamp_key().clone());
+            }
+        }
+
+        with.sources.keys().for_each(|k| {
+            if self.sources.contains_key(k) {
+                errors.push(format!("duplicate source name found: {}", k));
+            }
+        });
+        with.sinks.keys().for_each(|k| {
+            if self.sinks.contains_key(k) {
+                errors.push(format!("duplicate sink name found: {}", k));
+            }
+        });
+        with.transforms.keys().for_each(|k| {
+            if self.transforms.contains_key(k) {
+                errors.push(format!("duplicate transform name found: {}", k));
+            }
+        });
+        with.tests.iter().for_each(|wt| {
+            if self.tests.iter().any(|t| t.name == wt.name) {
+                errors.push(format!("duplicate test name found: {}", wt.name));
+            }
+        });
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        self.sources.extend(with.sources);
+        self.sinks.extend(with.sinks);
+        self.transforms.extend(with.transforms);
+        self.tests.extend(with.tests);
+
+        Ok(())
     }
 
     pub fn typecheck(&self) -> Result<(), Vec<String>> {
@@ -365,5 +447,152 @@ mod test {
             Some(PathBuf::from("/var/lib/vector")),
             config.global.data_dir
         )
+    }
+
+    #[test]
+    fn default_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!("host", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "message",
+            config.global.log_schema.message_key().to_string()
+        );
+        assert_eq!(
+            "timestamp",
+            config.global.log_schema.timestamp_key().to_string()
+        );
+    }
+
+    #[test]
+    fn custom_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [log_schema]
+      host_key = "this"
+      message_key = "that"
+      timestamp_key = "then"
+
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!("this", config.global.log_schema.host_key().to_string());
+        assert_eq!("that", config.global.log_schema.message_key().to_string());
+        assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
+    }
+
+    #[test]
+    fn config_append() {
+        let mut config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.append(
+                toml::from_str(
+                    r#"
+        data_dir = "/foobar"
+
+        [transforms.foo]
+        type = "json_parser"
+        inputs = [ "in" ]
+
+        [[tests]]
+        name = "check_simple_log"
+        [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+        [[tests.outputs]]
+        extract_from = "foo"
+        [[tests.outputs.conditions]]
+        type = "check_fields"
+        "message.equals" = "Sorry, I'm busy this week Cecil"
+            "#,
+                )
+                .unwrap()
+            ),
+            Ok(())
+        );
+
+        assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
+        assert!(config.sources.contains_key("in"));
+        assert!(config.sinks.contains_key("out"));
+        assert!(config.transforms.contains_key("foo"));
+        assert_eq!(config.tests.len(), 1);
+    }
+
+    #[test]
+    fn config_append_collisions() {
+        let mut config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            config.append(
+                toml::from_str(
+                    r#"
+        [sources.in]
+        type = "file"
+        include = ["/var/log/messages"]
+
+        [transforms.foo]
+        type = "json_parser"
+        inputs = [ "in" ]
+
+        [sinks.out]
+        type = "console"
+        inputs = ["in"]
+        encoding = "json"
+            "#,
+                )
+                .unwrap()
+            ),
+            Err(vec![
+                "duplicate source name found: in".into(),
+                "duplicate sink name found: out".into(),
+            ])
+        );
     }
 }

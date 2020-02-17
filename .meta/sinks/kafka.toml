@@ -1,16 +1,18 @@
 [sinks.kafka]
 title = "Kafka"
-buffer = true
+beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
-encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
 service_providers = ["AWS", "Confluent"]
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
-tls_options = ["+enabled", "-verify"]
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "kafka") %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.kafka.options") %>
 
 [sinks.kafka.options.bootstrap_servers]
 type = "string"
@@ -21,6 +23,20 @@ description = """\
 A comma delimited list of host and port pairs that the Kafka client should contact to bootstrap \
 its cluster metadata.\
 """
+
+[sinks.kafka.options.encoding]
+type = "string"
+category = "requests"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.kafka.options.encoding.enum]
+json = "Each event is encoded into JSON and the payload is represented as a JSON array."
+text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+
 
 [sinks.kafka.options.key_field]
 type = "string"
@@ -33,9 +49,40 @@ randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
 
+<%= render("_partials/_tls_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify: false) %>
+
 [sinks.kafka.options.topic]
 type = "string"
 common = true
 examples = ["topic-1234"]
 required = true
 description = "The Kafka topic name to write events to."
+
+[sinks.kafka.options.socket_timeout_ms]
+type = "int"
+examples = [30000, 90000]
+default = 60000
+description = "Default timeout for network requests."
+
+[sinks.kafka.options.message_timeout_ms]
+type = "int"
+examples = [150000, 450000]
+default = 300000
+description = "Local message timeout."
+
+[sinks.kafka.options.librdkafka_options]
+type = "table"
+category = "Advanced"
+description = """\
+Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+"""
+
+[sinks.kafka.options.librdkafka_options.children."`[field-name]`"]
+type = "string"
+examples = [
+  {"client.id" = "${ENV_VAR}"},
+  {"socket.send.buffer.bytes" = "100"},
+]
+description = """\
+The options and their values. Accepts `string` values.
+"""

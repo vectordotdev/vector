@@ -3,10 +3,13 @@ title = "Logfmt Parser"
 allow_you_to_description = """\
 extract data from a logfmt-formatted log field\
 """
+beta = true
 common = true
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "logfmt_parser") %>
 
 [transforms.logfmt_parser.options.field]
 type = "string"

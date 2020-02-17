@@ -62,7 +62,7 @@ impl Sink for BlackholeSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let message_len = match item {
             Event::Log(log) => log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().len())
                 .unwrap_or(0),
             Event::Metric(metric) => serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0),

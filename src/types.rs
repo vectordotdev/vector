@@ -256,16 +256,25 @@ pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_bool, parse_timestamp, Conversion, Error};
+    use super::parse_bool;
+    #[cfg(unix)]
+    use super::parse_timestamp;
+    #[cfg(unix)]
+    use super::{Conversion, Error};
+    #[cfg(unix)]
     use crate::event::Value;
+    #[cfg(unix)]
     use chrono::prelude::*;
 
+    #[cfg(unix)]
     const TIMEZONE: &str = "Australia/Brisbane";
 
+    #[cfg(unix)]
     fn dateref() -> DateTime<Utc> {
         Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
     }
 
+    #[cfg(unix)]
     fn convert(fmt: &str, value: &str) -> Result<Value, Error> {
         std::env::set_var("TZ", TIMEZONE);
         fmt.parse::<Conversion>()

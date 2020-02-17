@@ -4,21 +4,25 @@
 <%- full_path = [path, field.name].compact.join(".") -%>
 
 <Field
+  common={<%= field.common? %>}
   defaultValue={<%= field.default.to_json %>}
   enumValues={<%= field.enum.to_json %>}
   examples={<%= field.examples.to_json %>}
   name={<%= field.name.to_json %>}
   path={<%= path.to_json %>}
-  required={<%= field.required?.to_json %>}
+  relevantWhen={<%= field.relevant_when.to_json %>}
+  required={<%= field.required? %>}
+  templateable={<%= field.templateable? %>}
   type={<%= field.type.to_json %>}
+  unit={<%= field.unit.to_json %>}
   >
 
 <%= "#" * heading_depth %> <%= field.name %>
 
 <%= field.description %>[[references:<%= field.name %>]]
 
-<%- if field.fields? -%>
-<%= fields(field.fields_list, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
+<%- if field.children_list.any? -%>
+<%= fields(field.children_list, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
 <%- end -%>
 
 </Field>

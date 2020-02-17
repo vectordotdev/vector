@@ -8,12 +8,12 @@
 
 ## Options
 
-<%= options(component.specific_options_list, heading_depth: 3) %>
+<%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= options(component.env_vars_list, heading_depth: 3) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 ## How It Works [[sort]]

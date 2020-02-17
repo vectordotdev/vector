@@ -308,7 +308,7 @@ Delay between file discovery calls. This controls the interval at which Vector s
 
 ### host_key
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host. This can also be globally set via the [global [`host_key`](#host_key) option][docs.reference.global-options#host_key]. See [Context](#context) for more info.
 
 
 </Field>
@@ -511,49 +511,61 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/var/log/nginx.log"]}
   name={"file"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### file
 
-The _full_ path of the file tha the log originated from. See [Checkpointing](#checkpointing) and [Context](#context) for more info.
+The _full_ path of the file tha the log originated from. This can be renamed via the [`file_key`](#file_key) option. See [Checkpointing](#checkpointing) and [Context](#context) for more info.
 
 
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
   name={"host"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### host
 
-The current hostname, equivalent to the `gethostname` command.
+The current hostname, equivalent to the `gethostname` command. This can be renamed via the [`host_key`](#host_key) option.
 
 
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -565,13 +577,17 @@ The raw log message, unaltered.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp
@@ -724,6 +740,7 @@ read position will resume from the last checkpoint.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
+[docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
