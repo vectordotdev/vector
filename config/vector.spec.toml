@@ -4507,7 +4507,7 @@ end
     # * unit: seconds
     timeout_secs = 60
 
-# Batches `metric` events to InfluxDB using HTTP API.
+# Batches `metric` events to InfluxDB using v1 or v2 HTTP API.
 [sinks.influxdb_metrics]
   #
   # General
@@ -4527,19 +4527,26 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The destination bucket for writes.
+  # The destination bucket for writes into InfluxDB 2.
   #
   # * required
   # * type: string
   bucket = "vector-bucket"
   bucket = "4d2225e4d3d49f75"
 
+  # Sets the target database for the write into InfluxDB 1.
+  #
+  # * required
+  # * type: string
+  database = "vector-database"
+  database = "iot-store"
+
   # InfluxDB endpoint to send metrics to.
   #
   # * required
   # * type: string
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  endpoint = "http://influxdb:9999"
+  endpoint = "http://localhost:8086/"
 
   # A prefix that will be added to all metric names.
   #
@@ -4547,19 +4554,29 @@ end
   # * type: string
   namespace = "service"
 
-  # Specifies the destination organization for writes.
+  # Specifies the destination organization for writes into InfluxDB 2.
   #
   # * required
   # * type: string
   org = "Organization"
   org = "33f2cff0a28e5b63"
 
-  # InfluxDB authentication token
+  # Authentication token for InfluxDB 2.
   #
   # * required
   # * type: string
   token = "${INFLUXDB_TOKEN_ENV_VAR}"
   token = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # Sets the write consistency for the point for InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  consistency = "any"
+  consistency = "one"
+  consistency = "quorum"
+  consistency = "all"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -4568,6 +4585,32 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  # Sets the password for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "influxdb4ever"
+
+  # Sets the target retention policy for the write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  retention_policy_name = "autogen"
+  retention_policy_name = "one_day_only"
+
+  # Sets the username for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  username = "todd"
+  username = "vector-source"
 
   #
   # Batch
