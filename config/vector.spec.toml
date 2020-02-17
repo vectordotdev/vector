@@ -452,7 +452,7 @@ dns_servers = ["0.0.0.0:53"]
   socket_timeout_ms = 60000
 
   #
-  # Librdkafka options
+  # Advanced
   #
 
   [sources.kafka.librdkafka_options]

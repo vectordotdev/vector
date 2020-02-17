@@ -74,7 +74,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   session_timeout_ms = 10000 # default, milliseconds
   socket_timeout_ms = 60000 # default, milliseconds
 
-  # OPTIONAL - Librdkafka options
+  # OPTIONAL - Advanced
   [sources.my_source_id.librdkafka_options]
     "client.id" = "${ENV_VAR}" # example
     "fetch.error.backoff.ms" = "1000" # example
