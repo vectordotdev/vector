@@ -1,0 +1,17 @@
+[transforms.regex_parser_simple]
+  inputs = []
+  type = "regex_parser"
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+[[tests]]
+  name = "regex_parser_simple"
+  [tests.input]
+    insert_at = "regex_parser_simple"
+    type = "raw"
+    value = "2020-01-01T12:34:56Z INFO hello"
+  [[tests.outputs]]
+    extract_from = "regex_parser_simple"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "timestamp.equals" = "2020-01-01T12:34:56Z"
+      "level.equals" = "INFO"
+      "message.equals" = "hello"

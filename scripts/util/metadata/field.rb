@@ -85,6 +85,8 @@ class Field
   def <=>(other)
     if prioritize? && !other.prioritize?
       -1
+    elsif !wildcard? && other.wildcard?
+      -1
     else
       name <=> other.name
     end

@@ -3,11 +3,11 @@ title: Configuration
 description: Configuring Vector
 ---
 
-This section covers configuring Vector and creating
-[pipelines][docs.concepts#pipelines] like the [example](#example) below.
-Vector's configuration uses the [TOML][urls.toml] syntax, and the configuration
-file must be passed via the [`--config` flag][docs.process-management#flags]
-when [starting][docs.process-management#starting] vector:
+This section covers configuring Vector and creating pipelines like the
+[example below](#example). Vector's configuration uses the [TOML][urls.toml]
+syntax, and the configuration file must be passed via the
+[`--config` flag][docs.process-management#flags] when
+[starting][docs.process-management#starting] Vector:
 
 ```bash
 vector --config /etc/vector/vector.toml
@@ -21,80 +21,27 @@ vector --config /etc/vector/vector.toml
 <%= File.read("#{Dir.pwd}/../config/examples/docs_example.toml") %>
 ```
 
-## Quick Start
+The key thing to notice above is the use of the `inputs` option. This connects
+Vector's component to create a pipeline. For a simple introduction, please
+refer to the:
 
-At the very minimum, a Vector configuration file must be composed of a
-[source][docs.sources] and a [sink][docs.sinks], [transforms][docs.transforms]
-are optional. To get started:
+<Jump to="[[[docs.guides.getting-started]]]">Getting Started Guide</Jump>
 
-1.  Choose a [source][docs.sources]
+## Reference
 
-    To begin, you'll need to ingest data into Vector. This happens through one
-    or more [sources][docs.sources]. For example:
+Vector provides a [full reference][docs.reference] that you can use to build
+your configuration files.
 
-    <CodeHeader fileName="vector.toml" />
+<Jump to="/docs/reference/sources/">Sources</Jump>
+<Jump to="/docs/reference/transforms/">Transforms</Jump>
+<Jump to="/docs/reference/sinks/">Sinks</Jump>
 
-    ```toml
-    [sources.nginx_logs]
-      type = "file"
-      include = "/var/log/nginx*.log"
-    ```
+And for more advanced techniques:
 
-2.  Optionally choose a [transform][docs.transforms]
-
-    Next, you'll want to choose a [transform][docs.transforms]. Transforms are
-    optional, but most configuration include at least one since they help to
-    improve your data through parsing, structuring, and enriching. For example,
-    let's use the [`regex_parser` transform][docs.transforms.regex_parser] to parse
-    and structure our data:
-
-    <CodeHeader fileName="vector.toml" />
-
-    ```toml
-    [sources.nginx_logs]
-      type = "file"
-      include = "/var/log/nginx*.log"
-
-    [transforms.nginx_parser]
-      inputs  = ["nginx_logs"] # <--- connect the transform to our source
-      type    = "regex_parser"
-      include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
-    ```
-
-    Notice how we connected the new transform to our source via the `inputs`
-    option.
-
-3.  Choose a [sink][docs.sinks]
-
-    Finally, you'll want to choose a sink. Sinks are responsible for emitting data
-    out of Vector. For this example, we'll use the
-    [`console` sink][docs.sinks.console], which is simply writes the data to
-    `STDOUT`:
-
-    <CodeHeader fileName="vector.toml" />
-
-    ```toml
-    [sources.nginx_logs]
-      type = "file"
-      include = "/var/log/nginx*.log"
-
-    [transforms.nginx_parser]
-      inputs  = ["nginx_logs"]
-      type    = "regex_parser"
-      include = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
-
-    [sinks.print]
-      inputs = ["nginx_parser"] # <--- connect the sink to our transform
-      type   = "console"
-    ```
-
-    Again, notice how we connect the new sink via the `inputs` option.
-
-4.  Next steps
-
-    This serves as a basic example of how to build a minimal Vector configuration
-    file. It's likely you'll want to build more advanced pipelines which are
-    covered in the [guides section][docs.guides].
+<Jump to="/docs/reference/env-vars/">Env Vars</Jump>
+<Jump to="/docs/reference/global-options/">Global options</Jump>
+<Jump to="/docs/reference/templating/">Templating</Jump>
+<Jump to="/docs/reference/tests/">Tests</Jump>
 
 ## How It Works [[sort]]
 
@@ -128,17 +75,15 @@ quotes around the definition.
 
 </Alert>
 
-#### Environment Variable Escaping
+Please refer to the [environment variables reference][docs.reference.env-vars]
+for more info.
 
-You can escape environment variable by preceding them with a `$` character. For
-example `$${HOSTNAME}` will be treated _literally_ in the above environment
-variable example.
+### Templating
 
-### Field Interpolation
-
-Select configuration options support Vector's field interpolation syntax to
-produce dynamic values derived from the event's data. Two syntaxes are supported
-for fields that support field interpolation:
+Select configuration options support Vector's
+[templating syntax][docs.reference.templating] to produce dynamic values derived
+from the event's data. Two syntaxes are supported for fields that support field
+interpolation:
 
 1. [Strptime specifiers][urls.strptime_specifiers]. Ex: `date=%Y/%m/%d`
 2. [Event fields][docs.data-model]. Ex: `{{ field_name }}`
@@ -168,6 +113,22 @@ The `index` value will result in:
 
 ```toml
 index = "user-2-2019-05-02"
+```
+
+Learn more in the [templating reference][docs.reference.templating].
+
+### Multiple config files
+
+You can pass multiple configuration files when starting Vector:
+
+```bash
+vector --config vector1.toml --config vector2.toml
+```
+
+Or use a [globbing syntax][urls.globbing]:
+
+```bash
+vector --config /etc/vector/*.toml
 ```
 
 ### Syntax

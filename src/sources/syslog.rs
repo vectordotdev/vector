@@ -74,7 +74,10 @@ impl SourceConfig for SyslogConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(event::log_schema().host_key().to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address } => {
@@ -211,7 +214,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .unwrap_or_else(Utc::now);
     event
         .as_mut_log()
-        .insert(event::TIMESTAMP.clone(), timestamp);
+        .insert(event::log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
 
@@ -317,7 +320,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert("host", "74794bfb6795");
@@ -353,10 +356,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert("host", "74794bfb6795");
+            expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -442,10 +445,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(20, 7, 26),
             );
-            expected.insert("host", "74794bfb6795");
+            expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("appname", "root");
@@ -470,7 +473,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(21, 31, 56),
             );
             expected.insert("host", "74794bfb6795");
@@ -501,7 +504,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),

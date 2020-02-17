@@ -53,7 +53,7 @@ pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
         Encoding::Json => serde_json::to_vec(&log.unflatten()),
         Encoding::Text => {
             let bytes = log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)

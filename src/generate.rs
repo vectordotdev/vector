@@ -2,6 +2,7 @@ use crate::topology::config::{
     component::ExampleError, GlobalOptions, SinkDescription, SourceDescription,
     TransformDescription,
 };
+use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -92,7 +93,10 @@ fn generate_example(expression: &str) -> Result<String, Vec<String>> {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(format!("{}", err));
+                        errs.push(format!(
+                            "failed to generate source '{}': {}",
+                            source_type, err
+                        ));
                     }
                     Value::Table(BTreeMap::new())
                 }
@@ -131,7 +135,10 @@ fn generate_example(expression: &str) -> Result<String, Vec<String>> {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(format!("{}", err));
+                        errs.push(format!(
+                            "failed to generate transform '{}': {}",
+                            transform_type, err
+                        ));
                     }
                     Value::Table(BTreeMap::new())
                 }
@@ -163,7 +170,7 @@ fn generate_example(expression: &str) -> Result<String, Vec<String>> {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
-                        errs.push(format!("{}", err));
+                        errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
                     }
                     Value::Table(BTreeMap::new())
                 }
@@ -255,7 +262,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             exitcode::OK
         }
         Err(errs) => {
-            errs.iter().for_each(|e| eprintln!("Generate error: {}", e));
+            errs.iter().for_each(|e| eprintln!("{}", e.red()));
             exitcode::SOFTWARE
         }
     }
@@ -271,6 +278,11 @@ mod tests {
             generate_example("stdin/json_parser/console"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
+
+[log_schema]
+message_key = "message"
+timestamp_key = "timestamp"
+host_key = "host"
 
 [sources.source0]
 max_length = 102400
@@ -300,6 +312,11 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
+[log_schema]
+message_key = "message"
+timestamp_key = "timestamp"
+host_key = "host"
+
 [sources.source0]
 max_length = 102400
 type = "stdin"
@@ -328,6 +345,11 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
+[log_schema]
+message_key = "message"
+timestamp_key = "timestamp"
+host_key = "host"
+
 [sources.source0]
 max_length = 102400
 type = "stdin"
@@ -350,6 +372,11 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
+[log_schema]
+message_key = "message"
+timestamp_key = "timestamp"
+host_key = "host"
+
 [sinks.sink0]
 healthcheck = true
 inputs = ["TODO"]
@@ -367,6 +394,11 @@ when_full = "block"
             generate_example("/add_fields,json_parser,remove_fields"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
+
+[log_schema]
+message_key = "message"
+timestamp_key = "timestamp"
+host_key = "host"
 
 [transforms.transform0]
 inputs = []

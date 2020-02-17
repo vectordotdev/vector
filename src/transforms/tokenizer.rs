@@ -34,7 +34,10 @@ inventory::submit! {
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+        let field = self
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 

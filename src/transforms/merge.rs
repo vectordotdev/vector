@@ -39,7 +39,7 @@ impl Default for MergeConfig {
     fn default() -> Self {
         Self {
             partial_event_marker_field: event::PARTIAL.clone(),
-            merge_fields: vec![event::MESSAGE.clone()],
+            merge_fields: vec![event::log_schema().message_key().clone()],
             stream_discriminant_fields: vec![],
         }
     }

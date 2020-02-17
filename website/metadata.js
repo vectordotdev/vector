@@ -17615,7 +17615,7 @@ module.exports = {
     "docker": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the docker engine daemon and outputs log events.",
+      "description": "Ingests data through the [Docker engine daemon][urls.docker_daemon] and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -18016,7 +18016,7 @@ module.exports = {
     "ansi_stripper": {
       "beta": false,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to strips ANSI characters from the specified field.",
+      "description": "Accepts log events and allows you to strips ANSI escape sequences from the specified field.",
       "event_types": [
         "log"
       ],
