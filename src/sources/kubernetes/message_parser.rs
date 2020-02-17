@@ -161,7 +161,7 @@ mod tests {
         has(&event, "stream", "stdout");
         has(
             &event,
-            event::log_schema().message_key(),
+            event::log_schema().timestamp_key(),
             DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
                 .unwrap()
                 .with_timezone(&Utc),
