@@ -8,6 +8,7 @@
 import React, {useState} from 'react';
 
 import Link from '@docusaurus/Link';
+import SVG from 'react-inlinesvg';
 
 import classnames from 'classnames';
 import isInternalUrl from '@docusaurus/utils';
@@ -190,8 +191,8 @@ function DocSidebar(props) {
 
   return (
     <div className={styles.sidebar}>
-      <div className={styles.sidebarLogo}>
-        {logo != null && <img src={logoUrl} alt={logo.alt} />}
+      <div className={classnames(styles.sidebarLogo, 'sidebar__logo')}>
+        {logo != null && <SVG src={logoUrl} alt={logo.alt} />}
         {title != null && <strong>{title}</strong>}
       </div>
       <div
