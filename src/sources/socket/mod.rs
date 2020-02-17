@@ -6,6 +6,7 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
+    tls::TlsSettings,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use futures::sync::mpsc;
@@ -77,7 +78,8 @@ impl SourceConfig for SocketConfig {
                 let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
-                tcp.run(config.address, config.shutdown_timeout_secs, out)
+                let tls = TlsSettings::from_config(&config.tls, true)?;
+                tcp.run(config.address, config.shutdown_timeout_secs, tls, out)
             }
             Mode::Udp(config) => {
                 let host_key = config
@@ -115,7 +117,10 @@ mod test {
     use super::SocketConfig;
     use crate::event;
     use crate::runtime;
-    use crate::test_util::{block_on, collect_n, next_addr, send_lines, wait_for_tcp};
+    use crate::test_util::{
+        block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp,
+    };
+    use crate::tls::{TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
     use futures::Stream;
@@ -180,6 +185,52 @@ mod test {
         ];
 
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
+
+        let (event, rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(
+            event.unwrap().as_log()[&event::log_schema().message_key()],
+            "short".into()
+        );
+
+        let (event, _rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(
+            event.unwrap().as_log()[&event::log_schema().message_key()],
+            "more short".into()
+        );
+    }
+
+    #[test]
+    fn tcp_with_tls() {
+        let (tx, rx) = mpsc::channel(10);
+
+        let addr = next_addr();
+
+        let mut config = TcpConfig::new(addr.into());
+        config.max_length = 10;
+        config.tls = Some(TlsConfig {
+            enabled: Some(true),
+            options: TlsOptions {
+                crt_path: Some("tests/data/localhost.crt".into()),
+                key_path: Some("tests/data/localhost.key".into()),
+                ..Default::default()
+            },
+        });
+
+        let server = SocketConfig::from(config)
+            .build("default", &GlobalOptions::default(), tx)
+            .unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+        wait_for_tcp(addr);
+
+        let lines = vec![
+            "short".to_owned(),
+            "this is too long".to_owned(),
+            "more short".to_owned(),
+        ];
+
+        rt.block_on(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
+            .unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(

@@ -1,4 +1,4 @@
-use native_tls::{Certificate, Identity, TlsConnectorBuilder};
+use native_tls::{Certificate, Identity, TlsAcceptor, TlsConnectorBuilder};
 use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
@@ -53,6 +53,8 @@ enum TlsError {
         filename: PathBuf,
         source: native_tls::Error,
     },
+    #[snafu(display("TLS configuration requires a certificate when enabled"))]
+    MissingRequiredIdentity,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -86,12 +88,22 @@ pub struct TlsSettings {
 pub struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
-    pub fn from_config(config: &Option<TlsConfig>) -> crate::Result<Option<Self>> {
+    pub fn from_config(
+        config: &Option<TlsConfig>,
+        require_ident: bool,
+    ) -> crate::Result<Option<Self>> {
         match config {
             None => Ok(None),
             Some(config) => match config.enabled.unwrap_or(false) {
                 false => Ok(None),
-                true => Ok(Some(Self::from_options(&Some(config.options.clone()))?)),
+                true => {
+                    let tls = Self::from_options(&Some(config.options.clone()))?;
+                    if require_ident && tls.identity.is_none() {
+                        Err(TlsError::MissingRequiredIdentity.into())
+                    } else {
+                        Ok(Some(tls))
+                    }
+                }
             },
         }
     }
@@ -164,6 +176,13 @@ impl TlsSettings {
         self.identity.as_ref().map(|identity| {
             Identity::from_pkcs12(&identity.0, &identity.1).expect("Could not build identity")
         })
+    }
+
+    pub(crate) fn acceptor(&self) -> crate::Result<TlsAcceptor> {
+        match self.identity() {
+            None => Err(TlsError::MissingRequiredIdentity.into()),
+            Some(identity) => TlsAcceptor::new(identity).map_err(Into::into),
+        }
     }
 }
 
@@ -309,18 +328,29 @@ mod test {
 
     #[test]
     fn from_config_none() {
-        assert!(TlsSettings::from_config(&None).unwrap().is_none());
+        assert!(TlsSettings::from_config(&None, true).unwrap().is_none());
+        assert!(TlsSettings::from_config(&None, false).unwrap().is_none());
     }
 
     #[test]
     fn from_config_not_enabled() {
-        assert!(settings_from_config(None, false, false).is_none());
-        assert!(settings_from_config(Some(false), false, false).is_none());
+        assert!(settings_from_config(None, false, false, true).is_none());
+        assert!(settings_from_config(None, false, false, false).is_none());
+        assert!(settings_from_config(Some(false), false, false, true).is_none());
+        assert!(settings_from_config(Some(false), false, false, false).is_none());
+    }
+
+    #[test]
+    fn from_config_fails_without_certificate() {
+        let config = make_config(Some(true), false, false);
+        let error = TlsSettings::from_config(&Some(config), true)
+            .expect_err("from_config failed to check for a certificate");
+        assert_downcast_matches!(error, TlsError, TlsError::MissingRequiredIdentity);
     }
 
     #[test]
     fn from_config_with_certificate() {
-        let config = settings_from_config(Some(true), true, true);
+        let config = settings_from_config(Some(true), true, true, true);
         assert!(config.is_some());
     }
 
@@ -328,9 +358,11 @@ mod test {
         enabled: Option<bool>,
         set_crt: bool,
         set_key: bool,
+        require_ident: bool,
     ) -> Option<TlsSettings> {
         let config = make_config(enabled, set_crt, set_key);
-        TlsSettings::from_config(&Some(config)).expect("Failed to generate settings from config")
+        TlsSettings::from_config(&Some(config), require_ident)
+            .expect("Failed to generate settings from config")
     }
 
     fn make_config(enabled: Option<bool>, set_crt: bool, set_key: bool) -> TlsConfig {

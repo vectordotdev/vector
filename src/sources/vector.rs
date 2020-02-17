@@ -1,6 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
+    tls::{TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
@@ -17,6 +18,7 @@ pub struct VectorConfig {
     pub address: SocketListenAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
+    tls: Option<TlsConfig>,
 }
 
 fn default_shutdown_timeout_secs() -> u64 {
@@ -28,6 +30,7 @@ impl VectorConfig {
         Self {
             address,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            tls: None,
         }
     }
 }
@@ -45,7 +48,8 @@ impl SourceConfig for VectorConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
-        vector.run(self.address, self.shutdown_timeout_secs, out)
+        let tls = TlsSettings::from_config(&self.tls, true)?;
+        vector.run(self.address, self.shutdown_timeout_secs, tls, out)
     }
 
     fn output_type(&self) -> DataType {
