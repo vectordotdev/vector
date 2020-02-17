@@ -123,14 +123,18 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let ts = if let Some(event::Value::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
+        let ts = if let Some(event::Value::Timestamp(ts)) =
+            event.as_log().get(&event::log_schema().timestamp_key())
+        {
             ts.timestamp_nanos()
         } else {
             chrono::Utc::now().timestamp_nanos()
         };
 
         if self.remove_timestamp {
-            event.as_mut_log().remove(&event::TIMESTAMP);
+            event
+                .as_mut_log()
+                .remove(&event::log_schema().timestamp_key());
         }
 
         let event = match &self.encoding {
@@ -139,7 +143,7 @@ impl HttpSink for LokiConfig {
 
             Encoding::Text => event
                 .as_log()
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };
