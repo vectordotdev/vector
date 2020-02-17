@@ -9,7 +9,7 @@ pub mod aws_s3;
 pub mod blackhole;
 pub mod clickhouse;
 pub mod console;
-pub mod datadog_metrics;
+pub mod datadog;
 pub mod elasticsearch;
 pub mod file;
 pub mod gcp;
@@ -35,7 +35,7 @@ pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("Unable to resolve DNS for {:?}", address))]
     DNSFailure { address: String },
     #[snafu(display("DNS errored {}", source))]
@@ -48,7 +48,7 @@ enum BuildError {
 
 /// Common healthcheck errors
 #[derive(Debug, Snafu)]
-enum HealthcheckError {
+pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
 }
