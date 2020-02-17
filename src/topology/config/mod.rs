@@ -239,7 +239,10 @@ pub struct TestDefinition {
     pub input: Option<TestInput>,
     #[serde(default)]
     pub inputs: Vec<TestInput>,
+    #[serde(default)]
     pub outputs: Vec<TestOutput>,
+    #[serde(default)]
+    pub no_outputs_from: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
