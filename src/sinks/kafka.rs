@@ -351,6 +351,9 @@ mod integration_test {
             encoding: Encoding::Text,
             key_field: None,
             tls,
+            socket_timeout_ms: 60000,
+            message_timeout_ms: 300000,
+            librdkafka_options: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
