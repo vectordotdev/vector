@@ -4556,6 +4556,22 @@ end
   healthcheck = true
   healthcheck = false
 
+  # Local message timeout.
+  #
+  # * optional
+  # * default: 300000
+  # * type: int
+  message_timeout_ms = 150000
+  message_timeout_ms = 450000
+
+  # Default timeout for network requests.
+  #
+  # * optional
+  # * default: 60000
+  # * type: int
+  socket_timeout_ms = 30000
+  socket_timeout_ms = 90000
+
   #
   # requests
   #
@@ -4567,6 +4583,19 @@ end
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
+
+  #
+  # Advanced
+  #
+
+  [sinks.kafka.librdkafka_options]
+    # The options and their values. Accepts `string` values.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    "client.id" = "${ENV_VAR}"
+    "socket.send.buffer.bytes" = "100"
 
   #
   # Buffer
