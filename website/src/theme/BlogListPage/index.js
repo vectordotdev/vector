@@ -22,16 +22,18 @@ import './styles.css';
 function BlogListPage(props) {
   const {metadata, items} = props;
   const context = useDocusaurusContext();
-  const {siteConfig = {}} = context;
+  const {siteConfig = {title: siteTitle}} = context;
   const {metadata: {post_tags: postTags}} = siteConfig.customFields;
   const enrichedTags = enrichTags(postTags);
   const typeTags = enrichedTags.filter(tag => tag.category == 'type');
   const domainTags = enrichedTags.filter(tag => tag.category == 'domain');
+  const isBlogOnlyMode = metadata.permalink === '/';
+  const title = isBlogOnlyMode ? siteTitle : 'Blog';
 
   viewedNewPost();
 
   return (
-    <Layout title="Blog" description="Blog">
+    <Layout title={title} description="Blog">
       <div className="blog-list container">
         <div className="blog-list--filters">
           <a href="/blog/rss.xml" style={{float: 'right', fontSize: '1.5em', marginTop: '0px', marginLeft: '-30px', width: '30px'}}><i className="feather icon-rss"></i></a>
@@ -62,7 +64,7 @@ function BlogListPage(props) {
               key={BlogPostContent.metadata.permalink}
               frontMatter={BlogPostContent.frontMatter}
               metadata={BlogPostContent.metadata}
-              truncated>
+              truncated={BlogPostContent.metadata.truncated}>
               <BlogPostContent />
             </BlogPostItem>
           ))}
