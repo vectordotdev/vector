@@ -4942,7 +4942,7 @@ end
   remove_label_fields = true
 
   # If this is set to `true` then the timestamp will be removed from the event.
-  # This isuseful because loki uses the timestamp to index the event.
+  # This is useful because loki uses the timestamp to index the event.
   #
   # * optional
   # * default: true
@@ -4951,8 +4951,10 @@ end
   remove_timestamp = false
 
   # The tenant id that will be sent with every request, by default this is not
-  # required since aproxy should set this header. When running loki locally a
-  # tenant id is not required either.You can read more about tenant id's here
+  # required since a proxy should set this header. When running loki locally a
+  # tenant id is not required either.
+  #
+  # You can read more about tenant id's here
   #
   # * optional
   # * no default

@@ -565,7 +565,7 @@ If this is set to `true` then when labels are collected from events those fields
 
 ### remove_timestamp
 
-If this is set to `true` then the timestamp will be removed from the event. This isuseful because loki uses the timestamp to index the event.
+If this is set to `true` then the timestamp will be removed from the event. This is useful because loki uses the timestamp to index the event.
 
 
 </Field>
@@ -767,7 +767,9 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 ### tenant_id
 
-The tenant id that will be sent with every request, by default this is not required since aproxy should set this header. When running loki locally a tenant id is not required either.You can read more about tenant id's [here][urls.loki_multi_tenancy]
+The tenant id that will be sent with every request, by default this is not required since a proxy should set this header. When running loki locally a tenant id is not required either.
+
+You can read more about tenant id's [here][urls.loki_multi_tenancy]
 
 
 </Field>
@@ -954,12 +956,13 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 
-### Decentralized deployments
+### Decentralized Deployments
 
-Loki currently does not support out-of-order inserts.  If Vector is deployed in a decentralized setup
-then there is the possiblity that logs might get rejected due to data races between Vector
-instances. To avoid this we suggest either assigning each Vector instance with a unique label
-or deploying a centralized Vector which will ensure no logs will get sent out-of-order.
+Loki currently does not support out-of-order inserts. If Vector is deployed in
+a decentralized setup  then there is the possiblity that logs might get
+rejected due to data races between Vector instances. To avoid this we suggest
+either assigning each Vector instance with a unique label or deploying a
+centralized Vector which will ensure no logs will get sent out-of-order.
 
 ### Environment Variables
 
@@ -970,11 +973,12 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-### Event ordering
+### Event Ordering
 
-The Loki sink will ensure that all logs are sorted via their timestamp. This is to ensure
-that logs will be accepted by Loki. If no timestamp is supplied with events then the Loki
-sink will supply its own monotonically increasing timestamp.
+The `loki` sink will ensure that all logs are sorted via their `timestamp`. This
+is to ensure that logs will be accepted by Loki. If no timestamp is supplied
+with events then the Loki sink will supply its own monotonically increasing
+timestamp.
 
 ### Health Checks
 

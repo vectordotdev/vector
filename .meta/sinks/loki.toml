@@ -53,8 +53,9 @@ type = "string"
 required = false
 examples = ["some_tenant_id"]
 description = """\
-The tenant id that will be sent with every request, by default this is not required since a\
-proxy should set this header. When running loki locally a tenant id is not required either.\
+The tenant id that will be sent with every request, by default this is not \
+required since a proxy should set this header. When running loki locally a \
+tenant id is not required either.
 
 You can read more about tenant id's [here][urls.loki_multi_tenancy]\
 """
@@ -84,8 +85,8 @@ type = "bool"
 required = false
 default = false
 description = """\
-If this is set to `true` then when labels are collected from events those fields \
-will also get removed from the event.\
+If this is set to `true` then when labels are collected from events those \
+fields will also get removed from the event.\
 """
 
 [sinks.loki.options.remove_timestamp]
@@ -93,8 +94,8 @@ type = "bool"
 required = false
 default = true
 description = """\
-If this is set to `true` then the timestamp will be removed from the event. This is\
-useful because loki uses the timestamp to index the event.\
+If this is set to `true` then the timestamp will be removed from the event. \
+This is useful because loki uses the timestamp to index the event.\
 """
 
 [sinks.loki.options.auth]
