@@ -19,6 +19,7 @@ pub mod humio_logs;
 pub mod kafka;
 pub mod logdna;
 pub mod new_relic_logs;
+pub mod papertrail;
 pub mod prometheus;
 pub mod sematext;
 pub mod socket;
