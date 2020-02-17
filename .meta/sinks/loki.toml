@@ -1,7 +1,7 @@
 [sinks.loki]
 title = "loki"
 beta = true
-common = false
+common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
 function_category = "transmit"

@@ -254,6 +254,7 @@ function Integrations() {
     'http_sink': 'small',
     'kafka_source': 'large',
     'log_to_metric_transform': 'large',
+    'loki_sink': 'medium',
     'lua_transform': 'medium',
     'prometheus_sink': 'large',
     'regex_parser': 'medium',
