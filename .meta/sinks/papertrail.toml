@@ -1,0 +1,34 @@
+[sinks.papertrail]
+title = "Papertrail"
+beta = true
+common = false
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+write_to_description = "[Papertrail](https://www.papertrail.com/)"
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "papertrail") %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.papertrail.options") %>
+
+[sinks.papertrail.options.endpoint]
+type = "string"
+common = true
+required = true
+examples = ["logs.papertrailapp.com:12345"]
+description = "The endpoint to stream logs to."
+
+[sinks.papertrail.options.encoding]
+type = "string"
+category = "requests"
+common = true
+required = true
+description = """\
+The encoding format used to serialize the events before outputting.\
+"""
+
+[sinks.papertrail.options.encoding.enum]
+json = "Each event is encoded into JSON."
+text = "Each event is encoded into text via the `message` key."

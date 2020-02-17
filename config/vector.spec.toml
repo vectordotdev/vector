@@ -5004,6 +5004,92 @@ end
     # * unit: seconds
     timeout_secs = 30
 
+# Streams `log` events to Papertrail.
+[sinks.papertrail]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "papertrail"
+  type = "papertrail"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The endpoint to stream logs to.
+  #
+  # * required
+  # * type: string
+  endpoint = "logs.papertrailapp.com:12345"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
+
+  #
+  # Buffer
+  #
+
+  [sinks.papertrail.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
   # The component type. This is a required field that tells Vector which

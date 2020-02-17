@@ -117,6 +117,7 @@ scopes:
   - kafka sink
   - logdna sink
   - new_relic_logs sink
+  - papertrail sink
   - prometheus sink
   - sematext sink
   - socket sink
