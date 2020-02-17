@@ -271,6 +271,7 @@ mod integration_test {
             commit_interval_ms: 5000,
             host_key: None,
             key_field: Some("message_key".to_string()),
+            ..Default::default()
         };
 
         let mut rt = runtime();
