@@ -218,10 +218,26 @@ mod tests {
     }
 
     #[test]
-    fn map_values_matter() {
+    fn map_values_matter_1() {
         let mut event_1 = new_log_event();
-        event_1.insert("nested.a", "a");
+        event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
         let event_2 = new_log_event(); // empty event
+
+        let discriminant_fields = vec![Atom::from("nested")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_ne!(discriminant_1, discriminant_2);
+        assert_ne!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn map_values_matter_2() {
+        let mut event_1 = new_log_event();
+        event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
+        let mut event_2 = new_log_event();
+        event_2.insert("nested", "x"); // `nested` is a `Value::String`
 
         let discriminant_fields = vec![Atom::from("nested")];
 
