@@ -1,8 +1,8 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    sinks::util::tls::TlsOptions,
     sinks::util::MetadataFuture,
+    tls::TlsOptions,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{
@@ -307,9 +307,11 @@ mod tests {
 #[cfg(test)]
 mod integration_test {
     use super::*;
-    use crate::buffers::Acker;
-    use crate::sinks::util::tls::TlsOptions;
-    use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
+    use crate::{
+        buffers::Acker,
+        test_util::{block_on, random_lines_with_stream, random_string, wait_for},
+        tls::TlsOptions,
+    };
     use futures::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},

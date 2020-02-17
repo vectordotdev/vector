@@ -3,9 +3,9 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;

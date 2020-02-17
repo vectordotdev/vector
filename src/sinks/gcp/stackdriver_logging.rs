@@ -4,11 +4,11 @@ use crate::{
     sinks::{
         util::{
             http::{https_client, HttpRetryLogic, HttpService},
-            tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};

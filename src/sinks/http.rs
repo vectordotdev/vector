@@ -3,9 +3,9 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, Future};

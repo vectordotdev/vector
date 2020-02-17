@@ -4,9 +4,9 @@ use crate::{
     sinks::util::{
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};

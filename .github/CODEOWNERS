@@ -22,6 +22,7 @@
 /src/region.rs @LucioFranco
 /src/runtime.rs @LucioFranco
 /src/template.rs @lukesteensen
+/src/tls.rs @bruceg
 /src/trace.rs @LucioFranco
 /src/types.rs @bruceg
 

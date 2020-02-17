@@ -1,7 +1,4 @@
-use crate::{
-    dns::Resolver,
-    sinks::util::{http::https_client, tls::TlsSettings},
-};
+use crate::{dns::Resolver, sinks::util::http::https_client, tls::TlsSettings};
 use futures::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body, Chunk};
@@ -260,7 +257,7 @@ pub enum RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::ClientConfig;
-    use crate::{dns::Resolver, sinks::util::tls::TlsSettings};
+    use crate::{dns::Resolver, tls::TlsSettings};
     use http::Uri;
 
     #[test]

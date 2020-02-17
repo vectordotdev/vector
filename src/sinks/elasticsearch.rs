@@ -3,10 +3,10 @@ use crate::{
     event::Event,
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{stream::iter_ok, Future, Sink};
@@ -418,8 +418,8 @@ mod integration_tests {
     use crate::{
         event,
         sinks::util::http::https_client,
-        sinks::util::tls::TlsOptions,
         test_util::{random_events_with_stream, random_string, runtime},
+        tls::TlsOptions,
         topology::config::{SinkConfig, SinkContext},
         Event,
     };

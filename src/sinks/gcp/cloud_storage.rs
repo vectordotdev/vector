@@ -5,13 +5,13 @@ use crate::{
         util::{
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
-            tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
             SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
     template::Template,
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
