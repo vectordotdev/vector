@@ -368,6 +368,10 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through Kafka 0.9 or later and outputs `log` events.
 [sources.kafka]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -411,6 +415,15 @@ dns_servers = ["0.0.0.0:53"]
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
+  # Maximum time the broker may wait to fill the response.
+  #
+  # * optional
+  # * default: 100
+  # * type: int
+  # * unit: milliseconds
+  fetch_wait_max_ms = 50
+  fetch_wait_max_ms = 100
+
   # The log field name to use for the topic key. If unspecified, the key would
   # not be added to the log event. If the message has null key, then this field
   # would not be added to the log event.
@@ -428,6 +441,28 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: milliseconds
   session_timeout_ms = 5000
   session_timeout_ms = 10000
+
+  # Default timeout for network requests.
+  #
+  # * optional
+  # * default: 60000
+  # * type: int
+  # * unit: milliseconds
+  socket_timeout_ms = 30000
+  socket_timeout_ms = 60000
+
+  #
+  # Advanced
+  #
+
+  [sources.kafka.librdkafka_options]
+    # The options and their values. Accepts `string` values.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    "client.id" = "${ENV_VAR}"
+    "fetch.error.backoff.ms" = "1000"
 
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
