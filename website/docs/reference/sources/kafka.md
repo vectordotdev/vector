@@ -72,7 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   key_field = "user_id" # example, no default
   session_timeout_ms = 10000 # default, milliseconds
 
-  # OPTIONAL - Librdkafka options
+  # OPTIONAL - Advanced
   [sources.my_source_id.librdkafka_options]
     "client.id" = "${ENV_VAR}" # example
     "socket.send.buffer.bytes" = "100" # example
@@ -196,7 +196,7 @@ The log field name to use for the topic key. If unspecified, the key would not b
 
 ### librdkafka_options
 
-Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
 
 
 <Fields filters={false}>

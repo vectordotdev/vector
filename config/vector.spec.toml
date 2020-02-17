@@ -434,7 +434,7 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 10000
 
   #
-  # Librdkafka options
+  # Advanced
   #
 
   [sources.kafka.librdkafka_options]

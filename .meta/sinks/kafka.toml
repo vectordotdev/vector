@@ -72,8 +72,9 @@ description = "Local message timeout."
 
 [sources.kafka.options.librdkafka_options]
 type = "table"
+category = "Advanced"
 description = """\
-Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
 """
 
 [sources.kafka.options.librdkafka_options.children."`[field-name]`"]
