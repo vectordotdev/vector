@@ -112,7 +112,7 @@ enum Encoding {
 }
 
 impl Encoding {
-    fn content_type(self) -> &'static str {
+    fn content_type(&self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",
@@ -130,13 +130,13 @@ enum Compression {
 }
 
 impl Compression {
-    fn content_encoding(self) -> Option<&'static str> {
+    fn content_encoding(&self) -> Option<&'static str> {
         match self {
             Self::Gzip => Some("gzip"),
             Self::None => None,
         }
     }
-    fn extension(self) -> &'static str {
+    fn extension(&self) -> &'static str {
         match self {
             Self::Gzip => "log.gz",
             Self::None => "log",
