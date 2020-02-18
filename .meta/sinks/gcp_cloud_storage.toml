@@ -2,7 +2,7 @@
 title = "GCP Cloud Storage (GCS)"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"

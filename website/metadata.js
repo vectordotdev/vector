@@ -17275,7 +17275,7 @@ module.exports = {
     },
     "gcp_cloud_storage": {
       "beta": true,
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
       "event_types": [
         "log"
