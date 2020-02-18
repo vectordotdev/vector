@@ -146,6 +146,15 @@ impl TlsSettings {
             identity,
         })
     }
+
+    pub fn identity(&self) -> Option<Identity> {
+        // This data was test-built previously, so we can just use it
+        // here and expect the results will not fail. This can all be
+        // reworked when `native_tls::Identity` gains the Clone impl.
+        self.identity.as_ref().map(|identity| {
+            Identity::from_pkcs12(&identity.0, &identity.1).expect("Could not build identity")
+        })
+    }
 }
 
 impl fmt::Debug for TlsSettings {
@@ -165,17 +174,9 @@ impl TlsConnectorExt for TlsConnectorBuilder {
     fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self {
         self.danger_accept_invalid_certs(!settings.verify_certificate);
         self.danger_accept_invalid_hostnames(!settings.verify_hostname);
+        settings.identity().map(|identity| self.identity(identity));
         if let Some(certificate) = settings.authority {
             self.add_root_certificate(certificate);
-        }
-        if let Some(identity) = settings.identity {
-            // This data was test-built previously, so we can just use
-            // it here and expect the results will not fail. This can
-            // all be reworked when `native_tls::Identity` gains the
-            // Clone impl.
-            let identity =
-                Identity::from_pkcs12(&identity.0, &identity.1).expect("Could not build identity");
-            self.identity(identity);
         }
         self
     }
