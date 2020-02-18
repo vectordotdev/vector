@@ -9,7 +9,7 @@ it's still a good idea to get yourself ahead of the competition. In this guide
 we're going to cover some tips and tricks that will help you write clear, bug
 free Vector configs that are easy to maintain.
 
-## Building Pipeline Structure
+## Building Pipelines
 
 In Vector each component of a pipeline specifies which components it consumes
 events from. This makes it very easy to build multiplexed topologies. However,
@@ -48,7 +48,7 @@ with an `inputs` field that specifies the component before it:
 
 ```toml
 [transforms.transform0]
-  inputs = [ "TODO" ]
+  inputs = [ "somewhere" ]
   type = "json_parser"
   # etc ...
 
@@ -112,7 +112,7 @@ end of our config:
 [[tests]]
   name = "check_simple_log"
 
-  [tests.input]
+  [[tests.inputs]]
     insert_at = "foo"
     type = "raw"
     value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
@@ -148,7 +148,7 @@ output in order to turn it into a regression test:
 [[tests]]
   name = "check_simple_log"
 
-  [tests.input]
+  [[tests.inputs]]
     insert_at = "foo"
     type = "raw"
     value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
@@ -187,7 +187,7 @@ $ vector -c ./configs/foo.toml ./configs/bar.toml
 ```
 
 If you have a large chain of components it's a good idea to break them out into
-their own file, each with its own unit tests.
+individual files, each with its own unit tests.
 
 TODO: What does this look like? Config example in `./config/examples`?
 
