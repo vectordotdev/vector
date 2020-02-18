@@ -77,7 +77,7 @@ impl TransformConfig for SwimlanesConfig {
         Err("this transform must be expanded".into())
     }
 
-    fn expand(&mut self) -> Option<IndexMap<String, Box<dyn TransformConfig>>> {
+    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         while let Some((k, v)) = self.lanes.pop() {
@@ -91,9 +91,9 @@ impl TransformConfig for SwimlanesConfig {
         }
 
         if !map.is_empty() {
-            Some(map)
+            Ok(Some(map))
         } else {
-            None
+            Err("must specify at least one swimlane".into())
         }
     }
 
