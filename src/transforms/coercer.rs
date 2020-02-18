@@ -56,11 +56,12 @@ impl Transform for Coercer {
             // below, as it will be fewer steps to fully recreate the
             // event than to scan the event for extraneous fields after
             // conversion.
-            let drain = log.drain().collect::<Vec<_>>();
-            for (field, value) in drain {
+            let mut new_event = Event::new_empty_log();
+            let new_log = new_event.as_mut_log();
+            for (field, value) in log.all_fields() {
                 if let Some(conv) = self.types.get(&field) {
-                    match conv.convert(value) {
-                        Ok(converted) => log.insert(field, converted),
+                    match conv.convert(value.clone()) {
+                        Ok(converted) => new_log.insert(field, converted),
                         Err(error) => {
                             warn!(
                                 message = "Could not convert types.",
@@ -72,6 +73,7 @@ impl Transform for Coercer {
                     }
                 }
             }
+            return Some(new_event);
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {

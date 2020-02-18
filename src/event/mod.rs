@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::{hash_map::Drain, HashMap};
+use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
@@ -38,13 +38,13 @@ pub enum Event {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
-    fields: HashMap<Atom, Value>,
+    fields: BTreeMap<Atom, Value>,
 }
 
 impl Event {
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent {
-            fields: HashMap::new(),
+            fields: BTreeMap::new(),
         })
     }
 
@@ -129,10 +129,6 @@ impl LogEvent {
     pub fn unflatten(self) -> unflatten::Unflatten {
         unflatten::Unflatten::from(self.fields)
     }
-
-    pub fn drain(&mut self) -> Drain<Atom, Value> {
-        self.fields.drain()
-    }
 }
 
 impl std::ops::Index<&Atom> for LogEvent {
@@ -210,7 +206,7 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
-    Map(HashMap<Atom, Value>),
+    Map(BTreeMap<Atom, Value>),
     Array(Vec<Value>),
 }
 
@@ -280,8 +276,8 @@ impl From<f64> for Value {
     }
 }
 
-impl From<HashMap<Atom, Value>> for Value {
-    fn from(value: HashMap<Atom, Value>) -> Self {
+impl From<BTreeMap<Atom, Value>> for Value {
+    fn from(value: BTreeMap<Atom, Value>) -> Self {
         Value::Map(value)
     }
 }
@@ -358,8 +354,8 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
-fn decode_map(fields: HashMap<String, proto::Value>) -> Option<Value> {
-    let mut accum: HashMap<Atom, Value> = HashMap::with_capacity(fields.len());
+fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
+    let mut accum: BTreeMap<Atom, Value> = BTreeMap::new();
     for (key, value) in fields {
         match decode_value(value) {
             Some(value) => {
@@ -410,7 +406,7 @@ impl From<proto::EventWrapper> for Event {
                     .fields
                     .into_iter()
                     .filter_map(|(k, v)| decode_value(v).map(|value| (Atom::from(k), value)))
-                    .collect::<HashMap<_, _>>();
+                    .collect::<BTreeMap<_, _>>();
 
                 Event::Log(LogEvent { fields })
             }
@@ -487,7 +483,7 @@ fn encode_value(value: Value) -> proto::Value {
     }
 }
 
-fn encode_map(fields: HashMap<Atom, Value>) -> proto::ValueMap {
+fn encode_map(fields: BTreeMap<Atom, Value>) -> proto::ValueMap {
     proto::ValueMap {
         fields: fields
             .into_iter()
@@ -509,7 +505,7 @@ impl From<Event> for proto::EventWrapper {
                 let fields = fields
                     .into_iter()
                     .map(|(k, v)| (k.to_string(), encode_value(v)))
-                    .collect::<HashMap<_, _>>();
+                    .collect::<BTreeMap<_, _>>();
 
                 let event = EventProto::Log(Log { fields });
 
@@ -603,7 +599,7 @@ impl From<Event> for Vec<u8> {
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
-            fields: HashMap::new(),
+            fields: BTreeMap::new(),
         });
 
         event
@@ -643,7 +639,7 @@ impl From<Metric> for Event {
 
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
-    inner: std::collections::hash_map::Iter<'a, Atom, Value>,
+    inner: std::collections::btree_map::Iter<'a, Atom, Value>,
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
