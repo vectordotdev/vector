@@ -293,7 +293,7 @@ impl Service<RequestWrapper> for GcsSink {
 }
 
 fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(&value).unwrap();
+    let value = serde_json::to_value(value).unwrap();
     value.as_str().unwrap().into()
 }
 
@@ -358,13 +358,15 @@ struct RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
-        let acl = HeaderValue::from_str(&to_string(&config.acl)).unwrap();
+        let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
+        let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
         let content_type = HeaderValue::from_str(config.encoding.content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
-        let storage_class = HeaderValue::from_str(&to_string(&config.storage_class)).unwrap();
+        let storage_class = config.storage_class.unwrap_or(GcsStorageClass::default());
+        let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
         let tags = config
             .tags
             .as_ref()
