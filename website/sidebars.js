@@ -158,6 +158,8 @@ module.exports = {
             
               "reference/transforms/concat",
             
+              "reference/transforms/dedupe",
+            
               "reference/transforms/field_filter",
             
               "reference/transforms/geoip",

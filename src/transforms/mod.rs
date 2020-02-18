@@ -7,6 +7,7 @@ pub mod ansi_stripper;
 pub mod aws_ec2_metadata;
 pub mod coercer;
 pub mod concat;
+pub mod dedupe;
 pub mod field_filter;
 pub mod geoip;
 pub mod grok_parser;
