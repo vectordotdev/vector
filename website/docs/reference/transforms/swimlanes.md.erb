@@ -26,6 +26,10 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+## Output
+
+<%= component_output(component, component.output.log, heading_depth: 3) %>
+
 ## How It Works [[sort]]
 
 ### Creating Swimlanes

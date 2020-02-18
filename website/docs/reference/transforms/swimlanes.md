@@ -192,6 +192,95 @@ Check whether a fields contents does not match the value specified.
 
 </Fields>
 
+## Output
+
+The `swimlanes` transform accepts [`log`][docs.data-model.log] events and allows you to route events across parallel streams using logical filters.
+For example:
+
+
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="ifelse"
+  values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="ifelse">
+
+The `swimlanes` transform, in it's simplest form, can act as a simple if/else stream splitter. For example, let's split the `log` stream based on `level`
+equaling `"error"`:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.error_splitter]
+  type = "swimlanes"
+
+  [transforms.error_splitter.lanes.errors]
+    type = "check_fields"
+    "level.eq" = "error"
+
+  [transforms.error_splitter.lanes.not_errors]
+    type = "check_fields"
+    "level.neq" = "error"
+
+[sinks.error_printer]
+  type = "console"
+  inputs = ["errors"]
+  target = "stderr"
+
+[sinks.not_errors_printer]
+  type = "console"
+  inputs = ["not_errors"]
+  target = "stdout"
+```
+
+Notice how our conditions for each lane are mutually exclusive. You can see why this approach is more powerful than a simple if/else transform.
+
+</TabItem>
+
+<TabItem value="splitting">
+
+To follow up with the previous `If/Else` example, let's say we want to split a log stream based on all of the log `level` values:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.error_splitter]
+  type = "swimlanes"
+
+  [transforms.error_splitter.lanes.debug_events]
+    type = "check_fields"
+    "level.eq" = "debug"
+
+  [transforms.error_splitter.lanes.info_events]
+    type = "check_fields"
+    "level.neq" = "info"
+
+  [transforms.error_splitter.lanes.warn_events]
+    type = "check_fields"
+    "level.neq" = "warn"
+
+  [transforms.error_splitter.lanes.error_events]
+    type = "check_fields"
+    "level.neq" = "error_events"
+
+[sinks.error_printer]
+  type = "console"
+  inputs = ["error_events"]
+  target = "stderr"
+
+# Add more sinks or transforms that use the `debug_events`, `info_events`,
+# and `warn_events` streams
+```
+
+Notice how we must define mutually exclusive conditions for each `level` value. If a log `level` does not match any of the lanes it will be dropped.
+
+</TabItem>
+</Tabs>
+
 ## How It Works
 
 ### Creating Swimlanes
