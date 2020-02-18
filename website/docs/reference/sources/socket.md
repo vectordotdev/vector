@@ -130,7 +130,7 @@ The address to listen for connections on, or `systemd#N` to use the Nth socket p
 
 ### host_key
 
-The key name added to each event representing the current host. This can also be globally set via the [global [`host_key`](#host_key) option][docs.reference.global-options#host-key]. See [Context](#context) for more info.
+The key name added to each event representing the current host. This can also be globally set via the [global [`host_key`](#host_key) option][docs.reference.global-options#host_key]. See [Context](#context) for more info.
 
 
 </Field>
@@ -343,4 +343,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.reference.global-options#host-key]: /docs/reference/global-options/#host-key
+[docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key

@@ -106,7 +106,7 @@ import Field from '@site/src/components/Field';
 
 ### host
 
-Represents the originating host of the log. This is automatically set within select [sources][docs.sources] if the key does not exist. Change this field name via the [global `host_key` option][docs.reference.global-options#host-key] or the source-level `host_key` option for relevant sources. See [Changing The Default Schema](#changing-the-default-schema) for more info.
+Represents the originating host of the log. This is automatically set within select [sources][docs.sources] if the key does not exist. Change this field name via the [global `host_key` option][docs.reference.global-options#host_key] or the source-level `host_key` option for relevant sources. See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
 </Field>
@@ -193,10 +193,10 @@ import Jump from '@site/src/components/Jump';
 
 ### Changing The Default Schema
 
-Vectur is unique in that you can change the default schema. Vector does not
-require you to use specific field names. This makes integrating Vector into
-existing pipelines much easier. The [`message`](#message), [`host`](#host), and [`timestamp`](#timestamp) field
-names can all be changed via the
+Vector is unique in that you are not required to use a specific schema. You
+can change the default schema. This makes integrating Vector into existing
+pipelines much easier. The [`message`](#message), [`host`](#host), and [`timestamp`](#timestamp) field names can
+all be changed via the
 [global `log_schema` options][docs.reference.global-options#log_schema].
 
 #### Field name collisions
@@ -255,7 +255,7 @@ Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
 stored as UTC.
 
 
-[docs.reference.global-options#host-key]: /docs/reference/global-options/#host-key
+[docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message-key]: /docs/reference/global-options/#message-key
 [docs.sources]: /docs/reference/sources/

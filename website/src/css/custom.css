@@ -597,7 +597,6 @@ header h1 {
   font-size: 2.5rem;
 }
 .hero .hero--subtitle {
-  color: var(--ifm-color-emphasis-600);
   font-size: 1.1rem;
   margin-top: 0.3rem;
   margin-bottom: var(--ifm-spacing-vertical);
@@ -610,7 +609,7 @@ header h1 {
   color: var(--ifm-link-color);
 }
 .hero .hero--subsubtitle {
-  color: var(--ifm-color-emphasis-600);
+  color: var(--ifm-hero-text-color);
   font-size: 0.9rem;
   margin-top: 0.3rem;
 }
