@@ -269,7 +269,7 @@ impl Service<RequestWrapper> for GcsSink {
         builder.method(Method::PUT);
         builder.uri(uri);
         let headers = builder.headers_mut().unwrap();
-        headers.insert("content-type", HeaderValue::from_str("text/plain").unwrap()); // FIXME needs proper content type
+        headers.insert("content-type", settings.content_type);
         headers.insert(
             "content-length",
             HeaderValue::from_str(&format!("{}", request.body.len())).unwrap(),
