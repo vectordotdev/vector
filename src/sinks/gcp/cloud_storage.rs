@@ -55,25 +55,25 @@ pub struct GcsSinkConfig {
     acl: Option<GcsPredefinedAcl>,
     storage_class: Option<GcsStorageClass>,
     tags: Option<HashMap<String, String>>,
-    pub key_prefix: Option<String>,
-    pub filename_time_format: Option<String>,
-    pub filename_append_uuid: Option<bool>,
-    pub filename_extension: Option<String>,
+    key_prefix: Option<String>,
+    filename_time_format: Option<String>,
+    filename_append_uuid: Option<bool>,
+    filename_extension: Option<String>,
     encoding: Encoding,
-    pub compression: Compression,
+    compression: Compression,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    batch: BatchBytesConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    request: TowerRequestConfig,
     #[serde(flatten)]
-    pub auth: GcpAuthConfig,
-    pub tls: Option<TlsOptions>,
+    auth: GcpAuthConfig,
+    tls: Option<TlsOptions>,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "camelCase")]
-pub enum GcsPredefinedAcl {
+enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
     BucketOwnerRead,
@@ -86,7 +86,7 @@ pub enum GcsPredefinedAcl {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum GcsStorageClass {
+enum GcsStorageClass {
     #[derivative(Default)]
     Standard,
     Nearline,
@@ -105,7 +105,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub enum Encoding {
+enum Encoding {
     #[derivative(Default)]
     Text,
     Ndjson,
@@ -123,7 +123,7 @@ impl Encoding {
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub enum Compression {
+enum Compression {
     #[derivative(Default)]
     Gzip,
     None,
@@ -224,7 +224,7 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(&self) -> crate::Result<Healthcheck> {
+    fn healthcheck(&self) -> crate::Result<Healthcheck> {
         let mut builder = Request::builder();
         builder.method(Method::HEAD);
         builder.uri(self.base_url.parse::<Uri>()?);
@@ -434,7 +434,7 @@ fn encode_event(
 }
 
 #[derive(Clone)]
-pub struct GcsRetryLogic;
+struct GcsRetryLogic;
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
 impl RetryLogic for GcsRetryLogic {
