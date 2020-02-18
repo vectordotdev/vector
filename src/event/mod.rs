@@ -661,7 +661,7 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::Event;
+    use super::{Atom, Event, Value};
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -732,6 +732,25 @@ mod test {
             ]
             .into_iter()
             .collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn event_iteration_order() {
+        let mut event = Event::new_empty_log();
+        let log = event.as_mut_log();
+        log.insert(&Atom::from("lZDfzKIL"), Value::from("tOVrjveM"));
+        log.insert(&Atom::from("o9amkaRY"), Value::from("pGsfG7Nr"));
+        log.insert(&Atom::from("YRjhxXcg"), Value::from("nw8iM5Jr"));
+
+        let collected: Vec<_> = log.all_fields().collect();
+        assert_eq!(
+            collected,
+            vec![
+                (&Atom::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
+                (&Atom::from("lZDfzKIL"), &Value::from("tOVrjveM")),
+                (&Atom::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+            ]
         );
     }
 }
