@@ -98,6 +98,7 @@ scopes:
   - remove_tags transform
   - sampler transform
   - split transform
+  - swimlanes transform
   - tokenizer transform
 
   # sinks

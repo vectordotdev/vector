@@ -1,0 +1,63 @@
+<%- component = metadata.transforms.swimlanes -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%- if !component.requirements.nil? -%>
+## Requirements
+
+<Alert type="danger" fill={true} icon={false}>
+
+<%= component.requirements %>
+
+</Alert>
+
+<%- end -%>
+## Options
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+### Creating Swimlanes
+
+If we were to have two sinks `only_loves_gerry` and `hates_gerry`, and wished to
+route messages from the host `gerry` to the sink `only_loves_gerry` and _all_
+other events to the sink `hates_gerry` we can achieve that with two swimlanes:
+
+```toml
+[transforms.splitting_gerrys]
+  inputs = [ "somewhere" ]
+  type = "swimlanes"
+
+  [transforms.splitting_gerrys.lanes.only_gerrys]
+    type = "check_fields"
+    "host.eq" = "gerry"
+
+  [transforms.splitting_gerrys.lanes.no_gerrys]
+    type = "check_fields"
+    "host.neq" = "gerry"
+
+[sinks.only_loves_gerry]
+  inputs = [ "splitting_gerrys.only_gerrys" ]
+  type = "something"
+
+[sinks.hates_gerry]
+  inputs = [ "splitting_gerrys.no_gerrys" ]
+  type = "something_else"
+```
+
+This syntax makes it easy to create arbitrary numbers of swimlanes, each with
+their own logic, and easily route them to downstream components.
+
+<%= component_sections(component) %>
+

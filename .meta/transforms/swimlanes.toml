@@ -1,0 +1,65 @@
+[transforms.swimlanes]
+title = "Swimlanes"
+allow_you_to_description = "route events across parallel streams using logical filters"
+beta = true
+common = false
+function_category = "filter"
+input_types = ["log"]
+output_types = ["log"]
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "swimlanes") %>
+
+[transforms.swimlanes.options.lanes]
+type = "table"
+common = true
+description = """\
+A table of swimlane identifiers to logical conditions representing the filter of \
+the swimlane. Each swimlane can then be referenced as an input by other components \
+with the name `<transform_name>.<swimlane_id>`.\
+"""
+
+[transforms.swimlanes.options.lanes.children."`<swimlane_id>`"]
+type = "table"
+common = true
+description = "The identifier of a swimlane."
+
+[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children.type]
+type = "string"
+examples = ["check_fields"]
+common = true
+description = """\
+The type of the condition to execute. Currently only the `check_fields` type is \
+available.\
+"""
+
+[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children."`<field_name>`.eq"]
+type = "string"
+examples = [
+  { "message.eq" = "this is the content to match against" }
+]
+common = true
+description = """\
+Check whether a fields contents exactly matches the value specified.\
+"""
+
+[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children."`<field_name>`.neq"]
+type = "string"
+examples = [
+  { "method.neq" = "POST" }
+]
+common = true
+description = """\
+Check whether a fields contents does not match the value specified.\
+"""
+
+[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children."`<field_name>`.exists"]
+type = "bool"
+examples = [
+  { "host.exists" = true }
+]
+common = true
+description = """\
+Check whether a field exists or does not exist, depending on the provided value\
+being `true` or `false` respectively.\
+"""
+

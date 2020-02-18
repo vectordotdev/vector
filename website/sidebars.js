@@ -184,6 +184,8 @@ module.exports = {
             
               "reference/transforms/split",
             
+              "reference/transforms/swimlanes",
+            
               "reference/transforms/tokenizer",
             
           ]
