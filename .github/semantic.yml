@@ -112,6 +112,7 @@ scopes:
   - file sink
   - gcp_pubsub sink
   - gcp_stackdriver_logging sink
+  - honeycomb sink
   - http sink
   - humio_logs sink
   - kafka sink

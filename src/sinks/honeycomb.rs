@@ -19,9 +19,10 @@ lazy_static::lazy_static! {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HoneycombConfig {
     api_key: String,
-    dataset: String,
 
-    host: Option<UriSerde>,
+    // TODO: we probably want to make this a template
+    // but this limits us in how we can do our healthcheck.
+    dataset: String,
 
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -97,9 +98,7 @@ impl HttpSink for HoneycombConfig {
 
 impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
-        let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
-
-        let uri = format!("{}/{}", host, self.dataset);
+        let uri = format!("{}/{}", HOST.clone(), self.dataset);
 
         uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
