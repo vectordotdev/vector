@@ -6,7 +6,36 @@ function_category = "collect"
 output_types = ["log"]
 through_description = "kubernetes node's"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "kubernetes") %>
+[sources.kubernetes.options.include_container_names]
+type = "[string]"
+common = true
+examples = [["my_container_name","container_prefix"]]
+description = """\
+A list of container names to match against. Prefix matches are \
+supported, meaning you can supply just the first few characters of \
+the container name. If not provided, all containers will be included.\
+"""
+
+[sources.kubernetes.options.include_pod_uids]
+type = "[string]"
+common = false
+examples = [["8f0290f83cb28","a027f09d-8f18-2345-"]]
+description = """\
+A list of Pod UIDs to match against. Prefix matches are \
+supported, meaning you can supply just the first few characters \
+of the Pod UID. If not provided, all Pods will be included.\
+"""
+
+[sources.kubernetes.options.include_namespaces]
+type = "[string]"
+common = true
+examples = [["my_app_namespace","kube-system"]]
+description = """\
+A list of namespaces to match against.\
+If not provided, all namespaces will be included with exception \
+of `kube-system`. Which is by default excluded, \
+unless there are any non empty `include` options.\
+"""
 
 [sources.kubernetes.output.log.fields.container_name]
 type = "string"

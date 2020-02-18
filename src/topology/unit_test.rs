@@ -114,7 +114,7 @@ impl UnitTest {
                     .iter()
                     .enumerate()
                     .flat_map(|(i, cond)| {
-                        outputs
+                        let cond_errs = outputs
                             .iter()
                             .enumerate()
                             .filter_map(|(j, e)| {
@@ -126,7 +126,13 @@ impl UnitTest {
                                     }
                                 })
                             })
-                            .collect::<Vec<_>>()
+                            .collect::<Vec<_>>();
+                        if cond_errs.len() < outputs.len() {
+                            // At least one output succeeded for this condition.
+                            Vec::new()
+                        } else {
+                            cond_errs
+                        }
                     })
                     .collect::<Vec<_>>();
                 if !failed_conditions.is_empty() {
@@ -136,6 +142,12 @@ impl UnitTest {
                         failed_conditions.join("\n  "),
                         events_to_string("input", inputs),
                         events_to_string("output", outputs),
+                    ));
+                }
+                if outputs.is_empty() {
+                    errors.push(format!(
+                        "check transform '{}' failed, no events received.",
+                        check.extract_from,
                     ));
                 }
             } else {
@@ -599,6 +611,107 @@ mod tests {
 
         let mut tests = build_unit_tests(&config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_fail_no_outputs() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = [ "TODO" ]
+  type = "field_filter"
+  field = "not_exist"
+  value = "not_value"
+
+[[tests]]
+    name = "check_no_outputs"
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "test value"
+
+    [[tests.outputs]]
+        extract_from = "foo"
+        [[tests.outputs.conditions]]
+            type = "check_fields"
+            "message.equals" = "test value"
+      "#,
+        )
+        .unwrap();
+
+        let mut tests = build_unit_tests(&config).unwrap();
+        assert_ne!(tests[0].run().1, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_fail_two_output_events() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = [ "TODO" ]
+  type = "add_fields"
+  [transforms.foo.fields]
+    foo = "new field 1"
+
+[transforms.bar]
+  inputs = [ "foo" ]
+  type = "add_fields"
+  [transforms.bar.fields]
+    bar = "new field 2"
+
+[transforms.baz]
+  inputs = [ "foo" ]
+  type = "add_fields"
+  [transforms.baz.fields]
+    baz = "new field 3"
+
+[transforms.boo]
+  inputs = [ "bar", "baz" ]
+  type = "add_fields"
+  [transforms.boo.fields]
+    boo = "new field 4"
+
+[[tests]]
+    name = "check_multi_payloads"
+
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "first"
+
+    [[tests.outputs]]
+        extract_from = "boo"
+
+        [[tests.outputs.conditions]]
+            type = "check_fields"
+            "baz.equals" = "new field 3"
+
+        [[tests.outputs.conditions]]
+            type = "check_fields"
+            "bar.equals" = "new field 2"
+
+[[tests]]
+    name = "check_multi_payloads_bad"
+
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "first"
+
+    [[tests.outputs]]
+        extract_from = "boo"
+
+        [[tests.outputs.conditions]]
+            type = "check_fields"
+            "baz.equals" = "new field 3"
+            "bar.equals" = "new field 2"
+      "#,
+        )
+        .unwrap();
+
+        let mut tests = build_unit_tests(&config).unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
+        assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
     #[test]

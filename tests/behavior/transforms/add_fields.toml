@@ -84,3 +84,47 @@
     [[tests.outputs.conditions]]
       type = "check_fields"
       "a.equals" = "new value"
+
+[transforms.add_fields_templated_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_templated_1.fields]
+    a = "initial value"
+[transforms.add_fields_templated_2]
+  inputs = ["add_fields_templated_1"]
+  type = "add_fields"
+  [transforms.add_fields_templated_2.fields]
+    b = "a was: {{a}}"
+[[tests]]
+  name = "add_fields_templated_1"
+  [tests.input]
+    insert_at = "add_fields_templated_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_templated_2"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "b.equals" = "a was: initial value"
+
+[transforms.add_fields_templated_nested_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_templated_nested_1.fields]
+    a.b = "initial value"
+[transforms.add_fields_templated_nested_2]
+  inputs = ["add_fields_templated_nested_1"]
+  type = "add_fields"
+  [transforms.add_fields_templated_nested_2.fields]
+    b.c = "a.b was: {{a.b}}"
+[[tests]]
+  name = "add_fields_templated_nested_1"
+  [tests.input]
+    insert_at = "add_fields_templated_nested_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_templated_nested_2"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "b.c.equals" = "a.b was: initial value"

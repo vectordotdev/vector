@@ -152,7 +152,7 @@ function DocItem(props) {
       <div className="padding-vert--lg">
         <div className="container container--fluid">
           <div className="row">
-            <div className="col">
+            <div className="col col--9" style={{width: "1px"}}>
               <div className={styles.docItemContainer}>
                 <article>
                   {version && (

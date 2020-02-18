@@ -61,16 +61,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   group_id = "consumer-group-name" # example
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
 
-  # OPTIONAL
+  # OPTIONAL - General
   auto_offset_reset = "largest" # default
+  fetch_wait_max_ms = 100 # default, milliseconds
   key_field = "user_id" # example, no default
   session_timeout_ms = 10000 # default, milliseconds
+  socket_timeout_ms = 60000 # default, milliseconds
+
+  # OPTIONAL - Advanced
+  [sources.my_source_id.librdkafka_options]
+    "client.id" = "${ENV_VAR}" # example
+    "fetch.error.backoff.ms" = "1000" # example
 ```
 
 </TabItem>
@@ -131,6 +138,29 @@ A comma-separated list of host and port pairs that are the addresses of the Kafk
 
 
 <Field
+  common={false}
+  defaultValue={100}
+  enumValues={null}
+  examples={[50,100]}
+  name={"fetch_wait_max_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"milliseconds"}
+  >
+
+### fetch_wait_max_ms
+
+Maximum time the broker may wait to fill the response.
+
+
+
+</Field>
+
+
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -177,6 +207,56 @@ The log field name to use for the topic key. If unspecified, the key would not b
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### librdkafka_options
+
+Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"}]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={10000}
   enumValues={null}
   examples={[5000,10000]}
@@ -192,6 +272,29 @@ The log field name to use for the topic key. If unspecified, the key would not b
 ### session_timeout_ms
 
 The Kafka session timeout in milliseconds.
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={60000}
+  enumValues={null}
+  examples={[30000,60000]}
+  name={"socket_timeout_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"milliseconds"}
+  >
+
+### socket_timeout_ms
+
+Default timeout for network requests.
 
 
 

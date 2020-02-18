@@ -70,6 +70,41 @@ description = """\
 The Kafka session timeout in milliseconds.
 """
 
+[sources.kafka.options.socket_timeout_ms]
+type = "int"
+examples = [30000, 60000]
+default = 60000
+unit = "milliseconds"
+description = """\
+Default timeout for network requests.
+"""
+
+[sources.kafka.options.fetch_wait_max_ms]
+type = "int"
+examples = [50, 100]
+default = 100
+unit = "milliseconds"
+description = """\
+Maximum time the broker may wait to fill the response.
+"""
+
+[sources.kafka.options.librdkafka_options]
+type = "table"
+category = "Advanced"
+description = """\
+Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+"""
+
+[sources.kafka.options.librdkafka_options.children."`[field-name]`"]
+type = "string"
+examples = [
+  {"client.id" = "${ENV_VAR}"},
+  {"fetch.error.backoff.ms" = "1000"},
+]
+description = """\
+The options and their values. Accepts `string` values.
+"""
+
 [sources.kafka.output.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]

@@ -16,7 +16,7 @@ use rdkafka::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
@@ -36,6 +36,19 @@ pub struct KafkaSinkConfig {
     key_field: Option<Atom>,
     encoding: Encoding,
     tls: Option<KafkaSinkTlsConfig>,
+    #[serde(default = "default_socket_timeout_ms")]
+    socket_timeout_ms: u64,
+    #[serde(default = "default_message_timeout_ms")]
+    message_timeout_ms: u64,
+    librdkafka_options: Option<HashMap<String, String>>,
+}
+
+fn default_socket_timeout_ms() -> u64 {
+    60000 // default in librdkafka
+}
+
+fn default_message_timeout_ms() -> u64 {
+    300000 // default in librdkafka
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -107,6 +120,13 @@ impl KafkaSinkConfig {
             }
             if let Some(ref pass) = tls.options.key_pass {
                 client_config.set("ssl.keystore.password", pass);
+            }
+        }
+        client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
+        client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
+        if let Some(ref librdkafka_options) = self.librdkafka_options {
+            for (key, value) in librdkafka_options.iter() {
+                client_config.set(key.as_str(), value.as_str());
             }
         }
         Ok(client_config)
@@ -331,6 +351,9 @@ mod integration_test {
             encoding: Encoding::Text,
             key_field: None,
             tls,
+            socket_timeout_ms: 60000,
+            message_timeout_ms: 300000,
+            librdkafka_options: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();

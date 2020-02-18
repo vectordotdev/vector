@@ -20,7 +20,8 @@ import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useHideableNavbar from '@theme/hooks/useHideableNavbar';
-import useTheme from '@theme/hooks/useTheme';
+import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
+import useThemeContext from '@theme/hooks/useThemeContext';
 
 import styles from './styles.module.css';
 
@@ -101,24 +102,34 @@ function Navbar() {
   const {title, logo = {}, links = [], hideOnScroll = false} = navbar;
   const [sidebarShown, setSidebarShown] = useState(false);
   const [isSearchBarExpanded, setIsSearchBarExpanded] = useState(false);
-  const [theme, setTheme] = useTheme();
+  const {isDarkTheme, setLightTheme, setDarkTheme} = useThemeContext();
   const {navbarRef, isNavbarVisible} = useHideableNavbar(hideOnScroll);
 
+  useLockBodyScroll(sidebarShown);
+
   const showSidebar = useCallback(() => {
-    document.body.style.overflow = 'hidden';
     setSidebarShown(true);
   }, [setSidebarShown]);
   const hideSidebar = useCallback(() => {
-    document.body.style.overflow = 'visible';
     setSidebarShown(false);
   }, [setSidebarShown]);
 
   const onToggleChange = useCallback(
-    e => setTheme(e.target.checked ? 'dark' : ''),
-    [setTheme],
+    e => (e.target.checked ? setDarkTheme() : setLightTheme()),
+    [setLightTheme, setDarkTheme],
   );
 
-  const logoUrl = useBaseUrl(logo.src);
+  const logoLink = logo.href || baseUrl;
+  const isExternalLogoLink = /http/.test(logoLink);
+  const logoLinkProps = isExternalLogoLink
+    ? {
+        rel: 'noopener noreferrer',
+        target: '_blank',
+      }
+    : null;
+  const logoSrc = logo.srcDark && isDarkTheme ? logo.srcDark : logo.src;
+  const logoImageUrl = useBaseUrl(logoSrc);
+
   return (
     <nav
       ref={navbarRef}
@@ -153,9 +164,9 @@ function Navbar() {
               />
             </svg>
           </div>
-          <Link className="navbar__brand" to={baseUrl}>
+          <Link className="navbar__brand" to={logoLink} {...logoLinkProps}>
             {logo != null && (
-              <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
+              <SVG className="navbar__logo" src={logoImageUrl} alt={logo.alt} />
             )}
             {title != null && (
               <strong
@@ -180,7 +191,7 @@ function Navbar() {
             <Toggle
               className={styles.displayOnlyInLargeViewport}
               aria-label="Dark mode toggle"
-              checked={theme === 'dark'}
+              checked={isDarkTheme}
               onChange={onToggleChange}
             />
           )}
@@ -197,16 +208,20 @@ function Navbar() {
       />
       <div className="navbar-sidebar">
         <div className="navbar-sidebar__brand">
-          <Link className="navbar__brand" onClick={hideSidebar} to={baseUrl}>
+          <Link
+            className="navbar__brand"
+            onClick={hideSidebar}
+            to={logoLink}
+            {...logoLinkProps}>
             {logo != null && (
-              <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
+              <SVG className="navbar__logo" src={logoImageUrl} alt={logo.alt} />
             )}
             {title != null && <strong>{title}</strong>}
           </Link>
           {!disableDarkMode && sidebarShown && (
             <Toggle
               aria-label="Dark mode toggle in sidebar"
-              checked={theme === 'dark'}
+              checked={isDarkTheme}
               onChange={onToggleChange}
             />
           )}

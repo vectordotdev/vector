@@ -19,6 +19,7 @@ pub mod list;
 pub mod metrics;
 pub mod region;
 pub mod runtime;
+pub mod serde;
 pub mod sinks;
 pub mod sources;
 pub mod template;
