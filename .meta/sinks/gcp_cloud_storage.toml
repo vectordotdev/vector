@@ -66,18 +66,18 @@ NEARLINE = "Nearline Storage is a low-cost, highly durable storage service for s
 COLDLINE = "Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data."
 ARCHIVE = "Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."
 
-[sinks.gcp_cloud_storage.options.tags]
+[sinks.gcp_cloud_storage.options.metadata]
 type = "string"
 category = "Object Attributes"
 common = false
 required = false
-description = "The tag-set for the created objects."
+description = "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata][urls.gcs_custom_metadata] documentation for more details."
 
-[sinks.gcp_cloud_storage.options.tags.children."`[tag-name]`"]
+[sinks.gcp_cloud_storage.options.metadata.children."`[key-name]`"]
 type = "string"
 required = false
-examples = [ {"Tag1" = "Value1"} ]
-description = "A custom tag to be added to the created objects."
+examples = [ {"Key1" = "Value1"} ]
+description = "A custom metadata item to be added to the created objects."
 
 [sinks.gcp_cloud_storage.options.key_prefix]
 type = "string"

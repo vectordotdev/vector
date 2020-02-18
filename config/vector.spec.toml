@@ -3592,6 +3592,13 @@ end
   acl = "projectPrivate"
   acl = "publicRead"
 
+  # The set of metadata `key:value` pairs for the created objects. See the GCS
+  # custom metadata documentation for more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
   # The storage class for the created objects. See the GCP storage classes for
   # more details.
   #
@@ -3603,12 +3610,6 @@ end
   storage_class = "NEARLINE"
   storage_class = "COLDLINE"
   storage_class = "ARCHIVE"
-
-  # The tag-set for the created objects.
-  #
-  # * optional
-  # * no default
-  # * type: string
 
   #
   # Batch

@@ -54,7 +54,7 @@ pub struct GcsSinkConfig {
     bucket: String,
     acl: Option<GcsPredefinedAcl>,
     storage_class: Option<GcsStorageClass>,
-    tags: Option<HashMap<String, String>>,
+    metadata: Option<HashMap<String, String>>,
     key_prefix: Option<String>,
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
@@ -279,7 +279,7 @@ impl Service<RequestWrapper> for GcsSink {
             .map(|ce| headers.insert("content-encoding", ce));
         headers.insert("x-goog-acl", settings.acl);
         headers.insert("x-goog-storage-class", settings.storage_class);
-        for (p, v) in settings.tags {
+        for (p, v) in settings.metadata {
             headers.insert(p, v);
         }
 
@@ -350,7 +350,7 @@ struct RequestSettings {
     content_type: HeaderValue,
     content_encoding: Option<HeaderValue>,
     storage_class: HeaderValue,
-    tags: Vec<(HeaderName, HeaderValue)>,
+    metadata: Vec<(HeaderName, HeaderValue)>,
     extension: String,
     time_format: String,
     append_uuid: bool,
@@ -367,10 +367,15 @@ impl RequestSettings {
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
         let storage_class = config.storage_class.unwrap_or(GcsStorageClass::default());
         let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
-        let tags = config
-            .tags
+        let metadata = config
+            .metadata
             .as_ref()
-            .map(|tags| tags.iter().map(make_header).collect::<Result<Vec<_>, _>>())
+            .map(|metadata| {
+                metadata
+                    .iter()
+                    .map(make_header)
+                    .collect::<Result<Vec<_>, _>>()
+            })
             .unwrap_or(Ok(vec![]))?;
         let extension = config
             .filename_extension
@@ -383,7 +388,7 @@ impl RequestSettings {
             content_type,
             content_encoding,
             storage_class,
-            tags,
+            metadata,
             extension,
             time_format,
             append_uuid,

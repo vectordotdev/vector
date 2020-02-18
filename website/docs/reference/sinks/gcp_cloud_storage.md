@@ -92,8 +92,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Object Attributes
   acl = "authenticatedRead" # example, no default, enum
+  metadata = nil # example, no default
   storage_class = "STANDARD" # example, no default, enum
-  tags = nil # example, no default
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -552,6 +552,54 @@ A prefix to apply to all object key names. This should be used to partition your
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  name={"metadata"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### metadata
+
+The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata][urls.gcs_custom_metadata] documentation for more details.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Key1":"Value1"}]}
+  name={"`[key-name]`"}
+  path={"metadata"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[key-name]`
+
+A custom metadata item to be added to the created objects.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -745,54 +793,6 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 The storage class for the created objects. See [the GCP storage classes](https://cloud.google.com/storage/docs/storage-classes) for more details.
 
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  name={"tags"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### tags
-
-The tag-set for the created objects.
-
-<Fields filters={false}>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Tag1":"Value1"}]}
-  name={"`[tag-name]`"}
-  path={"tags"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### `[tag-name]`
-
-A custom tag to be added to the created objects.
-
-
-</Field>
-
-
-</Fields>
 
 </Field>
 
@@ -1110,5 +1110,6 @@ You can learn more about the complete syntax in the
 [docs.reference.templating]: /docs/reference/templating/
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
+[urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 [urls.new_gcp_cloud_storage_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_cloud_storage
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
