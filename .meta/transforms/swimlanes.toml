@@ -23,43 +23,81 @@ type = "table"
 common = true
 description = "The identifier of a swimlane."
 
-[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children.type]
-type = "string"
-examples = ["check_fields"]
-common = true
-description = """\
-The type of the condition to execute. Currently only the `check_fields` type is \
-available.\
+<%= render("_partials/_conditions.toml", namespace: "transforms.swimlanes.options.lanes.children.\"`<swimlane_id>`\".children") %>
+
+[[transforms.swimlanes.output.log.examples]]
+label = "If/Else"
+body = """\
+The `swimlanes` transform, in it's simplest form, can act as a simple if/else \
+stream splitter. For example, let's split the `log` stream based on `level`
+equaling `"error"`:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.error_splitter]
+  type = "swimlanes"
+
+  [transforms.error_splitter.lanes.errors]
+    type = "check_fields"
+    "level.eq" = "error"
+
+  [transforms.error_splitter.lanes.not_errors]
+    type = "check_fields"
+    "level.neq" = "error"
+
+[sinks.error_printer]
+  type = "console"
+  inputs = ["errors"]
+  target = "stderr"
+
+[sinks.not_errors_printer]
+  type = "console"
+  inputs = ["not_errors"]
+  target = "stdout"
+```
+
+Notice how our conditions for each lane are mutually exclusive. You can see \
+why this approach is more powerful than a simple if/else transform.\
 """
 
-[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children."`<field_name>`.eq"]
-type = "string"
-examples = [
-  { "message.eq" = "this is the content to match against" }
-]
-common = true
-description = """\
-Check whether a fields contents exactly matches the value specified.\
-"""
+[[transforms.swimlanes.output.log.examples]]
+label = "Splitting"
+body = """\
+To follow up with the previous `If/Else` example, let's say we want to split \
+a log stream based on all of the log `level` values:
 
-[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children."`<field_name>`.neq"]
-type = "string"
-examples = [
-  { "method.neq" = "POST" }
-]
-common = true
-description = """\
-Check whether a fields contents does not match the value specified.\
-"""
+<CodeHeader fileName="vector.toml" />
 
-[transforms.swimlanes.options.lanes.children."`<swimlane_id>`".children."`<field_name>`.exists"]
-type = "bool"
-examples = [
-  { "host.exists" = true }
-]
-common = true
-description = """\
-Check whether a field exists or does not exist, depending on the provided value\
-being `true` or `false` respectively.\
-"""
+```toml
+[transforms.error_splitter]
+  type = "swimlanes"
 
+  [transforms.error_splitter.lanes.debug_events]
+    type = "check_fields"
+    "level.eq" = "debug"
+
+  [transforms.error_splitter.lanes.info_events]
+    type = "check_fields"
+    "level.neq" = "info"
+
+  [transforms.error_splitter.lanes.warn_events]
+    type = "check_fields"
+    "level.neq" = "warn"
+
+  [transforms.error_splitter.lanes.error_events]
+    type = "check_fields"
+    "level.neq" = "error_events"
+
+[sinks.error_printer]
+  type = "console"
+  inputs = ["error_events"]
+  target = "stderr"
+
+# Add more sinks or transforms that use the `debug_events`, `info_events`,
+# and `warn_events` streams
+```
+
+Notice how we must define mutually exclusive conditions for each `level` \
+value. If a log `level` does not match any of the lanes it will be dropped.\
+"""
