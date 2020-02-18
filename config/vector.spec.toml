@@ -3578,8 +3578,7 @@ end
   #
 
   # Predefined ACL to apply to the created objects. For more information, see
-  # [Predefined
-  # ACLs]https://cloud.google.com/storage/docs/access-control/lists#predefined-acl).
+  # Predefined ACLs.
   #
   # * optional
   # * no default

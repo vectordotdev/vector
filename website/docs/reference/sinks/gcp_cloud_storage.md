@@ -134,6 +134,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </Tabs>
 
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -159,7 +160,7 @@ import Field from '@site/src/components/Field';
 
 ### acl
 
-Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs]https://cloud.google.com/storage/docs/access-control/lists#predefined-acl).
+Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs][urls.gcs_predefined_acl]. See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -453,7 +454,7 @@ The encoding format used to serialize the events before outputting.
 
 ### filename_append_uuid
 
-Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases.
+Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object naming](#object-naming) for more info.
 
 
 </Field>
@@ -497,7 +498,7 @@ The filename extension to use in the object name.
 
 ### filename_time_format
 
-The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported.
+The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported. See [Object naming](#object-naming) for more info.
 
 
 </Field>
@@ -541,7 +542,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 ### key_prefix
 
-A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root GCS "folder". See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
+A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root GCS "folder". See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
 
 
 </Field>
@@ -791,7 +792,7 @@ The maximum time a request can take before being aborted. It is highly recommend
 
 ### storage_class
 
-The storage class for the created objects. See [the GCP storage classes](https://cloud.google.com/storage/docs/storage-classes) for more details.
+The storage class for the created objects. See [the GCP storage classes][urls.gcs_storage_classes] for more details. See [Storage class](#storage-class) for more info.
 
 
 </Field>
@@ -1050,6 +1051,63 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
+### Object access control list (ACL)
+
+GCP Cloud Storage supports access control lists (ACL) for buckets and
+objects. In the context of Vector, only object ACLs are relevant (Vector
+does not create or modify buckets). You can set the object level ACL by
+using the [`acl`](#acl) option, which allows you to set one of the [predefined
+ACLs][urls.gcs_predefined_acl] on each created object.
+
+
+### Object naming
+
+By default, Vector will name your GCS objects in the following format:
+
+<Tabs
+  block={true}
+  defaultValue="without_compression"
+  values={[
+    { label: 'Without Compression', value: 'without_compression', },
+    { label: 'With Compression', value: 'with_compression', },
+  ]
+}>
+
+<TabItem value="without_compression">
+
+```
+<key_prefix><timestamp>-<uuidv4>.log
+```
+
+For example:
+
+```
+date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
+```
+
+</TabItem>
+<TabItem value="with_compression">
+
+```
+<key_prefix><timestamp>-<uuidv4>.log.gz
+```
+
+For example:
+
+```
+date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
+```
+
+</TabItem>
+</Tabs>
+
+Vector appends a [UUIDV4][urls.uuidv4] token to ensure there are no name
+conflicts in the unlikely event 2 Vector instances are writing data at the same
+time.
+
+You can control the resulting name via the [`key_prefix`](#key_prefix), [`filename_time_format`](#filename_time_format),
+and [`filename_append_uuid`](#filename_append_uuid) options.
+
 ### Partitioning
 
 Partitioning is controlled via the [`key_prefix`](#key_prefix)
@@ -1077,6 +1135,20 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+
+### Storage class
+
+GCS offers [storage classes][urls.gcs_storage_classes]. You can apply
+defaults, and rules, at the bucket level or set the storage class at the
+object level. In the context of Vector only the object level is relevant
+(Vector does not create or modify buckets). You can set the storage
+class via the [`storage_class`](#storage_class) option.
+
+### Tags & metadata
+
+Vector supports adding [custom metadata][urls.gcs_custom_metadata] to
+created objects. These metadata items are a way of associating extra
+data items with the object that are not part of the uploaded data.
 
 ### Template Syntax
 
@@ -1111,5 +1183,8 @@ You can learn more about the complete syntax in the
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
+[urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
+[urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 [urls.new_gcp_cloud_storage_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_cloud_storage
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
