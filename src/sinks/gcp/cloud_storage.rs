@@ -389,8 +389,7 @@ impl RequestSettings {
 }
 
 // Make a header pair from a key-value string pair
-fn make_header(kv: (&String, &String)) -> crate::Result<(HeaderName, HeaderValue)> {
-    let (name, value) = kv;
+fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, HeaderValue)> {
     Ok((
         HeaderName::from_bytes(name.as_bytes())?,
         HeaderValue::from_str(&value)?,
