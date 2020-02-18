@@ -293,7 +293,8 @@ impl Service<RequestWrapper> for GcsSink {
 }
 
 fn to_string(value: impl Serialize) -> String {
-    serde_json::to_value(&value).unwrap().to_string()
+    let value = serde_json::to_value(&value).unwrap();
+    value.as_str().unwrap().into()
 }
 
 #[derive(Clone, Debug)]

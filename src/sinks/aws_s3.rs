@@ -301,7 +301,8 @@ impl Service<Request> for S3Sink {
 }
 
 fn to_string(value: impl Serialize) -> String {
-    serde_json::to_value(&value).unwrap().to_string()
+    let value = serde_json::to_value(&value).unwrap();
+    value.as_str().unwrap().into()
 }
 
 fn build_request(
