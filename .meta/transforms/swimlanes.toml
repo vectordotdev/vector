@@ -12,6 +12,7 @@ output_types = ["log"]
 [transforms.swimlanes.options.lanes]
 type = "table"
 common = true
+required = true
 description = """\
 A table of swimlane identifiers to logical conditions representing the filter of \
 the swimlane. Each swimlane can then be referenced as an input by other components \
@@ -20,6 +21,7 @@ with the name `<transform_name>.<swimlane_id>`.\
 
 [transforms.swimlanes.options.lanes.children."`<swimlane_id>`"]
 type = "table"
+required = true
 common = true
 description = "The identifier of a swimlane."
 

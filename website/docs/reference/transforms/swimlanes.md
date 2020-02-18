@@ -96,6 +96,28 @@ The identifier of a swimlane.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={["check_fields"]}
+  name={"type"}
+  path={"lanes.`<swimlane_id>`"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### type
+
+The type of the condition to execute. Currently only the `check_fields` type is available.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={[{"message.eq":"this is the content to match against"}]}
   name={"`<field_name>`.eq"}
   path={"lanes.`<swimlane_id>`"}
@@ -153,28 +175,6 @@ Check whether a field exists or does not exist, depending on the provided valueb
 ##### `<field_name>`.neq
 
 Check whether a fields contents does not match the value specified.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["check_fields"]}
-  name={"type"}
-  path={"lanes.`<swimlane_id>`"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### type
-
-The type of the condition to execute. Currently only the `check_fields` type is available.
 
 
 </Field>

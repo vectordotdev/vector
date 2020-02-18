@@ -3,6 +3,7 @@ type = "string"
 required = true
 examples = ["check_fields"]
 common = true
+prioritize = true
 description = """\
 The type of the condition to execute. Currently only the `check_fields` type is \
 available.\
