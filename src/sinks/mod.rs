@@ -27,6 +27,7 @@ pub mod splunk_hec;
 pub mod statsd;
 pub mod util;
 pub mod vector;
+pub mod honeycomb;
 
 use crate::Event;
 
