@@ -1,7 +1,7 @@
 use crate::dns::Resolver;
 use futures::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
-use hyper::{client::HttpConnector, Body};
+use hyper::{client::HttpConnector, Body, Chunk};
 use hyper_openssl::HttpsConnector;
 use k8s_openapi::{
     api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
@@ -131,8 +131,8 @@ impl WatchClient {
         &self,
         request: Request<Body>,
     ) -> impl Stream<Item = Pod, Error = RuntimeError> {
-        // Unused bytes from Server responses.
-        let mut unused = Vec::new();
+        let mut decoder = Decoder::default();
+
         self.client
             .request(request)
             .map_err(|error| RuntimeError::FailedConnecting { source: error })
@@ -151,66 +151,86 @@ impl WatchClient {
             })
             .flatten_stream()
             // Process Server responses/data.
-            .map(move |chunk| {
-                // We need to process unused data as soon as we get
-                // them. Because a watch on Kubernetes object behaves
-                // like a never ending stream of bytes.
-
-                // Append new data to unused.
-                unused.extend_from_slice(chunk.as_ref());
-
-                // Decodes watch response from unused data.
-                // Repeats decoding so long as there is sufficient data.
-                // Removes used data.
-                // StatusCode must be 200 OK.
-                let mut decoded = Vec::new();
-                loop {
-                    match WatchPodForAllNamespacesResponse::try_from_parts(StatusCode::OK, &unused)
-                    {
-                        Ok((response, used_bytes)) => {
-                            assert!(used_bytes > 0, "Parser must consume some data");
-                            // Remove used data.
-                            let _ = unused.drain(..used_bytes);
-
-                            decoded.push(Ok(response));
-                            // Continue decoding out data.
-                        }
-                        Err(ResponseError::NeedMoreData) => break,
-                        Err(error) => {
-                            decoded.push(Err(RuntimeError::ParseResponseError {
-                                name: "WatchPodForAllNamespacesResponse".to_owned(),
-                                error,
-                            }));
-                            break;
-                        }
-                    };
-                }
-
-                // Returns all currently decodable watch responses.
-                futures::stream::iter_result(decoded)
-            })
+            .map(move |chunk| decoder.decode(chunk))
             .flatten()
-            // Extracts event from response
-            .and_then(|response| match response {
-                WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
-                WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
-                    Err(RuntimeError::WrongObjectInResponse)
+            .and_then(Self::extract_event)
+            .and_then(Self::extract_metadata)
+    }
+
+    /// Extracts event from response
+    fn extract_event(
+        response: WatchPodForAllNamespacesResponse,
+    ) -> Result<WatchEvent<Pod>, RuntimeError> {
+        match response {
+            WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
+            WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
+                Err(RuntimeError::WrongObjectInResponse)
+            }
+            WatchPodForAllNamespacesResponse::Other(Err(error)) => {
+                Err(error).context(ResponseParseError)
+            }
+        }
+    }
+
+    /// Extracts Pod metadata from event
+    fn extract_metadata(event: WatchEvent<Pod>) -> Result<Pod, RuntimeError> {
+        match event {
+            WatchEvent::Added(data)
+            | WatchEvent::Modified(data)
+            | WatchEvent::Bookmark(data)
+            | WatchEvent::Deleted(data) => Ok(data),
+            WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
+            WatchEvent::ErrorOther(other) => Err(RuntimeError::UnknownWatchEventError { other }),
+        }
+    }
+}
+
+/// Decodes responses from incoming Chunks
+#[derive(Debug, Default)]
+struct Decoder {
+    // Unused bytes from Server responses.
+    unused: Vec<u8>,
+}
+
+impl Decoder {
+    fn decode(
+        &mut self,
+        chunk: Chunk,
+    ) -> impl Stream<Item = WatchPodForAllNamespacesResponse, Error = RuntimeError> {
+        // We need to process unused data as soon as we get
+        // them. Because a watch on Kubernetes object behaves
+        // like a never ending stream of bytes.
+
+        // Append new data to unused.
+        self.unused.extend_from_slice(chunk.as_ref());
+
+        // Decodes watch response from unused data.
+        // Repeats decoding so long as there is sufficient data.
+        // Removes used data.
+        let mut decoded = Vec::new();
+        loop {
+            match WatchPodForAllNamespacesResponse::try_from_parts(StatusCode::OK, &self.unused) {
+                Ok((response, used_bytes)) => {
+                    assert!(used_bytes > 0, "Parser must consume some data");
+                    // Remove used data.
+                    let _ = self.unused.drain(..used_bytes);
+
+                    decoded.push(Ok(response));
+                    // Continue decoding out data.
                 }
-                WatchPodForAllNamespacesResponse::Other(Err(error)) => {
-                    Err(error).context(ResponseParseError)
+                Err(ResponseError::NeedMoreData) => break,
+                Err(error) => {
+                    decoded.push(Err(RuntimeError::ParseResponseError {
+                        name: "WatchPodForAllNamespacesResponse".to_owned(),
+                        error,
+                    }));
+                    break;
                 }
-            })
-            // Extracts Pod metadata from event
-            .and_then(|event| match event {
-                WatchEvent::Added(data)
-                | WatchEvent::Modified(data)
-                | WatchEvent::Bookmark(data)
-                | WatchEvent::Deleted(data) => Ok(data),
-                WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
-                WatchEvent::ErrorOther(other) => {
-                    Err(RuntimeError::UnknownWatchEventError { other })
-                }
-            })
+            };
+        }
+
+        // Returns all currently decodable watch responses.
+        futures::stream::iter_result(decoded)
     }
 }
 
@@ -292,7 +312,7 @@ mod kube_tests {
     use crate::{
         dns::Resolver,
         sources::kubernetes::test::{echo, Kube},
-        test_util::{runtime, temp_file},
+        test_util::runtime,
     };
     use dirs;
     use futures::{future::Future, stream::Stream};
@@ -304,8 +324,6 @@ mod kube_tests {
     };
     use serde_yaml;
     use snafu::{ResultExt, Snafu};
-    use std::fs::OpenOptions;
-    use std::io::Write;
     use std::{fs::File, path::PathBuf, str::FromStr, sync::mpsc::channel, time::Duration};
     use uuid::Uuid;
 
