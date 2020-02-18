@@ -13,6 +13,7 @@ pub mod datadog_metrics;
 pub mod elasticsearch;
 pub mod file;
 pub mod gcp;
+pub mod honeycomb;
 pub mod http;
 pub mod humio_logs;
 #[cfg(feature = "rdkafka")]
@@ -27,7 +28,6 @@ pub mod splunk_hec;
 pub mod statsd;
 pub mod util;
 pub mod vector;
-pub mod honeycomb;
 
 use crate::Event;
 
