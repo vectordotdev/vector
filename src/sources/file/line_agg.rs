@@ -173,7 +173,7 @@ where
     fn handle_line(&mut self, line: Bytes, src: Filename) -> Option<(Bytes, Filename)> {
         match self.config.mode {
             Mode::Legacy => self.handle_line_mode_legacy(line, src),
-            _ => todo!(),
+            _ => self.handle_line_with_condition(line, src),
         }
     }
 
@@ -204,6 +204,116 @@ where
             self.buffers.insert(src, line.into());
         }
         None
+    }
+
+    fn handle_line_with_condition(
+        &mut self,
+        line: Bytes,
+        src: Filename,
+    ) -> Option<(Bytes, Filename)> {
+        // Check if we already have the buffered data for the source.
+        if self.buffers.contains_key(&src) {
+            let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
+            match self.config.mode {
+                // All consecutive lines matching this pattern are included in
+                // the group.
+                Mode::ContinueThrough => {
+                    if condition_matched {
+                        let buffered = self
+                            .buffers
+                            .get_mut(&src)
+                            .expect("already asserted key is present");
+                        buffered.extend_from_slice(b"\n");
+                        buffered.extend_from_slice(&line);
+                        return None;
+                    } else {
+                        let buffered = self
+                            .buffers
+                            .insert(src.clone(), line.into())
+                            .expect("already asserted key is present");
+                        return Some((buffered.freeze(), src));
+                    }
+                }
+                // All consecutive lines matching this pattern, plus one
+                // additional line, are included in the group.
+                Mode::ContinuePast => {
+                    if condition_matched {
+                        let buffered = self
+                            .buffers
+                            .get_mut(&src)
+                            .expect("already asserted key is present");
+                        buffered.extend_from_slice(b"\n");
+                        buffered.extend_from_slice(&line);
+                        return None;
+                    } else {
+                        let mut buffered = self
+                            .buffers
+                            .remove(&src)
+                            .expect("already asserted key is present");
+                        buffered.extend_from_slice(b"\n");
+                        buffered.extend_from_slice(&line);
+                        return Some((buffered.freeze(), src));
+                    }
+                }
+                // All consecutive lines not matching this pattern are included
+                // in the group.
+                Mode::HaltBefore => {
+                    if condition_matched {
+                        let buffered = self
+                            .buffers
+                            .insert(src.clone(), line.into())
+                            .expect("already asserted key is present");
+                        return Some((buffered.freeze(), src));
+                    } else {
+                        let buffered = self
+                            .buffers
+                            .get_mut(&src)
+                            .expect("already asserted key is present");
+                        buffered.extend_from_slice(b"\n");
+                        buffered.extend_from_slice(&line);
+                        return None;
+                    }
+                }
+                // All consecutive lines, up to and including the first line
+                // matching this pattern, are included in the group.
+                Mode::HaltWith => {
+                    if condition_matched {
+                        let mut buffered = self
+                            .buffers
+                            .remove(&src)
+                            .expect("already asserted key is present");
+                        buffered.extend_from_slice(b"\n");
+                        buffered.extend_from_slice(&line);
+                        return Some((buffered.freeze(), src));
+                    } else {
+                        let buffered = self
+                            .buffers
+                            .get_mut(&src)
+                            .expect("already asserted key is present");
+                        buffered.extend_from_slice(b"\n");
+                        buffered.extend_from_slice(&line);
+                        return None;
+                    }
+                }
+                Mode::Legacy => panic!("Legacy mode covered by other function"),
+            }
+        }
+
+        // We reached this code, this means the incoming line, whatever it was,
+        // was not consumed as a result of the condition matching.
+        // This line is a candidate for buffering, or passing through.
+        if self.config.start_pattern.is_match(line.as_ref()) {
+            // It was indeed a new line we need to filter.
+            // Set the timeout and buffer this line.
+            self.timeouts
+                .insert(src.clone(), Duration::from_millis(self.config.timeout));
+            let buffered = self.buffers.insert(src, line.into());
+            debug_assert!(buffered.is_none(), "do not throw away the data");
+            return None;
+        } else {
+            // It's just a regular line we don't really care about.
+            return Some((line, src));
+        }
     }
 }
 
