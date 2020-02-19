@@ -105,7 +105,7 @@ class Component
     @option_example_groups ||=
       begin
         groups = {}
-        
+
         if option_groups.any?
           option_groups.each do |group|
             groups[group] = options_list.select do |option|
