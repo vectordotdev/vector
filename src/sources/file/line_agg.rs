@@ -322,37 +322,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn mode_legacy_1() {
-        let lines = vec![
-            "INFO some usual line",
-            "INFO some other usual line",
-            "INFO first part",
-            "second part",
-            "last part",
-            "ERROR another normal message",
-            "ERROR finishing message",
-            "last part of the incomplete finishing message",
-        ];
-        let config = Config {
-            start_pattern: Regex::new("^(INFO|ERROR)").unwrap(), // example from the docs
-            condition_pattern: Regex::new("").unwrap(),          // not used in legacy mode
-            mode: Mode::Legacy,
-            timeout: 10,
-        };
-        let expected = vec![
-            "INFO some usual line",
-            "INFO some other usual line",
-            concat!("INFO first part\n", "second part\n", "last part"),
-            "ERROR another normal message",
-            concat!(
-                "ERROR finishing message\n",
-                "last part of the incomplete finishing message"
-            ),
-        ];
-        run_and_assert(&lines, config, &expected);
-    }
-
-    #[test]
     fn mode_continue_through_1() {
         let lines = vec![
             "some usual line",
@@ -520,17 +489,55 @@ mod tests {
         run_and_assert(&lines, config, &expected);
     }
 
+    #[test]
+    fn legacy() {
+        let lines = vec![
+            "INFO some usual line",
+            "INFO some other usual line",
+            "INFO first part",
+            "second part",
+            "last part",
+            "ERROR another normal message",
+            "ERROR finishing message",
+            "last part of the incomplete finishing message",
+        ];
+        let expected = vec![
+            "INFO some usual line",
+            "INFO some other usual line",
+            concat!("INFO first part\n", "second part\n", "last part"),
+            "ERROR another normal message",
+            concat!(
+                "ERROR finishing message\n",
+                "last part of the incomplete finishing message"
+            ),
+        ];
+
+        let stream = stream_from_lines(&lines);
+        let line_agg = LineAgg::new_legacy(
+            stream,
+            Regex::new("^(INFO|ERROR)").unwrap(), // example from the docs
+            10,
+        );
+        let results = collect_results(line_agg);
+        assert_results(results, &expected);
+    }
+
     // Test helpers.
 
-    fn run(lines: &[&'static str], config: Config) -> Vec<(Bytes, Filename)> {
-        let stream = futures::stream::iter_ok::<_, ()>(
+    fn stream_from_lines<'a>(
+        lines: &'a [&'static str],
+    ) -> impl Stream<Item = (Bytes, Filename), Error = ()> + 'a {
+        futures::stream::iter_ok::<_, ()>(
             lines
                 .iter()
                 .map(|line| (Bytes::from_static(line.as_bytes()), "test.log".to_owned())),
-        );
+        )
+    }
 
-        let line_agg = LineAgg::new(stream, config);
-
+    fn collect_results<T>(line_agg: LineAgg<T>) -> Vec<(Bytes, Filename)>
+    where
+        T: Stream<Item = (Bytes, Filename), Error = ()>,
+    {
         futures::future::Future::wait(futures::stream::Stream::collect(line_agg))
             .expect("Failed to collect test results")
     }
@@ -545,7 +552,9 @@ mod tests {
     }
 
     fn run_and_assert(lines: &[&'static str], config: Config, expected: &[&'static str]) {
-        let results = run(lines, config);
+        let stream = stream_from_lines(lines);
+        let line_agg = LineAgg::new(stream, config);
+        let results = collect_results(line_agg);
         assert_results(results, expected);
     }
 }
