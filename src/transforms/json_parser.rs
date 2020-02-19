@@ -99,10 +99,6 @@ impl Transform for JsonParser {
                 }
             });
 
-        if self.drop_field {
-            event.as_mut_log().remove(&self.field);
-        }
-
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
@@ -112,8 +108,12 @@ impl Transform for JsonParser {
                         event.as_mut_log().remove(&target_atom);
                     }
                     if !self.overwrite_target && contains_target {
-                        error!(message = "target field already exsists", %target_field);
+                        error!(message = "target field already exists", %target_field);
                     } else {
+                        if self.drop_field {
+                            event.as_mut_log().remove(&self.field);
+                        }
+
                         for (name, value) in object {
                             insert(
                                 event.as_mut_log(),
@@ -124,6 +124,10 @@ impl Transform for JsonParser {
                     }
                 }
                 None => {
+                    if self.drop_field {
+                        event.as_mut_log().remove(&self.field);
+                    }
+
                     flatten(event.as_mut_log(), object);
                 }
             }
@@ -413,6 +417,23 @@ mod test {
 
         assert_eq!(event.as_log()[&Atom::from("key")], "data".into());
         assert_eq!(event.as_log()[&Atom::from("message")], "inner".into());
+    }
+
+    #[test]
+    fn doesnt_drop_field_after_failed_parse() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: true,
+            ..Default::default()
+        });
+
+        let event = Event::from(r#"invalid json"#);
+
+        let event = parser.transform(event).unwrap();
+
+        assert_eq!(
+            event.as_log()[&Atom::from("message")],
+            "invalid json".into()
+        );
     }
 
     #[test]
