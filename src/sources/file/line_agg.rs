@@ -8,7 +8,7 @@ use tokio::timer::DelayQueue;
 
 #[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub(super) enum Mode {
+pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
     /// The first line (the line that matched the start pattern) does not need
     /// to match the `ContinueThrough` pattern.
@@ -37,17 +37,18 @@ pub(super) enum Mode {
     HaltWith,
 }
 
+#[derive(Debug, Clone)]
 pub(super) struct Config {
     /// Start pattern to look for as a beginning of the message.
-    start_pattern: Regex,
+    pub start_pattern: Regex,
     /// Condition pattern to look for. Exact behavior is configured via `mode`.
-    condition_pattern: Regex,
+    pub condition_pattern: Regex,
     /// Mode of operation, specifies how the condition pattern is interpreted.
-    mode: Mode,
+    pub mode: Mode,
     /// The maximum time to wait for the continuation. Once this timeout is
     /// reached, the buffered message is guaraneed to be flushed, even if
     /// incomplete.
-    timeout: Duration,
+    pub timeout: Duration,
 }
 
 impl Config {
