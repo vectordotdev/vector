@@ -86,6 +86,16 @@ pub struct TlsSettings {
 pub struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
+    pub fn from_config(config: &Option<TlsConfig>) -> crate::Result<Option<Self>> {
+        match config {
+            None => Ok(None),
+            Some(config) => match config.enabled.unwrap_or(false) {
+                false => Ok(None),
+                true => Ok(Some(Self::from_options(&Some(config.options.clone()))?)),
+            },
+        }
+    }
+
     pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
         let default = TlsOptions::default();
         let options = options.as_ref().unwrap_or(&default);
@@ -227,11 +237,16 @@ fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::assert_downcast_matches;
+
+    const TEST_PKCS12: &str = "tests/data/localhost.p12";
+    const TEST_PEM_CRT: &str = "tests/data/localhost.crt";
+    const TEST_PEM_KEY: &str = "tests/data/localhost.key";
 
     #[test]
     fn from_options_pkcs12() {
         let options = TlsOptions {
-            crt_path: Some("tests/data/localhost.p12".into()),
+            crt_path: Some(TEST_PKCS12.into()),
             key_pass: Some("NOPASS".into()),
             ..Default::default()
         };
@@ -244,8 +259,8 @@ mod test {
     #[test]
     fn from_options_pem() {
         let options = TlsOptions {
-            crt_path: Some("tests/data/localhost.crt".into()),
-            key_path: Some("tests/data/localhost.key".into()),
+            crt_path: Some(TEST_PEM_CRT.into()),
+            key_path: Some(TEST_PEM_KEY.into()),
             ..Default::default()
         };
         let settings =
@@ -264,5 +279,77 @@ mod test {
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
         assert!(settings.authority.is_some());
+    }
+
+    #[test]
+    fn from_options_none() {
+        let settings = TlsSettings::from_options(&None).expect("Failed to generate null settings");
+        assert!(settings.identity.is_none());
+        assert!(settings.authority.is_none());
+    }
+
+    #[test]
+    fn from_options_bad_certificate() {
+        let options = TlsOptions {
+            key_path: Some(TEST_PEM_KEY.into()),
+            ..Default::default()
+        };
+        let error = TlsSettings::from_options(&Some(options))
+            .expect_err("from_options failed to check certificate");
+        assert_downcast_matches!(error, TlsError, TlsError::MissingCrtKeyFile);
+
+        let options = TlsOptions {
+            crt_path: Some(TEST_PEM_CRT.into()),
+            ..Default::default()
+        };
+        let _error = TlsSettings::from_options(&Some(options))
+            .expect_err("from_options failed to check certificate");
+        // Actual error is an ASN parse, doesn't really matter
+    }
+
+    #[test]
+    fn from_config_none() {
+        assert!(TlsSettings::from_config(&None).unwrap().is_none());
+    }
+
+    #[test]
+    fn from_config_not_enabled() {
+        assert!(settings_from_config(None, false, false).is_none());
+        assert!(settings_from_config(Some(false), false, false).is_none());
+    }
+
+    #[test]
+    fn from_config_with_certificate() {
+        let config = settings_from_config(Some(true), true, true);
+        assert!(config.is_some());
+    }
+
+    fn settings_from_config(
+        enabled: Option<bool>,
+        set_crt: bool,
+        set_key: bool,
+    ) -> Option<TlsSettings> {
+        let config = make_config(enabled, set_crt, set_key);
+        TlsSettings::from_config(&Some(config)).expect("Failed to generate settings from config")
+    }
+
+    fn make_config(enabled: Option<bool>, set_crt: bool, set_key: bool) -> TlsConfig {
+        TlsConfig {
+            enabled,
+            options: TlsOptions {
+                crt_path: and_some(set_crt, TEST_PEM_CRT.into()),
+                key_path: and_some(set_key, TEST_PEM_KEY.into()),
+                ..Default::default()
+            },
+        }
+    }
+
+    // This can be eliminated once the `bool_to_option` feature migrates
+    // out of nightly.
+    fn and_some<T>(src: bool, value: T) -> Option<T> {
+        match src {
+            true => Some(value),
+            false => None,
+        }
     }
 }
