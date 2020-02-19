@@ -39,6 +39,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]
+    ignore = ["field1", "field2"] # example, no default
     match = ["timestamp"] # default
 ```
 
@@ -125,6 +126,29 @@ Options controlling what fields to match against
 
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["field1","field2"]]}
+  groups={[]}
+  name={"ignore"}
+  path={"fields"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### ignore
+
+The field names to ignore when deciding if an Event is a duplicate.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={["timestamp"]}
   enumValues={null}
   examples={[["field1","field2"]]}
@@ -132,7 +156,7 @@ Options controlling what fields to match against
   name={"match"}
   path={"fields"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[string]"}
   unit={null}

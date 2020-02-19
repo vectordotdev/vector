@@ -1203,9 +1203,16 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [transforms.dedupe.fields]
+    # The field names to ignore when deciding if an Event is a duplicate.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    ignore = ["field1", "field2"]
+
     # The field names considered when deciding if an Event is a duplicate.
     #
-    # * required
+    # * optional
     # * default: ["timestamp"]
     # * type: [string]
     match = ["field1", "field2"]

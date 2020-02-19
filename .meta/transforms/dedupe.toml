@@ -18,10 +18,16 @@ required = true
 [transforms.dedupe.options.fields.children.match]
 type = "[string]"
 common = true
-required = true
 examples = [["field1", "field2"]]
 default = ["timestamp"]
 description = "The field names considered when deciding if an Event is a duplicate."
+
+[transforms.dedupe.options.fields.children.ignore]
+type = "[string]"
+common = true
+examples = [["field1", "field2"]]
+description = "The field names to ignore when deciding if an Event is a duplicate."
+
 
 [transforms.dedupe.options.cache]
 type = "table"
