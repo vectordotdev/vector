@@ -157,12 +157,13 @@ sure, right?
 
 ## 4. Test it
 
-No one is saying that explosions aren't cool, but you should be doing that in
-your own time and with your own infrastructure.
+No one is saying that unplanned explosions aren't cool, but you should be doing
+that in your own time. In order to test our transform we _could_ set up a local
+Elasticsearch instance and run the whole pipeline, but that's an awful bother
+and Vector has a much better way.
 
-Vector takes testing seriously and has support for writing
-[unit tests][docs.guides.unit_testing] as part of your config, so let's humor it
-by writing one for our log parser:
+Instead, we can write [unit tests][docs.guides.unit_testing] as part of our
+config just like you would for regular code:
 
 <Tabs
   block={true}
@@ -239,7 +240,7 @@ by writing one for our log parser:
 
 This unit test spec has a name, defines an input event to feed into our pipeline
 at a specific transform (in this case our _only_ transform), and defines where
-we expect to see resulting events coming out.
+we'd like to capture resulting events coming out.
 
 When we run `vector test ./vector.toml` it will print the input and output
 events of our target transform:
@@ -259,9 +260,9 @@ check transform 'apache_parser' payloads (events encoded as JSON):
   output: {"host":"172.128.80.109","user":"Bins5273","bytes_out":"10272","timestamp":"2019-05-03T13:11:48-04:00","path":"/mesh","bytes_in":"656","method":"PUT","status":"406"}
 ```
 
-This is called an _inspection_ test and is super cool. It allows us to
-experiment by injecting events and inspecting the results without needing to
-temporarily change our sources and sinks.
+This is called an _inspection_ test, as we've defined a test without any
+conditions. This is super cool as it allows us to experiment by injecting events
+and inspecting the results.
 
 We can see here that our input event is correctly parsed out into a structured
 format, great! However, our test isn't actually _testing_ anything right now.
