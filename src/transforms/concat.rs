@@ -1,8 +1,7 @@
 use super::{BuildError, Transform};
-use crate::runtime::TaskExecutor;
 use crate::{
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};

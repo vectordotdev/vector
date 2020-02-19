@@ -2,9 +2,8 @@ use super::Transform;
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     event::{self, Value},
-    runtime::TaskExecutor,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;

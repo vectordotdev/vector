@@ -5,8 +5,7 @@ use crate::{
         flatten::{flatten, insert},
         Event,
     },
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

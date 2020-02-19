@@ -1,9 +1,8 @@
 use super::Transform;
 use crate::{
     event::{Event, Value},
-    runtime::TaskExecutor,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
