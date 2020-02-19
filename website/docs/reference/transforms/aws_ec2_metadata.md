@@ -424,6 +424,12 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 ## How It Works
 
+### Docker on EC2
+
+If you are running Vector within a docker container on EC2 then ensure that
+you pass the `--net=host` flag so that Vector can reach the metadata endpoint
+on the host machine.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.

@@ -32,6 +32,12 @@
 
 ## How It Works [[sort]]
 
+### Docker on EC2
+
+If you are running Vector within a docker container on EC2 then ensure that
+you pass the `--net=host` flag so that Vector can reach the metadata endpoint
+on the host machine.
+
 <%= component_sections(component) %>
 
 
