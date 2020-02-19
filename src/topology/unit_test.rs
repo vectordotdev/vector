@@ -2,7 +2,7 @@ use crate::{
     conditions::Condition,
     event::{Event, Value},
     runtime::Runtime,
-    topology::config::{TestCondition, TestDefinition, TestInputValue},
+    topology::config::{TestCondition, TestDefinition, TestInputValue, TransformContext},
     transforms::Transform,
 };
 use indexmap::IndexMap;
@@ -300,7 +300,10 @@ fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build(rt.executor()) {
+            match transform_config
+                .inner
+                .build(TransformContext::new_test(rt.executor()))
+            {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

@@ -109,7 +109,7 @@ mod tests {
     use crate::{
         event::{LogEvent, Value},
         test_util,
-        topology::config::TransformConfig,
+        topology::config::{TransformConfig, TransformContext},
         Event,
     };
 
@@ -122,7 +122,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

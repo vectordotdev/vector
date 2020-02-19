@@ -199,7 +199,10 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
 mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
 
     fn do_transform(
         event: &str,
@@ -218,7 +221,7 @@ mod tests {
             drop_failed,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).map(|event| event.into_log())

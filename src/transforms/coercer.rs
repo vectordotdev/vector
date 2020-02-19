@@ -96,7 +96,10 @@ impl Transform for Coercer {
 mod tests {
     use super::CoercerConfig;
     use crate::event::{flatten::flatten, LogEvent, Value};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
 
@@ -122,7 +125,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }

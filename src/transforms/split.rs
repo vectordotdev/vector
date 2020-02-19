@@ -140,7 +140,10 @@ mod tests {
     use super::split;
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -184,7 +187,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             ..Default::default()
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

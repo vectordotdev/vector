@@ -123,7 +123,11 @@ impl Transform for GrokParser {
 mod tests {
     use super::GrokParserConfig;
     use crate::event::LogEvent;
-    use crate::{event, topology::config::TransformConfig, Event};
+    use crate::{
+        event,
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
@@ -142,7 +146,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
         parser.transform(event).unwrap().into_log()
     }
