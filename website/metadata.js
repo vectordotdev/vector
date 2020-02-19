@@ -17369,6 +17369,30 @@ module.exports = {
 
       ]
     },
+    "influxdb_metrics": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "transmit",
+      "id": "influxdb_metrics_sink",
+      "name": "influxdb_metrics",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "InfluxData"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "kafka": {
       "beta": false,
       "delivery_guarantee": "at_least_once",

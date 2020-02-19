@@ -1,0 +1,98 @@
+[sinks.influxdb_metrics]
+title = "InfluxDB Metrics"
+beta = true
+common = false
+delivery_guarantee = "best_effort"
+egress_method = "batching"
+function_category = "transmit"
+healthcheck = true
+input_types = ["metric"]
+service_providers = ["InfluxData"]
+write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API"
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "influxdb_metrics") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.influxdb_metrics.options", common: false, max_events: 20, max_size: nil, timeout_secs: 1) %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.influxdb_metrics.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
+
+[sinks.influxdb_metrics.options.endpoint]
+type = "string"
+common = true
+examples = ["https://us-west-2-1.aws.cloud2.influxdata.com", "http://localhost:8086/"]
+required = true
+description = "InfluxDB endpoint to send metrics to."
+
+[sinks.influxdb_metrics.options.org]
+type = "string"
+common = true
+examples = ["Organization", "33f2cff0a28e5b63"]
+required = true
+description = "Specifies the destination organization for writes into InfluxDB 2."
+
+[sinks.influxdb_metrics.options.bucket]
+type = "string"
+common = true
+examples = ["vector-bucket", "4d2225e4d3d49f75"]
+required = true
+description = "The destination bucket for writes into InfluxDB 2."
+
+[sinks.influxdb_metrics.options.token]
+type = "string"
+common = true
+examples = ["${INFLUXDB_TOKEN_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+required = true
+description = "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
+
+[sinks.influxdb_metrics.options.database]
+type = "string"
+common = true
+examples = ["vector-database", "iot-store"]
+required = true
+description = "Sets the target database for the write into InfluxDB 1."
+
+[sinks.influxdb_metrics.options.consistency]
+type = "string"
+common = true
+examples = ["any", "one", "quorum", "all"]
+required = false
+description = "Sets the write consistency for the point for InfluxDB 1."
+
+[sinks.influxdb_metrics.options.retention_policy_name]
+type = "string"
+common = true
+examples = ["autogen", "one_day_only"]
+required = false
+description = "Sets the target retention policy for the write into InfluxDB 1."
+
+[sinks.influxdb_metrics.options.username]
+type = "string"
+common = true
+examples = ["todd", "vector-source"]
+required = false
+description = "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
+
+[sinks.influxdb_metrics.options.password]
+type = "string"
+common = true
+examples = ["${INFLUXDB_PASSWORD_ENV_VAR}", "influxdb4ever"]
+required = false
+description = "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
+
+[sinks.influxdb_metrics.options.namespace]
+type = "string"
+common = true
+examples = ["service"]
+required = true
+description = "A prefix that will be added to all metric names."

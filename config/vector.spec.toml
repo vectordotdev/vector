@@ -4507,6 +4507,197 @@ end
     # * unit: seconds
     timeout_secs = 60
 
+# Batches `metric` events to InfluxDB using v1 or v2 HTTP API.
+[sinks.influxdb_metrics]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "influxdb_metrics"
+  type = "influxdb_metrics"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The destination bucket for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  bucket = "vector-bucket"
+  bucket = "4d2225e4d3d49f75"
+
+  # Sets the target database for the write into InfluxDB 1.
+  #
+  # * required
+  # * type: string
+  database = "vector-database"
+  database = "iot-store"
+
+  # InfluxDB endpoint to send metrics to.
+  #
+  # * required
+  # * type: string
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  endpoint = "http://localhost:8086/"
+
+  # A prefix that will be added to all metric names.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
+  # Specifies the destination organization for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  org = "Organization"
+  org = "33f2cff0a28e5b63"
+
+  # Authentication token for InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  token = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # Sets the write consistency for the point for InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  consistency = "any"
+  consistency = "one"
+  consistency = "quorum"
+  consistency = "all"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # Sets the password for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "influxdb4ever"
+
+  # Sets the target retention policy for the write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  retention_policy_name = "autogen"
+  retention_policy_name = "one_day_only"
+
+  # Sets the username for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  username = "todd"
+  username = "vector-source"
+
+  #
+  # Batch
+  #
+
+  [sinks.influxdb_metrics.batch]
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * required
+    # * default: 20
+    # * type: int
+    # * unit: events
+    max_events = 20
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Request
+  #
+
+  [sinks.influxdb_metrics.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Streams `log` events to Apache Kafka via the Kafka protocol.
 [sinks.kafka]
   #

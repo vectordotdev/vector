@@ -213,6 +213,7 @@ docker = [
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
+  "influxdb-integration-tests",
   "splunk-integration-tests",
   "docker-integration-tests",
   "ec2-metadata-integration-tests",
@@ -229,6 +230,7 @@ kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
+influxdb-integration-tests = []
 
 kubernetes = ["kubernetes-integration-tests"]
 kubernetes-integration-tests = []

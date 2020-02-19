@@ -58,6 +58,7 @@ scopes:
   - datadog provider
   - elastic provider
   - google provider
+  - influxdata provider
   - confluent provider
   - new relic provider
   - splunk provider
@@ -114,6 +115,7 @@ scopes:
   - gcp_stackdriver_logging sink
   - http sink
   - humio_logs sink
+  - influxdb_metrics sink
   - kafka sink
   - logdna sink
   - loki sink
