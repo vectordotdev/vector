@@ -13,6 +13,7 @@ class Field
     :display,
     :enum,
     :examples,
+    :groups,
     :partition_key,
     :prioritize,
     :relevant_when,
@@ -29,6 +30,7 @@ class Field
     @display = hash["display"]
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @groups = hash["groups"] || []
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
     @prioritize = hash["prioritize"] == true
@@ -39,6 +41,8 @@ class Field
     @unit = hash["unit"]
 
     @category = hash["category"] || ((@children.to_h.values.empty? || inline?) ? "General" : @name.humanize)
+
+    if !@
 
     if @required == true && !@defualt.nil?
       raise ArgumentError.new("#{self.class.name}#required must be false if there is a default for field #{@name}")

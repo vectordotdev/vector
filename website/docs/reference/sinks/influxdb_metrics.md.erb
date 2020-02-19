@@ -4,7 +4,65 @@
 
 ## Configuration
 
-<%= component_config_example(component) %>
+<Tabs
+  block={true}
+  defaultValue="default"
+  values={[
+    { label: 'Default Schema', value: 'default', },
+    { label: 'Custom Fields', value: 'custom', },
+    { label: 'Nested Fields', value: 'nested', },
+  ]
+}>
+<TabItem value="v2">
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[sinks.my_sink_id]
+  # REQUIRED
+  type = "influxdb_metrics" # must be: "influxdb_metrics"
+  namespace = "service"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  org = "my-org"
+  bucket = "my-bucket"
+  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+
+  # OPTIONAL
+  healthcheck = true # default
+```
+
+</TabItem>
+<TabItem value="v1">
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[sinks.my_sink_id]
+  # REQUIRED
+  type = "influxdb_metrics"
+  namespace = "service"
+  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
+  database = "vector-database"
+
+  # OPTIONAL
+  consistency = "one"
+  healthcheck = true # default
+  retention_policy_name = "one_day_only"
+  username = "vector-source"
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
+```
+
+</TabItem>
+</Tabs>
 
 <%- if !component.requirements.nil? -%>
 ## Requirements

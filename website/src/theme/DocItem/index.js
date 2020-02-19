@@ -42,7 +42,7 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, minVersion, operatingSystems, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
@@ -87,6 +87,10 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
             <i className="feather icon-shield"></i> at-least-once
           </Link>
         </div>}
+      {minVersion &&
+        <div>
+          <i className="feather icon-key"></i> >= {minVersion}
+        </div>}
       {operatingSystemsEls.length > 0 &&
         <div>
           <Link to="/docs/setup/installation/operating-systems/" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
@@ -121,6 +125,7 @@ function DocItem(props) {
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
       issues_url: issuesUrl,
+      min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
       source_url: sourceUrl,
@@ -187,7 +192,12 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className="table-of-contents">
-                  <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
+                  <Statuses
+                    deliveryGuarantee={deliveryGuarantee}
+                    minVersion={minVersion}
+                    operatingSystems={operatingSystems}
+                    status={status}
+                    unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>

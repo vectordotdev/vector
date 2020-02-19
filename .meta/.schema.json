@@ -244,6 +244,13 @@
             "transmit"
           ]
         },
+        "groups": {
+          "type": "array",
+          "description": "The overaching group that this configuration belongs to. This is an advanced option that should be used for large groups of mutually exclusive options. For example, a set of options specifically for v1 and another set for v2.",
+          "items": {
+            "type": "string"
+          }
+        },
         "healthcheck": {
           "type": "boolean",
           "description": "If the sink implements a healthcheck."
@@ -255,6 +262,10 @@
             "type": "string",
             "enum": ["log", "metric"]
           }
+        },
+        "min_version": {
+          "type": "string",
+          "description": "The minimum version supported for the system this component interfaces with."
         },
         "options": {
           "$ref": "#/definitions/fields",
