@@ -59,13 +59,13 @@ pub struct JsonParser {
 impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
         let field = if let Some(field) = &config.field {
-            field
+            field.clone()
         } else {
-            &event::log_schema().message_key()
+            event::message_key()
         };
 
         JsonParser {
-            field: field.clone(),
+            field,
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
             target_field: config.target_field.clone(),

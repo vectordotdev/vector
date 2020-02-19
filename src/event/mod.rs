@@ -1,4 +1,5 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
+use arc_swap::ArcSwap;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use getset::{Getters, Setters};
@@ -24,7 +25,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
+pub static LOG_SCHEMA: OnceCell<ArcSwap<LogSchema>> = OnceCell::new();
 
 lazy_static! {
     pub static ref PARTIAL: Atom = Atom::from("_partial");
@@ -160,7 +161,7 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     }
 }
 
-pub fn log_schema() -> &'static LogSchema {
+pub fn log_schema() -> std::sync::Arc<LogSchema> {
     // TODO: Help Rust project support before_each
     // Support uninitialized schemas in tests to help our contributors.
     // Don't do it in release because that is scary.
@@ -168,10 +169,13 @@ pub fn log_schema() -> &'static LogSchema {
     {
         if LOG_SCHEMA.get().is_none() {
             error!("You are not initializing a schema in this test -- This could fail in release");
-            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
+            LOG_SCHEMA
+                .set(ArcSwap::new(std::sync::Arc::new(LogSchema::default())))
+                .ok(); // If this fails it means some other test set it while we were trying to.
         }
     }
-    LOG_SCHEMA.get().expect("Schema was not initialized")
+
+    arc_swap::Guard::into_inner(LOG_SCHEMA.get().expect("Schema was not initialized").load())
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
@@ -182,6 +186,21 @@ pub struct LogSchema {
     timestamp_key: Atom,
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
+}
+
+pub fn host_key() -> Atom {
+    let schema = log_schema();
+    schema.host_key().clone()
+}
+
+pub fn message_key() -> Atom {
+    let schema = log_schema();
+    schema.message_key().clone()
+}
+
+pub fn timestamp_key() -> Atom {
+    let schema = log_schema();
+    schema.message_key().clone()
 }
 
 impl Default for LogSchema {

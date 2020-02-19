@@ -27,21 +27,18 @@ inventory::submit! {
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self
-            .field
-            .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+        let field = self.field.clone().unwrap_or(event::message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
+        let drop_field = self.drop_field && !self.field_names.clone().iter().any(|f| f == &field);
 
         Ok(Box::new(Split::new(
             self.field_names.clone(),
             self.separator.clone(),
-            field.clone(),
+            field,
             drop_field,
             types,
         )))

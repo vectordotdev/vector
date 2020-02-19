@@ -25,14 +25,11 @@ inventory::submit! {
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
     fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self
-            .field
-            .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+        let field = self.field.clone().unwrap_or(event::message_key());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
-            field: field.clone(),
+            field,
             drop_field: self.drop_field,
             conversions,
         }))

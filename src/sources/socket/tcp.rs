@@ -52,9 +52,9 @@ impl TcpSource for RawTcpSource {
         let mut event = Event::from(frame);
 
         let host_key = if let Some(key) = &self.config.host_key {
-            key
+            key.clone()
         } else {
-            &event::log_schema().host_key()
+            event::host_key()
         };
 
         if let Some(host) = host {

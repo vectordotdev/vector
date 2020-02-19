@@ -41,7 +41,9 @@ fn build_tests(i: usize, path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     };
     if i == 0 {
         event::LOG_SCHEMA
-            .set(config.global.log_schema.clone())
+            .set(arc_swap::ArcSwap::new(std::sync::Arc::new(
+                config.global.log_schema.clone(),
+            )))
             .expect("Couldn't set schema");
     }
 

@@ -40,6 +40,25 @@ pub fn start(
     rt: &mut runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
+    let schema = std::sync::Arc::new(config.global.log_schema.clone());
+
+    if let Some(global_schema) = crate::event::LOG_SCHEMA.get() {
+        global_schema.store(schema);
+    } else {
+        let res = crate::event::LOG_SCHEMA.set(arc_swap::ArcSwap::new(schema));
+
+        // This can fail on tests since we call start many times creating
+        // a race between the get and the set.
+        #[cfg(test)]
+        let _ = res;
+
+        // This can fail if for some reason we call `topology::start` from multiple
+        // threads. In a normal vector application we only call this from one thread
+        // so we are safe from this race condition. Tests may case it to panic since
+        // we call start from many threads.
+        res.expect("Value should be set; this could be a race condition");
+    }
+
     validate(&config, rt.executor())
         .and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
 }

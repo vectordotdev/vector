@@ -4693,6 +4693,7 @@ name = "vector"
 version = "0.8.0"
 dependencies = [
  "approx",
+ "arc-swap",
  "atty",
  "base64 0.10.1",
  "built",

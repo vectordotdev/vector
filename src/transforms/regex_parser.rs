@@ -69,10 +69,7 @@ pub struct RegexParser {
 
 impl RegexParser {
     pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
-        let field = config
-            .field
-            .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+        let field = config.field.clone().unwrap_or(event::message_key());
 
         let regex = Regex::new(&config.regex).context(super::InvalidRegex)?;
 
@@ -84,7 +81,7 @@ impl RegexParser {
 
         Ok(Box::new(RegexParser::new(
             regex,
-            field.clone(),
+            field,
             config.drop_field,
             config.drop_failed,
             types,

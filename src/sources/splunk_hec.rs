@@ -321,12 +321,12 @@ impl<R: Read> EventStream<R> {
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
-                    &event::log_schema().host_key(),
+                    event::host_key(),
                     host.map(|value| value.as_bytes().into()),
                 ),
-                DefaultExtractor::new("index", &INDEX),
-                DefaultExtractor::new("source", &SOURCE),
-                DefaultExtractor::new("sourcetype", &SOURCETYPE),
+                DefaultExtractor::new("index", INDEX.clone()),
+                DefaultExtractor::new("source", SOURCE.clone()),
+                DefaultExtractor::new("sourcetype", SOURCETYPE.clone()),
             ],
         }
     }
@@ -465,12 +465,12 @@ impl<R: Read> Stream for EventStream<R> {
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
     field: &'static str,
-    to_field: &'static Atom,
+    to_field: Atom,
     value: Option<Value>,
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static Atom) -> Self {
+    fn new(field: &'static str, to_field: Atom) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -478,11 +478,7 @@ impl DefaultExtractor {
         }
     }
 
-    fn new_with(
-        field: &'static str,
-        to_field: &'static Atom,
-        value: impl Into<Option<Value>>,
-    ) -> Self {
+    fn new_with(field: &'static str, to_field: Atom, value: impl Into<Option<Value>>) -> Self {
         DefaultExtractor {
             field,
             to_field,
