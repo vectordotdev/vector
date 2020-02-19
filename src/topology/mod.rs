@@ -45,18 +45,16 @@ pub fn start(
     if let Some(global_schema) = crate::event::LOG_SCHEMA.get() {
         global_schema.store(schema);
     } else {
-        let res = crate::event::LOG_SCHEMA.set(arc_swap::ArcSwap::new(schema));
-
-        // This can fail on tests since we call start many times creating
-        // a race between the get and the set.
-        #[cfg(test)]
-        let _ = res;
-
-        // This can fail if for some reason we call `topology::start` from multiple
-        // threads. In a normal vector application we only call this from one thread
-        // so we are safe from this race condition. Tests may case it to panic since
-        // we call start from many threads.
-        res.expect("Value should be set; this could be a race condition");
+        // This will return err if some thread beats us in setting a value
+        // then in that case lets just set our own. This will only really
+        // happen in test where we don't do any funky stuff with globals.
+        // Since this is only called from `main.rs` on one thread its impossible
+        // for a race condition to happen running normally.
+        if let Err(global_schema) =
+            crate::event::LOG_SCHEMA.set(arc_swap::ArcSwap::new(schema.clone()))
+        {
+            global_schema.store(schema);
+        }
     }
 
     validate(&config, rt.executor())
