@@ -50,6 +50,22 @@ pub(super) struct Config {
     timeout: Duration,
 }
 
+impl Config {
+    pub(super) fn for_legacy(marker: Regex, timeout_ms: u64) -> Self {
+        let start_pattern = marker;
+        let condition_pattern = start_pattern.clone();
+        let mode = Mode::HaltBefore;
+        let timeout = Duration::from_millis(timeout_ms);
+
+        Self {
+            start_pattern,
+            condition_pattern,
+            mode,
+            timeout,
+        }
+    }
+}
+
 /// Private type alias to be more expressive in the internal implementation.
 type Filename = String;
 
@@ -76,22 +92,6 @@ pub(super) struct LineAgg<T> {
 }
 
 impl<T> LineAgg<T> {
-    pub(super) fn new_legacy(inner: T, marker: Regex, timeout_ms: u64) -> Self {
-        let start_pattern = marker;
-        let condition_pattern = start_pattern.clone();
-        let mode = Mode::HaltBefore;
-        let timeout = Duration::from_millis(timeout_ms);
-
-        let config = Config {
-            start_pattern,
-            condition_pattern,
-            mode,
-            timeout,
-        };
-
-        Self::new(inner, config)
-    }
-
     pub(super) fn new(inner: T, config: Config) -> Self {
         Self {
             inner,
@@ -469,10 +469,12 @@ mod tests {
         ];
 
         let stream = stream_from_lines(&lines);
-        let line_agg = LineAgg::new_legacy(
+        let line_agg = LineAgg::new(
             stream,
-            Regex::new("^(INFO|ERROR)").unwrap(), // example from the docs
-            10,
+            Config::for_legacy(
+                Regex::new("^(INFO|ERROR)").unwrap(), // example from the docs
+                10,
+            ),
         );
         let results = collect_results(line_agg);
         assert_results(results, &expected);
