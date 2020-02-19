@@ -48,6 +48,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}

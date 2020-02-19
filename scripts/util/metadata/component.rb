@@ -147,11 +147,11 @@ class Component
   def sorted_option_group_keys
     option_example_groups.keys.sort_by do |key|
       if key.downcase.include?("advanced")
-        1
-      else
         -1
+      else
+        1
       end
-    end
+    end.reverse
   end
 
   def source?

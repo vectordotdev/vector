@@ -89,6 +89,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -111,6 +112,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -133,6 +135,7 @@ Enables/disables the sink healthcheck upon start.
   defaultValue={"30"}
   enumValues={null}
   examples={["30"]}
+  groups={[]}
   name={"idle_timeout_secs"}
   path={null}
   relevantWhen={null}
@@ -156,6 +159,7 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
   defaultValue={null}
   enumValues={null}
   examples={["vector-%Y-%m-%d.log","application-{{ application_id }}-%Y-%m-%d.log"]}
+  groups={[]}
   name={"path"}
   path={null}
   relevantWhen={null}

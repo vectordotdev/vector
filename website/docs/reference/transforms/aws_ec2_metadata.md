@@ -51,6 +51,7 @@ import Field from '@site/src/components/Field';
   defaultValue={["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]}
   enumValues={null}
   examples={[["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]]}
+  groups={[]}
   name={"fields"}
   path={null}
   relevantWhen={null}
@@ -73,6 +74,7 @@ A list of fields to include in each event.
   defaultValue={"http://169.254.169.254"}
   enumValues={null}
   examples={["http://169.254.169.254"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -95,6 +97,7 @@ Override the default EC2 Metadata host.
   defaultValue={""}
   enumValues={null}
   examples={[""]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}
@@ -117,6 +120,7 @@ Prepend a namespace to each field's key.
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"refresh_interval_secs"}
   path={null}
   relevantWhen={null}
@@ -166,6 +170,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["ami-00068cd7555f543d5"]}
+  groups={[]}
   name={"ami-id"}
   path={null}
   relevantWhen={null}
@@ -188,6 +193,7 @@ The `ami-id` that the current EC2 instance is using.
   defaultValue={null}
   enumValues={null}
   examples={["54.234.246.107"]}
+  groups={[]}
   name={"availability-zone"}
   path={null}
   relevantWhen={null}
@@ -210,6 +216,7 @@ The `availability-zone` that the current EC2 instance is running in.
   defaultValue={null}
   enumValues={null}
   examples={["i-096fba6d03d36d262"]}
+  groups={[]}
   name={"instance-id"}
   path={null}
   relevantWhen={null}
@@ -232,6 +239,7 @@ The `instance-id` of the current EC2 instance.
   defaultValue={null}
   enumValues={null}
   examples={["ip-172-31-93-227.ec2.internal"]}
+  groups={[]}
   name={"local-hostname"}
   path={null}
   relevantWhen={null}
@@ -254,6 +262,7 @@ The `local-hostname` of the current EC2 instance.
   defaultValue={null}
   enumValues={null}
   examples={["172.31.93.227"]}
+  groups={[]}
   name={"local-ipv4"}
   path={null}
   relevantWhen={null}
@@ -276,6 +285,7 @@ The `local-ipv4` of the current EC2 instance.
   defaultValue={null}
   enumValues={null}
   examples={["ec2-54-234-246-107.compute-1.amazonaws.com"]}
+  groups={[]}
   name={"public-hostname"}
   path={null}
   relevantWhen={null}
@@ -298,6 +308,7 @@ The `public-hostname` of the current EC2 instance.
   defaultValue={null}
   enumValues={null}
   examples={["54.234.246.107"]}
+  groups={[]}
   name={"public-ipv4"}
   path={null}
   relevantWhen={null}
@@ -320,6 +331,7 @@ The `public-ipv4` of the current EC2 instance.
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
+  groups={[]}
   name={"region"}
   path={null}
   relevantWhen={null}
@@ -342,6 +354,7 @@ The [`region`](#region) that the current EC2 instance is running in.
   defaultValue={null}
   enumValues={null}
   examples={["some_iam_role"]}
+  groups={[]}
   name={"role-name"}
   path={null}
   relevantWhen={null}
@@ -364,6 +377,7 @@ The `role-name` that the current EC2 instance is using.
   defaultValue={null}
   enumValues={null}
   examples={["subnet-9d6713b9"]}
+  groups={[]}
   name={"subnet-id"}
   path={null}
   relevantWhen={null}
@@ -386,6 +400,7 @@ The `subnet-id` of the current EC2 instance's default network interface.
   defaultValue={null}
   enumValues={null}
   examples={["vpc-a51da4dc"]}
+  groups={[]}
   name={"vpc-id"}
   path={null}
   relevantWhen={null}

@@ -49,12 +49,12 @@ function Statuses({deliveryGuarantee, minVersion, operatingSystems, status, unsu
   let operatingSystemsEls = [];
 
   (operatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
+    operatingSystemsEls.push(<span key={operatingSystem} className="text--primary">{operatingSystem}</span>);
     operatingSystemsEls.push(<>, </>);
   });
 
   (unsupportedOperatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
+    operatingSystemsEls.push(<del key={operatingSystem} className="text--warning">{operatingSystem}</del>);
     operatingSystemsEls.push(<>, </>);
   });
 

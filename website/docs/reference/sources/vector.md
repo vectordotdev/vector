@@ -51,6 +51,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#1"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -74,6 +75,7 @@ The TCP address to listen for connections on, or `systemd#N to use the Nth socke
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"shutdown_timeout_secs"}
   path={null}
   relevantWhen={null}

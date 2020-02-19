@@ -45,6 +45,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[["field1","field2"]]}
+  groups={[]}
   name={"fields"}
   path={null}
   relevantWhen={null}

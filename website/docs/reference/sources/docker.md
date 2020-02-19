@@ -84,6 +84,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"auto_partial_merge"}
   path={null}
   relevantWhen={null}
@@ -106,6 +107,7 @@ Setting this to `false` will disable the automatic merging of partial events. Se
   defaultValue={null}
   enumValues={null}
   examples={[["serene_","serene_leakey","ad08cc418cf9"]]}
+  groups={[]}
   name={"include_containers"}
   path={null}
   relevantWhen={null}
@@ -129,6 +131,7 @@ container ID or name. If not provided, all containers will be included.
   defaultValue={null}
   enumValues={null}
   examples={[["httpd","redis"]]}
+  groups={[]}
   name={"include_images"}
   path={null}
   relevantWhen={null}
@@ -151,6 +154,7 @@ A list of image names to match against. If not provided, all images will be incl
   defaultValue={null}
   enumValues={null}
   examples={[["com.example.vendor=Timber Inc.","com.example.name=Vector"]]}
+  groups={[]}
   name={"include_labels"}
   path={null}
   relevantWhen={null}
@@ -173,6 +177,7 @@ A list of container object labels to match against when filtering running contai
   defaultValue={"_partial"}
   enumValues={null}
   examples={["_partial"]}
+  groups={[]}
   name={"partial_event_marker_field"}
   path={null}
   relevantWhen={null}
@@ -202,6 +207,7 @@ The field name to be added to events that are detected to contain an incomplete 
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
+  groups={[]}
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
@@ -224,6 +230,7 @@ The docker host to connect to. See [Connecting to the Docker daemon](#connecting
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
@@ -254,10 +261,10 @@ For example:
   "container_id": "9b6247364a03",
   "container_name": "evil_ptolemy",
   "image": "ubuntu:latest",
+  "com.example.vendor": "Timber Inc.",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "stream": "stdout",
-  "timestamp": "2019-11-01T21:15:47+00:00",
-  "com.example.vendor": "Timber Inc."
+  "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
 More detail on the output schema is below.
@@ -270,6 +277,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"container_created_at"}
   path={null}
   relevantWhen={null}
@@ -292,6 +300,7 @@ A UTC timestamp representing when the container was created.
   defaultValue={null}
   enumValues={null}
   examples={["9b6247364a03","715ebfcee040"]}
+  groups={[]}
   name={"container_id"}
   path={null}
   relevantWhen={null}
@@ -314,6 +323,7 @@ The Docker container ID that the log was collected from.
   defaultValue={null}
   enumValues={null}
   examples={["evil_ptolemy","nostalgic_stallman"]}
+  groups={[]}
   name={"container_name"}
   path={null}
   relevantWhen={null}
@@ -336,6 +346,7 @@ The Docker container name that the log was collected from.
   defaultValue={null}
   enumValues={null}
   examples={["ubuntu:latest","busybox","timberio/vector:latest-alpine"]}
+  groups={[]}
   name={"image"}
   path={null}
   relevantWhen={null}
@@ -357,7 +368,31 @@ The image name that the container is based on.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
+  groups={[]}
+  name={"`[label-key]`"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### `[label-key]`
+
+[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -380,6 +415,7 @@ The raw log message, unaltered.
   defaultValue={null}
   enumValues={{"stdout":"The STDOUT stream","stderr":"The STDERR stream"}}
   examples={["stdout","stderr"]}
+  groups={[]}
   name={"stream"}
   path={null}
   relevantWhen={null}
@@ -402,6 +438,7 @@ The [standard stream][urls.standard_streams] that the log was collected from.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}
@@ -414,28 +451,6 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 ### timestamp
 
 The UTC timestamp extracted from the Docker log event.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
-  name={"`[label-key]`"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### `[label-key]`
-
-[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
 
 
 </Field>

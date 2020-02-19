@@ -50,6 +50,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tags"}
   path={null}
   relevantWhen={null}
@@ -71,6 +72,7 @@ A table of key/value pairs representing the tags to be added to the metric.
   defaultValue={null}
   enumValues={null}
   examples={[{"static_tag":"my value"},{"env_tag":"${ENV_VAR}"}]}
+  groups={[]}
   name={"`[tag-name]`"}
   path={"tags"}
   relevantWhen={null}

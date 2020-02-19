@@ -95,6 +95,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -117,6 +118,7 @@ Represents the originating host of the log. This is automatically set within sel
   defaultValue={null}
   enumValues={null}
   examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -140,6 +142,7 @@ Represents the log message. Change this field name via the [global `message_key`
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}
@@ -163,6 +166,7 @@ A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this fie
   defaultValue={null}
   enumValues={null}
   examples={[{"my-key":"my-value"},{"parent":{"child":"child-value"}}]}
+  groups={[]}
   name={"`[custom-key]`"}
   path={null}
   relevantWhen={null}

@@ -50,6 +50,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/GeoLite2-City.mmdb"]}
+  groups={[]}
   name={"database"}
   path={null}
   relevantWhen={null}
@@ -73,6 +74,7 @@ Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City
   defaultValue={null}
   enumValues={null}
   examples={["ip_address","x-forwarded-for"]}
+  groups={[]}
   name={"source"}
   path={null}
   relevantWhen={null}
@@ -95,6 +97,7 @@ The field name that contains the IP address. This field should contain a valid I
   defaultValue={"geoip"}
   enumValues={null}
   examples={["geoip"]}
+  groups={[]}
   name={"target"}
   path={null}
   relevantWhen={null}
@@ -142,6 +145,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"geoip"}
   path={null}
   relevantWhen={null}
@@ -163,6 +167,7 @@ The root field containing all geolocation data as sub-fields.
   defaultValue={null}
   enumValues={null}
   examples={["New York","Brooklyn","Chicago"]}
+  groups={[]}
   name={"city_name"}
   path={"geoip"}
   relevantWhen={null}
@@ -185,6 +190,7 @@ The city name associated with the IP address.
   defaultValue={null}
   enumValues={{"AF":"Africa","AN":"Antarctica","AS":"Asia","EU":"Europe","NA":"North America","OC":"Oceania","SA":"South America"}}
   examples={["AF","AN","AS","EU","NA","OC","SA"]}
+  groups={[]}
   name={"continent_code"}
   path={"geoip"}
   relevantWhen={null}
@@ -207,6 +213,7 @@ The continent code associated with the IP address.
   defaultValue={null}
   enumValues={null}
   examples={["US","US-PR","FR","FR-BL","GB","A1","A2"]}
+  groups={[]}
   name={"country_code"}
   path={"geoip"}
   relevantWhen={null}
@@ -229,6 +236,7 @@ The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.
   defaultValue={null}
   enumValues={null}
   examples={["51.75"]}
+  groups={[]}
   name={"latitude"}
   path={"geoip"}
   relevantWhen={null}
@@ -251,6 +259,7 @@ The latitude associated with the IP address.
   defaultValue={null}
   enumValues={null}
   examples={["-1.25"]}
+  groups={[]}
   name={"longitude"}
   path={"geoip"}
   relevantWhen={null}
@@ -273,6 +282,7 @@ The longitude associated with the IP address.
   defaultValue={null}
   enumValues={null}
   examples={["07094","10010","OX1"]}
+  groups={[]}
   name={"postal_code"}
   path={"geoip"}
   relevantWhen={null}
@@ -295,6 +305,7 @@ The postal code associated with the IP address.
   defaultValue={null}
   enumValues={null}
   examples={["America/New_York","Asia/Atyrau","Europe/London"]}
+  groups={[]}
   name={"timezone"}
   path={"geoip"}
   relevantWhen={null}

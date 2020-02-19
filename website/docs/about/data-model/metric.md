@@ -175,6 +175,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
   examples={["absolute","incremental"]}
+  groups={[]}
   name={"kind"}
   path={null}
   relevantWhen={null}
@@ -198,6 +199,7 @@ The metric value kind. This determines how the value is merged downstream if met
   defaultValue={null}
   enumValues={null}
   examples={["login.count","response_time"]}
+  groups={[]}
   name={"name"}
   path={null}
   relevantWhen={null}
@@ -220,6 +222,7 @@ The metric name.
   defaultValue={null}
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
+  groups={[]}
   name={"tags"}
   path={null}
   relevantWhen={null}
@@ -242,6 +245,7 @@ Tags that add additional metadata or context to the metric. These are simple key
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}
@@ -264,6 +268,7 @@ The metric timestamp, representing when the metric was created/ingested within V
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"type"}
   path={null}
   relevantWhen={null}
@@ -285,6 +290,7 @@ A metric must be one of 6 types.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"aggregated_histogram"}
   path={"type"}
   relevantWhen={null}
@@ -306,6 +312,7 @@ Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples
   defaultValue={null}
   enumValues={null}
   examples={[[1,2,5,10,25]]}
+  groups={[]}
   name={"buckets"}
   path={"type.aggregated_histogram"}
   relevantWhen={null}
@@ -328,6 +335,7 @@ The buckets contained within this histogram.
   defaultValue={null}
   enumValues={null}
   examples={[54]}
+  groups={[]}
   name={"count"}
   path={"type.aggregated_histogram"}
   relevantWhen={null}
@@ -350,6 +358,7 @@ The total number of values contained within the histogram.
   defaultValue={null}
   enumValues={null}
   examples={[[1,5,25,2,5]]}
+  groups={[]}
   name={"counts"}
   path={"type.aggregated_histogram"}
   relevantWhen={null}
@@ -372,6 +381,7 @@ The number of values contained within each bucket.
   defaultValue={null}
   enumValues={null}
   examples={[524.0]}
+  groups={[]}
   name={"sum"}
   path={"type.aggregated_histogram"}
   relevantWhen={null}
@@ -399,6 +409,7 @@ The sum of all values contained within the histogram.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"aggregated_summary"}
   path={"type"}
   relevantWhen={null}
@@ -421,6 +432,7 @@ Similar to a histogram, a summary samples observations (usually things like requ
   defaultValue={null}
   enumValues={null}
   examples={[54]}
+  groups={[]}
   name={"count"}
   path={"type.aggregated_summary"}
   relevantWhen={null}
@@ -443,6 +455,7 @@ The total number of values contained within the summary.
   defaultValue={null}
   enumValues={null}
   examples={[[0.1,0.5,0.75,1.0]]}
+  groups={[]}
   name={"quantiles"}
   path={"type.aggregated_summary"}
   relevantWhen={null}
@@ -465,6 +478,7 @@ The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
   defaultValue={null}
   enumValues={null}
   examples={[524.0]}
+  groups={[]}
   name={"sum"}
   path={"type.aggregated_summary"}
   relevantWhen={null}
@@ -487,6 +501,7 @@ The sum of all values contained within the summary.
   defaultValue={null}
   enumValues={null}
   examples={[[2.1,4.68,23.02,120.1]]}
+  groups={[]}
   name={"values"}
   path={"type.aggregated_summary"}
   relevantWhen={null}
@@ -514,6 +529,7 @@ The values contained within the summary that align with the [`quantiles`](#quant
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"counter"}
   path={"type"}
   relevantWhen={null}
@@ -535,6 +551,7 @@ A single value that can _only_ be incremented or reset to zero value, it cannot 
   defaultValue={null}
   enumValues={null}
   examples={[2.6,5.0]}
+  groups={[]}
   name={"value"}
   path={"type.counter"}
   relevantWhen={null}
@@ -562,6 +579,7 @@ The value to increment the counter by. Can only be positive.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"distribution"}
   path={"type"}
   relevantWhen={null}
@@ -583,6 +601,7 @@ A distribution represents a distribution of sampled values.
   defaultValue={null}
   enumValues={null}
   examples={[[12,43,25]]}
+  groups={[]}
   name={"sample_rates"}
   path={"type.distribution"}
   relevantWhen={null}
@@ -605,6 +624,7 @@ The rate at which each individual value was sampled.
   defaultValue={null}
   enumValues={null}
   examples={[[12.0,43.3,25.2]]}
+  groups={[]}
   name={"values"}
   path={"type.distribution"}
   relevantWhen={null}
@@ -632,6 +652,7 @@ The list of values contained within the distribution.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"gauge"}
   path={"type"}
   relevantWhen={null}
@@ -653,6 +674,7 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
   defaultValue={null}
   enumValues={null}
   examples={[554222.0]}
+  groups={[]}
   name={"value"}
   path={"type.gauge"}
   relevantWhen={null}
@@ -680,6 +702,7 @@ A specific point-in-time value for the gauge.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"set"}
   path={"type"}
   relevantWhen={null}
@@ -701,6 +724,7 @@ A set represents a count of unique values, AKA the cardinality.
   defaultValue={null}
   enumValues={null}
   examples={[["unique item 1","unique item 2"]]}
+  groups={[]}
   name={"values"}
   path={"type.set"}
   relevantWhen={null}

@@ -50,6 +50,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[["first[..3]","second[-5..]","third[3..6]"]]}
+  groups={[]}
   name={"items"}
   path={null}
   relevantWhen={null}
@@ -72,6 +73,7 @@ A list of substring definitons in the format of source_field[start..end]. For bo
   defaultValue={" "}
   enumValues={null}
   examples={[" ",",","_","+"]}
+  groups={[]}
   name={"joiner"}
   path={null}
   relevantWhen={null}
@@ -94,6 +96,7 @@ The string that is used to join all items.
   defaultValue={null}
   enumValues={null}
   examples={["dest_field_name"]}
+  groups={[]}
   name={"target"}
   path={null}
   relevantWhen={null}
