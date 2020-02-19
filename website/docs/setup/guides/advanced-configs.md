@@ -19,15 +19,6 @@ number of transforms increases.
 Luckily, the Vector team are desperate for your approval and have worked hard to
 mitigate this with the following tools.
 
-### TODO: Talk about compose transform or pipelines
-
-TODO: Once added we can reduce the `generate` section to just a side note, or
-tip.
-
-This saves you the burden of maintaining the links between chained transforms.
-Instead you can simply insert transforms exactly where they need to be within
-the chain, and remove them without breaking the topology.
-
 ### Generating Chains
 
 In cases where we simply want to chain a few components together we can avoid
@@ -67,19 +58,9 @@ The names of the generated components are sequential (`transform0`,
 `transform1`, and so on). It's therefore worth doing a search and replace with
 your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
 
-### Swimlanes
-
-It's very common to want to execute different transforms depending on the
-contents of an event. This is made easy in Vector with the
-[`swimlanes` transform]\[docs.transform.swimlanes]:
-
-```toml
-TODO
-```
-
 ## Test Driven Configuration
 
-Test driven configuration is a paradigm I just made up, so there's still time
+Test driven configuration is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
 configs with [unit tests][docs.guides.unit-testing], and as it turns out they're
 also pretty useful during the building stage.
@@ -167,8 +148,18 @@ output in order to turn it into a regression test:
 ```
 
 How many tests you add is at your discretion, but you probably don't need to
-test every single transform. I recommend every four transforms, except during a
+test every single transform. We recommend every four transforms, except during a
 full moon when you should test every two just to be sure.
+
+## Updating Configs
+
+Sometimes it's useful to update Vector configs on the fly. If you find yourself
+tinkering with a config that Vector is already running you can prompt it to
+reload the changes you've made by sending it a `SIGHUP` signal.
+
+If you're running Vector in environments where it's not possible to issue
+`SIGHUP` signals you can instead run it with the `--watch-config` flag and it'll
+automatically gobble up changes whenever the file is written to.
 
 ## Organizing Configs
 
@@ -188,16 +179,5 @@ $ vector -c ./configs/foo.toml ./configs/bar.toml
 
 If you have a large chain of components it's a good idea to break them out into
 individual files, each with its own unit tests.
-
-TODO: What does this look like? Config example in `./config/examples`?
-
-### Recycled Pipelines
-
-TODO: When compose or pipelines allows config reuse.
-
-Sometimes we might need to build a chain of transforms for a specific purpose
-that might appear multiple times in a topology.
-
-\[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
 
 [docs.guides.unit-testing]: /docs/setup/guides/unit-testing/
