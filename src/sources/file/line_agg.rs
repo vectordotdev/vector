@@ -47,7 +47,7 @@ pub(super) struct Config {
     /// The maximum time to wait for the continuation. Once this timeout is
     /// reached, the buffered message is guaraneed to be flushed, even if
     /// incomplete.
-    timeout: u64,
+    timeout: Duration,
 }
 
 /// Private type alias to be more expressive in the internal implementation.
@@ -76,10 +76,11 @@ pub(super) struct LineAgg<T> {
 }
 
 impl<T> LineAgg<T> {
-    pub(super) fn new_legacy(inner: T, marker: Regex, timeout: u64) -> Self {
+    pub(super) fn new_legacy(inner: T, marker: Regex, timeout_ms: u64) -> Self {
         let start_pattern = marker;
         let condition_pattern = start_pattern.clone();
         let mode = Mode::HaltBefore;
+        let timeout = Duration::from_millis(timeout_ms);
 
         let config = Config {
             start_pattern,
@@ -261,7 +262,7 @@ where
             // It was indeed a new line we need to filter.
             // Set the timeout and buffer this line.
             self.timeouts
-                .insert(src.clone(), Duration::from_millis(self.config.timeout));
+                .insert(src.clone(), self.config.timeout.clone());
             let buffered = self.buffers.insert(src, line.into());
             debug_assert!(buffered.is_none(), "do not throw away the data");
             return None;
@@ -292,7 +293,7 @@ mod tests {
             start_pattern: Regex::new("^[^\\s]").unwrap(),
             condition_pattern: Regex::new("^[\\s]+").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: 10,
+            timeout: Duration::from_millis(10),
         };
         let expected = vec![
             "some usual line",
@@ -323,7 +324,7 @@ mod tests {
             start_pattern: Regex::new("\\\\$").unwrap(),
             condition_pattern: Regex::new("\\\\$").unwrap(),
             mode: Mode::ContinuePast,
-            timeout: 10,
+            timeout: Duration::from_millis(10),
         };
         let expected = vec![
             "some usual line",
@@ -354,7 +355,7 @@ mod tests {
             start_pattern: Regex::new("").unwrap(),
             condition_pattern: Regex::new("^(INFO|ERROR) ").unwrap(),
             mode: Mode::HaltBefore,
-            timeout: 10,
+            timeout: Duration::from_millis(10),
         };
         let expected = vec![
             "INFO some usual line",
@@ -385,7 +386,7 @@ mod tests {
             start_pattern: Regex::new("[^;]$").unwrap(),
             condition_pattern: Regex::new(";$").unwrap(),
             mode: Mode::HaltWith,
-            timeout: 10,
+            timeout: Duration::from_millis(10),
         };
         let expected = vec![
             "some usual line;",
@@ -411,7 +412,7 @@ mod tests {
             start_pattern: Regex::new("^[^\\s]").unwrap(),
             condition_pattern: Regex::new("^[\\s]+at").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: 10,
+            timeout: Duration::from_millis(10),
         };
         let expected = vec![concat!(
             "java.lang.Exception\n",
@@ -433,7 +434,7 @@ mod tests {
             start_pattern: Regex::new("^[^\\s]").unwrap(),
             condition_pattern: Regex::new("^[\\s]+from").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: 10,
+            timeout: Duration::from_millis(10),
         };
         let expected = vec![concat!(
             "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n",
