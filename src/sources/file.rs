@@ -197,7 +197,7 @@ pub fn file_source(
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(msi) = message_start_indicator {
-                Box::new(LineAgg::new(
+                Box::new(LineAgg::new_legacy(
                     rx,
                     Regex::new(&msi).unwrap(), // validated in build
                     multi_line_timeout,
