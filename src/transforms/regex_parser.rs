@@ -41,7 +41,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         RegexParser::build(&self)
     }
 

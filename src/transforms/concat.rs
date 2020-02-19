@@ -24,7 +24,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var.into(),

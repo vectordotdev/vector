@@ -23,7 +23,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 

@@ -22,7 +22,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer {
             types,

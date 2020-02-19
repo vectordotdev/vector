@@ -47,7 +47,7 @@ impl Default for MergeConfig {
 
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Merge::from(self.clone())))
     }
 

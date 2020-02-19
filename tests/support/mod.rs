@@ -151,7 +151,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self, _exec: TaskExecutor) -> Result<Box<dyn Transform>, vector::Error> {
+    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

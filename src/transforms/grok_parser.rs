@@ -35,7 +35,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
