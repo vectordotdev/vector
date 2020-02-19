@@ -35,10 +35,6 @@ pub(super) enum Mode {
     /// This is useful where a log line ends with a termination marker, such as
     /// a semicolon.
     HaltWith,
-
-    /// Legacy `message_start_indicator` behaviour.
-    #[doc(hidden)]
-    Legacy,
 }
 
 pub(super) struct Config {
@@ -82,8 +78,8 @@ pub(super) struct LineAgg<T> {
 impl<T> LineAgg<T> {
     pub(super) fn new_legacy(inner: T, marker: Regex, timeout: u64) -> Self {
         let start_pattern = marker;
-        let condition_pattern = Regex::new("").unwrap(); // not used in legacy mode
-        let mode = Mode::Legacy;
+        let condition_pattern = start_pattern.clone();
+        let mode = Mode::HaltBefore;
 
         let config = Config {
             start_pattern,
@@ -171,46 +167,6 @@ where
 {
     /// Handle line, if we have something to output - return it.
     fn handle_line(&mut self, line: Bytes, src: Filename) -> Option<(Bytes, Filename)> {
-        match self.config.mode {
-            Mode::Legacy => self.handle_line_mode_legacy(line, src),
-            _ => self.handle_line_with_condition(line, src),
-        }
-    }
-
-    /// Handle line in legacy mode.
-    fn handle_line_mode_legacy(&mut self, line: Bytes, src: Filename) -> Option<(Bytes, Filename)> {
-        // Check if we already have the buffered data for the source.
-        if self.buffers.contains_key(&src) {
-            if self.config.start_pattern.is_match(line.as_ref()) {
-                // buffer the incoming line and flush the existing data
-                let buffered = self
-                    .buffers
-                    .insert(src.clone(), line.into())
-                    .expect("already asserted key is present");
-                return Some((buffered.freeze(), src));
-            } else {
-                // append new line to the buffered data
-                let buffered = self
-                    .buffers
-                    .get_mut(&src)
-                    .expect("already asserted key is present");
-                buffered.extend_from_slice(b"\n");
-                buffered.extend_from_slice(&line);
-            }
-        } else {
-            // no existing data for this source so buffer it with timeout
-            self.timeouts
-                .insert(src.clone(), Duration::from_millis(self.config.timeout));
-            self.buffers.insert(src, line.into());
-        }
-        None
-    }
-
-    fn handle_line_with_condition(
-        &mut self,
-        line: Bytes,
-        src: Filename,
-    ) -> Option<(Bytes, Filename)> {
         // Check if we already have the buffered data for the source.
         if self.buffers.contains_key(&src) {
             let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
@@ -295,7 +251,6 @@ where
                         return None;
                     }
                 }
-                Mode::Legacy => panic!("Legacy mode covered by other function"),
             }
         }
 
