@@ -9,7 +9,7 @@ use k8s_openapi::{
     RequestError, Response, ResponseError, WatchOptional,
 };
 use openssl::ssl::{SslConnector, SslConnectorBuilder, SslMethod};
-use snafu::{ResultExt, Snafu};
+use snafu::{futures01::future::FutureExt, ResultExt, Snafu};
 
 /// Config which could be loaded from kubeconfig or local kubernetes cluster.
 /// Used to build WatchClient which is in turn used to build Stream of metadata.
@@ -58,14 +58,7 @@ impl ClientConfig {
         })
         .context(K8SOpenapiError)?;
 
-        self.authorize(&mut request)?;
-        self.fill_uri(&mut request)?;
-
-        let (parts, body) = request.into_parts();
-        Ok(Request::from_parts(parts, body.into()))
-    }
-
-    fn authorize(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
+        // Authorize
         if let Some(token) = self.token.as_ref() {
             request.headers_mut().insert(
                 header::AUTHORIZATION,
@@ -74,14 +67,13 @@ impl ClientConfig {
             );
         }
 
-        Ok(())
-    }
-
-    fn fill_uri(&self, request: &mut Request<Vec<u8>>) -> Result<(), BuildError> {
+        // Fill uri
         let mut uri = self.server.clone().into_parts();
         uri.path_and_query = request.uri().clone().into_parts().path_and_query;
         *request.uri_mut() = Uri::from_parts(uri).context(InvalidUriParts)?;
-        Ok(())
+
+        let (parts, body) = request.into_parts();
+        Ok(Request::from_parts(parts, body.into()))
     }
 }
 
@@ -135,7 +127,7 @@ impl WatchClient {
 
         self.client
             .request(request)
-            .map_err(|error| RuntimeError::FailedConnecting { source: error })
+            .context(FailedConnecting)
             .and_then(|response| {
                 let status = response.status();
                 if status == StatusCode::OK {
@@ -153,35 +145,27 @@ impl WatchClient {
             // Process Server responses/data.
             .map(move |chunk| decoder.decode(chunk))
             .flatten()
-            .and_then(Self::extract_event)
-            .and_then(Self::extract_metadata)
-    }
-
-    /// Extracts event from response
-    fn extract_event(
-        response: WatchPodForAllNamespacesResponse,
-    ) -> Result<WatchEvent<Pod>, RuntimeError> {
-        match response {
-            WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
-            WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
-                Err(RuntimeError::WrongObjectInResponse)
-            }
-            WatchPodForAllNamespacesResponse::Other(Err(error)) => {
-                Err(error).context(ResponseParseError)
-            }
-        }
-    }
-
-    /// Extracts Pod metadata from event
-    fn extract_metadata(event: WatchEvent<Pod>) -> Result<Pod, RuntimeError> {
-        match event {
-            WatchEvent::Added(data)
-            | WatchEvent::Modified(data)
-            | WatchEvent::Bookmark(data)
-            | WatchEvent::Deleted(data) => Ok(data),
-            WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
-            WatchEvent::ErrorOther(other) => Err(RuntimeError::UnknownWatchEventError { other }),
-        }
+            // Extracts event from response
+            .and_then(|response| match response {
+                WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
+                WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
+                    Err(RuntimeError::WrongObjectInResponse)
+                }
+                WatchPodForAllNamespacesResponse::Other(Err(error)) => {
+                    Err(error).context(ResponseParseError)
+                }
+            })
+            // Extracts Pod metadata from event
+            .and_then(|event| match event {
+                WatchEvent::Added(data)
+                | WatchEvent::Modified(data)
+                | WatchEvent::Bookmark(data)
+                | WatchEvent::Deleted(data) => Ok(data),
+                WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
+                WatchEvent::ErrorOther(other) => {
+                    Err(RuntimeError::UnknownWatchEventError { other })
+                }
+            })
     }
 }
 
@@ -464,6 +448,6 @@ mod kube_tests {
 
         receiver
             .recv_timeout(Duration::from_secs(5))
-            .expect("Client didn't saw Pod change.");
+            .expect("Client did not see a Pod change.");
     }
 }
