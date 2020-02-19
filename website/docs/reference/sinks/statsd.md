@@ -53,6 +53,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"127.0.0.1:8125"}
   enumValues={null}
   examples={["127.0.0.1:8125"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -75,6 +76,7 @@ The UDP socket address to send stats to.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -97,6 +99,7 @@ Enables/disables the sink healthcheck upon start.
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}

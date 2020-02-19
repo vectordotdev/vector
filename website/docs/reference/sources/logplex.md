@@ -47,6 +47,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:8088"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}

@@ -58,6 +58,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"drop_field"}
   path={null}
   relevantWhen={null}
@@ -80,6 +81,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -102,6 +104,7 @@ The log field to execute the [`pattern`](#pattern) against. Must be a `string` v
   defaultValue={null}
   enumValues={null}
   examples={["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]}
+  groups={[]}
   name={"pattern"}
   path={null}
   relevantWhen={null}
@@ -124,6 +127,7 @@ The [Grok pattern][urls.grok_patterns]
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"types"}
   path={null}
   relevantWhen={null}
@@ -145,6 +149,7 @@ Key/Value pairs representing mapped log field types.
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"types"}
   relevantWhen={null}

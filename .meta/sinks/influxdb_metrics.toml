@@ -2,7 +2,7 @@
 title = "InfluxDB Metrics"
 beta = true
 common = false
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
@@ -10,14 +10,28 @@ input_types = ["metric"]
 service_providers = ["InfluxData"]
 write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "influxdb_metrics") %>
+<%= render(
+  "_partials/_component_options.toml",
+  groups: ["v1", "v2"],
+  name: "influxdb_metrics",
+  type: "sink"
+) %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.influxdb_metrics.options", common: false, max_events: 20, max_size: nil, timeout_secs: 1) %>
+<%= render(
+  "_partials/_batch_options.toml",
+  common: false,
+  groups: ["v1", "v2"],
+  max_events: 20,
+  max_size: nil,
+  namespace: "sinks.influxdb_metrics.options",
+  timeout_secs: 1
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
   namespace: "sinks.influxdb_metrics.options",
   common: false,
+  groups: ["v1", "v2"],
   in_flight_limit: 5,
   rate_limit_duration_secs: 1,
   rate_limit_num: 5,
@@ -31,13 +45,17 @@ write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_
 type = "string"
 common = true
 examples = ["https://us-west-2-1.aws.cloud2.influxdata.com", "http://localhost:8086/"]
+groups = ["v1", "v2"]
+prioritize = true
 required = true
 description = "InfluxDB endpoint to send metrics to."
 
 [sinks.influxdb_metrics.options.org]
 type = "string"
+category = "auth"
 common = true
 examples = ["Organization", "33f2cff0a28e5b63"]
+groups = ["v2"]
 required = true
 description = "Specifies the destination organization for writes into InfluxDB 2."
 
@@ -45,13 +63,16 @@ description = "Specifies the destination organization for writes into InfluxDB 2
 type = "string"
 common = true
 examples = ["vector-bucket", "4d2225e4d3d49f75"]
+groups = ["v2"]
 required = true
 description = "The destination bucket for writes into InfluxDB 2."
 
 [sinks.influxdb_metrics.options.token]
 type = "string"
+category = "auth"
 common = true
 examples = ["${INFLUXDB_TOKEN_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+groups = ["v2"]
 required = true
 description = "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
 
@@ -59,34 +80,43 @@ description = "[Authentication token][urls.influxdb_authentication_token] for In
 type = "string"
 common = true
 examples = ["vector-database", "iot-store"]
+groups = ["v1"]
 required = true
 description = "Sets the target database for the write into InfluxDB 1."
 
 [sinks.influxdb_metrics.options.consistency]
 type = "string"
+category = "persistence"
 common = true
 examples = ["any", "one", "quorum", "all"]
+groups = ["v1"]
 required = false
 description = "Sets the write consistency for the point for InfluxDB 1."
 
 [sinks.influxdb_metrics.options.retention_policy_name]
 type = "string"
+category = "persistence"
 common = true
 examples = ["autogen", "one_day_only"]
+groups = ["v1"]
 required = false
 description = "Sets the target retention policy for the write into InfluxDB 1."
 
 [sinks.influxdb_metrics.options.username]
 type = "string"
+category = "auth"
 common = true
 examples = ["todd", "vector-source"]
+groups = ["v1"]
 required = false
 description = "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 
 [sinks.influxdb_metrics.options.password]
 type = "string"
+category = "auth"
 common = true
 examples = ["${INFLUXDB_PASSWORD_ENV_VAR}", "influxdb4ever"]
+groups = ["v1"]
 required = false
 description = "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 
@@ -94,5 +124,7 @@ description = "Sets the password for authentication if you’ve enabled authenti
 type = "string"
 common = true
 examples = ["service"]
+groups = ["v1", "v2"]
+prioritize = true
 required = true
 description = "A prefix that will be added to all metric names."

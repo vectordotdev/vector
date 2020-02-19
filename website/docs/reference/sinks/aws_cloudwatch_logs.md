@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -63,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -111,7 +107,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -128,6 +123,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
   name={"assume_role"}
   path={null}
   relevantWhen={null}
@@ -150,6 +146,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authe
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -171,6 +168,7 @@ Configures the sink batching behavior.
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
@@ -193,6 +191,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
@@ -220,6 +219,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -241,6 +241,7 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
@@ -263,6 +264,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -285,6 +287,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
@@ -307,6 +310,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -334,6 +338,7 @@ The behavior when the buffer becomes full.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"create_missing_group"}
   path={null}
   relevantWhen={null}
@@ -356,6 +361,7 @@ Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not alr
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"create_missing_stream"}
   path={null}
   relevantWhen={null}
@@ -378,6 +384,7 @@ Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not a
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -400,6 +407,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
@@ -422,6 +430,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   defaultValue={null}
   enumValues={null}
   examples={["{{ file }}","ec2/{{ instance_id }}","group-name"]}
+  groups={[]}
   name={"group_name"}
   path={null}
   relevantWhen={null}
@@ -444,6 +453,7 @@ The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stre
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -466,6 +476,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
+  groups={[]}
   name={"region"}
   path={null}
   relevantWhen={{"host":""}}
@@ -488,6 +499,7 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -509,6 +521,7 @@ Configures the sink request behavior.
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -531,6 +544,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -553,6 +567,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -575,6 +590,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -597,6 +613,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -619,6 +636,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -641,6 +659,7 @@ The maximum amount of time, in seconds, to wait between retries.
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -668,6 +687,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={["{{ instance_id }}","%Y-%m-%d","stream-name"]}
+  groups={[]}
   name={"stream_name"}
   path={null}
   relevantWhen={null}
@@ -697,6 +717,7 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs st
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -719,6 +740,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}

@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -60,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -79,7 +75,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -96,6 +91,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#3"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
@@ -119,6 +115,7 @@ The address to listen for connections on, or `systemd#N` to use the Nth socket p
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
+  groups={[]}
   name={"host_key"}
   path={null}
   relevantWhen={null}
@@ -141,6 +138,7 @@ The key name added to each event representing the current host. This can also be
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
+  groups={[]}
   name={"max_length"}
   path={null}
   relevantWhen={null}
@@ -163,6 +161,7 @@ The maximum bytes size of incoming messages before they are discarded.
   defaultValue={null}
   enumValues={{"tcp":"TCP Socket.","udp":"UDP Socket.","unix":"Unix Domain Socket."}}
   examples={["tcp","udp","unix"]}
+  groups={[]}
   name={"mode"}
   path={null}
   relevantWhen={null}
@@ -185,6 +184,7 @@ The type of socket to use.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/socket"]}
+  groups={[]}
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
@@ -207,6 +207,7 @@ The unix socket path. *This should be absolute path*.
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"shutdown_timeout_secs"}
   path={null}
   relevantWhen={{"mode":"tcp"}}
@@ -258,6 +259,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -281,6 +283,7 @@ The upstream hostname.
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -304,6 +307,7 @@ The raw message, unaltered.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}

@@ -1,5 +1,7 @@
+<%- groups ||= [] -%>
 [<%= namespace %>.buffer]
 type = "table"
+groups = <%= groups.to_json %>
 description = "Configures the sink specific buffer behavior."
 
 [<%= namespace %>.buffer.children.max_events]

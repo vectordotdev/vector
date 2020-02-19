@@ -97,6 +97,41 @@ class Component
     @options_list ||= options.to_h.values.sort
   end
 
+  def option_groups
+    @option_groups ||= options_list.collect(&:groups).flatten.uniq.sort
+  end
+
+  def option_example_groups
+    @option_example_groups ||=
+      begin
+        groups = {}
+
+        if option_groups.any?
+          option_groups.each do |group|
+            groups[group] = options_list.select do |option|
+              option.group?(group) && option.common?
+            end
+          end
+
+          if advanced_relevant?
+            option_groups.each do |group|
+              groups["#{group} (advanced)"] = options_list.select do |option|
+                option.group?(group)
+              end
+            end
+          end
+        else
+          groups["Common"] = options_list.select(&:common?)
+
+          if advanced_relevant?
+            groups["Advanced"] = options_list
+          end
+        end
+
+        groups
+      end
+  end
+
   def partition_options
     options_list.select(&:partition_key?)
   end
@@ -107,6 +142,16 @@ class Component
 
   def sink?
     type == "sink"
+  end
+
+  def sorted_option_group_keys
+    option_example_groups.keys.sort_by do |key|
+      if key.downcase.include?("advanced")
+        -1
+      else
+        1
+      end
+    end.reverse
   end
 
   def source?

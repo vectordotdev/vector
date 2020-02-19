@@ -99,6 +99,13 @@
           "type": "array",
           "description": "An array of example values used for documentation purposes."
         },
+        "groups": {
+          "type": "array",
+          "description": "The overaching group that this configuration belongs to. This is an advanced option that should be used for large groups of mutually exclusive options. For example, a set of options specifically for v1 and another set for v2.",
+          "items": {
+            "type": "string"
+          }
+        },
         "partition_key": {
           "type": "boolean",
           "description": "If this option can be used to partition data. For example, the `path` option in the `aws_s3` sink."
@@ -255,6 +262,10 @@
             "type": "string",
             "enum": ["log", "metric"]
           }
+        },
+        "min_version": {
+          "type": "string",
+          "description": "The minimum version supported for the system this component interfaces with."
         },
         "options": {
           "$ref": "#/definitions/fields",

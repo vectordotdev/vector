@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -57,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -81,7 +77,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -98,6 +93,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"largest"}
   enumValues={null}
   examples={["smallest","earliest","beginning","largest","latest","end","error"]}
+  groups={[]}
   name={"auto_offset_reset"}
   path={null}
   relevantWhen={null}
@@ -120,6 +116,7 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
   defaultValue={null}
   enumValues={null}
   examples={["10.14.22.123:9092,10.14.23.332:9092"]}
+  groups={[]}
   name={"bootstrap_servers"}
   path={null}
   relevantWhen={null}
@@ -142,6 +139,7 @@ A comma-separated list of host and port pairs that are the addresses of the Kafk
   defaultValue={100}
   enumValues={null}
   examples={[50,100]}
+  groups={[]}
   name={"fetch_wait_max_ms"}
   path={null}
   relevantWhen={null}
@@ -165,6 +163,7 @@ Maximum time the broker may wait to fill the response.
   defaultValue={null}
   enumValues={null}
   examples={["consumer-group-name"]}
+  groups={[]}
   name={"group_id"}
   path={null}
   relevantWhen={null}
@@ -188,6 +187,7 @@ The consumer group name to be used to consume events from Kafka.
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}
+  groups={[]}
   name={"key_field"}
   path={null}
   relevantWhen={null}
@@ -210,6 +210,7 @@ The log field name to use for the topic key. If unspecified, the key would not b
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"librdkafka_options"}
   path={null}
   relevantWhen={null}
@@ -232,6 +233,7 @@ Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   defaultValue={null}
   enumValues={null}
   examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}
   relevantWhen={null}
@@ -260,6 +262,7 @@ The options and their values. Accepts `string` values.
   defaultValue={10000}
   enumValues={null}
   examples={[5000,10000]}
+  groups={[]}
   name={"session_timeout_ms"}
   path={null}
   relevantWhen={null}
@@ -283,6 +286,7 @@ The Kafka session timeout in milliseconds.
   defaultValue={60000}
   enumValues={null}
   examples={[30000,60000]}
+  groups={[]}
   name={"socket_timeout_ms"}
   path={null}
   relevantWhen={null}
@@ -306,6 +310,7 @@ Default timeout for network requests.
   defaultValue={null}
   enumValues={null}
   examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
+  groups={[]}
   name={"topics"}
   path={null}
   relevantWhen={null}
@@ -347,6 +352,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -370,6 +376,7 @@ The raw event message, unaltered.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}

@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -62,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -125,7 +121,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -142,6 +137,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"auth"}
   path={null}
   relevantWhen={null}
@@ -163,6 +159,7 @@ Options for the authentication strategy.
   defaultValue={null}
   enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["basic"]}
+  groups={[]}
   name={"strategy"}
   path={"auth"}
   relevantWhen={null}
@@ -185,6 +182,7 @@ The authentication strategy to use.
   defaultValue={null}
   enumValues={null}
   examples={["${PASSWORD_ENV_VAR}","password"]}
+  groups={[]}
   name={"password"}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
@@ -207,6 +205,7 @@ The basic authentication password.If using GrafanaLab's hosted Loki then this mu
   defaultValue={null}
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
+  groups={[]}
   name={"user"}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
@@ -234,6 +233,7 @@ The basic authentication user name.If using GrafanaLab's hosted Loki then this m
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -255,6 +255,7 @@ Configures the sink batching behavior.
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
@@ -277,6 +278,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
@@ -304,6 +306,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -325,6 +328,7 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
@@ -347,6 +351,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -369,6 +374,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
@@ -391,6 +397,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -418,6 +425,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON","text":"Each event is encoded into text via the `message` key."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -440,6 +448,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={["http://localhost:3100","http://127.0.0.1:8080"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={null}
@@ -462,6 +471,7 @@ The endpoint used to ship logs to.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -484,6 +494,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={[{"label":"value"}]}
+  groups={[]}
   name={"labels"}
   path={null}
   relevantWhen={null}
@@ -505,6 +516,7 @@ A set of labels that will be attached to each batch of events. These valuesare a
   defaultValue={null}
   enumValues={null}
   examples={[{"key":"value"},{"key":"{{ event_field }}"}]}
+  groups={[]}
   name={"`[label-name`"}
   path={"labels"}
   relevantWhen={null}
@@ -532,6 +544,7 @@ A key-value pair for labels.
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"remove_label_fields"}
   path={null}
   relevantWhen={null}
@@ -554,6 +567,7 @@ If this is set to `true` then when labels are collected from events those fields
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"remove_timestamp"}
   path={null}
   relevantWhen={null}
@@ -576,6 +590,7 @@ If this is set to `true` then the timestamp will be removed from the event. This
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -597,6 +612,7 @@ Configures the sink request behavior.
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -619,6 +635,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -641,6 +658,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -663,6 +681,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -685,6 +704,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -707,6 +727,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -729,6 +750,7 @@ The maximum amount of time, in seconds, to wait between retries.
   defaultValue={60}
   enumValues={null}
   examples={[60]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -756,6 +778,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={["some_tenant_id"]}
+  groups={[]}
   name={"tenant_id"}
   path={null}
   relevantWhen={null}
@@ -780,6 +803,7 @@ You can read more about tenant id's [here][urls.loki_multi_tenancy]
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -801,6 +825,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -823,6 +848,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -845,6 +871,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -867,6 +894,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -889,6 +917,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -911,6 +940,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_hostname"}
   path={"tls"}
   relevantWhen={null}

@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -64,7 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -100,7 +96,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -117,6 +112,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
+  groups={[]}
   name={"data_dir"}
   path={null}
   relevantWhen={null}
@@ -139,6 +135,7 @@ The directory used to persist file checkpoint positions. By default, the [global
   defaultValue={null}
   enumValues={null}
   examples={[["/var/log/nginx/*.[0-9]*.log"]]}
+  groups={[]}
   name={"exclude"}
   path={null}
   relevantWhen={null}
@@ -161,6 +158,7 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes pre
   defaultValue={"file"}
   enumValues={null}
   examples={["file"]}
+  groups={[]}
   name={"file_key"}
   path={null}
   relevantWhen={null}
@@ -183,6 +181,7 @@ The key name added to each event with the full path of the file. See [Context](#
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"fingerprinting"}
   path={null}
   relevantWhen={null}
@@ -204,6 +203,7 @@ Configuration for how the file source should identify files.
   defaultValue={"checksum"}
   enumValues={{"checksum":"Read [`fingerprint_bytes`](#fingerprint_bytes) bytes from the head of the file to uniquely identify files via a checksum.","device_and_inode":"Uses the [device and inode][urls.inode] to unique identify files."}}
   examples={["checksum","device_and_inode"]}
+  groups={[]}
   name={"strategy"}
   path={"fingerprinting"}
   relevantWhen={null}
@@ -226,6 +226,7 @@ The strategy used to uniquely identify files. This is important for [checkpointi
   defaultValue={256}
   enumValues={null}
   examples={[256]}
+  groups={[]}
   name={"fingerprint_bytes"}
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
@@ -248,6 +249,7 @@ The number of bytes read off the head of the file to generate a unique fingerpri
   defaultValue={0}
   enumValues={null}
   examples={[0]}
+  groups={[]}
   name={"ignored_header_bytes"}
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
@@ -275,6 +277,7 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"glob_minimum_cooldown"}
   path={null}
   relevantWhen={null}
@@ -297,6 +300,7 @@ Delay between file discovery calls. This controls the interval at which Vector s
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
+  groups={[]}
   name={"host_key"}
   path={null}
   relevantWhen={null}
@@ -319,6 +323,7 @@ The key name added to each event representing the current host. This can also be
   defaultValue={null}
   enumValues={null}
   examples={[86400]}
+  groups={[]}
   name={"ignore_older"}
   path={null}
   relevantWhen={null}
@@ -341,6 +346,7 @@ Ignore files with a data modification date that does not exceed this age.
   defaultValue={null}
   enumValues={null}
   examples={[["/var/log/nginx/*.log"]]}
+  groups={[]}
   name={"include"}
   path={null}
   relevantWhen={null}
@@ -363,6 +369,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported. See [File
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
+  groups={[]}
   name={"max_line_bytes"}
   path={null}
   relevantWhen={null}
@@ -385,6 +392,7 @@ The maximum number of a bytes a line can contain before being discarded. This pr
   defaultValue={2048}
   enumValues={null}
   examples={[2048]}
+  groups={[]}
   name={"max_read_bytes"}
   path={null}
   relevantWhen={null}
@@ -407,6 +415,7 @@ An approximate limit on the amount of data read from a single file at a given ti
   defaultValue={null}
   enumValues={null}
   examples={["^(INFO|ERROR)"]}
+  groups={[]}
   name={"message_start_indicator"}
   path={null}
   relevantWhen={null}
@@ -429,6 +438,7 @@ When present, Vector will aggregate multiple lines into a single event, using th
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"multi_line_timeout"}
   path={null}
   relevantWhen={null}
@@ -451,6 +461,7 @@ When [`message_start_indicator`](#message_start_indicator) is present, this sets
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"oldest_first"}
   path={null}
   relevantWhen={null}
@@ -473,6 +484,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"start_at_beginning"}
   path={null}
   relevantWhen={null}
@@ -515,6 +527,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["/var/log/nginx.log"]}
+  groups={[]}
   name={"file"}
   path={null}
   relevantWhen={null}
@@ -537,6 +550,7 @@ The _full_ path of the file tha the log originated from. This can be renamed via
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -559,6 +573,7 @@ The current hostname, equivalent to the `gethostname` command. This can be renam
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -581,6 +596,7 @@ The raw log message, unaltered.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}

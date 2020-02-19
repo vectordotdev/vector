@@ -46,6 +46,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["file"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -68,6 +69,7 @@ The target log field to compare against the [`value`](#value).
   defaultValue={null}
   enumValues={null}
   examples={["/var/log/nginx.log"]}
+  groups={[]}
   name={"value"}
   path={null}
   relevantWhen={null}

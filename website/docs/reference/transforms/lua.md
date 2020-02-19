@@ -59,6 +59,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[["/etc/vector/lua"]]}
+  groups={[]}
   name={"search_dirs"}
   path={null}
   relevantWhen={null}
@@ -81,6 +82,7 @@ A list of directories search when loading a Lua file via the `require` function.
   defaultValue={null}
   enumValues={null}
   examples={["require(\"script\") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
+  groups={[]}
   name={"source"}
   path={null}
   relevantWhen={null}

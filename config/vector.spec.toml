@@ -4554,6 +4554,18 @@ end
   # * type: string
   namespace = "service"
 
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # auth
+  #
+
   # Specifies the destination organization for writes into InfluxDB 2.
   #
   # * required
@@ -4568,6 +4580,28 @@ end
   token = "${INFLUXDB_TOKEN_ENV_VAR}"
   token = "ef8d5de700e7989468166c40fc8a0ccd"
 
+  # Sets the password for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "influxdb4ever"
+
+  # Sets the username for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  username = "todd"
+  username = "vector-source"
+
+  #
+  # persistence
+  #
+
   # Sets the write consistency for the point for InfluxDB 1.
   #
   # * optional
@@ -4578,23 +4612,6 @@ end
   consistency = "quorum"
   consistency = "all"
 
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # Sets the password for authentication if you’ve enabled authentication for the
-  # write into InfluxDB 1.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
-  password = "influxdb4ever"
-
   # Sets the target retention policy for the write into InfluxDB 1.
   #
   # * optional
@@ -4602,15 +4619,6 @@ end
   # * type: string
   retention_policy_name = "autogen"
   retention_policy_name = "one_day_only"
-
-  # Sets the username for authentication if you’ve enabled authentication for the
-  # write into InfluxDB 1.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  username = "todd"
-  username = "vector-source"
 
   #
   # Batch

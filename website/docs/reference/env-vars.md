@@ -35,6 +35,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -57,6 +58,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}
@@ -79,6 +81,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
+  groups={[]}
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
@@ -101,6 +104,7 @@ The docker host to connect to.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
@@ -123,6 +127,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
+  groups={[]}
   name={"GOOGLE_APPLICATION_CREDENTIALS"}
   path={null}
   relevantWhen={null}
@@ -145,6 +150,7 @@ The [GCP api key][urls.gcp_authentication_api_key] used for authentication.
   defaultValue={null}
   enumValues={null}
   examples={["debug"]}
+  groups={[]}
   name={"LOG"}
   path={null}
   relevantWhen={null}
@@ -167,6 +173,7 @@ Sets Vector's log level. See the [log section in the monitoring guide][docs.moni
   defaultValue={null}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"RUST_BACKTRACE"}
   path={null}
   relevantWhen={null}

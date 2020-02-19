@@ -34,32 +34,6 @@
 <%- end -%>
 ## How It Works [[sort]]
 
-### Configuration example
-
-#### InfluxDB v1
-```toml
-[sinks.my_sink_id]
-  type = "influxdb_metrics"
-  namespace = "service"
-  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
-  database = "vector-database"
-  consistency = "one"
-  retention_policy_name = "one_day_only"
-  username = "vector-source"
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
-```
-
-#### InfluxDB v2
-```toml
-[sinks.my_sink_id]
-  type = "influxdb_metrics"
-  namespace = "service"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  org = "my-org"
-  bucket = "my-bucket"
-  token = "${INFLUXDB_TOKEN_ENV_VAR}"
-```
-
 ### Metric Types
 
 InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
