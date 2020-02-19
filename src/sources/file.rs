@@ -9,6 +9,7 @@ use futures::{future, sync::mpsc, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -43,6 +44,14 @@ enum BuildError {
         indicator: String,
         source: regex::Error,
     },
+    InvalidMultilineStartPattern {
+        start_pattern: String,
+        source: regex::Error,
+    },
+    InvalidMultilineConditionPattern {
+        condition_pattern: String,
+        source: regex::Error,
+    },
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -61,8 +70,45 @@ pub struct FileConfig {
     pub fingerprinting: FingerprintingConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
+    pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,
     pub oldest_first: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MultilineConfig {
+    pub start_pattern: String,
+    pub condition_pattern: String,
+    pub mode: line_agg::Mode,
+    pub timeout_ms: u64,
+}
+
+impl TryFrom<&MultilineConfig> for line_agg::Config {
+    type Error = crate::Error;
+
+    fn try_from(config: &MultilineConfig) -> crate::Result<Self> {
+        let MultilineConfig {
+            start_pattern,
+            condition_pattern,
+            mode,
+            timeout_ms,
+        } = config;
+
+        let start_pattern = Regex::new(start_pattern)
+            .with_context(|| InvalidMultilineStartPattern { start_pattern })?;
+        let condition_pattern = Regex::new(condition_pattern)
+            .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
+        let mode = mode.clone();
+        let timeout = Duration::from_millis(*timeout_ms);
+
+        Ok(Self {
+            start_pattern,
+            condition_pattern,
+            mode,
+            timeout,
+        })
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -113,6 +159,7 @@ impl Default for FileConfig {
             glob_minimum_cooldown: 1000, // millis
             message_start_indicator: None,
             multi_line_timeout: 1000, // millis
+            multiline: None,
             max_read_bytes: 2048,
             oldest_first: false,
         }
@@ -136,6 +183,10 @@ impl SourceConfig for FileConfig {
         // without the file servers' checkpointers interfering with each
         // other
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
+
+        if let Some(ref config) = self.multiline {
+            TryInto::<line_agg::Config>::try_into(config)?;
+        }
 
         if let Some(ref indicator) = self.message_start_indicator {
             Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
@@ -187,6 +238,7 @@ pub fn file_source(
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
+    let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     Box::new(future::lazy(move || {
@@ -196,7 +248,12 @@ pub fn file_source(
         let (tx, rx) = futures::sync::mpsc::channel(100);
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
-            if let Some(msi) = message_start_indicator {
+            if let Some(ref multiline_config) = multiline_config {
+                Box::new(LineAgg::new(
+                    rx,
+                    line_agg::Config::try_from(multiline_config).unwrap(), // validated in build
+                ))
+            } else if let Some(msi) = message_start_indicator {
                 Box::new(LineAgg::new(
                     rx,
                     line_agg::Config::for_legacy(
@@ -1056,7 +1113,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_aggregation() {
+    fn test_multi_line_aggregation_legacy() {
         let (tx, rx) = futures::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
@@ -1065,6 +1122,83 @@ mod tests {
             include: vec![dir.path().join("*")],
             message_start_indicator: Some("INFO".into()),
             multi_line_timeout: 25, // less than 50 in sleep()
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+
+        let mut rt = runtime::Runtime::new().unwrap();
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep(); // The files must be observed at their original lengths before writing to them
+
+        writeln!(&mut file, "leftover foo").unwrap();
+        writeln!(&mut file, "INFO hello").unwrap();
+        writeln!(&mut file, "INFO goodbye").unwrap();
+        writeln!(&mut file, "part of goodbye").unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "INFO hi again").unwrap();
+        writeln!(&mut file, "and some more").unwrap();
+        writeln!(&mut file, "INFO hello").unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "too slow").unwrap();
+        writeln!(&mut file, "INFO doesn't have").unwrap();
+        writeln!(&mut file, "to be INFO in").unwrap();
+        writeln!(&mut file, "the middle").unwrap();
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "leftover foo".into(),
+                "INFO hello".into(),
+                "INFO goodbye\npart of goodbye".into(),
+                "INFO hi again\nand some more".into(),
+                "INFO hello".into(),
+                "too slow".into(),
+                "INFO doesn't have".into(),
+                "to be INFO in\nthe middle".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_multi_line_aggregation() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            multiline: Some(MultilineConfig {
+                start_pattern: "INFO".to_owned(),
+                condition_pattern: "INFO".to_owned(),
+                mode: line_agg::Mode::HaltBefore,
+                timeout_ms: 25, // less than 50 in sleep()
+            }),
             ..test_default_file_config(&dir)
         };
 
