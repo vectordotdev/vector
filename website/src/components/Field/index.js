@@ -153,7 +153,7 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
   return (
     <div className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
-        {groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
+        {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
         {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
         <span className="badge badge--secondary">{type}{unit && <> ({unit})</>}</span>
         {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary" title="This option is an enumation and only allows specific values">enum</span>}
