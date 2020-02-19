@@ -42,8 +42,6 @@ class Field
 
     @category = hash["category"] || ((@children.to_h.values.empty? || inline?) ? "General" : @name.humanize)
 
-    if !@
-
     if @required == true && !@defualt.nil?
       raise ArgumentError.new("#{self.class.name}#required must be false if there is a default for field #{@name}")
     end
@@ -171,6 +169,12 @@ class Field
     sections.select do |section|
       section.referenced_options.include?(name) ||
         section.referenced_options.any? { |o| o.end_with?(name) }
+    end
+  end
+
+  def group?(group_name)
+    groups.any? do |group|
+      group.downcase == group_name.downcase
     end
   end
 

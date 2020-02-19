@@ -1,5 +1,5 @@
 ---
-delivery_guarantee: "best_effort"
+delivery_guarantee: "at_least_once"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
@@ -27,16 +27,12 @@ import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  defaultValue="v1"
+  values={[{"label":"v1","value":"v1"},{"label":"v2","value":"v2"},{"label":"v1 (advanced)","value":"v1-advanced"},{"label":"v2 (advanced)","value":"v2-advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
-<TabItem value="common">
+<TabItem value="v1">
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
@@ -44,47 +40,56 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  bucket = "vector-bucket" # example
+  # REQUIRED - General
   database = "vector-database" # example
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
   namespace = "service" # example
-  org = "Organization" # example
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
 
-  # OPTIONAL
-  consistency = "any" # example, no default
-  healthcheck = true # default
+  # OPTIONAL - auth
   password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
-  retention_policy_name = "autogen" # example, no default
   username = "todd" # example, no default
+
+  # OPTIONAL - persistence
+  consistency = "any" # example, no default
+  retention_policy_name = "autogen" # example, no default
 ```
 
 </TabItem>
-<TabItem value="advanced">
+<TabItem value="v2">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
   bucket = "vector-bucket" # example
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
+  namespace = "service" # example
+
+  # REQUIRED - auth
+  org = "Organization" # example
+  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
+```
+
+</TabItem>
+<TabItem value="v1-advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  # REQUIRED - General
   database = "vector-database" # example
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
   namespace = "service" # example
-  org = "Organization" # example
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
 
-  # OPTIONAL - General
-  consistency = "any" # example, no default
-  healthcheck = true # default
+  # OPTIONAL - auth
   password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
-  retention_policy_name = "autogen" # example, no default
   username = "todd" # example, no default
+
+  # OPTIONAL - persistence
+  consistency = "any" # example, no default
+  retention_policy_name = "autogen" # example, no default
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -103,7 +108,38 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
+<TabItem value="v2-advanced">
 
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  # REQUIRED - General
+  bucket = "vector-bucket" # example
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
+  namespace = "service" # example
+
+  # REQUIRED - auth
+  org = "Organization" # example
+  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_events = 20 # default, events
+    timeout_secs = 1 # default, seconds
+
+  # OPTIONAL - Request
+  [sinks.my_sink_id.request]
+    in_flight_limit = 5 # default, requests
+    rate_limit_duration_secs = 1 # default, seconds
+    rate_limit_num = 5 # default
+    retry_attempts = -1 # default
+    retry_initial_backoff_secs = 1 # default, seconds
+    retry_max_duration_secs = 10 # default, seconds
+    timeout_secs = 60 # default, seconds
+```
+
+</TabItem>
 </Tabs>
 
 ## Options
@@ -233,28 +269,6 @@ Sets the write consistency for the point for InfluxDB 1.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["vector-database","iot-store"]}
-  name={"database"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### database
-
-Sets the target database for the write into InfluxDB 1.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["https://us-west-2-1.aws.cloud2.influxdata.com","http://localhost:8086/"]}
   name={"endpoint"}
   path={null}
@@ -268,6 +282,28 @@ Sets the target database for the write into InfluxDB 1.
 ### endpoint
 
 InfluxDB endpoint to send metrics to.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["vector-database","iot-store"]}
+  name={"database"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### database
+
+Sets the target database for the write into InfluxDB 1.
 
 
 </Field>
@@ -610,32 +646,6 @@ Sets the username for authentication if you’ve enabled authentication for the 
 </Fields>
 
 ## How It Works
-
-### Configuration example
-
-#### InfluxDB v1
-```toml
-[sinks.my_sink_id]
-  type = "influxdb_metrics"
-  namespace = "service"
-  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
-  database = "vector-database"
-  consistency = "one"
-  retention_policy_name = "one_day_only"
-  username = "vector-source"
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
-```
-
-#### InfluxDB v2
-```toml
-[sinks.my_sink_id]
-  type = "influxdb_metrics"
-  namespace = "service"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  org = "my-org"
-  bucket = "my-bucket"
-  token = "${INFLUXDB_TOKEN_ENV_VAR}"
-```
 
 ### Environment Variables
 

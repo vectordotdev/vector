@@ -70,12 +70,34 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # REQUIRED - Input
   [tests.input]
-    # REQUIRED
+    # REQUIRED - General
     type = "raw" # example, enum
     insert_at = "foo" # example
 
-    # OPTIONAL
+    # OPTIONAL - General
     value = "some message contents" # example, no default, relevant when type = "raw"
+
+    # OPTIONAL - Log fields
+    [tests.input.log_fields]
+      message = "some message contents" # example
+      host = "myhost" # example
+
+    # OPTIONAL - Metric
+    [tests.input.metric]
+      # REQUIRED - General
+      type = "counter" # example, enum
+      name = "duration_total" # example
+      timestamp = "2019-11-01T21:15:47.443232Z" # example
+      val = 10.2 # example
+
+      # OPTIONAL - General
+      direction = "plus" # example, no default, enum
+      sample_rate = 1 # example, no default
+
+      # OPTIONAL - Tags
+      [tests.input.metric.tags]
+        host = "foohost" # example
+        region = "us-east-1" # example
 ```
 
 </TabItem>

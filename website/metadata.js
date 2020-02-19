@@ -17371,7 +17371,7 @@ module.exports = {
     },
     "influxdb_metrics": {
       "beta": true,
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.",
       "event_types": [
         "metric"
