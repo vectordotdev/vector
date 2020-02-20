@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
+min_version: null
 operating_systems: ["Linux"]
 sidebar_label: "journald|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
@@ -73,10 +74,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 import Alert from '@site/src/components/Alert';
 
-<Alert type="danger" fill={true} icon={false}>
+<Alert icon={false} type="danger" classNames="list--warnings">
 
-1. The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
-2. If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
+* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
+* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
 
 </Alert>
 

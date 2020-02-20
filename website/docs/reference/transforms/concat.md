@@ -2,6 +2,7 @@
 description: "The Vector `concat` transform accepts `log` events and allows you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22
+min_version: null
 sidebar_label: "concat|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/concat.rs
 status: "beta"

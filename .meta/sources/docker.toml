@@ -4,8 +4,17 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
+min_version = "1.24"
 output_types = ["log"]
 through_description = "the [Docker engine daemon][urls.docker_daemon]"
+requirements = """\
+* The [`json-file`][urls.docker_logging_driver_json_file] (default) or \
+[`journald`][urls.docker_logging_driver_journald] Docker logging driver \
+must be enabled for this source to work. See the \
+[Docker Integration Strategy section](#docker-integration-strategy) \
+for more info.
+* Docker version >= 1.24 is required.
+"""
 
 <%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
 

@@ -2,6 +2,7 @@
 description: "The Vector `sampler` transform accepts `log` events and allows you to sample events with a configurable rate."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
+min_version: null
 sidebar_label: "sampler|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
 status: "beta"

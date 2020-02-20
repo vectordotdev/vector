@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "syslog|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs

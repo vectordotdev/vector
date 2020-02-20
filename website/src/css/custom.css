@@ -734,6 +734,34 @@ input[type="text"]:focus {
 }
 
 /**
+ * list--warnings
+ *
+ * Generic list with warnings as list styles.
+ */
+
+div.list--warnings > ul,
+ul.list--warnings {
+  list-style: none;
+  margin-left: 1em;
+  padding-left: 1em;
+}
+div.list--warnings > ul > li:before,
+ul.list--warnings > li:before {
+  content: "⚠";
+  display: block;
+  float: left;
+  font-size: 1.25em;
+  font-weight: bold;
+  margin-left: -1.6em;
+  margin-top: -0.2em;
+}
+div.list--warnings > ul > li,
+ul.list--warnings > li {
+  margin: 0 0 1em 0;
+  padding: 0;
+}
+
+/**
  * menu
  *
  * Menu styling generally used as a navigation menu, such a the left-side

@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
+min_version: "1.24"
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "docker|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/docker.rs
@@ -69,6 +70,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
+* Docker version >= 1.24 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -219,7 +232,7 @@ The field name to be added to events that are detected to contain an incomplete 
 
 ### DOCKER_HOST
 
-The docker host to connect to. See [Connecting to the Docker daemon](#connecting-to-the-docker-daemon) for more info.
+The docker host to connect to. See [Connecting To The Docker Daemon](#connecting-to-the-docker-daemon) for more info.
 
 
 </Field>
@@ -242,7 +255,7 @@ The docker host to connect to. See [Connecting to the Docker daemon](#connecting
 
 ### DOCKER_VERIFY_TLS
 
-If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate. See [Connecting to the Docker daemon](#connecting-to-the-docker-daemon) for more info.
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate. See [Connecting To The Docker Daemon](#connecting-to-the-docker-daemon) for more info.
 
 
 </Field>
@@ -460,12 +473,67 @@ The UTC timestamp extracted from the Docker log event.
 
 ## How It Works
 
-### Connecting to the Docker daemon
+### Connecting To The Docker Daemon
 
-Vector will automatically attempt to connect to the docker daemon for you. In most
-situations if your current user is able to run `docker ps` then Vector will be able to
-connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
-use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon_socket_option].
+Vector will automatically attempt to connect to the docker daemon for you. If
+the user that Vector is running under can run `docker ps` then Vector will be
+able to connect. Vector will also respect if `DOCKER_HOST` and
+`DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
+See the [Docker daemon docs][urls.docker_daemon_socket_option].
+
+### Docker Integration Strategy
+
+There are two primary ways through which you can integrate with Docker to
+receive its logs:
+
+1. Interact with the [Docker daemon][urls.docker_daemon] directly via the
+   `docker logs` command. (simplest)
+2. Configure a compatible [Docker logging driver][urls.docker_logging_drivers]
+   with a matching [Vector source][docs.sources]. (advanced)
+
+The Vector `docker` source implements option 1. This is the simplest option,
+but it is prone to performance and stability issues with _large_ deployments. If
+you experience this, please see the
+[Alternate Strategies section](#alternate-strategies) below.
+
+#### Alternate Strategies
+
+First, it's worth mentioning that Vector strives to guide you towards the
+optimal observability setup without presenting you with unncessary details or
+questions. Unfortunately, there are circumstances where tradeoffs must be made
+and you must determine which tradeoffs are appropriate. Docker is one of these
+circumstances.
+
+Second, if you have a large container-based deployment you should consider using
+a container orchestrator like Kubernetes. These platforms provide alternate log
+collection means that side-step the Docker logging problems. For supported
+platforms see Vector's
+[Containers installation section][docs.installation.containers].
+
+Finally, if you cannot use a container orchestrator then you can configure a
+compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
+[Vector source][docs.sources]. For example:
+
+1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
+   [Vector `syslog` source][docs.sources.syslog].
+2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
+   [Vector `journald` source][docs.sources.journald].
+3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
+   [Vector `splunk_hec` source][docs.sources.splunk_hec].
+
+To our knowledge there is no discernable difference in performance or stability
+between any of these. If we had to recommend one, we would recommend the
+`syslog` combination.
+
+### Docker Logging Drivers
+
+In order for the Vector `docker` source to work properly, you must configure
+the [`json-file`][urls.docker_logging_driver_json_file] (default) or
+[`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
+This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
+uses to integrate. See the
+[Docker Integration Strategy section](#docker-integration-strategy) for more
+info.
 
 ### Environment Variables
 
@@ -489,7 +557,17 @@ that we use to determine if an event is partial via the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.installation.containers]: /docs/setup/installation/containers/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
+[docs.sources.syslog]: /docs/reference/sources/syslog/
+[docs.sources]: /docs/reference/sources/
 [urls.docker_daemon]: https://docs.docker.com/engine/docker-overview/#the-docker-daemon
 [urls.docker_daemon_socket_option]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
+[urls.docker_logging_driver_journald]: https://docs.docker.com/config/containers/logging/journald/
+[urls.docker_logging_driver_json_file]: https://docs.docker.com/config/containers/logging/json-file/
+[urls.docker_logging_driver_splunk]: https://docs.docker.com/config/containers/logging/splunk/
+[urls.docker_logging_driver_syslog]: https://docs.docker.com/config/containers/logging/syslog/
+[urls.docker_logging_drivers]: https://docs.docker.com/config/containers/logging/configure/
 [urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

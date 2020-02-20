@@ -2,6 +2,7 @@
 description: "The Vector `tokenizer` transform accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
+min_version: null
 sidebar_label: "tokenizer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs
 status: "prod-ready"

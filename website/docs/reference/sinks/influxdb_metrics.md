@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "influxdb_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb_metrics.rs

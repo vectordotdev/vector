@@ -2,6 +2,7 @@
 description: "The Vector `coercer` transform accepts `log` events and allows you to coerce log fields into fixed types."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
+min_version: null
 sidebar_label: "coercer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
 status: "prod-ready"

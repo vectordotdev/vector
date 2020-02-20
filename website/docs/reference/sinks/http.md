@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
