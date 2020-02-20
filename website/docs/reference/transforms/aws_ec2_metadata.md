@@ -445,7 +445,7 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 ### Network Access
 
-The `aws_ec2_metadata` transform requires network access to 
+The `aws_ec2_metadata` transform requires network access to
 operate correctly.
 
 #### Docker Network Access
