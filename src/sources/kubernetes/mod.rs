@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test;
+pub mod test;
 
 mod applicable_transform;
 mod file_source_builder;
