@@ -226,6 +226,8 @@ module.exports = {
             
               "reference/sinks/humio_logs",
             
+              "reference/sinks/influxdb_metrics",
+            
               "reference/sinks/kafka",
             
               "reference/sinks/logdna",

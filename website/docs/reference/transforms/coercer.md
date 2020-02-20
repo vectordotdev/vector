@@ -2,6 +2,7 @@
 description: "The Vector `coercer` transform accepts `log` events and allows you to coerce log fields into fixed types."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
+min_version: null
 sidebar_label: "coercer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
 status: "prod-ready"
@@ -25,11 +26,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -57,7 +54,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -78,7 +75,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -95,6 +91,7 @@ import Field from '@site/src/components/Field';
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"drop_unspecified"}
   path={null}
   relevantWhen={null}
@@ -117,6 +114,7 @@ Set to `true` to drop all fields that are not specified in the [`types`](#types)
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"types"}
   path={null}
   relevantWhen={null}
@@ -138,6 +136,7 @@ Key/Value pairs representing mapped log field types.
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"types"}
   relevantWhen={null}

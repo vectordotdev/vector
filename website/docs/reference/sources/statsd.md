@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/statsd/
@@ -47,6 +48,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.1:8126"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}

@@ -35,7 +35,7 @@ vector test /etc/vector/*.toml
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.tests.children_list, path: "tests", array: true, common: true) %>
+<%= config_example(metadata.tests.children_list.select(&:common?), path: "tests", array: true) %>
 ```
 
 </TabItem>
@@ -48,7 +48,7 @@ vector test /etc/vector/*.toml
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.tests.children_list, path: "tests", array: true, common: false) %>
+<%= config_example(metadata.tests.children_list, path: "tests", array: true) %>
 ```
 
 </TabItem>

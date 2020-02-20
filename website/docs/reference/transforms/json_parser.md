@@ -2,6 +2,7 @@
 description: "The Vector `json_parser` transform accepts `log` events and allows you to parse a log field value as JSON."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
+min_version: null
 sidebar_label: "json_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
 status: "prod-ready"
@@ -25,11 +26,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -54,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -71,7 +68,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -88,6 +84,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"drop_field"}
   path={null}
   relevantWhen={null}
@@ -99,7 +96,7 @@ import Field from '@site/src/components/Field';
 
 ### drop_field
 
-If the specified [`field`](#field) should be dropped (removed) after parsing.
+If the specified [`field`](#field) should be dropped (removed) after parsing. If parsing fails, the field will not be removed, irrespective of this setting.
 
 
 </Field>
@@ -110,6 +107,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   defaultValue={null}
   enumValues={null}
   examples={[true]}
+  groups={[]}
   name={"drop_invalid"}
   path={null}
   relevantWhen={null}
@@ -132,6 +130,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -154,6 +153,7 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"overwrite_target"}
   path={null}
   relevantWhen={null}
@@ -176,6 +176,7 @@ If [`target_field`](#target_field) is set and the log contains a field of the sa
   defaultValue={null}
   enumValues={null}
   examples={["target"]}
+  groups={[]}
   name={"target_field"}
   path={null}
   relevantWhen={null}

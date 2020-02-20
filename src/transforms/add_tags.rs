@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -25,7 +24,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone())))
     }
 

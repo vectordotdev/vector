@@ -30,12 +30,22 @@ lazy_static! {
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
     address: SocketAddr,
     /// Splunk HEC token
-    token: String,
+    token: Option<String>,
+}
+
+impl Default for SplunkConfig {
+    fn default() -> Self {
+        SplunkConfig {
+            address: default_socket_address(),
+            token: None,
+        }
+    }
 }
 
 fn default_socket_address() -> SocketAddr {
@@ -93,13 +103,16 @@ struct SplunkSource {
     /// Trigger for ending http server
     trigger: Arc<Mutex<Option<Trigger>>>,
 
-    credentials: Bytes,
+    credentials: Option<Bytes>,
 }
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, out: mpsc::Sender<Event>, trigger: Trigger) -> Self {
         SplunkSource {
-            credentials: format!("Splunk {}", config.token).into(),
+            credentials: config
+                .token
+                .as_ref()
+                .map(|token| format!("Splunk {}", token).into()),
             out,
             trigger: Arc::new(Mutex::new(Some(trigger))),
         }
@@ -183,8 +196,11 @@ impl SplunkSource {
         let credentials = source.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
-                match token {
-                    Some(token) if token.as_bytes() == credentials => Ok(()),
+                match (token, credentials.as_ref()) {
+                    (_, None) => Ok(()),
+                    (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
+                        Ok(())
+                    }
                     _ => Err(Rejection::from(ApiError::BadRequest)),
                 }
             });
@@ -237,11 +253,16 @@ impl SplunkSource {
     fn authorization(&self) -> BoxedFilter<((),)> {
         let credentials = self.credentials.clone();
         warp::header::optional("Authorization")
-            .and_then(move |token: Option<String>| match token {
-                Some(token) if token.as_bytes() == credentials => Ok(()),
-                Some(_) => Err(Rejection::from(ApiError::InvalidAuthorization)),
-                None => Err(Rejection::from(ApiError::MissingAuthorization)),
-            })
+            .and_then(
+                move |token: Option<String>| match (token, credentials.as_ref()) {
+                    (_, None) => Ok(()),
+                    (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
+                        Ok(())
+                    }
+                    (Some(_), Some(_)) => Err(Rejection::from(ApiError::InvalidAuthorization)),
+                    (None, Some(_)) => Err(Rejection::from(ApiError::MissingAuthorization)),
+                },
+            )
             .boxed()
     }
 
@@ -678,16 +699,17 @@ mod tests {
     const CHANNEL_CAPACITY: usize = 1000;
 
     fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
+        source_with(rt, Some(TOKEN.to_owned()))
+    }
+
+    fn source_with(rt: &mut Runtime, token: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         test_util::trace_init();
         let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
         let address = test_util::next_addr();
         rt.spawn(
-            SplunkConfig {
-                address,
-                token: TOKEN.to_owned(),
-            }
-            .build("default", &GlobalOptions::default(), sender)
-            .unwrap(),
+            SplunkConfig { address, token }
+                .build("default", &GlobalOptions::default(), sender)
+                .unwrap(),
         );
         (recv, address)
     }
@@ -938,6 +960,22 @@ mod tests {
                 "",
                 "nope"
             )
+        );
+    }
+
+    #[test]
+    fn no_autorization() {
+        let message = "no_autorization";
+        let mut rt = test_util::runtime();
+        let (source, address) = source_with(&mut rt, None);
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip, rt.executor());
+        assert!(rt.block_on(health).is_ok());
+
+        let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
+
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            message.into()
         );
     }
 

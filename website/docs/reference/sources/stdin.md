@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+stdin%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "stdin|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/stdin.rs
@@ -28,11 +29,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -54,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -69,7 +66,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -86,6 +82,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
+  groups={[]}
   name={"host_key"}
   path={null}
   relevantWhen={null}
@@ -108,6 +105,7 @@ The key name added to each event representing the current host. This can also be
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
+  groups={[]}
   name={"max_length"}
   path={null}
   relevantWhen={null}
@@ -159,6 +157,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -182,6 +181,7 @@ The local hostname.
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -205,6 +205,7 @@ The raw message, unaltered.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}

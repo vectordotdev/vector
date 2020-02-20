@@ -2,6 +2,7 @@
 description: "The Vector `logfmt_parser` transform accepts `log` events and allows you to extract data from a logfmt-formatted log field."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
+min_version: null
 sidebar_label: "logfmt_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/logfmt_parser.rs
 status: "beta"
@@ -57,6 +58,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"drop_field"}
   path={null}
   relevantWhen={null}
@@ -79,6 +81,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -101,6 +104,7 @@ The log field to parse.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"types"}
   path={null}
   relevantWhen={null}
@@ -122,6 +126,7 @@ Key/Value pairs representing mapped log field types.
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"types"}
   relevantWhen={null}

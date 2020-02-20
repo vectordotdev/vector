@@ -2,6 +2,7 @@
 description: "The Vector `add_fields` transform accepts `log` events and allows you to add one or more log fields."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
+min_version: null
 sidebar_label: "add_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
 status: "prod-ready"
@@ -56,6 +57,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"fields"}
   path={null}
   relevantWhen={null}
@@ -77,6 +79,7 @@ A table of key/value pairs representing the keys to be added to the event.
   defaultValue={null}
   enumValues={null}
   examples={[{"string_field":"string value"},{"env_var_field":"${ENV_VAR}"},{"int_field":1},{"float_field":1.2},{"bool_field":true},{"timestamp_field":"1979-05-27 00:32:00 -0700"},{"parent":{"child":"child_value"}},{"list_field":["first","second","third"]}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"fields"}
   relevantWhen={null}

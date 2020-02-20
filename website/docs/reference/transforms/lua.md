@@ -2,6 +2,7 @@
 description: "The Vector `lua` transform accepts `log` events and allows you to transform events with a full embedded Lua engine."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
+min_version: null
 sidebar_label: "lua|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 status: "beta"
@@ -59,6 +60,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[["/etc/vector/lua"]]}
+  groups={[]}
   name={"search_dirs"}
   path={null}
   relevantWhen={null}
@@ -81,6 +83,7 @@ A list of directories search when loading a Lua file via the `require` function.
   defaultValue={null}
   enumValues={null}
   examples={["require(\"script\") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
+  groups={[]}
   name={"source"}
   path={null}
   relevantWhen={null}

@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::{
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -23,7 +22,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
     }
 

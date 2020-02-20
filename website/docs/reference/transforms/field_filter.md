@@ -2,6 +2,7 @@
 description: "The Vector `field_filter` transform accepts `log` and `metric` events and allows you to filter events by a log field's value."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
+min_version: null
 sidebar_label: "field_filter|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 status: "beta"
@@ -46,6 +47,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["file"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -68,6 +70,7 @@ The target log field to compare against the [`value`](#value).
   defaultValue={null}
   enumValues={null}
   examples={["/var/log/nginx.log"]}
+  groups={[]}
   name={"value"}
   path={null}
   relevantWhen={null}

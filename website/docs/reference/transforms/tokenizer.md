@@ -2,6 +2,7 @@
 description: "The Vector `tokenizer` transform accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
+min_version: null
 sidebar_label: "tokenizer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs
 status: "prod-ready"
@@ -58,6 +59,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"drop_field"}
   path={null}
   relevantWhen={null}
@@ -80,6 +82,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -102,6 +105,7 @@ The log field to tokenize.
   defaultValue={null}
   enumValues={null}
   examples={[["timestamp","level","message"]]}
+  groups={[]}
   name={"field_names"}
   path={null}
   relevantWhen={null}
@@ -124,6 +128,7 @@ The log field names assigned to the resulting tokens, in order.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"types"}
   path={null}
   relevantWhen={null}
@@ -145,6 +150,7 @@ Key/Value pairs representing mapped log field types.
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"types"}
   relevantWhen={null}

@@ -93,13 +93,9 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, common: false, path: nil, titles: true)
+  def config_example(options, array: false, path: nil, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
-    end
-
-    if common
-      options = options.select(&:common?)
     end
 
     options = options.sort_by(&:config_file_sort_token)

@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
+min_version: null
 operating_systems: ["Linux"]
 sidebar_label: "journald|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
@@ -28,11 +29,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -55,7 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -71,17 +68,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Requirements
 
 import Alert from '@site/src/components/Alert';
 
-<Alert type="danger" fill={true} icon={false}>
+<Alert icon={false} type="danger" classNames="list--warnings">
 
-1. The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
-2. If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
+* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
+* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
 
 </Alert>
 
@@ -99,6 +95,7 @@ import Field from '@site/src/components/Field';
   defaultValue={16}
   enumValues={null}
   examples={[16]}
+  groups={[]}
   name={"batch_size"}
   path={null}
   relevantWhen={null}
@@ -121,6 +118,7 @@ The systemd journal is read in batches, and a checkpoint is set at the end of ea
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"current_boot_only"}
   path={null}
   relevantWhen={null}
@@ -143,6 +141,7 @@ Include only entries from the current boot.
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
+  groups={[]}
   name={"data_dir"}
   path={null}
   relevantWhen={null}
@@ -165,6 +164,7 @@ The directory used to persist the journal checkpoint position. By default, the g
   defaultValue={"journalctl"}
   enumValues={null}
   examples={["/usr/local/bin/journalctl"]}
+  groups={[]}
   name={"journalctl_path"}
   path={null}
   relevantWhen={null}
@@ -187,6 +187,7 @@ The full path of the [`journalctl`](#journalctl) executable. If not set, Vector 
   defaultValue={[]}
   enumValues={null}
   examples={[["ntpd","sysinit.target"]]}
+  groups={[]}
   name={"units"}
   path={null}
   relevantWhen={null}
@@ -279,6 +280,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={[{"_SYSTEMD_UNIT":"ntpd.service"},{"_BOOT_ID":"124c781146e841ae8d9b4590df8b9231"}]}
+  groups={[]}
   name={"`[record-key]`"}
   path={null}
   relevantWhen={null}
@@ -302,6 +304,7 @@ Additional Journald fields are passed through as log fields.
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -324,6 +327,7 @@ The value of the journald `_HOSTNAME` field.
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -346,6 +350,7 @@ The value of the journald `MESSAGE` field.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}

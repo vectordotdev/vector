@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `blackhole` sink streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "blackhole|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
@@ -52,6 +53,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -74,6 +76,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"print_amount"}
   path={null}
   relevantWhen={null}

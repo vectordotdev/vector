@@ -1,6 +1,8 @@
+<%- groups ||= [] -%>
 [<%= namespace %>.request]
 type = "table"
 common = <%= common %>
+groups = <%= groups.to_json %>
 description = "Configures the sink request behavior."
 
 [<%= namespace %>.request.children.in_flight_limit]

@@ -42,19 +42,19 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, minVersion, operatingSystems, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
   let operatingSystemsEls = [];
 
   (operatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
+    operatingSystemsEls.push(<span key={operatingSystem} className="text--primary">{operatingSystem}</span>);
     operatingSystemsEls.push(<>, </>);
   });
 
   (unsupportedOperatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
+    operatingSystemsEls.push(<del key={operatingSystem} className="text--warning">{operatingSystem}</del>);
     operatingSystemsEls.push(<>, </>);
   });
 
@@ -86,6 +86,10 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
           <Link to="/docs/about/guarantees/#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
             <i className="feather icon-shield"></i> at-least-once
           </Link>
+        </div>}
+      {minVersion &&
+        <div>
+          <i className="feather icon-key"></i> >= {minVersion}
         </div>}
       {operatingSystemsEls.length > 0 &&
         <div>
@@ -121,6 +125,7 @@ function DocItem(props) {
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
       issues_url: issuesUrl,
+      min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
       source_url: sourceUrl,
@@ -187,7 +192,12 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className="table-of-contents">
-                  <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
+                  <Statuses
+                    deliveryGuarantee={deliveryGuarantee}
+                    minVersion={minVersion}
+                    operatingSystems={operatingSystems}
+                    status={status}
+                    unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>

@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+splunk_hec%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/splunk_hec.rs
@@ -51,6 +52,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"0.0.0.0:8088"}
   enumValues={null}
   examples={["0.0.0.0:8088"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -73,6 +75,7 @@ The address to accept connections on.
   defaultValue={null}
   enumValues={null}
   examples={["A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
   name={"token"}
   path={null}
   relevantWhen={null}
@@ -125,6 +128,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -147,6 +151,7 @@ The raw log message, unaltered.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"splunk_channel"}
   path={null}
   relevantWhen={null}
@@ -169,6 +174,7 @@ The Splunk channel, value of the `X-Splunk-Request-Channel` header.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}

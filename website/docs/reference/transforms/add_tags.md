@@ -2,6 +2,7 @@
 description: "The Vector `add_tags` transform accepts `metric` events and allows you to add one or more metric tags."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
+min_version: null
 sidebar_label: "add_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
 status: "prod-ready"
@@ -50,6 +51,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tags"}
   path={null}
   relevantWhen={null}
@@ -71,6 +73,7 @@ A table of key/value pairs representing the tags to be added to the metric.
   defaultValue={null}
   enumValues={null}
   examples={[{"static_tag":"my value"},{"env_tag":"${ENV_VAR}"}]}
+  groups={[]}
   name={"`[tag-name]`"}
   path={"tags"}
   relevantWhen={null}

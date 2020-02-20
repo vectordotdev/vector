@@ -1,10 +1,9 @@
 use super::Transform;
-use crate::runtime::TaskExecutor;
 use crate::{
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -47,7 +46,7 @@ impl Default for MergeConfig {
 
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Merge::from(self.clone())))
     }
 

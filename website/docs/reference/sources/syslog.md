@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "syslog|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
@@ -28,11 +29,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -59,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -77,7 +74,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -94,6 +90,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#2"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
@@ -116,6 +113,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
+  groups={[]}
   name={"host_key"}
   path={null}
   relevantWhen={null}
@@ -138,6 +136,7 @@ The key name added to each event representing the current host. This can also be
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
+  groups={[]}
   name={"max_length"}
   path={null}
   relevantWhen={null}
@@ -160,6 +159,7 @@ The maximum bytes size of incoming messages before they are discarded.
   defaultValue={null}
   enumValues={{"tcp":"Read incoming Syslog data over the TCP protocol.","udp":"Read incoming Syslog data over the UDP protocol.","unix":"Read uncoming Syslog data through a Unix socker."}}
   examples={["tcp","udp","unix"]}
+  groups={[]}
   name={"mode"}
   path={null}
   relevantWhen={null}
@@ -182,6 +182,7 @@ The input mode.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/socket"]}
+  groups={[]}
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
@@ -230,6 +231,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["app-name"]}
+  groups={[]}
   name={"appname"}
   path={null}
   relevantWhen={null}
@@ -252,6 +254,7 @@ The appname extracted from the Syslog formatted line. If a appname is not found,
   defaultValue={null}
   enumValues={null}
   examples={["1"]}
+  groups={[]}
   name={"facility"}
   path={null}
   relevantWhen={null}
@@ -274,6 +277,7 @@ The facility extracted from the Syslog line. If a facility is not found, then th
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -296,6 +300,7 @@ The hostname extracted from the  Syslog line. If a hostname is not found, then V
   defaultValue={null}
   enumValues={null}
   examples={["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -319,6 +324,7 @@ The raw message, unaltered.
   defaultValue={null}
   enumValues={null}
   examples={["ID47"]}
+  groups={[]}
   name={"msgid"}
   path={null}
   relevantWhen={null}
@@ -341,6 +347,7 @@ The msgid extracted from the Syslog line. If a msgid is not found, then the key 
   defaultValue={null}
   enumValues={null}
   examples={[8710]}
+  groups={[]}
   name={"procid"}
   path={null}
   relevantWhen={null}
@@ -363,6 +370,7 @@ The procid extracted from the Syslog line. If a procid is not found, then the ke
   defaultValue={null}
   enumValues={null}
   examples={["notice"]}
+  groups={[]}
   name={"severity"}
   path={null}
   relevantWhen={null}
@@ -385,6 +393,7 @@ The severity extracted from the Syslog line. If a severity is not found, then th
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}
@@ -407,6 +416,7 @@ The timestamp extracted from the incoming line. If a timestamp is not found, the
   defaultValue={null}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"version"}
   path={null}
   relevantWhen={null}

@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
+min_version: "1.24"
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "docker|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/docker.rs
@@ -28,11 +29,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -56,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -72,8 +69,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
+* Docker version >= 1.24 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -89,6 +97,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"auto_partial_merge"}
   path={null}
   relevantWhen={null}
@@ -111,6 +120,7 @@ Setting this to `false` will disable the automatic merging of partial events. Se
   defaultValue={null}
   enumValues={null}
   examples={[["serene_","serene_leakey","ad08cc418cf9"]]}
+  groups={[]}
   name={"include_containers"}
   path={null}
   relevantWhen={null}
@@ -134,6 +144,7 @@ container ID or name. If not provided, all containers will be included.
   defaultValue={null}
   enumValues={null}
   examples={[["httpd","redis"]]}
+  groups={[]}
   name={"include_images"}
   path={null}
   relevantWhen={null}
@@ -156,6 +167,7 @@ A list of image names to match against. If not provided, all images will be incl
   defaultValue={null}
   enumValues={null}
   examples={[["com.example.vendor=Timber Inc.","com.example.name=Vector"]]}
+  groups={[]}
   name={"include_labels"}
   path={null}
   relevantWhen={null}
@@ -178,6 +190,7 @@ A list of container object labels to match against when filtering running contai
   defaultValue={"_partial"}
   enumValues={null}
   examples={["_partial"]}
+  groups={[]}
   name={"partial_event_marker_field"}
   path={null}
   relevantWhen={null}
@@ -207,6 +220,7 @@ The field name to be added to events that are detected to contain an incomplete 
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
+  groups={[]}
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
@@ -218,7 +232,7 @@ The field name to be added to events that are detected to contain an incomplete 
 
 ### DOCKER_HOST
 
-The docker host to connect to. See [Connecting to the Docker daemon](#connecting-to-the-docker-daemon) for more info.
+The docker host to connect to. See [Connecting To The Docker Daemon](#connecting-to-the-docker-daemon) for more info.
 
 
 </Field>
@@ -229,6 +243,7 @@ The docker host to connect to. See [Connecting to the Docker daemon](#connecting
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
@@ -240,7 +255,7 @@ The docker host to connect to. See [Connecting to the Docker daemon](#connecting
 
 ### DOCKER_VERIFY_TLS
 
-If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate. See [Connecting to the Docker daemon](#connecting-to-the-docker-daemon) for more info.
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate. See [Connecting To The Docker Daemon](#connecting-to-the-docker-daemon) for more info.
 
 
 </Field>
@@ -275,6 +290,7 @@ More detail on the output schema is below.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"container_created_at"}
   path={null}
   relevantWhen={null}
@@ -297,6 +313,7 @@ A UTC timestamp representing when the container was created.
   defaultValue={null}
   enumValues={null}
   examples={["9b6247364a03","715ebfcee040"]}
+  groups={[]}
   name={"container_id"}
   path={null}
   relevantWhen={null}
@@ -319,6 +336,7 @@ The Docker container ID that the log was collected from.
   defaultValue={null}
   enumValues={null}
   examples={["evil_ptolemy","nostalgic_stallman"]}
+  groups={[]}
   name={"container_name"}
   path={null}
   relevantWhen={null}
@@ -341,6 +359,7 @@ The Docker container name that the log was collected from.
   defaultValue={null}
   enumValues={null}
   examples={["ubuntu:latest","busybox","timberio/vector:latest-alpine"]}
+  groups={[]}
   name={"image"}
   path={null}
   relevantWhen={null}
@@ -363,6 +382,7 @@ The image name that the container is based on.
   defaultValue={null}
   enumValues={null}
   examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
+  groups={[]}
   name={"`[label-key]`"}
   path={null}
   relevantWhen={null}
@@ -385,6 +405,7 @@ The image name that the container is based on.
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
   relevantWhen={null}
@@ -407,6 +428,7 @@ The raw log message, unaltered.
   defaultValue={null}
   enumValues={{"stdout":"The STDOUT stream","stderr":"The STDERR stream"}}
   examples={["stdout","stderr"]}
+  groups={[]}
   name={"stream"}
   path={null}
   relevantWhen={null}
@@ -429,6 +451,7 @@ The [standard stream][urls.standard_streams] that the log was collected from.
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
   relevantWhen={null}
@@ -450,12 +473,67 @@ The UTC timestamp extracted from the Docker log event.
 
 ## How It Works
 
-### Connecting to the Docker daemon
+### Connecting To The Docker Daemon
 
-Vector will automatically attempt to connect to the docker daemon for you. In most
-situations if your current user is able to run `docker ps` then Vector will be able to
-connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
-use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon_socket_option].
+Vector will automatically attempt to connect to the docker daemon for you. If
+the user that Vector is running under can run `docker ps` then Vector will be
+able to connect. Vector will also respect if `DOCKER_HOST` and
+`DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
+See the [Docker daemon docs][urls.docker_daemon_socket_option].
+
+### Docker Integration Strategy
+
+There are two primary ways through which you can integrate with Docker to
+receive its logs:
+
+1. Interact with the [Docker daemon][urls.docker_daemon] directly via the
+   `docker logs` command. (simplest)
+2. Configure a compatible [Docker logging driver][urls.docker_logging_drivers]
+   with a matching [Vector source][docs.sources]. (advanced)
+
+The Vector `docker` source implements option 1. This is the simplest option,
+but it is prone to performance and stability issues with _large_ deployments. If
+you experience this, please see the
+[Alternate Strategies section](#alternate-strategies) below.
+
+#### Alternate Strategies
+
+First, it's worth mentioning that Vector strives to guide you towards the
+optimal observability setup without presenting you with unncessary details or
+questions. Unfortunately, there are circumstances where tradeoffs must be made
+and you must determine which tradeoffs are appropriate. Docker is one of these
+circumstances.
+
+Second, if you have a large container-based deployment you should consider using
+a container orchestrator like Kubernetes. These platforms provide alternate log
+collection means that side-step the Docker logging problems. For supported
+platforms see Vector's
+[Containers installation section][docs.installation.containers].
+
+Finally, if you cannot use a container orchestrator then you can configure a
+compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
+[Vector source][docs.sources]. For example:
+
+1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
+   [Vector `syslog` source][docs.sources.syslog].
+2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
+   [Vector `journald` source][docs.sources.journald].
+3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
+   [Vector `splunk_hec` source][docs.sources.splunk_hec].
+
+To our knowledge there is no discernable difference in performance or stability
+between any of these. If we had to recommend one, we would recommend the
+`syslog` combination.
+
+### Docker Logging Drivers
+
+In order for the Vector `docker` source to work properly, you must configure
+the [`json-file`][urls.docker_logging_driver_json_file] (default) or
+[`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
+This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
+uses to integrate. See the
+[Docker Integration Strategy section](#docker-integration-strategy) for more
+info.
 
 ### Environment Variables
 
@@ -479,7 +557,17 @@ that we use to determine if an event is partial via the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.installation.containers]: /docs/setup/installation/containers/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
+[docs.sources.syslog]: /docs/reference/sources/syslog/
+[docs.sources]: /docs/reference/sources/
 [urls.docker_daemon]: https://docs.docker.com/engine/docker-overview/#the-docker-daemon
 [urls.docker_daemon_socket_option]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
+[urls.docker_logging_driver_journald]: https://docs.docker.com/config/containers/logging/journald/
+[urls.docker_logging_driver_json_file]: https://docs.docker.com/config/containers/logging/json-file/
+[urls.docker_logging_driver_splunk]: https://docs.docker.com/config/containers/logging/splunk/
+[urls.docker_logging_driver_syslog]: https://docs.docker.com/config/containers/logging/syslog/
+[urls.docker_logging_drivers]: https://docs.docker.com/config/containers/logging/configure/
 [urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

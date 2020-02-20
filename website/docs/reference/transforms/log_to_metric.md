@@ -2,6 +2,7 @@
 description: "The Vector `log_to_metric` transform accepts `log` events and allows you to convert logs into one or more metrics."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
+min_version: null
 sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
 status: "prod-ready"
@@ -51,6 +52,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"metrics"}
   path={null}
   relevantWhen={null}
@@ -72,6 +74,7 @@ A table of key/value pairs representing the keys to be added to the event.
   defaultValue={null}
   enumValues={null}
   examples={["duration"]}
+  groups={[]}
   name={"field"}
   path={"metrics"}
   relevantWhen={null}
@@ -94,6 +97,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"increment_by_value"}
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
@@ -116,6 +120,7 @@ If `true` the metric will be incremented by the [`field`](#field) value. If `fal
   defaultValue={null}
   enumValues={null}
   examples={["duration_total"]}
+  groups={[]}
   name={"name"}
   path={"metrics"}
   relevantWhen={null}
@@ -138,6 +143,7 @@ The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` 
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tags"}
   path={"metrics"}
   relevantWhen={null}
@@ -159,6 +165,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   defaultValue={null}
   enumValues={null}
   examples={[{"host":"${HOSTNAME}"},{"region":"us-east-1"},{"status":"{{status}}"}]}
+  groups={[]}
   name={"`[tag-name]`"}
   path={"metrics.tags"}
   relevantWhen={null}
@@ -186,6 +193,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environ
   defaultValue={null}
   enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
   examples={["counter","gauge","histogram","set"]}
+  groups={[]}
   name={"type"}
   path={"metrics"}
   relevantWhen={null}

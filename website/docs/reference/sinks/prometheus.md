@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
@@ -55,6 +56,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9598"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -77,6 +79,7 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
   enumValues={null}
   examples={[[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]]}
+  groups={[]}
   name={"buckets"}
   path={null}
   relevantWhen={null}
@@ -99,6 +102,7 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
   defaultValue={60}
   enumValues={null}
   examples={[60]}
+  groups={[]}
   name={"flush_period_secs"}
   path={null}
   relevantWhen={null}
@@ -121,6 +125,7 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -143,6 +148,7 @@ Enables/disables the sink healthcheck upon start.
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}
