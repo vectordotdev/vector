@@ -1,5 +1,5 @@
 ---
-component_title: Concat
+component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22

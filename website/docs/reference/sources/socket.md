@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
-component_title: Socket
+component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+socket%22

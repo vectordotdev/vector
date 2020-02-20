@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
-component_title: Sematext
+component_title: "Sematext"
 description: "The Vector `sematext` sink batches `log` events to Sematext via the Elasticsearch API."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+sematext%22

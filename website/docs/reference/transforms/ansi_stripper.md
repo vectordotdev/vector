@@ -1,5 +1,5 @@
 ---
-component_title: ANSI Stripper
+component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22

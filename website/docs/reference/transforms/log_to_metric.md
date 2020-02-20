@@ -1,5 +1,5 @@
 ---
-component_title: Log to Metric
+component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22

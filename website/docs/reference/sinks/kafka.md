@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "at_least_once"
-component_title: Kafka
+component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
