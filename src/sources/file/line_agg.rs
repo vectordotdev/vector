@@ -3,6 +3,7 @@ use futures::{Async, Poll, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::hash::Hash;
 use std::time::Duration;
 use tokio::timer::DelayQueue;
 
@@ -67,32 +68,33 @@ impl Config {
     }
 }
 
-/// Private type alias to be more expressive in the internal implementation.
-type Filename = String;
-
-pub(super) struct LineAgg<T> {
+pub(super) struct LineAgg<T, K> {
     /// The stream from which we read the lines.
     inner: T,
 
     /// Configuration parameters to use.
     config: Config,
 
-    /// Line per filename.
-    buffers: HashMap<Filename, BytesMut>,
+    /// Line per key.
+    /// Key is usually a filename or other line source identifier.
+    buffers: HashMap<K, BytesMut>,
 
     /// Draining queue. We switch to draining mode when we get `None` from
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
-    draining: Option<Vec<(Bytes, Filename)>>,
+    draining: Option<Vec<(Bytes, K)>>,
 
-    /// A queue of filename timeouts.
-    timeouts: DelayQueue<Filename>,
+    /// A queue of key timeouts.
+    timeouts: DelayQueue<K>,
 
-    /// A queue of filenames with expired timeouts.
-    expired: VecDeque<Filename>,
+    /// A queue of keys with expired timeouts.
+    expired: VecDeque<K>,
 }
 
-impl<T> LineAgg<T> {
+impl<T, K> LineAgg<T, K>
+where
+    K: Hash + Eq + Clone,
+{
     pub(super) fn new(inner: T, config: Config) -> Self {
         Self {
             inner,
@@ -107,12 +109,13 @@ impl<T> LineAgg<T> {
     }
 }
 
-impl<T> Stream for LineAgg<T>
+impl<T, K> Stream for LineAgg<T, K>
 where
-    T: Stream<Item = (Bytes, Filename), Error = ()>,
+    T: Stream<Item = (Bytes, K), Error = ()>,
+    K: Hash + Eq + Clone,
 {
-    /// `Bytes` - the message data; `Filename` - file name.
-    type Item = (Bytes, Filename);
+    /// `Bytes` - the line data; `K` - file name, or other line source.
+    type Item = (Bytes, K);
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -163,12 +166,13 @@ where
     }
 }
 
-impl<T> LineAgg<T>
+impl<T, K> LineAgg<T, K>
 where
-    T: Stream<Item = (Bytes, Filename), Error = ()>,
+    T: Stream<Item = (Bytes, K), Error = ()>,
+    K: Hash + Eq + Clone,
 {
     /// Handle line, if we have something to output - return it.
-    fn handle_line(&mut self, line: Bytes, src: Filename) -> Option<(Bytes, Filename)> {
+    fn handle_line(&mut self, line: Bytes, src: K) -> Option<(Bytes, K)> {
         // Check if we already have the buffered data for the source.
         if self.buffers.contains_key(&src) {
             let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
@@ -483,6 +487,9 @@ mod tests {
 
     // Test helpers.
 
+    /// Private type alias to be more expressive in the internal implementation.
+    type Filename = String;
+
     fn stream_from_lines<'a>(
         lines: &'a [&'static str],
     ) -> impl Stream<Item = (Bytes, Filename), Error = ()> + 'a {
@@ -493,9 +500,10 @@ mod tests {
         )
     }
 
-    fn collect_results<T>(line_agg: LineAgg<T>) -> Vec<(Bytes, Filename)>
+    fn collect_results<T, K>(line_agg: LineAgg<T, K>) -> Vec<(Bytes, K)>
     where
-        T: Stream<Item = (Bytes, Filename), Error = ()>,
+        T: Stream<Item = (Bytes, K), Error = ()>,
+        K: Hash + Eq + Clone,
     {
         futures::future::Future::wait(futures::stream::Stream::collect(line_agg))
             .expect("Failed to collect test results")
