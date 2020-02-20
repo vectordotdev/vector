@@ -264,35 +264,35 @@ mod tests {
         ];
 
         assert_eq!(
-            input[0].as_log()[&event::MESSAGE],
+            input[0].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[0][0])
         );
         assert_eq!(
-            input[1].as_log()[&event::MESSAGE],
+            input[1].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[1][0])
         );
         assert_eq!(
-            input[2].as_log()[&event::MESSAGE],
+            input[2].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[0][1])
         );
         assert_eq!(
-            input[3].as_log()[&event::MESSAGE],
+            input[3].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[3][0])
         );
         assert_eq!(
-            input[4].as_log()[&event::MESSAGE],
+            input[4].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[2][0])
         );
         assert_eq!(
-            input[5].as_log()[&event::MESSAGE],
+            input[5].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[2][1])
         );
         assert_eq!(
-            input[6].as_log()[&event::MESSAGE],
+            input[6].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[4][0])
         );
         assert_eq!(
-            input[7].as_log()[&event::MESSAGE],
+            input[7].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[5][0])
         );
     }

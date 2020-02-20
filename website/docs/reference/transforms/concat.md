@@ -29,7 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "concat" # must be: "concat"
   inputs = ["my-source-id"] # example
-  items = ["fist[..3]", "second[-5..]", "third[3..6]"] # example
+  items = ["first[..3]", "second[-5..]", "third[3..6]"] # example
   target = "dest_field_name" # example
 
   # OPTIONAL
@@ -49,7 +49,8 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["fist[..3]","second[-5..]","third[3..6]"]]}
+  examples={[["first[..3]","second[-5..]","third[3..6]"]]}
+  groups={[]}
   name={"items"}
   path={null}
   relevantWhen={null}
@@ -72,6 +73,7 @@ A list of substring definitons in the format of source_field[start..end]. For bo
   defaultValue={" "}
   enumValues={null}
   examples={[" ",",","_","+"]}
+  groups={[]}
   name={"joiner"}
   path={null}
   relevantWhen={null}
@@ -94,6 +96,7 @@ The string that is used to join all items.
   defaultValue={null}
   enumValues={null}
   examples={["dest_field_name"]}
+  groups={[]}
   name={"target"}
   path={null}
   relevantWhen={null}

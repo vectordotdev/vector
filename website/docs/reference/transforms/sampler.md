@@ -49,6 +49,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[["[error]","field2"]]}
+  groups={[]}
   name={"pass_list"}
   path={null}
   relevantWhen={null}
@@ -71,6 +72,7 @@ A list of regular expression patterns to exclude events from sampling. If an eve
   defaultValue={null}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"rate"}
   path={null}
   relevantWhen={null}

@@ -23,39 +23,9 @@ The Vector `console` sink [streams](#streaming) [`log`][docs.data-model.log] and
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[sinks.my_sink_id]
-  # REQUIRED
-  type = "console" # must be: "console"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
-  target = "stdout" # default, enum
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -67,13 +37,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   target = "stdout" # default, enum
   healthcheck = true # default
 
-  # OPTIONAL - requests
-  encoding = "json" # example, no default, enum
+  # REQUIRED - requests
+  encoding = "json" # example, enum
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -85,14 +51,15 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -107,10 +74,11 @@ The encoding format used to serialize the events before outputting.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -133,6 +101,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
+  groups={[]}
   name={"target"}
   path={null}
   relevantWhen={null}

@@ -18,12 +18,12 @@
 <%- end -%>
 ## Options
 
-<%= options(component.specific_options_list, heading_depth: 3) %>
+<%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= options(component.env_vars_list, heading_depth: 3) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 <%- if component.output.log -%>
@@ -72,13 +72,26 @@ like the [`lua` transform][docs.transforms.lua].
 
 Keys specified in this transform will replace existing keys.
 
+### Value Templating
+
+It is possible to use template values in the field. If an input lacks one of the keys needed for a templated field it
+will drop that field from the output.
+
+```toml
+[transforms.<transform-id>]
+  # ...
+
+  [transforms.<transform-id>.fields]
+    my_field = "{{timestamp}} {{message}}"
+```
+
 ### Nested Fields
 
 The `add_fields` transform will support dotted keys or [TOML
 tables][urls.toml_table]. We recommend the dotted key syntax since it is less
 verbose for this usecase:
 
-```
+```toml
 [transforms.<transform-id>]
   # ...
 

@@ -2,7 +2,11 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{
+        retries::RetryLogic,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, SinkExt, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -39,6 +43,7 @@ pub struct KinesisSinkConfig {
     pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub assume_role: Option<String>,
 }
 
 lazy_static! {
@@ -86,6 +91,7 @@ impl KinesisService {
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(create_client(
             config.region.clone().try_into()?,
+            config.assume_role.clone(),
             cx.resolver(),
         )?);
 
@@ -172,7 +178,11 @@ enum HealthcheckError {
 }
 
 fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
-    let client = create_client(config.region.try_into()?, resolver)?;
+    let client = create_client(
+        config.region.try_into()?,
+        config.assume_role.clone(),
+        resolver,
+    )?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -197,13 +207,14 @@ fn healthcheck(config: KinesisSinkConfig, resolver: Resolver) -> crate::Result<s
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisClient> {
-    use rusoto_credential::DefaultCredentialsProvider;
-
-    let p = DefaultCredentialsProvider::new()?;
-    let d = crate::sinks::util::rusoto::client(resolver)?;
-
-    Ok(KinesisClient::new_with(d, p, region))
+fn create_client(
+    region: Region,
+    assume_role: Option<String>,
+    resolver: Resolver,
+) -> crate::Result<KinesisClient> {
+    let client = rusoto::client(resolver)?;
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
+    Ok(KinesisClient::new_with(client, creds, region))
 }
 
 fn encode_event(
@@ -239,7 +250,7 @@ fn encode_event(
         }
 
         Encoding::Text => log
-            .get(&event::MESSAGE)
+            .get(&event::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -288,7 +299,7 @@ mod tests {
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 

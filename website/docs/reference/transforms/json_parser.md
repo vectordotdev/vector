@@ -25,11 +25,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -54,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -71,7 +67,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -88,6 +83,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"drop_field"}
   path={null}
   relevantWhen={null}
@@ -110,6 +106,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   defaultValue={null}
   enumValues={null}
   examples={[true]}
+  groups={[]}
   name={"drop_invalid"}
   path={null}
   relevantWhen={null}
@@ -132,6 +129,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -154,6 +152,7 @@ The log field to decode as JSON. Must be a `string` value type. See [Invalid JSO
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"overwrite_target"}
   path={null}
   relevantWhen={null}
@@ -176,6 +175,7 @@ If [`target_field`](#target_field) is set and the log contains a field of the sa
   defaultValue={null}
   enumValues={null}
   examples={["target"]}
+  groups={[]}
   name={"target_field"}
   path={null}
   relevantWhen={null}

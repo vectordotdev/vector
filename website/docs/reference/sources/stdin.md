@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -54,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -69,7 +65,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -86,6 +81,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
+  groups={[]}
   name={"host_key"}
   path={null}
   relevantWhen={null}
@@ -97,7 +93,7 @@ import Field from '@site/src/components/Field';
 
 ### host_key
 
-The key name added to each event representing the current host. See [Context](#context) for more info.
+The key name added to each event representing the current host. This can also be globally set via the [global [`host_key`](#host_key) option][docs.reference.global-options#host_key]. See [Context](#context) for more info.
 
 
 </Field>
@@ -108,6 +104,7 @@ The key name added to each event representing the current host. See [Context](#c
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
+  groups={[]}
   name={"max_length"}
   path={null}
   relevantWhen={null}
@@ -155,13 +152,18 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["my.host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### host
@@ -174,13 +176,18 @@ The local hostname.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -193,13 +200,18 @@ The raw message, unaltered.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp
@@ -236,3 +248,4 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key

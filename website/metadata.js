@@ -17345,6 +17345,54 @@ module.exports = {
 
       ]
     },
+    "humio_logs": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "humio_logs_sink",
+      "name": "humio_logs",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "influxdb_metrics": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "transmit",
+      "id": "influxdb_metrics_sink",
+      "name": "influxdb_metrics",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "InfluxData"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "kafka": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -17380,6 +17428,30 @@ module.exports = {
       "function_category": "transmit",
       "id": "logdna_sink",
       "name": "logdna",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "loki": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Loki][urls.loki].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "loki_sink",
+      "name": "loki",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -17567,7 +17639,7 @@ module.exports = {
     "docker": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the docker engine daemon and outputs log events.",
+      "description": "Ingests data through the [Docker engine daemon][urls.docker_daemon] and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -17806,7 +17878,7 @@ module.exports = {
     "syslog": {
       "beta": false,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the Syslog 5424 protocol and outputs log events.",
+      "description": "Ingests data through the Syslog protocol and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -17968,7 +18040,7 @@ module.exports = {
     "ansi_stripper": {
       "beta": false,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to strips ANSI characters from the specified field.",
+      "description": "Accepts log events and allows you to strips ANSI escape sequences from the specified field.",
       "event_types": [
         "log"
       ],

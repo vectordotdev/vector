@@ -84,9 +84,11 @@ impl PortableFileExt for File {
         let info = self.get_file_info()?;
         Ok(info.dwVolumeSerialNumber.into())
     }
+    // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
     fn portable_ino(&self) -> std::io::Result<u64> {
         let info = self.get_file_info()?;
-        Ok(info.nNumberOfLinks.into())
+        // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
+        Ok((info.nFileIndexLow as u64) | ((info.nFileIndexHigh as u64) << 32))
     }
 }
 

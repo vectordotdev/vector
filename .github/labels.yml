@@ -46,6 +46,9 @@
 - name: "domain: sources"
   description: Anything sources related
   color: 212f3e
+- name: "domain: templating"
+  description: Anything templating related
+  color: 212f3e
 - name: "domain: testing"
   description: Anything testing related
   color: 212f3e
@@ -159,6 +162,9 @@
   color: ff9f43
 - name: "provider: google"
   description: Anything Google related
+  color: ff9f43
+- name: "provider: influxdata"
+  description: Anything InfluxData related
   color: ff9f43
 - name: "provider: confluent"
   description: Anything Confluent related
@@ -310,11 +316,20 @@
 - name: "sink: http"
   description: Anything `http` sink related
   color: 4ddbfb
+- name: "sink: humio_logs"
+  description: Anything `humio_logs` sink related
+  color: 4ddbfb
+- name: "sink: influxdb_metrics"
+  description: Anything `influxdb_metrics` sink related
+  color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related
   color: 4ddbfb
 - name: "sink: logdna"
   description: Anything `logdna` sink related
+  color: 4ddbfb
+- name: "sink: loki"
+  description: Anything `loki` sink related
   color: 4ddbfb
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related

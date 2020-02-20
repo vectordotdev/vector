@@ -23,36 +23,9 @@ The Vector `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] a
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[sinks.my_sink_id]
-  type = "blackhole" # must be: "blackhole"
-  inputs = ["my-source-id"] # example
-  print_amount = 1000 # example
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]
@@ -65,10 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # default
 ```
 
-</TabItem>
-
-</Tabs>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -79,10 +48,11 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -105,6 +75,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"print_amount"}
   path={null}
   relevantWhen={null}

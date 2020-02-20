@@ -56,6 +56,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"fields"}
   path={null}
   relevantWhen={null}
@@ -77,6 +78,7 @@ A table of key/value pairs representing the keys to be added to the event.
   defaultValue={null}
   enumValues={null}
   examples={[{"string_field":"string value"},{"env_var_field":"${ENV_VAR}"},{"int_field":1},{"float_field":1.2},{"bool_field":true},{"timestamp_field":"1979-05-27 00:32:00 -0700"},{"parent":{"child":"child_value"}},{"list_field":["first","second","third"]}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"fields"}
   relevantWhen={null}
@@ -125,6 +127,7 @@ Given the following configuration:
     field6 = ["item 1", "item 2"]
     field7.nested = "nested value",
     field8 = "#{HOSTNAME}"
+    field9 = "{{field1}} {{field2}}"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
@@ -201,7 +204,7 @@ The `add_fields` transform will support dotted keys or [TOML
 tables][urls.toml_table]. We recommend the dotted key syntax since it is less
 verbose for this usecase:
 
-```
+```toml
 [transforms.<transform-id>]
   # ...
 
@@ -228,6 +231,21 @@ See the [`remove_fields` transform][docs.transforms.remove_fields].
 All supported [configuration value types][docs.configuration#types] are accepted.
 This includes primitivate types (`string`, `int`, `float`, `boolean`) and
 special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
+
+
+
+### Value Templating
+
+It is possible to use template values in the field. If an input lacks one of the keys needed for a templated field it
+will drop that field from the output.
+
+```toml
+[transforms.<transform-id>]
+  # ...
+
+  [transforms.<transform-id>.fields]
+    my_field = "{{timestamp}} {{message}}"
+```
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

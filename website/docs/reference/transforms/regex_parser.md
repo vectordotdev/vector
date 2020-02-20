@@ -58,6 +58,7 @@ import Field from '@site/src/components/Field';
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"drop_field"}
   path={null}
   relevantWhen={null}
@@ -80,6 +81,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   defaultValue={"message"}
   enumValues={null}
   examples={["message"]}
+  groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
@@ -102,6 +104,7 @@ The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
   defaultValue={null}
   enumValues={null}
   examples={["^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"]}
+  groups={[]}
   name={"regex"}
   path={null}
   relevantWhen={null}
@@ -124,6 +127,7 @@ The Regular Expression to apply. Do not include the leading or trailing `/`. See
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"types"}
   path={null}
   relevantWhen={null}
@@ -145,6 +149,7 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
   examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"types"}
   relevantWhen={null}

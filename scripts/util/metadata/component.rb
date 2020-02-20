@@ -1,6 +1,6 @@
 #encoding: utf-8
 
-require_relative "option"
+require_relative "field"
 
 class Component
   DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
@@ -27,7 +27,7 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
     @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
@@ -36,7 +36,7 @@ class Component
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
-    @options = Option.build_struct(hash["options"] || {})
+    @options = (hash["options"] || {}).to_struct_with_name(Field)
 
     # Operating Systems
 
@@ -49,30 +49,6 @@ class Component
     end
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
-
-    # Default options
-
-    @options.type =
-      Option.new({
-        "name" => "type",
-        "description" => "The component type. This is a required field that tells Vector which component to use. The value _must_ be `#{name}`.",
-        "enum" => {
-          name => "The name of this component"
-        },
-        "required" => true,
-        "type" => "string"
-      })
-
-    if type != "source"
-      @options.inputs =
-        Option.new({
-          "name" => "inputs",
-          "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
-          "examples" => [["my-source-id"]],
-          "required" => true,
-          "type" => "[string]"
-        })
-    end
   end
 
   def <=>(other)
@@ -121,6 +97,41 @@ class Component
     @options_list ||= options.to_h.values.sort
   end
 
+  def option_groups
+    @option_groups ||= options_list.collect(&:groups).flatten.uniq.sort
+  end
+
+  def option_example_groups
+    @option_example_groups ||=
+      begin
+        groups = {}
+
+        if option_groups.any?
+          option_groups.each do |group|
+            groups[group] = options_list.select do |option|
+              option.group?(group) && option.common?
+            end
+          end
+
+          if advanced_relevant?
+            option_groups.each do |group|
+              groups["#{group} (advanced)"] = options_list.select do |option|
+                option.group?(group)
+              end
+            end
+          end
+        else
+          groups["Common"] = options_list.select(&:common?)
+
+          if advanced_relevant?
+            groups["Advanced"] = options_list
+          end
+        end
+
+        groups
+      end
+  end
+
   def partition_options
     options_list.select(&:partition_key?)
   end
@@ -131,6 +142,16 @@ class Component
 
   def sink?
     type == "sink"
+  end
+
+  def sorted_option_group_keys
+    option_example_groups.keys.sort_by do |key|
+      if key.downcase.include?("advanced")
+        -1
+      else
+        1
+      end
+    end.reverse
   end
 
   def source?

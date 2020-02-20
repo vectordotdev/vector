@@ -9,7 +9,7 @@ module.exports = {
         <%= metadata.links.fetch_id("docs.concepts").to_json %>,
         {
           type: 'category',
-          label: 'Data Model (Event)',
+          label: 'Data Model',
           items: [
             <%= metadata.links.fetch_id("docs.data-model").to_json %>,
             <%= metadata.links.fetch_id("docs.data-model.log").to_json %>,
@@ -140,6 +140,7 @@ module.exports = {
           items: [
             <%= metadata.links.fetch_id("docs.reference.env-vars").to_json %>,
             <%= metadata.links.fetch_id("docs.reference.global-options").to_json %>,
+            <%= metadata.links.fetch_id("docs.reference.templating").to_json %>,
             <%= metadata.links.fetch_id("docs.reference.tests").to_json %>,
           ]
         },

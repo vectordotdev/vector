@@ -12,3 +12,8 @@ jobs:
     - uses: EmbarkStudios/cargo-deny-action@v0
       with:
         command: "check advisories"
+  test-behavior:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - run: "cd tests && make test-behavior"

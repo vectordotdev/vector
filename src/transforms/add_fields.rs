@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     event::{Event, Value},
     runtime::TaskExecutor,
+    template::Template,
     topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use chrono::{DateTime, Utc};
@@ -16,8 +17,26 @@ pub struct AddFieldsConfig {
     pub fields: IndexMap<String, TomlValue>,
 }
 
+#[derive(Clone)]
+enum TemplateOrValue {
+    Template(Template),
+    Value(Value),
+}
+
+impl From<Template> for TemplateOrValue {
+    fn from(v: Template) -> Self {
+        TemplateOrValue::Template(v)
+    }
+}
+
+impl From<Value> for TemplateOrValue {
+    fn from(v: Value) -> Self {
+        TemplateOrValue::Value(v)
+    }
+}
+
 pub struct AddFields {
-    fields: IndexMap<Atom, Value>,
+    fields: IndexMap<Atom, TemplateOrValue>,
 }
 
 inventory::submit! {
@@ -57,7 +76,21 @@ impl AddFields {
 
 impl Transform for AddFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        for (key, value) in self.fields.clone() {
+        for (key, value_or_template) in self.fields.clone() {
+            let value = match value_or_template {
+                TemplateOrValue::Template(v) => match v.render_string(&event) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        warn!(
+                            "Failed to render templated value at key `{}`, dropping.",
+                            key
+                        );
+                        continue;
+                    }
+                }
+                .into(),
+                TemplateOrValue::Value(v) => v,
+            };
             event.as_mut_log().insert(key, value);
         }
 
@@ -65,17 +98,31 @@ impl Transform for AddFields {
     }
 }
 
-fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, Value>) {
+fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, TemplateOrValue>) {
     match value {
-        TomlValue::String(s) => new_fields.insert(key, s.into()),
-        TomlValue::Integer(i) => new_fields.insert(key, i.into()),
-        TomlValue::Float(f) => new_fields.insert(key, f.into()),
-        TomlValue::Boolean(b) => new_fields.insert(key, b.into()),
+        TomlValue::String(s) => {
+            let t = Template::from(s);
+            new_fields.insert(key, t.into())
+        }
+        TomlValue::Integer(i) => {
+            let i = Value::from(i);
+            new_fields.insert(key, i.into())
+        }
+        TomlValue::Float(f) => {
+            let f = Value::from(f);
+            new_fields.insert(key, f.into())
+        }
+        TomlValue::Boolean(b) => {
+            let b = Value::from(b);
+            new_fields.insert(key, b.into())
+        }
         TomlValue::Datetime(dt) => {
             let dt = dt.to_string();
             if let Ok(ts) = dt.parse::<DateTime<Utc>>() {
+                let ts = Value::from(ts);
                 new_fields.insert(key, ts.into())
             } else {
+                let dt = Value::from(dt);
                 new_fields.insert(key, dt.into())
             }
         }
@@ -119,6 +166,22 @@ mod tests {
         let kv = new_event.as_log().get(&key);
 
         let val = "some_val".to_string();
+        assert_eq!(kv, Some(&val.into()));
+    }
+
+    #[test]
+    fn add_fields_templating() {
+        let event = Event::from("augment me");
+        let mut fields = IndexMap::new();
+        fields.insert("some_key".into(), "{{message}} {{message}}".into());
+        let mut augment = AddFields::new(fields);
+
+        let new_event = augment.transform(event).unwrap();
+
+        let key = Atom::from("some_key".to_string());
+        let kv = new_event.as_log().get(&key);
+
+        let val = "augment me augment me".to_string();
         assert_eq!(kv, Some(&val.into()));
     }
 

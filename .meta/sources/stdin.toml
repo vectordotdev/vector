@@ -7,6 +7,8 @@ function_category = "receive"
 output_types = ["log"]
 through_description = "standard input (STDIN)"
 
+<%= render("_partials/_component_options.toml", type: "source", name: "stdin") %>
+
 [sources.stdin.options.max_length]
 type = "int"
 default = 102400
@@ -19,7 +21,9 @@ category = "Context"
 required = true
 default = "host"
 description = """\
-The key name added to each event representing the current host.\
+The key name added to each event representing the current host. This can also \
+be globally set via the \
+[global `host_key` option][docs.reference.global-options#host_key].\
 """
 
 [[sources.stdin.output.log.examples]]

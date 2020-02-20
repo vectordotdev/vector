@@ -50,6 +50,7 @@ import Field from '@site/src/components/Field';
   defaultValue={["message"]}
   enumValues={null}
   examples={[["message"]]}
+  groups={[]}
   name={"merge_fields"}
   path={null}
   relevantWhen={null}
@@ -72,6 +73,7 @@ Fields to merge. The values of these fields will be merged into the first partia
   defaultValue={"_partial"}
   enumValues={null}
   examples={["_partial"]}
+  groups={[]}
   name={"partial_event_marker_field"}
   path={null}
   relevantWhen={null}
@@ -94,6 +96,7 @@ The field that indicates that the event is partial. A consequent stream of parti
   defaultValue={[]}
   enumValues={null}
   examples={[[]]}
+  groups={[]}
   name={"stream_discriminant_fields"}
   path={null}
   relevantWhen={null}

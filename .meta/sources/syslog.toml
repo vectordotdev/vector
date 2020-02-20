@@ -5,7 +5,9 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-through_description = "the Syslog 5424 protocol"
+through_description = "the Syslog protocol"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "syslog") %>
 
 [sources.syslog.options.address]
 type = "string"
@@ -23,7 +25,9 @@ category = "Context"
 required = true
 default = "host"
 description = """\
-The key name added to each event representing the current host.\
+The key name added to each event representing the current host. This can also \
+be globally set via the \
+[global `host_key` option][docs.reference.global-options#host_key].\
 """
 
 [sources.syslog.options.max_length]
@@ -58,27 +62,26 @@ The unix socket path. *This should be absolute path.*
 type = "string"
 examples = ["app-name"]
 description = """\
-The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-appname is not found, then the key will not be added.\
+The appname extracted from the Syslog formatted line. If a appname is not \
+found, then the key will not be added.\
 """
 
 [sources.syslog.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-key_name_option = "host_key"
 required = true
 description = """\
-The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-hostname is not found, then Vector will use the upstream hostname. In the \
-case where `mode` = `"unix"` the socket path will be used.\
+The hostname extracted from the  Syslog line. If a hostname is not found, then \
+Vector will use the upstream hostname. In the case where `mode` = `"unix"` the \
+socket path will be used. This key can be renamed via the `host_key` option.\
 """
 
 [sources.syslog.output.log.fields.facility]
 type = "string"
 examples = ["1"]
 description = """\
-The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-facility is not found, then the key will not be added.\
+The facility extracted from the Syslog line. If a facility is not found, then \
+the key will not be added.\
 """
 
 [sources.syslog.output.log.fields.message]
@@ -93,24 +96,24 @@ The raw message, unaltered.
 type = "string"
 examples = ["ID47"]
 description = """\
-The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-msgid is not found, then the key will not be added.\
+The msgid extracted from the Syslog line. If a msgid is not found, then the \
+key will not be added.\
 """
 
 [sources.syslog.output.log.fields.procid]
 type = "int"
 examples = [8710]
 description = """\
-The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-procid is not found, then the key will not be added.\
+The procid extracted from the Syslog line. If a procid is not found, then the \
+key will not be added.\
 """
 
 [sources.syslog.output.log.fields.severity]
 type = "string"
 examples = ["notice"]
 description = """\
-The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-severity is not found, then the key will not be added.\
+The severity extracted from the Syslog line. If a severity is not found, then \
+the key will not be added.\
 """
 
 [sources.syslog.output.log.fields.timestamp]
@@ -126,6 +129,6 @@ then Vector will use the current time.\
 type = "int"
 examples = [1]
 description = """\
-The version extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-version is not found, then the key will not be added.
+The version extracted from the Syslog line. If a version is not found, then \
+the key will not be added.\
 """

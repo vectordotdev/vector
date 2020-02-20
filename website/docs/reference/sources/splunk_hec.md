@@ -51,6 +51,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"0.0.0.0:8088"}
   enumValues={null}
   examples={["0.0.0.0:8088"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -73,6 +74,7 @@ The address to accept connections on.
   defaultValue={null}
   enumValues={null}
   examples={["A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
   name={"token"}
   path={null}
   relevantWhen={null}
@@ -121,13 +123,18 @@ More detail on the output schema is below.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
+  groups={[]}
   name={"message"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### message
@@ -139,13 +146,18 @@ The raw log message, unaltered.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"splunk_channel"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### splunk_channel
@@ -157,13 +169,18 @@ The Splunk channel, value of the `X-Splunk-Request-Channel` header.
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp

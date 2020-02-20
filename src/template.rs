@@ -80,6 +80,21 @@ impl Template {
             .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
     }
 
+    pub fn get_fields(&self) -> Option<Vec<Atom>> {
+        if self.has_fields {
+            RE.captures_iter(&self.src)
+                .map(|c| {
+                    c.get(1)
+                        .map(|s| Atom::from(s.as_str().trim()))
+                        .expect("src should match regex")
+                })
+                .collect::<Vec<_>>()
+                .into()
+        } else {
+            None
+        }
+    }
+
     pub fn is_dynamic(&self) -> bool {
         self.has_fields || self.has_ts
     }
@@ -114,7 +129,9 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
-        Event::Log(log) => log.get(&event::TIMESTAMP).and_then(Value::as_timestamp),
+        Event::Log(log) => log
+            .get(&event::log_schema().timestamp_key())
+            .and_then(Value::as_timestamp),
         _ => None,
     };
     if let Some(ts) = timestamp {
@@ -165,6 +182,19 @@ impl Serialize for Template {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    #[test]
+    fn get_fields() {
+        let f1 = Template::from("{{ foo }}").get_fields().unwrap();
+        let f2 = Template::from("{{ foo }}-{{ bar }}").get_fields().unwrap();
+        let f3 = Template::from("nofield").get_fields();
+        let f4 = Template::from("%F").get_fields();
+
+        assert_eq!(f1, vec![Atom::from("foo")]);
+        assert_eq!(f2, vec![Atom::from("foo"), Atom::from("bar")]);
+        assert_eq!(f3, None);
+        assert_eq!(f4, None);
+    }
 
     #[test]
     fn is_dynamic() {
@@ -253,7 +283,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("abcd-%F");
 
@@ -267,7 +297,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("abcd-%F_%T");
 
@@ -285,7 +315,7 @@ mod tests {
         event.as_mut_log().insert("foo", "butts");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("{{ foo }}-%F_%T");
 
@@ -303,7 +333,7 @@ mod tests {
         event.as_mut_log().insert("format", "%F");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("nested {{ format }} %T");
 
@@ -321,7 +351,7 @@ mod tests {
         event.as_mut_log().insert("%F", "foo");
         event
             .as_mut_log()
-            .insert(crate::event::TIMESTAMP.clone(), ts);
+            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
 
         let template = Template::from("nested {{ %F }} %T");
 

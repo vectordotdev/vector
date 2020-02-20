@@ -28,11 +28,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -56,12 +52,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
+
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
+  # OPTIONAL - General
+  healthcheck = true # default
+
+  # OPTIONAL - Batch
+  [sinks.my_sink_id.batch]
+    max_size = 10490000 # default, bytes
+    timeout_secs = 300 # default, seconds
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -78,7 +85,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
 
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
   # OPTIONAL - General
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
   endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
   healthcheck = true # default
 
@@ -89,13 +100,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
   grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
   server_side_encryption = "AES256" # example, no default, enum
-  ssekms_key_id = nil # example, no default
+  ssekms_key_id = "abcd1234" # example, no default
   storage_class = "STANDARD" # example, no default, enum
   [sinks.my_sink_id.tags]
     Tag1 = "Value1" # example
-
-  # OPTIONAL - requests
-  encoding = "ndjson" # example, no default, enum
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -104,24 +112,26 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
+    in_flight_limit = 5 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 5 # default
-    retry_attempts = 5 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 30 # default, seconds
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -138,6 +148,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={{"private":"Owner gets FULL_CONTROL. No one else has access rights (default).","public-read":"Owner gets FULL_CONTROL. The AllUsers group gets READ access.","public-read-write":"Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. Granting this on a bucket is generally not recommended.","aws-exec-read":"Owner gets FULL_CONTROL. Amazon EC2 gets READ access to GET an Amazon Machine Image (AMI) bundle from Amazon S3.","authenticated-read":"Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access.","log-delivery-write":"The LogDelivery group gets WRITE and READ_ACP permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html)."}}
   examples={["private","public-read","public-read-write","aws-exec-read","authenticated-read","log-delivery-write"]}
+  groups={[]}
   name={"acl"}
   path={null}
   relevantWhen={null}
@@ -159,7 +170,31 @@ Canned ACL to apply to the created objects. For more information, see [Canned AC
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -181,10 +216,11 @@ Configures the sink batching behavior.
   defaultValue={10490000}
   enumValues={null}
   examples={[10490000]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -192,7 +228,7 @@ Configures the sink batching behavior.
 
 #### max_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
@@ -203,10 +239,11 @@ The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffe
   defaultValue={300}
   enumValues={null}
   examples={[300]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -230,6 +267,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={["my-bucket"]}
+  groups={[]}
   name={"bucket"}
   path={null}
   relevantWhen={null}
@@ -252,6 +290,7 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -263,20 +302,21 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -291,14 +331,15 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -313,14 +354,15 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -328,7 +370,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -339,6 +381,7 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -366,6 +409,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={{"gzip":"GZIP compression","none":"No compression"}}
   examples={["gzip","none"]}
+  groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
@@ -384,14 +428,15 @@ The compression mechanism to use.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -410,6 +455,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
@@ -432,6 +478,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"filename_append_uuid"}
   path={null}
   relevantWhen={null}
@@ -454,6 +501,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
   defaultValue={"log"}
   enumValues={null}
   examples={["log"]}
+  groups={[]}
   name={"filename_extension"}
   path={null}
   relevantWhen={null}
@@ -476,6 +524,7 @@ The extension to use in the object name.
   defaultValue={"%s"}
   enumValues={null}
   examples={["%s"]}
+  groups={[]}
   name={"filename_time_format"}
   path={null}
   relevantWhen={null}
@@ -498,6 +547,7 @@ The format of the resulting object file name. [`strftime` specifiers][urls.strpt
   defaultValue={null}
   enumValues={null}
   examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
   name={"grant_full_control"}
   path={null}
   relevantWhen={null}
@@ -520,6 +570,7 @@ Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP per
   defaultValue={null}
   enumValues={null}
   examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
   name={"grant_read"}
   path={null}
   relevantWhen={null}
@@ -542,6 +593,7 @@ Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and 
   defaultValue={null}
   enumValues={null}
   examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
   name={"grant_read_acp"}
   path={null}
   relevantWhen={null}
@@ -564,6 +616,7 @@ Allows the named [grantee][urls.aws_s3_grantee] to read the created objects' ACL
   defaultValue={null}
   enumValues={null}
   examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
   name={"grant_write_acp"}
   path={null}
   relevantWhen={null}
@@ -582,10 +635,11 @@ Allows the named [grantee][urls.aws_s3_grantee] to write the created objects' AC
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -608,6 +662,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={"date=%F/"}
   enumValues={null}
   examples={["date=%F/","date=%F/hour=%H/","year=%Y/month=%m/day=%d/","application_id={{ application_id }}/date=%F/"]}
+  groups={[]}
   name={"key_prefix"}
   path={null}
   relevantWhen={null}
@@ -630,6 +685,7 @@ A prefix to apply to all object key names. This should be used to partition your
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
+  groups={[]}
   name={"region"}
   path={null}
   relevantWhen={{"host":""}}
@@ -652,6 +708,7 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -673,13 +730,14 @@ Configures the sink request behavior.
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -695,6 +753,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -706,7 +765,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -717,6 +776,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -728,7 +788,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -736,9 +796,10 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={-1}
   enumValues={null}
-  examples={[5]}
+  examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -761,6 +822,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -783,6 +845,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -794,7 +857,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -805,6 +868,7 @@ The maximum amount of time to wait between retries.
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -832,6 +896,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={{"AES256":"256-bit Advanced Encryption Standard","aws:kms":"AWS managed key encryption"}}
   examples={["AES256","aws:kms"]}
+  groups={[]}
   name={"server_side_encryption"}
   path={null}
   relevantWhen={null}
@@ -853,7 +918,8 @@ The server-side encryption algorithm used when storing these objects. See [Serve
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
+  examples={["abcd1234"]}
+  groups={[]}
   name={"ssekms_key_id"}
   path={null}
   relevantWhen={null}
@@ -876,6 +942,7 @@ If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`
   defaultValue={null}
   enumValues={{"STANDARD":"The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class.","REDUCED_REDUNDANCY":"Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. ","INTELLIGENT_TIERING":"Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data.","STANDARD_IA":"Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class).","ONEZONE_IA":"Amazon S3 stores the object data in only one Availability Zone.","GLACIER":"Use for archives where portions of the data might need to be retrieved in minutes.","DEEP_ARCHIVE":"Use for archiving data that rarely needs to be accessed."}}
   examples={["STANDARD","REDUCED_REDUNDANCY","INTELLIGENT_TIERING","STANDARD_IA","ONEZONE_IA","GLACIER","DEEP_ARCHIVE"]}
+  groups={[]}
   name={"storage_class"}
   path={null}
   relevantWhen={null}
@@ -898,6 +965,7 @@ The storage class for the created objects. See [the S3 Storage Classes](https://
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tags"}
   path={null}
   relevantWhen={null}
@@ -919,6 +987,7 @@ The tag-set for the object.
   defaultValue={null}
   enumValues={null}
   examples={[{"Tag1":"Value1"}]}
+  groups={[]}
   name={"`[tag-name]`"}
   path={"tags"}
   relevantWhen={null}
@@ -953,6 +1022,7 @@ A custom tag to be added to the created objects.
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -975,6 +1045,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}
@@ -1015,6 +1086,11 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
 
+#### Assuming Roles
+
+Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
+optional setting that is helpful for a variety of use cases, such as cross
+account access.
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';
@@ -1139,8 +1215,8 @@ and [`filename_append_uuid`](#filename_append_uuid) options.
 
 Partitioning is controlled via the [`key_prefix`](#key_prefix)
 options and allows you to dynamically partition data on the fly.
-You'll notice that Vector's [template sytax](#field-interpolation) is supported
-for these options, enabling you to use field values as the partition's key.
+You'll notice that Vector's [template sytax][docs.reference.templating] is
+supported for these options, enabling you to use field values as partition keys.
 
 ### Rate Limits
 
@@ -1194,8 +1270,8 @@ object metadata requires a full rewrite of the object to make changes.
 ### Template Syntax
 
 The [`key_prefix`](#key_prefix) options
-support [Vector's template syntax][docs.configuration#field-interpolation],
-enabling dynamic values derived from the event's data. This syntax accepts
+support [Vector's template syntax][docs.reference.templating], enabling dynamic
+values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
@@ -1211,21 +1287,22 @@ enabling dynamic values derived from the event's data. This syntax accepts
   # ...
 ```
 
-You can read more about the complete syntax in the
-[template syntax section][docs.configuration#field-interpolation].
+You can learn more about the complete syntax in the
+[templating reference][docs.reference.templating].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.reference.templating]: /docs/reference/templating/
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_canonical_user_id]: https://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html#FindingCanonicalId
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.aws_s3_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
