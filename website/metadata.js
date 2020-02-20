@@ -17007,7 +17007,7 @@ module.exports = {
   },
   "sinks": {
     "aws_cloudwatch_logs": {
-      "beta": true,
+      "beta": false,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
       "event_types": [
@@ -17024,7 +17024,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
 
