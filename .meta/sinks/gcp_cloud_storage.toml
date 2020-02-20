@@ -7,6 +7,7 @@ function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
+requirements = {}
 service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview)"
 
