@@ -236,6 +236,8 @@ influxdb-integration-tests = []
 kubernetes = ["kubernetes-integration-tests"]
 kubernetes-integration-tests = []
 
+disable-resolv-conf = []
+
 [[bench]]
 name = "bench"
 harness = false
