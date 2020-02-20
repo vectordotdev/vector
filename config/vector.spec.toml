@@ -233,7 +233,7 @@ dns_servers = ["0.0.0.0:53"]
   host_key = "host"
 
   #
-  # Multi-line
+  # Multi-line (deprecated)
   #
 
   # When present, Vector will aggregate multiple lines into a single event, using
@@ -313,6 +313,48 @@ dns_servers = ["0.0.0.0:53"]
     # * enum: "checksum" or "device_and_inode"
     strategy = "checksum"
     strategy = "device_and_inode"
+
+  #
+  # Multiline
+  #
+
+  [sources.file.multiline]
+    # Condition pattern to look for. Exact behavior is configured via `mode`.
+    #
+    # * required
+    # * type: string
+    condition_pattern = "^[\\s]+"
+    condition_pattern = "\\\\$"
+    condition_pattern = "^(INFO|ERROR) "
+    condition_pattern = ";$"
+
+    # Mode of operation, specifies how the condition pattern is interpreted.
+    #
+    # * required
+    # * type: string
+    # * enum: "continue_through", "continue_past", "halt_before", and "halt_with"
+    mode = "continue_through"
+    mode = "continue_past"
+    mode = "halt_before"
+    mode = "halt_with"
+
+    # Start pattern to look for as a beginning of the message.
+    #
+    # * required
+    # * type: string
+    start_pattern = "^[^\\s]"
+    start_pattern = "\\\\$"
+    start_pattern = "^(INFO|ERROR) "
+    start_pattern = "[^;]$"
+
+    # The maximum time to wait for the continuation. Once this timeout is reached,
+    # the buffered message is guaraneed to be flushed, even if incomplete.
+    #
+    # * required
+    # * type: int
+    # * unit: milliseconds
+    timeout_ms = 1000
+    timeout_ms = 600000
 
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
