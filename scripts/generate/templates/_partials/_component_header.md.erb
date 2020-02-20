@@ -5,6 +5,7 @@ delivery_guarantee: <%= component.delivery_guarantee.to_json %>
 description: <%= "The Vector `#{component.name}` #{component.type} #{component_description(component).continuize}".remove_markdown_links.to_json %>
 event_types: <%= component.event_types.to_json %>
 issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
+min_version: <%= component.min_version.to_json %>
 <%- if !component.transform? -%>
 operating_systems: <%= component.operating_systems.to_json %>
 <%- end -%>

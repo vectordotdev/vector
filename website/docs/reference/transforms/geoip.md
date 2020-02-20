@@ -2,6 +2,7 @@
 description: "The Vector [`geoip`](#geoip) transform accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
+min_version: null
 sidebar_label: "geoip|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/geoip.rs
 status: "beta"

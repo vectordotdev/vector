@@ -353,6 +353,10 @@
             "receive"
           ]
         },
+        "min_version": {
+          "type": "string",
+          "description": "The minimum version supported for the system this component interfaces with."
+        },
         "only_operating_systems": {
           "$ref": "#/definitions/operating_systems",
           "description": "A whitelist of operating systems supported by this source."

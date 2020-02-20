@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 description: "The Vector `aws_kinesis_firehose` sink batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_firehose%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "aws_kinesis_firehose|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_firehose.rs

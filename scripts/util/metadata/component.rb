@@ -14,6 +14,7 @@ class Component
     :env_vars,
     :function_category,
     :id,
+    :min_version,
     :name,
     :operating_systems,
     :options,
@@ -29,6 +30,7 @@ class Component
     @common = hash["common"] == true
     @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
     @function_category = hash.fetch("function_category").downcase
+    @min_version = hash["min_version"]
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
     @requirements = hash["requirements"]
