@@ -6,12 +6,12 @@
 
 <%= component_config_example(component) %>
 
-<%- if !component.requirements.nil? -%>
+<%- if component.requirements.any? -%>
 ## Requirements
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-<%= component.requirements %>
+<%= component_requirements(component) %>
 
 </Alert>
 
@@ -33,5 +33,3 @@
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
-
-

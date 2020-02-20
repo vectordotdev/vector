@@ -1,5 +1,5 @@
 ---
-component_title: Split
+component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a given separator and zip the tokens into ordered field names."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22

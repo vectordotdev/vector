@@ -185,6 +185,19 @@
         }
       }
     },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "additional": {
+          "type": "string",
+          "description": "Additional free-form requirements. Markdown is supported and they should be in list format."
+        },
+        "network": {
+          "type": "boolean",
+          "description": "Is the network required for this component?"
+        }
+      }
+    },
     "sink": {
       "type": "object",
       "description": "A component that outputs/sends data from Vector.",
@@ -195,6 +208,7 @@
         "delivery_guarantee",
         "egress_method",
         "function_category",
+        "requirements",
         "title",
         "write_to_description"
       ],
@@ -275,6 +289,10 @@
           "$ref": "#/definitions/output",
           "description": "Output examples of this sink."
         },
+        "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
+        },
         "service_limits_short_link": {
           "type": "string",
           "description": "A link to the target service's limits, if applicable.",
@@ -319,6 +337,7 @@
         "common",
         "delivery_guarantee",
         "function_category",
+        "requirements",
         "through_description",
         "title"
       ],
@@ -383,8 +402,8 @@
           "description": "The types of events this source outputs."
         },
         "requirements": {
-          "type": "string",
-          "description": "A description of requirements needed for this source to operate correctly. Markdown syntax is supported."
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
         },
         "through_description": {
           "type": "string",
@@ -407,6 +426,7 @@
         "beta",
         "common",
         "function_category",
+        "requirements",
         "title"
       ],
       "properties": {
@@ -465,6 +485,10 @@
         "output_types": {
           "$ref": "#/definitions/event_types",
           "description": "The types of events this transform outputs."
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
         },
         "title": {
           "type": "string",

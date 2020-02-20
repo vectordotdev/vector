@@ -7,6 +7,7 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+requirements = {}
 service_limits_short_link = "aws_kinesis_streams_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"

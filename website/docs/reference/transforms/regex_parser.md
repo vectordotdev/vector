@@ -1,5 +1,5 @@
 ---
-component_title: Regex Parser
+component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22

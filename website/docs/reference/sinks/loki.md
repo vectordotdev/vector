@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
-component_title: loki
+component_title: "loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+loki%22

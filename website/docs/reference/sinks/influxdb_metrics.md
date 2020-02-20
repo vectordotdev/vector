@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "at_least_once"
-component_title: InfluxDB Metrics
+component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
@@ -163,17 +163,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* InfluxDB Metrics version >= 0 is required.
-
-
-</Alert>
 
 ## Options
 

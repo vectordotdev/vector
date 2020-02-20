@@ -1,5 +1,5 @@
 ---
-component_title: Field Filter
+component_title: "Field Filter"
 description: "The Vector `field_filter` transform accepts and outputs `log` events allowing you to filter events by a log field's value."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22

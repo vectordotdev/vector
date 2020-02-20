@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "at_least_once"
-component_title: AWS Cloudwatch Metrics
+component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
@@ -409,7 +409,7 @@ The following matrix outlines how Vector metric types are mapped into CloudWatch
 1. Gauge values are persisted between flushes. On Vector start up each gauge is assumed to have
 zero (0.0) value, that can be updated explicitly by the consequent absolute (not delta) gauge
 observation, or by delta increments/decrements. Delta gauges are considered an advanced feature
-useful in distributed setting, however it should be used with care.
+useful itn distributed setting, however it should be used with care.
 
 ### Streaming
 

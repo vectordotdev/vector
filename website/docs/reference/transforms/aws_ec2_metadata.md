@@ -1,5 +1,5 @@
 ---
-component_title: AWS EC2 Metadata
+component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
@@ -38,6 +38,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   namespace = "" # default
   refresh_interval_secs = 10 # default
 ```
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Network access is required for this component to function correctly. See the
+  [Network Access section](#network-access) for more info.
+
+</Alert>
 
 ## Options
 
@@ -432,6 +443,23 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
+### Network Access
+
+The `aws_ec2_metadata` transform requires network access to
+operate correctly.
+
+#### Docker Network Access
+
+If you are running Vector within a Docker container then you should pass the
+`--net=host` flag when starting Docker:
+
+```bash
+docker run --net=host ...
+```
+
+Otherwise Vector will not be able to communicate with EC2 metadata service.
+Learn more in the [Docker networking docs][urls.docker_networking].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/

@@ -7,6 +7,7 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+requirements = {}
 write_to_description = "[Humio][urls.humio] via the [HEC API][urls.humio_hec]"
 
 <%= render("_partials/_component_options.toml", type: "sink", name: "humio_logs") %>
