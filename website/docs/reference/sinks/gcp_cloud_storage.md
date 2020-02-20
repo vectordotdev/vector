@@ -131,16 +131,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert type="danger" fill={true} icon={false}>
-
-#<Requirements:0x00005587e43e2a30>
-
-</Alert>
-
 
 ## Options
 

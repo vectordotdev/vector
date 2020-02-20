@@ -6,14 +6,10 @@
 
 <%= component_config_example(component) %>
 
-<%- if !component.requirements.nil? -%>
+<%- if component.requirements.any? -%>
 ## Requirements
 
-<Alert type="danger" fill={true} icon={false}>
-
-<%= component.requirements %>
-
-</Alert>
+<%= component_requirements(component) %>
 
 <%- end -%>
 

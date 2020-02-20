@@ -81,6 +81,7 @@ import Alert from '@site/src/components/Alert';
 * Docker version >= 1.24 is required.
 * The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
 
+
 </Alert>
 
 ## Options
