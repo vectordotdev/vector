@@ -517,7 +517,7 @@ services:
       volumes:
         - ./tests/data:/usr/share/elasticsearch/config/certs:ro
     clickhouse:
-      image: yandex/clickhouse-server:19
+      image: yandex/clickhouse-server:1.1.54378
       ports:
         - "8123:8123"
     ec2_metadata:
