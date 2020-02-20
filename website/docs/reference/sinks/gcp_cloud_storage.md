@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "at_least_once"
-component_title: GCP Cloud Storage (GCS)
+component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_cloud_storage%22
@@ -130,6 +130,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="danger" fill={true} icon={false}>
+
+#<Requirements:0x00005587e43e2a30>
+
+</Alert>
 
 
 ## Options
