@@ -444,6 +444,3 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-
-[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/
