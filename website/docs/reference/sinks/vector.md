@@ -1,5 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: Vector
 description: "The Vector `vector` sink streams `log` events to another downstream `vector` source."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22

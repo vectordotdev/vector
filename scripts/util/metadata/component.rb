@@ -40,6 +40,12 @@ class Component
     @id = "#{@name}_#{@type}"
     @options = (hash["options"] || {}).to_struct_with_name(Field)
 
+    # Requirements
+
+    if @min_version && (!@requirements || !@requirements.include?(@min_version))
+      @requirements = "* #{title} version >= #{@min_version} is required.\n#{@requirements}"
+    end
+
     # Operating Systems
 
     if hash["only_operating_systems"]

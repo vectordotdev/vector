@@ -1,9 +1,10 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: InfluxDB Metrics
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
-min_version: null
+min_version: "0"
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "influxdb_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb_metrics.rs
@@ -163,6 +164,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* InfluxDB Metrics version >= 0 is required.
+
+
+</Alert>
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -249,29 +261,6 @@ The maximum age of a batch before it is flushed.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["https://us-west-2-1.aws.cloud2.influxdata.com","http://localhost:8086/"]}
-  groups={["v1","v2"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-InfluxDB endpoint to send metrics to.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["vector-bucket","4d2225e4d3d49f75"]}
   groups={["v2"]}
   name={"bucket"}
@@ -309,6 +298,29 @@ The destination bucket for writes into InfluxDB 2.
 ### consistency
 
 Sets the write consistency for the point for InfluxDB 1.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["https://us-west-2-1.aws.cloud2.influxdata.com","http://localhost:8086/"]}
+  groups={["v1","v2"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+InfluxDB endpoint to send metrics to.
 
 
 </Field>

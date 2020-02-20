@@ -13,7 +13,6 @@ requirements = """\
 must be enabled for this source to work. See the \
 [Docker Integration Strategy section](#docker-integration-strategy) \
 for more info.
-* Docker version >= 1.24 is required.
 """
 
 <%= render("_partials/_component_options.toml", type: "source", name: "docker") %>

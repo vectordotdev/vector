@@ -7,9 +7,8 @@
   border: 0px none;
   border-left: 6px solid var(--ifm-alert-background-color);
   border-radius: 0;
-  color: var(--ifm-color-content);
   font-size: 95%;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }
 

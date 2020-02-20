@@ -1,5 +1,6 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: Heroku Logplex
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+logplex%22

@@ -7,6 +7,7 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+min_version = "0"
 write_to_description = "[Loki][urls.loki]"
 
 <%= render("_partials/_component_options.toml", type: "sink", name: "loki") %>

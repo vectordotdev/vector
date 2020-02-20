@@ -1,5 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: Socket
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP or Unix domain socket."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+socket%22

@@ -18128,10 +18128,9 @@ module.exports = {
     "field_filter": {
       "beta": true,
       "delivery_guarantee": null,
-      "description": "Accepts log and metric events and allows you to filter events by a log field's value.",
+      "description": "Accepts log events and allows you to filter events by a log field's value.",
       "event_types": [
-        "log",
-        "metric"
+        "log"
       ],
       "function_category": "filter",
       "id": "field_filter_transform",

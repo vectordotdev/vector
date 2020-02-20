@@ -1,9 +1,10 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: Prometheus
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
-min_version: null
+min_version: "1.0"
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
@@ -41,6 +42,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   flush_period_secs = 60 # default, seconds
   healthcheck = true # default
 ```
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Prometheus version >= 1.0 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -357,8 +369,6 @@ The [`buckets`](#buckets) option defines the global default buckets for histogra
 These defaults are tailored to broadly measure the response time (in seconds)
 of a network service. Most likely, however, you will be required to define
 buckets customized to your use case.
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 

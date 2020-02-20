@@ -1,5 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: Vector
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22

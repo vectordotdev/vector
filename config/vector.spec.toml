@@ -745,7 +745,7 @@ dns_servers = ["0.0.0.0:53"]
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 
-# Accepts `log` events and allows you to add one or more log fields.
+# Accepts and outputs `log` events allowing you to add one or more log fields.
 [transforms.add_fields]
   #
   # General
@@ -784,7 +784,7 @@ dns_servers = ["0.0.0.0:53"]
     parent = {child = "child_value"}
     list_field = ["first", "second", "third"]
 
-# Accepts `metric` events and allows you to add one or more metric tags.
+# Accepts and outputs `metric` events allowing you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
@@ -817,7 +817,7 @@ dns_servers = ["0.0.0.0:53"]
     static_tag = "my value"
     env_tag = "${ENV_VAR}"
 
-# Accepts `log` events and allows you to strips ANSI escape sequences from the specified field.
+# Accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -840,7 +840,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   field = "message"
 
-# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+# Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -884,7 +884,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   refresh_interval_secs = 10
 
-# Accepts `log` events and allows you to coerce log fields into fixed types.
+# Accepts and outputs `log` events allowing you to coerce log fields into fixed types.
 [transforms.coercer]
   #
   # General
@@ -934,7 +934,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to concat (substrings) of other fields to a new one.
+# Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -973,7 +973,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "dest_field_name"
 
-# Accepts `log` and `metric` events and allows you to filter events by a log field's value.
+# Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1002,7 +1002,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   value = "/var/log/nginx.log"
 
-# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1042,7 +1042,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "geoip"
 
-# Accepts `log` events and allows you to parse a log field value with Grok.
+# Accepts and outputs `log` events allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
   #
   # General
@@ -1102,7 +1102,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to parse a log field value as JSON.
+# Accepts and outputs `log` events allowing you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1159,7 +1159,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target_field = "target"
 
-# Accepts `log` events and allows you to convert logs into one or more metrics.
+# Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
@@ -1227,7 +1227,7 @@ dns_servers = ["0.0.0.0:53"]
       region = "us-east-1"
       status = "{{status}}"
 
-# Accepts `log` events and allows you to extract data from a logfmt-formatted log field.
+# Accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field.
 [transforms.logfmt_parser]
   #
   # General
@@ -1281,7 +1281,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1321,7 +1321,7 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
-# Accepts `log` events and allows you to merge partial log events into a single event.
+# Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1367,7 +1367,7 @@ end
   # * type: [string]
   stream_discriminant_fields = []
 
-# Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
+# Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
   # General
@@ -1427,7 +1427,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to remove one or more log fields.
+# Accepts and outputs `log` events allowing you to remove one or more log fields.
 [transforms.remove_fields]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1449,7 +1449,7 @@ end
   # * type: [string]
   fields = ["field1", "field2"]
 
-# Accepts `metric` events and allows you to remove one or more metric tags.
+# Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1471,7 +1471,7 @@ end
   # * type: [string]
   tags = ["tag1", "tag2"]
 
-# Accepts `log` events and allows you to sample events with a configurable rate.
+# Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1504,7 +1504,7 @@ end
   # * type: [string]
   pass_list = ["[error]", "field2"]
 
-# Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to split a field's value on a given separator and zip the tokens into ordered field names.
 [transforms.split]
   #
   # General
@@ -1572,7 +1572,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General
