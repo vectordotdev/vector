@@ -196,13 +196,36 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 
     fn output_type(&self) -> DataType;
 
     fn transform_type(&self) -> &'static str;
+}
+
+#[derive(Debug, Clone)]
+pub struct TransformContext {
+    pub(super) exec: TaskExecutor,
+    pub(super) resolver: Resolver,
+}
+
+impl TransformContext {
+    pub fn new_test(exec: TaskExecutor) -> Self {
+        Self {
+            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            exec,
+        }
+    }
+
+    pub fn executor(&self) -> &TaskExecutor {
+        &self.exec
+    }
+
+    pub fn resolver(&self) -> Resolver {
+        self.resolver.clone()
+    }
 }
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;

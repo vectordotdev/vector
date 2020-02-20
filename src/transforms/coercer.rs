@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::event::Event;
-use crate::runtime::TaskExecutor;
-use crate::topology::config::{DataType, TransformConfig, TransformDescription};
+use crate::topology::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -22,7 +21,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer {
             types,
@@ -97,7 +96,10 @@ impl Transform for Coercer {
 mod tests {
     use super::CoercerConfig;
     use crate::event::{flatten::flatten, LogEvent, Value};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
 
@@ -123,7 +125,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }

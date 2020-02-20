@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -24,7 +23,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
@@ -110,7 +109,7 @@ mod tests {
     use crate::{
         event::{LogEvent, Value},
         test_util,
-        topology::config::TransformConfig,
+        topology::config::{TransformConfig, TransformContext},
         Event,
     };
 
@@ -123,7 +122,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

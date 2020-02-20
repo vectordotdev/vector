@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use futures::Stream;
@@ -109,7 +108,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
         let keys = Keys::new(&self.namespace);
@@ -129,7 +128,7 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        exec.spawn_std(
+        cx.executor().spawn_std(
             async move {
                 let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
 
@@ -498,7 +497,9 @@ mod tests {
             host: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform = config.build(rt.executor()).unwrap();
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -545,7 +546,9 @@ mod tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config.build(rt.executor()).unwrap();
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -574,7 +577,9 @@ mod tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config.build(rt.executor()).unwrap();
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));

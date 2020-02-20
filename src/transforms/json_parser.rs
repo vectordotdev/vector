@@ -5,8 +5,7 @@ use crate::{
         flatten::{flatten, insert},
         Event,
     },
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,7 +29,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(JsonParser::from(self.clone())))
     }
 
