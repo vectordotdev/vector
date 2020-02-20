@@ -1,6 +1,6 @@
 [sinks.aws_cloudwatch_logs]
 title = "AWS Cloudwatch Logs"
-beta = true
+beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
