@@ -67,10 +67,6 @@ class Templates
     send("#{component.type}_description", component)
   end
 
-  def component_guides(component)
-
-  end
-
   def component_header(component)
     render("#{partials_path}/_component_header.md", binding).strip
   end
@@ -79,6 +75,10 @@ class Templates
     examples = output.examples
     fields = output.fields ? output.fields.to_h.values.sort : []
     render("#{partials_path}/_component_output.md", binding).strip
+  end
+
+  def component_requirements(component)
+    render("#{partials_path}/_component_requirements.md", binding).strip
   end
 
   def component_sections(component)

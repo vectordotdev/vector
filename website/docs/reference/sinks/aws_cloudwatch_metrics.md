@@ -409,7 +409,7 @@ The following matrix outlines how Vector metric types are mapped into CloudWatch
 1. Gauge values are persisted between flushes. On Vector start up each gauge is assumed to have
 zero (0.0) value, that can be updated explicitly by the consequent absolute (not delta) gauge
 observation, or by delta increments/decrements. Delta gauges are considered an advanced feature
-useful in distributed setting, however it should be used with care.
+useful itn distributed setting, however it should be used with care.
 
 ### Streaming
 

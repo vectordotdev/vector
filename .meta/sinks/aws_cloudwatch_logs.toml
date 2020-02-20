@@ -7,6 +7,7 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+requirements = {}
 service_limits_short_link = "aws_cw_logs_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"

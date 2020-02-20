@@ -113,7 +113,6 @@ import Alert from '@site/src/components/Alert';
 
 * Kafka version >= 0.8 is required.
 
-
 </Alert>
 
 ## Options

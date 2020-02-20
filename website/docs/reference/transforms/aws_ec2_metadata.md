@@ -39,6 +39,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   refresh_interval_secs = 10 # default
 ```
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Network access is required for this component to function correctly. See the
+  [Network Access section](#network-access) for more info.
+
+</Alert>
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -424,7 +435,20 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 ## How It Works
 
-### Docker Environments
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
+section.
+### Network Access
+
+The `aws_ec2_metadata` transform requires network access to 
+operate correctly.
+
+#### Docker Network Access
 
 If you are running Vector within a Docker container then you should pass the
 `--net=host` flag when starting Docker:
@@ -436,12 +460,6 @@ docker run --net=host ...
 Otherwise Vector will not be able to communicate with EC2 metadata service.
 Learn more in the [Docker networking docs][urls.docker_networking].
 
-### Environment Variables
 
-Environment variables are supported through all of Vector's configuration.
-Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
-will be replaced before being evaluated.
-
-You can learn more in the [Environment Variables][docs.configuration#environment-variables]
-section.
-
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/

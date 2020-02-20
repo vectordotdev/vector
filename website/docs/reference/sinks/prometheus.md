@@ -51,7 +51,6 @@ import Alert from '@site/src/components/Alert';
 
 * Prometheus version >= 1.0 is required.
 
-
 </Alert>
 
 ## Options

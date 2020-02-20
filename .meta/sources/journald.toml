@@ -6,8 +6,7 @@ delivery_guarantee = "best_effort"
 function_category = "collect"
 only_operating_systems = ["Linux"]
 output_types = ["log"]
-through_description = "log records from journald"
-requirements = """\
+requirements.additional = """\
 * The `journald` source requires the presence of the `journalctl` binary. \
 This ensures that this source works across all platforms. Please see the \
 ["Communication strategy"](#communication-strategy) section for more info.
@@ -15,6 +14,7 @@ This ensures that this source works across all platforms. Please see the \
 `systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
 section for more info.\
 """
+through_description = "log records from journald"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "journald") %>
 

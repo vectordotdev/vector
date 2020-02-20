@@ -123,17 +123,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* Elasticsearch version >= 0 is required.
-
-
-</Alert>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
