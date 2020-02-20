@@ -112,7 +112,7 @@ Let's place our new transform in between our existing source and sink:
 +  inputs = ["foo"]
 +  type = "regex_parser"
 +  field = "message"
-+  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
++  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<mathod>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 +
  # Write the data
  [sinks.bar]
@@ -140,7 +140,7 @@ Let's place our new transform in between our existing source and sink:
   inputs = ["foo"]
   type = "regex_parser"
   field = "message"
-  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<mathod>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 
 # Write the data
 [sinks.bar]
@@ -196,114 +196,12 @@ config just like you would for regular code:
 +
 +  [[tests.outputs]]
 +    extract_from = "apache_parser"
-```
-
-</TabItem>
-<TabItem value="new_result">
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
-# Consume data
-[sources.foo]
-  type = "socket"
-  address = "0.0.0.0:9000"
-  mode = "tcp"
-
-# Structure the data
-[transforms.apache_parser]
-  inputs = ["foo"]
-  type = "regex_parser"
-  field = "message"
-  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
-
-# Write the data
-[sinks.bar]
-  inputs = ["apache_parser"]
-  type = "elasticsearch"
-  index = "example-index"
-  host = "http://10.24.32.122:9000"
-
-[[tests]]
-  name = "test apache regex"
-
-  [[tests.inputs]]
-    insert_at = "apache_parser"
-    type = "raw"
-    value = "172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] \"PUT /mesh\" 406 10272"
-
-  [[tests.outputs]]
-    extract_from = "apache_parser"
-```
-</TabItem>
-</Tabs>
-
-This unit test spec has a name, defines an input event to feed into our pipeline
-at a specific transform (in this case our _only_ transform), and defines where
-we'd like to capture resulting events coming out.
-
-When we run `vector test ./vector.toml` it will print the input and output
-events of our target transform:
-
-```text
-Running vector.toml tests
-test vector.toml: test apache regex ... passed
-
-inspections:
-
---- vector.toml ---
-
-test 'test apache regex':
-
-check transform 'apache_parser' payloads (events encoded as JSON):
-  input: {"timestamp":"2020-02-19T14:15:45.997803Z","message":"172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] \"PUT /mesh\" 406 10272"}
-  output: {"host":"172.128.80.109","user":"Bins5273","bytes_out":"10272","timestamp":"2019-05-03T13:11:48-04:00","path":"/mesh","bytes_in":"656","method":"PUT","status":"406"}
-```
-
-This is called an _inspection_ test, as we've defined a test without any
-conditions. This is super cool as it allows us to experiment by injecting events
-and inspecting the results.
-
-We can see here that our input event is correctly parsed out into a structured
-format, great! However, our test isn't actually _testing_ anything right now.
-Since we're happy with our pipeline we can turn this test into a regression test
-by adding a condition:
-
-<Tabs
-  block={true}
-  defaultValue="diff"
-  values={[
-    { label: 'Diff', value: 'diff', },
-    { label: 'Full Config', value: 'new_result', },
-  ]
-}>
-
-<TabItem value="diff">
-
-<CodeHeader fileName="vector.toml" />
-
-```diff
- [[tests]]
-   name = "test apache regex"
-
-
-   [[tests.inputs]]
-     insert_at = "apache_parser"
-     type = "raw"
-     value = "172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] \"PUT /mesh\" 406 10272"
-
-
-   [[tests.outputs]]
-     extract_from = "apache_parser"
 +    [[tests.outputs.conditions]]
 +      type = "check_fields"
 +      "method.eq" = "PUT"
 +      "host.eq" = "172.128.80.109"
-+      "user.eq" = "Bins5273"
-+      "bytes_out.eq" = "10272"
 +      "timestamp.eq" = "2019-05-03T13:11:48-04:00"
 +      "path.eq" = "/mesh"
-+      "bytes_in.eq" = "656"
 +      "status.eq" = "406"
 ```
 
@@ -324,7 +222,7 @@ by adding a condition:
   inputs = ["foo"]
   type = "regex_parser"
   field = "message"
-  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<mathod>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 
 # Write the data
 [sinks.bar]
@@ -347,25 +245,19 @@ by adding a condition:
       type = "check_fields"
       "method.eq" = "PUT"
       "host.eq" = "172.128.80.109"
-      "user.eq" = "Bins5273"
-      "bytes_out.eq" = "10272"
       "timestamp.eq" = "2019-05-03T13:11:48-04:00"
       "path.eq" = "/mesh"
-      "bytes_in.eq" = "656"
       "status.eq" = "406"
 ```
 </TabItem>
 </Tabs>
 
-Now when we run `vector test ./vector.toml` we'll get this:
+This unit test spec has a name, defines an input event to feed into our pipeline
+at a specific transform (in this case our _only_ transform), and defines where
+we'd like to capture resulting events coming out along with a condition to check
+the events against.
 
-```text
-Running vector.toml tests
-test vector.toml: test apache regex ... passed
-```
-
-If we were to make changes to our regular expression in the future that breaks
-it, when we run `vector test ./vector.toml` again we'll see a test failure:
+When we run `vector test ./vector.toml` it will parse and execute our test:
 
 ```text
 Running vector.toml tests
@@ -378,16 +270,30 @@ failures:
 test 'test apache regex':
 
 check transform 'apache_parser' failed conditions:
-  condition[0]: predicates failed: [ user.eq: "Bins5273" ]
+  condition[0]: predicates failed: [ method.eq: "PUT" ]
 payloads (events encoded as JSON):
-  input: {"timestamp":"2020-02-19T14:43:54.219633Z","message":"172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] \"PUT /mesh\" 406 10272"}
-  output: {"host":"172.128.80.109","bytes_in":"656","bytes_out":"10272","user_no":"Bins5273","method":"PUT","status":"406","timestamp":"2019-05-03T13:11:48-04:00","path":"/mesh"}
+  input: {"timestamp":"2020-02-20T10:19:27.283745Z","message":"172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] \"PUT /mesh\" 406 10272"}
+  output: {"bytes_in":"656","timestamp":"2019-05-03T13:11:48-04:00","mathod":"PUT","bytes_out":"10272","host":"172.128.80.109","status":"406","user":"Bins5273","path":"/mesh"}
 ```
 
-Naughty!
+By Jove! There _was_ a problem with our regular expression! Our test has pointed
+out that the predicate `method.eq` failed, and has helpfully printed our input
+and resulting events in JSON format.
 
-Next, try experimenting by adding more [transforms][docs.transforms] to your
-pipeline before moving onto the next guide.
+This allows us to inspect exactly what our transform is doing, and it turns out
+that the method from our Apache log is actually being captured in a field
+`mathod`.
+
+See if you can spot the typo, once it's fixed we can run
+`vector test ./vector.toml` again and we should get this:
+
+```text
+Running vector.toml tests
+test vector.toml: test apache regex ... passed
+```
+
+Success! Next, try experimenting by adding more [transforms][docs.transforms] to
+your pipeline before moving onto the next guide.
 
 Good luck, now that you're a Vector pro you'll have endless ragtag groups of
 misfits trying to recruit you as their hacker.
