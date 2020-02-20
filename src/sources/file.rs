@@ -44,10 +44,20 @@ enum BuildError {
         indicator: String,
         source: regex::Error,
     },
+    #[snafu(display(
+        "unable to parse multiline start pattern from {:?}: {}",
+        start_pattern,
+        source
+    ))]
     InvalidMultilineStartPattern {
         start_pattern: String,
         source: regex::Error,
     },
+    #[snafu(display(
+        "unable to parse multiline condition pattern from {:?}: {}",
+        condition_pattern,
+        source
+    ))]
     InvalidMultilineConditionPattern {
         condition_pattern: String,
         source: regex::Error,
