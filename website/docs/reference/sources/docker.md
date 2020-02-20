@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
-component_title: Docker
+component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
@@ -80,7 +80,6 @@ import Alert from '@site/src/components/Alert';
 
 * Docker version >= 1.24 is required.
 * The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
-
 
 </Alert>
 

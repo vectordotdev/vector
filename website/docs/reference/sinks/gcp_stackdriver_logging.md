@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "best_effort"
-component_title: GCP Stackdriver Logging
+component_title: "GCP Stackdriver Logging"
 description: "The Vector `gcp_stackdriver_logging` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22

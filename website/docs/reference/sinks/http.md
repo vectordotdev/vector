@@ -1,6 +1,6 @@
 ---
 delivery_guarantee: "at_least_once"
-component_title: HTTP
+component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22

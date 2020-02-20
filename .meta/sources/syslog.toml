@@ -5,6 +5,7 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
+requirements = {}
 through_description = "the Syslog protocol"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "syslog") %>
