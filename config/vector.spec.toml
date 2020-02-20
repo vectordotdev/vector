@@ -1118,7 +1118,8 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If the specified `field` should be dropped (removed) after parsing.
+  # If the specified `field` should be dropped (removed) after parsing. If
+  # parsing fails, the field will not be removed, irrespective of this setting.
   #
   # * required
   # * default: true

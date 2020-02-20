@@ -95,7 +95,7 @@ import Field from '@site/src/components/Field';
 
 ### drop_field
 
-If the specified [`field`](#field) should be dropped (removed) after parsing.
+If the specified [`field`](#field) should be dropped (removed) after parsing. If parsing fails, the field will not be removed, irrespective of this setting.
 
 
 </Field>
