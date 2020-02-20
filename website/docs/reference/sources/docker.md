@@ -274,10 +274,10 @@ For example:
   "container_id": "9b6247364a03",
   "container_name": "evil_ptolemy",
   "image": "ubuntu:latest",
+  "com.example.vendor": "Timber Inc.",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "stream": "stdout",
-  "timestamp": "2019-11-01T21:15:47+00:00",
-  "com.example.vendor": "Timber Inc."
+  "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
 More detail on the output schema is below.
@@ -381,6 +381,29 @@ The image name that the container is based on.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
+  groups={[]}
+  name={"`[label-key]`"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### `[label-key]`
+
+[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]}
   groups={[]}
   name={"message"}
@@ -446,29 +469,6 @@ The UTC timestamp extracted from the Docker log event.
 </Field>
 
 
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"com.example.vendor":"Timber Inc."},{"com.example.name":"Vector"},{"com.example.build-date":"2029-04-12T23:20:50.52Z"}]}
-  groups={[]}
-  name={"`[label-key]`"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### `[label-key]`
-
-[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair.
-
-
-</Field>
-
-
 </Fields>
 
 ## How It Works
@@ -528,7 +528,7 @@ between any of these. If we had to recommend one, we would recommend the
 ### Docker Logging Drivers
 
 In order for the Vector `docker` source to work properly, you must configure
-the [`json-file`][urls.docker_logging_driver_json_file] (default) or 
+the [`json-file`][urls.docker_logging_driver_json_file] (default) or
 [`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
 This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
 uses to integrate. See the
