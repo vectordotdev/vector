@@ -407,6 +407,7 @@
         "beta",
         "common",
         "function_category",
+        "requires_network",
         "title"
       ],
       "properties": {
@@ -465,6 +466,10 @@
         "output_types": {
           "$ref": "#/definitions/event_types",
           "description": "The types of events this transform outputs."
+        },
+        "requires_network": {
+          "type": "boolean",
+          "description": "Does this component require network access?",
         },
         "title": {
           "type": "string",

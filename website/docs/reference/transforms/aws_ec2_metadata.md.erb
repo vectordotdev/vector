@@ -34,13 +34,14 @@
 
 ### Docker Environments
 
-If you are running Vector within a Docker container then ensure you should pass
-the `--net=host` flag when starting Docker:
+If you are running Vector within a Docker container then you should pass the
+`--net=host` flag when starting Docker:
 
 ```bash
 docker run --net=host ...
 ```
 
+Otherwise Vector will not be able to communicate with EC2 metadata service.
 Learn more in the [Docker networking docs][urls.docker_networking].
 
 <%= component_sections(component) %>
