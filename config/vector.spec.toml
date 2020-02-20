@@ -2943,7 +2943,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -3417,7 +3417,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -3796,7 +3796,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -4040,7 +4040,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -4339,7 +4339,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -4629,7 +4629,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -5193,7 +5193,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -5677,7 +5677,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -6257,7 +6257,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -6503,7 +6503,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default

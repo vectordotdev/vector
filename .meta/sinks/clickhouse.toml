@@ -86,7 +86,7 @@ examples = ["mytable"]
 required = true
 description = "The table that data will be inserted into."
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify: true) %>
 
 [sinks.clickhouse.options.database]
 type = "string"

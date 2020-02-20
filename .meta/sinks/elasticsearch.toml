@@ -109,7 +109,7 @@ examples = [{"X-Powered-By" = "Vector"}]
 required = true
 description = "A custom parameter to be added to each Elasticsearch request."
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.elasticsearch.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.elasticsearch.options", can_enable: false, can_verify: true) %>
 
 [[sinks.elasticsearch.output.examples]]
 label = "Generic"

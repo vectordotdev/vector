@@ -41,7 +41,7 @@ type = "string"
 examples = ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 description = """\
 Pass phrase used to unlock the encrypted key file. This has no effect unless \
-`key_pass` is set.\
+`key_path` is set.\
 """
 
 <%- if can_verify -%>

@@ -103,7 +103,7 @@ type = "string"
 examples = ["https://10.22.212.22:9000/_health"]
 description = "A URI that Vector can request in order to determine the service health."
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.http.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.http.options", can_enable: false, can_verify: true) %>
 
 [sinks.http.options.uri]
 type = "string"
