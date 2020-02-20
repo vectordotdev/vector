@@ -195,7 +195,7 @@ impl SourceConfig for FileConfig {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
         if let Some(ref config) = self.multiline {
-            TryInto::<line_agg::Config>::try_into(config)?;
+            let _: line_agg::Config = config.try_into()?;
         }
 
         if let Some(ref indicator) = self.message_start_indicator {
@@ -261,7 +261,7 @@ pub fn file_source(
             if let Some(ref multiline_config) = multiline_config {
                 Box::new(LineAgg::new(
                     rx,
-                    line_agg::Config::try_from(multiline_config).unwrap(), // validated in build
+                    multiline_config.try_into().unwrap(), // validated in build
                 ))
             } else if let Some(msi) = message_start_indicator {
                 Box::new(LineAgg::new(
