@@ -307,6 +307,9 @@
 - name: "sink: file"
   description: Anything `file` sink related
   color: 4ddbfb
+- name: "sink: gcp_cloud_storage"
+  description: Anything `gcp_cloud_storage` sink related
+  color: 4ddbfb
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb

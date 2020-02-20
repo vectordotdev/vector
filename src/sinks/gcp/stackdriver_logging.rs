@@ -1,4 +1,4 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{Event, Unflatten},
     sinks::{
@@ -7,7 +7,7 @@ use crate::{
             tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, RouterSink,
+        Healthcheck, RouterSink,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -16,7 +16,14 @@ use http::{Method, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::collections::HashMap;
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Resource not found"))]
+    NotFound,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -152,19 +159,14 @@ impl StackdriverConfig {
 
         let client = https_client(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
         let creds = creds.clone();
-        let healthcheck = client
-            .request(request)
-            .map_err(|err| err.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => {
-                    // If there are credentials configured, the
-                    // generated token needs to be periodically
-                    // regenerated.
-                    creds.map(|creds| creds.spawn_regenerate_token());
-                    Ok(())
-                }
-                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-            });
+        let healthcheck =
+            client
+                .request(request)
+                .map_err(Into::into)
+                .and_then(healthcheck_response(
+                    creds,
+                    HealthcheckError::NotFound.into(),
+                ));
 
         Ok(Box::new(healthcheck))
     }

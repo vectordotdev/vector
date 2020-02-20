@@ -211,13 +211,12 @@ docker = [
   "es-integration-tests",
   "firehose-integration-tests",
   "gcp-pubsub-integration-tests",
+  "gcs-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
   "influxdb-integration-tests",
   "splunk-integration-tests",
-  "docker-integration-tests",
-  "ec2-metadata-integration-tests",
 ]
 clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
@@ -227,6 +226,7 @@ ec2-metadata-integration-tests = []
 es-integration-tests = []
 firehose-integration-tests = []
 gcp-pubsub-integration-tests = []
+gcs-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []

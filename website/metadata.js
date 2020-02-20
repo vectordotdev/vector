@@ -17273,6 +17273,30 @@ module.exports = {
 
       ]
     },
+    "gcp_cloud_storage": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "gcp_cloud_storage_sink",
+      "name": "gcp_cloud_storage",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "Google"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "gcp_pubsub": {
       "beta": true,
       "delivery_guarantee": "best_effort",

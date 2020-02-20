@@ -515,7 +515,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
 
 ### filename_extension
 
-The extension to use in the object name.
+The filename extension to use in the object name.
 
 
 </Field>

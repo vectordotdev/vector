@@ -123,7 +123,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -139,7 +139,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API.
 
 
 </Field>
@@ -233,4 +233,3 @@ variable example.
 [docs.process-management#reloading]: /docs/administration/process-management/#reloading
 [docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components?providers%5B%5D=aws/
-[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys

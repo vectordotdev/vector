@@ -2411,7 +2411,7 @@ end
   filename_append_uuid = true
   filename_append_uuid = false
 
-  # The extension to use in the object name.
+  # The filename extension to use in the object name.
   #
   # * required
   # * default: "log"
@@ -3507,6 +3507,330 @@ end
   encoding = "ndjson"
   encoding = "text"
 
+# Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
+[sinks.gcp_cloud_storage]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "gcp_cloud_storage"
+  type = "gcp_cloud_storage"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The GCS bucket name.
+  #
+  # * required
+  # * type: string
+  bucket = "my-bucket"
+
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the Cloud Storage API. If this is unset, Vector checks
+  # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+  #
+  # * required
+  # * type: string
+  credentials_path = "/path/to/credentials.json"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * required
+  # * default: true
+  # * type: bool
+  filename_append_uuid = true
+  filename_append_uuid = false
+
+  # The filename extension to use in the object name.
+  #
+  # * required
+  # * default: "log"
+  # * type: string
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * required
+  # * default: "%s"
+  # * type: string
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root GCS "folder".
+  #
+  # * optional
+  # * default: "date=%F/"
+  # * type: string
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  #
+  # Object Attributes
+  #
+
+  # Predefined ACL to apply to the created objects. For more information, see
+  # Predefined ACLs.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
+  acl = "authenticatedRead"
+  acl = "bucketOwnerFullControl"
+  acl = "bucketOwnerRead"
+  acl = "private"
+  acl = "projectPrivate"
+  acl = "publicRead"
+
+  # The set of metadata `key:value` pairs for the created objects. See the GCS
+  # custom metadata documentation for more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the GCP storage classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "STANDARD", "NEARLINE", "COLDLINE", and "ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "NEARLINE"
+  storage_class = "COLDLINE"
+  storage_class = "ARCHIVE"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_cloud_storage.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 10485760
+    # * type: int
+    # * unit: bytes
+    max_size = 10485760
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 300
+
+  #
+  # Buffer
+  #
+
+  [sinks.gcp_cloud_storage.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.gcp_cloud_storage.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 1000
+    # * type: int
+    rate_limit_num = 1000
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Tls
+  #
+
+  [sinks.gcp_cloud_storage.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface.
 [sinks.gcp_pubsub]
   #
@@ -3551,7 +3875,7 @@ end
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the pubsub project and topic. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-  # filename. Either this or `api_key` must be set.
+  # filename.
   #
   # * optional
   # * no default
@@ -3772,7 +4096,7 @@ end
   inputs = ["my-source-id"]
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the stackdriver logging API. If this is unset, Vector
+  # authenticate access to the Stackdriver Logging API. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
