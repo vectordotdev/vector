@@ -6,6 +6,7 @@ common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "grok_parser") %>
 

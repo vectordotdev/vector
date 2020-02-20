@@ -163,6 +163,9 @@
 - name: "provider: google"
   description: Anything Google related
   color: ff9f43
+- name: "provider: influxdata"
+  description: Anything InfluxData related
+  color: ff9f43
 - name: "provider: confluent"
   description: Anything Confluent related
   color: ff9f43
@@ -307,6 +310,9 @@
 - name: "sink: file"
   description: Anything `file` sink related
   color: 4ddbfb
+- name: "sink: gcp_cloud_storage"
+  description: Anything `gcp_cloud_storage` sink related
+  color: 4ddbfb
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
@@ -319,11 +325,17 @@
 - name: "sink: humio_logs"
   description: Anything `humio_logs` sink related
   color: 4ddbfb
+- name: "sink: influxdb_metrics"
+  description: Anything `influxdb_metrics` sink related
+  color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related
   color: 4ddbfb
 - name: "sink: logdna"
   description: Anything `logdna` sink related
+  color: 4ddbfb
+- name: "sink: loki"
+  description: Anything `loki` sink related
   color: 4ddbfb
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related

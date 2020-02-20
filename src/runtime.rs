@@ -1,5 +1,6 @@
 use futures::future::{ExecuteError, Executor, Future};
 use std::io;
+use std::pin::Pin;
 use tokio::runtime::Builder;
 
 pub struct Runtime {
@@ -92,3 +93,16 @@ where
         self.inner.execute(future)
     }
 }
+
+pub trait FutureExt: futures03::TryFuture {
+    /// Used to compat a `!Unpin` type from 0.3 futures to 0.1
+    fn boxed_compat(self) -> futures03::compat::Compat<Pin<Box<Self>>>
+    where
+        Self: Sized,
+    {
+        let fut = Box::pin(self);
+        futures03::compat::Compat::new(fut)
+    }
+}
+
+impl<T: futures03::TryFuture> FutureExt for T {}

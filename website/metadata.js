@@ -17007,7 +17007,7 @@ module.exports = {
   },
   "sinks": {
     "aws_cloudwatch_logs": {
-      "beta": true,
+      "beta": false,
       "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
       "event_types": [
@@ -17024,7 +17024,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -17273,6 +17273,30 @@ module.exports = {
 
       ]
     },
+    "gcp_cloud_storage": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "gcp_cloud_storage_sink",
+      "name": "gcp_cloud_storage",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "Google"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "gcp_pubsub": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -17369,6 +17393,30 @@ module.exports = {
 
       ]
     },
+    "influxdb_metrics": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "transmit",
+      "id": "influxdb_metrics_sink",
+      "name": "influxdb_metrics",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "InfluxData"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "kafka": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -17404,6 +17452,30 @@ module.exports = {
       "function_category": "transmit",
       "id": "logdna_sink",
       "name": "logdna",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "loki": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Loki][urls.loki].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "loki_sink",
+      "name": "loki",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -18080,10 +18152,9 @@ module.exports = {
     "field_filter": {
       "beta": true,
       "delivery_guarantee": null,
-      "description": "Accepts log and metric events and allows you to filter events by a log field's value.",
+      "description": "Accepts log events and allows you to filter events by a log field's value.",
       "event_types": [
-        "log",
-        "metric"
+        "log"
       ],
       "function_category": "filter",
       "id": "field_filter_transform",

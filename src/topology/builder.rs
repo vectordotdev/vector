@@ -1,5 +1,5 @@
 use super::{
-    config::SinkContext,
+    config::{SinkContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
 };
@@ -147,7 +147,12 @@ pub fn build_pieces(
 
         let typetag = &transform.inner.transform_type();
 
-        let mut transform = match transform.inner.build(exec.clone()) {
+        let cx = TransformContext {
+            resolver: resolver.clone(),
+            exec: exec.clone(),
+        };
+
+        let mut transform = match transform.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;

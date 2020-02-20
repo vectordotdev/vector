@@ -11,6 +11,7 @@ pub mod field_filter;
 pub mod geoip;
 pub mod grok_parser;
 pub mod json_parser;
+pub mod kubernetes;
 pub mod log_to_metric;
 pub mod logfmt_parser;
 pub mod lua;

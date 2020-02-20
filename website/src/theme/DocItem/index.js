@@ -42,19 +42,19 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOperatingSystems}) {
+function Statuses({componentTitle, deliveryGuarantee, minVersion, operatingSystems, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
   let operatingSystemsEls = [];
 
   (operatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
+    operatingSystemsEls.push(<span key={operatingSystem} className="text--primary">{operatingSystem}</span>);
     operatingSystemsEls.push(<>, </>);
   });
 
   (unsupportedOperatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
+    operatingSystemsEls.push(<del key={operatingSystem} className="text--warning">{operatingSystem}</del>);
     operatingSystemsEls.push(<>, </>);
   });
 
@@ -66,26 +66,30 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
       {status == "beta" &&
         <div>
           <Link to="/docs/about/guarantees/#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
-            <i className="feather icon-alert-triangle"></i> beta
+            <i className="feather icon-alert-triangle"></i> Beta
           </Link>
         </div>}
       {status == "prod-ready" &&
         <div>
           <Link to="/docs/about/guarantees/#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
-            <i className="feather icon-award"></i> prod-ready
+            <i className="feather icon-award"></i> Prod-ready
           </Link>
         </div>}
       {deliveryGuarantee == "best_effort" &&
         <div>
           <Link to="/docs/about/guarantees/#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
-            <i className="feather icon-shield-off"></i> best-effort
+            <i className="feather icon-shield-off"></i> Best-effort
           </Link>
         </div>}
       {deliveryGuarantee == "at_least_once" &&
         <div>
           <Link to="/docs/about/guarantees/#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
-            <i className="feather icon-shield"></i> at-least-once
+            <i className="feather icon-shield"></i> At-least-once
           </Link>
+        </div>}
+      {minVersion &&
+        <div className="text--primary">
+          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {componentTitle} versions</> : <>{componentTitle} >= {minVersion}</>}
         </div>}
       {operatingSystemsEls.length > 0 &&
         <div>
@@ -116,11 +120,13 @@ function DocItem(props) {
   } = metadata;
   const {
     frontMatter: {
+      component_title: componentTitle,
       delivery_guarantee: deliveryGuarantee,
       event_types: eventTypes,
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
       issues_url: issuesUrl,
+      min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
       source_url: sourceUrl,
@@ -187,7 +193,13 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className="table-of-contents">
-                  <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
+                  <Statuses
+                    componentTitle={componentTitle}
+                    deliveryGuarantee={deliveryGuarantee}
+                    minVersion={minVersion}
+                    operatingSystems={operatingSystems}
+                    status={status}
+                    unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>

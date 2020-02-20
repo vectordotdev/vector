@@ -9,6 +9,7 @@
  * https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
  */
 :root {
+  --ifm-alert-color: var(--ifm-heading-color);
   --ifm-background-color: white;
   --ifm-background-color-rgb: 255, 255, 255;
   --ifm-background-surface-color: var(--ifm-panel-background);
@@ -731,6 +732,34 @@ input[type="text"]:focus {
   border-bottom: 1px solid var(--ifm-color-warning);
   padding-bottom: 5px;
   font-size: 0.8rem;
+}
+
+/**
+ * list--warnings
+ *
+ * Generic list with warnings as list styles.
+ */
+
+div.list--warnings > ul,
+ul.list--warnings {
+  list-style: none;
+  margin-left: 1em;
+  padding-left: 1em;
+}
+div.list--warnings > ul > li:before,
+ul.list--warnings > li:before {
+  content: "⚠";
+  display: block;
+  float: left;
+  font-size: 1.25em;
+  font-weight: bold;
+  margin-left: -1.6em;
+  margin-top: -0.2em;
+}
+div.list--warnings > ul > li,
+ul.list--warnings > li {
+  margin: 0 0 1em 0;
+  padding: 0;
 }
 
 /**

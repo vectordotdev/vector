@@ -7,6 +7,7 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+requirements = {}
 service_providers = ["Splunk"]
 write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
 

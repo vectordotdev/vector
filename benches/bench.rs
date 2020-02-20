@@ -8,7 +8,7 @@ use vector::event::Event;
 use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use vector::topology::config::TransformConfig;
+use vector::topology::config::{TransformConfig, TransformContext};
 use vector::topology::{self, config};
 use vector::{runtime, sinks, sources, transforms};
 
@@ -414,7 +414,7 @@ fn benchmark_regex(c: &mut Criterion) {
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build(rt.executor()).unwrap();
+                    }.build(TransformContext::new_test(rt.executor())).unwrap();
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)

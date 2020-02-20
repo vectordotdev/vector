@@ -15,9 +15,11 @@ pub mod file;
 pub mod gcp;
 pub mod http;
 pub mod humio_logs;
+pub mod influxdb_metrics;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod logdna;
+pub mod loki;
 pub mod new_relic_logs;
 pub mod prometheus;
 pub mod sematext;

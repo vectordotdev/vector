@@ -30,7 +30,7 @@ function CheckboxList({humanize, icon, values, currentState, setState}) {
                 setState(newValues);
               }}
               checked={currentState.has(value)} />
-            {icon ? <i className={`feather icon-${icon}`}></i> : ''} {label}
+            {label && <>{icon ? <i className={`feather icon-${icon}`}></i> : ''} {label}</>}
           </label>
         );
       })}

@@ -5,6 +5,7 @@ common = false
 delivery_guarantee = "best_effort"
 function_category = "proxy"
 output_types = ["log", "metric"]
+requirements = {}
 through_description = "another upstream [`vector` sink][docs.sinks.vector]"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "vector") %>

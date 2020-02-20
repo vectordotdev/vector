@@ -66,7 +66,11 @@ impl Resolver {
 
             (config, opts)
         } else {
-            system_conf::read_system_conf().context(ReadSystemConf)?
+            #[cfg(feature = "disable-resolv-conf")]
+            let res = (Default::default(), Default::default());
+            #[cfg(not(feature = "disable-resolv-conf"))]
+            let res = system_conf::read_system_conf().context(ReadSystemConf)?;
+            res
         };
 
         let (inner, bg_task) = AsyncResolver::new(config, opt);
