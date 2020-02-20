@@ -8,7 +8,7 @@ min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "aws_cloudwatch_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/
-status: "beta"
+status: "prod-ready"
 title: "AWS Cloudwatch Logs Sink"
 unsupported_operating_systems: []
 ---

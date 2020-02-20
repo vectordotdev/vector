@@ -2,12 +2,13 @@
 titleOnly: true
 
 types:
-  - chore               # An internal change that should not be communicated to Vector users.
-  - docs                # A change relating to Vector's documentation.
-  - enhancement         # Anything that enhances it's subject.
-  - feat                # An entirely new feature, such as a new platform, source, transform, or sink.
-  - fix                 # A bug fix.
-  - perf                # A change that enhancements performance.
+  - chore               # An internal change this is not observable by users.
+  - docs                # Any user observable documentation change.
+  - enhancement         # Any user observable enhancement to an existing feature.
+  - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
+  - fix                 # Any user observable bug fix.
+  - perf                # Any user observable performance improvment.
+  - status              # A status change to a Vector component.
 
 scopes:
 
