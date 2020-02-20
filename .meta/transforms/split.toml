@@ -1,8 +1,8 @@
 [transforms.split]
 title = "Split"
 allow_you_to_description = """\
-split a field's value on a given separator \
-and zip the tokens into ordered field names\
+split a field's value on a _literal_ separator and zip the tokens into ordered \
+field names\
 """
 beta = false
 common = false
@@ -30,12 +30,13 @@ description = "The field names assigned to the resulting tokens, in order."
 [transforms.split.options.separator]
 type = "[string]"
 common = true
-default = "whitespace"
+default = "[whitespace]"
 examples = [","]
 required = true
 description = """\
-The separator to split the field on. \
-If no separator is given, it will split on whitespace.\
+The separator to split the field on. If no separator is given, it will split \
+on all whitespace. 'Whitespace' is defined according to the terms of the \
+[Unicode Derived Core Property `White_Space`][urls.unicode_whitespace].\
 """
 
 [transforms.split.options.drop_field]

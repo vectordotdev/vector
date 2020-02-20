@@ -18417,7 +18417,7 @@ module.exports = {
     "split": {
       "beta": false,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.",
+      "description": "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.",
       "event_types": [
         "log"
       ],

@@ -1504,7 +1504,7 @@ end
   # * type: [string]
   pass_list = ["[error]", "field2"]
 
-# Accepts and outputs `log` events allowing you to split a field's value on a given separator and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
 [transforms.split]
   #
   # General
@@ -1546,10 +1546,11 @@ end
   field_names = ["timestamp", "level", "message"]
 
   # The separator to split the field on. If no separator is given, it will split
-  # on whitespace.
+  # on all whitespace. 'Whitespace' is defined according to the terms of the
+  # Unicode Derived Core Property `White_Space`.
   #
   # * required
-  # * default: "whitespace"
+  # * default: "[whitespace]"
   # * type: [string]
   separator = ","
 
