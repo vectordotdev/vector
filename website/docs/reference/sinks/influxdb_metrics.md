@@ -41,6 +41,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "influxdb_metrics" # must be: "influxdb_metrics"
+  inputs = ["my-source-id"] # example
   bucket = "vector-bucket" # example
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
   namespace = "service" # example
@@ -48,6 +50,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - auth
   org = "Organization" # example
   token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL - General
+  healthcheck = true # default
 ```
 
 </TabItem>
@@ -58,9 +63,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "influxdb_metrics" # must be: "influxdb_metrics"
+  inputs = ["my-source-id"] # example
   database = "vector-database" # example
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
   namespace = "service" # example
+
+  # OPTIONAL - General
+  healthcheck = true # default
 
   # OPTIONAL - auth
   password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
@@ -79,6 +89,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "influxdb_metrics" # must be: "influxdb_metrics"
+  inputs = ["my-source-id"] # example
   bucket = "vector-bucket" # example
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
   namespace = "service" # example
@@ -86,6 +98,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - auth
   org = "Organization" # example
   token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL - General
+  healthcheck = true # default
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -111,9 +126,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
+  type = "influxdb_metrics" # must be: "influxdb_metrics"
+  inputs = ["my-source-id"] # example
   database = "vector-database" # example
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
   namespace = "service" # example
+
+  # OPTIONAL - General
+  healthcheck = true # default
 
   # OPTIONAL - auth
   password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
@@ -321,7 +341,7 @@ Sets the target database for the write into InfluxDB 1.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
