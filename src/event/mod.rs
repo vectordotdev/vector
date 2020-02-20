@@ -28,6 +28,11 @@ pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
 lazy_static! {
     pub static ref PARTIAL: Atom = Atom::from("_partial");
+    static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
+        message_key: Atom::from("message"),
+        timestamp_key: Atom::from("timestamp"),
+        host_key: Atom::from("host"),
+    };
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -170,17 +175,7 @@ impl Serialize for LogEvent {
 }
 
 pub fn log_schema() -> &'static LogSchema {
-    // TODO: Help Rust project support before_each
-    // Support uninitialized schemas in tests to help our contributors.
-    // Don't do it in release because that is scary.
-    #[cfg(debug_assertions)]
-    {
-        if LOG_SCHEMA.get().is_none() {
-            error!("You are not initializing a schema in this test -- This could fail in release");
-            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
-        }
-    }
-    LOG_SCHEMA.get().expect("Schema was not initialized")
+    LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
