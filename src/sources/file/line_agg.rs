@@ -183,8 +183,7 @@ where
                     Mode::ContinueThrough => {
                         if condition_matched {
                             let buffered = entry.get_mut();
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
+                            add_next_line(buffered, line);
                             return None;
                         } else {
                             let buffered = entry.insert(line.into());
@@ -196,13 +195,11 @@ where
                     Mode::ContinuePast => {
                         if condition_matched {
                             let buffered = entry.get_mut();
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
+                            add_next_line(buffered, line);
                             return None;
                         } else {
                             let (src, mut buffered) = entry.remove_entry();
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
+                            add_next_line(&mut buffered, line);
                             return Some((buffered.freeze(), src));
                         }
                     }
@@ -214,8 +211,7 @@ where
                             return Some((buffered.freeze(), entry.key().clone()));
                         } else {
                             let buffered = entry.get_mut();
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
+                            add_next_line(buffered, line);
                             return None;
                         }
                     }
@@ -224,13 +220,11 @@ where
                     Mode::HaltWith => {
                         if condition_matched {
                             let (src, mut buffered) = entry.remove_entry();
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
+                            add_next_line(&mut buffered, line);
                             return Some((buffered.freeze(), src));
                         } else {
                             let buffered = entry.get_mut();
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
+                            add_next_line(buffered, line);
                             return None;
                         }
                     }
@@ -252,6 +246,11 @@ where
             }
         }
     }
+}
+
+fn add_next_line(buffered: &mut BytesMut, line: Bytes) {
+    buffered.extend_from_slice(b"\n");
+    buffered.extend_from_slice(&line);
 }
 
 #[cfg(test)]
