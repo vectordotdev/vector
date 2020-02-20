@@ -120,7 +120,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-=======
 ## Requirements
 
 import Alert from '@site/src/components/Alert';
