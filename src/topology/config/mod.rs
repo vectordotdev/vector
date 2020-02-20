@@ -219,7 +219,7 @@ impl TransformContext {
         }
     }
 
-    pub fn exec(&self) -> &TaskExecutor {
+    pub fn executor(&self) -> &TaskExecutor {
         &self.exec
     }
 

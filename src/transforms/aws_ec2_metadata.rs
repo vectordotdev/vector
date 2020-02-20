@@ -128,7 +128,7 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        cx.exec().spawn_std(
+        cx.executor().spawn_std(
             async move {
                 let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
 
