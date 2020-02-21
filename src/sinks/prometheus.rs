@@ -14,7 +14,7 @@ use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
@@ -101,7 +101,7 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     }
 }
 
-fn encode_tags(tags: &Option<HashMap<String, String>>) -> String {
+fn encode_tags(tags: &Option<BTreeMap<String, String>>) -> String {
     if let Some(tags) = tags {
         let mut parts: Vec<_> = tags
             .iter()
@@ -116,7 +116,7 @@ fn encode_tags(tags: &Option<HashMap<String, String>>) -> String {
 }
 
 fn encode_tags_with_extra(
-    tags: &Option<HashMap<String, String>>,
+    tags: &Option<BTreeMap<String, String>>,
     tag: String,
     value: String,
 ) -> String {
@@ -421,7 +421,7 @@ mod tests {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use pretty_assertions::assert_eq;
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![("code".to_owned(), "200".to_owned())]
             .into_iter()
             .collect()

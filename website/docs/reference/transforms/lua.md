@@ -4,6 +4,7 @@ description: "The Vector `lua` transform accepts and outputs `log` events allowi
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
 min_version: null
+service_name: "LUA"
 sidebar_label: "lua|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 status: "beta"
@@ -234,6 +235,14 @@ event["parent.child"] = nil
 Vector provides a [`search_dirs`](#search_dirs) option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
+
+
+
+### Types
+
+Event fields can be set to scalar values (booleans, numbers, or strings),
+and the resulting event will keep the correct types. If an event field is
+set to an invalid value, a message will be logged and the field will be dropped.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

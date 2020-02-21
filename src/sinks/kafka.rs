@@ -273,7 +273,7 @@ fn encode_event(
 mod tests {
     use super::*;
     use crate::event::{self, Event};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn kafka_encode_event_text() {
@@ -294,7 +294,7 @@ mod tests {
 
         let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
 
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], "value".as_bytes());
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);

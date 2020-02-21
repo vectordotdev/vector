@@ -98,6 +98,12 @@ variable representing the event:
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
 
+### Types
+
+Event fields can be set to scalar values (booleans, numbers, or strings),
+and the resulting event will keep the correct types. If an event field is
+set to an invalid value, a message will be logged and the field will be dropped.
+
 ### Nested Fields
 
 As described in the [Data Model document][docs.data_model], Vector flatten

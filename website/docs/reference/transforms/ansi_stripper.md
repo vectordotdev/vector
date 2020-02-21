@@ -4,6 +4,7 @@ description: "The Vector `ansi_stripper` transform accepts and outputs `log` eve
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
 min_version: null
+service_name: "ANSI Stripper"
 sidebar_label: "ansi_stripper|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/ansi_stripper.rs
 status: "prod-ready"

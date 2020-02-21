@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+new_relic_logs%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "New Relic Logs"
 sidebar_label: "new_relic_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/new_relic_logs.rs
 status: "beta"

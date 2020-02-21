@@ -4,6 +4,7 @@ description: "The Vector [`merge`](#merge) transform accepts and outputs `log` e
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+merge%22
 min_version: null
+service_name: "Merge"
 sidebar_label: "merge|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/merge.rs
 status: "beta"

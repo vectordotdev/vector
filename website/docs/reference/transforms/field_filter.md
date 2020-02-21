@@ -4,6 +4,7 @@ description: "The Vector `field_filter` transform accepts and outputs `log` even
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
 min_version: null
+service_name: "Field Filter"
 sidebar_label: "field_filter|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 status: "beta"

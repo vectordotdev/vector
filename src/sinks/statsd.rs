@@ -8,7 +8,7 @@ use crate::{
 use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use tower::{Service, ServiceBuilder};
 
@@ -104,7 +104,7 @@ impl StatsdSvc {
     }
 }
 
-fn encode_tags(tags: &HashMap<String, String>) -> String {
+fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     let mut parts: Vec<_> = tags
         .iter()
         .map(|(name, value)| {
@@ -228,7 +228,7 @@ mod test {
         net::{UdpFramed, UdpSocket},
     };
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),

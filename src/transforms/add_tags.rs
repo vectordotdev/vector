@@ -5,7 +5,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -53,7 +53,7 @@ impl Transform for AddTags {
             let ref mut tags = event.as_mut_metric().tags;
 
             if tags.is_none() {
-                *tags = Some(HashMap::new());
+                *tags = Some(BTreeMap::new());
             }
 
             for (name, value) in &self.tags {

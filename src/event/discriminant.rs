@@ -1,6 +1,6 @@
 use super::{LogEvent, Value};
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     hash::{Hash, Hasher},
 };
 use string_cache::DefaultAtom as Atom;
@@ -119,8 +119,7 @@ fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
     }
 }
 
-fn hash_map<H: Hasher>(hasher: &mut H, map: &HashMap<Atom, Value>) {
-    // FIXME: until we replaced HashMap by a more suitable map collection this might be broken
+fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<Atom, Value>) {
     for (key, val) in map.iter() {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);

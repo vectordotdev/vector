@@ -4,6 +4,7 @@ description: "The Vector `remove_tags` transform accepts and outputs `metric` ev
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
 min_version: null
+service_name: "Remove Tags"
 sidebar_label: "remove_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_tags.rs
 status: "prod-ready"
