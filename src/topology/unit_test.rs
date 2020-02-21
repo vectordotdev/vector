@@ -27,6 +27,7 @@ pub struct UnitTest {
     inputs: Vec<(String, Event)>,
     transforms: IndexMap<String, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
+    no_outputs_from: Vec<String>,
 }
 
 //------------------------------------------------------------------------------
@@ -159,6 +160,19 @@ impl UnitTest {
                     "check transform '{}' failed: received zero resulting events.",
                     check.extract_from,
                 ));
+            }
+        }
+
+        for tform in &self.no_outputs_from {
+            if let Some((inputs, outputs)) = results.get(tform) {
+                if !outputs.is_empty() {
+                    errors.push(format!(
+                        "check transform '{}' failed: expected no outputs.\npayloads (events encoded as JSON):\n{}\n{}",
+                        tform,
+                        events_to_string("input", inputs),
+                        events_to_string("output", outputs),
+                    ));
+                }
             }
         }
 
@@ -330,6 +344,9 @@ fn build_unit_test(
     definition.outputs.iter().for_each(|o| {
         leaves.insert(o.extract_from.clone(), ());
     });
+    definition.no_outputs_from.iter().for_each(|o| {
+        leaves.insert(o.clone(), ());
+    });
 
     // Reduce the configured transforms into just the ones connecting our test
     // target with output targets.
@@ -385,6 +402,21 @@ fn build_unit_test(
             }
         }
     });
+    definition.no_outputs_from.iter().for_each(|o| {
+        if !transforms.contains_key(o) {
+            if inputs.len() == 1 {
+                errors.push(format!(
+                    "unable to complete topology between target transform '{}' and no_outputs_from target '{}'",
+                    inputs.first().map(|(i, _)| i).unwrap(), o,
+                ));
+            } else {
+                errors.push(format!(
+                    "unable to complete topology between target transforms {:?} and no_outputs_from target '{}'",
+                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o,
+                ));
+            }
+        }
+    });
 
     // Build all output conditions.
     let checks = definition
@@ -426,6 +458,12 @@ fn build_unit_test(
         })
         .collect();
 
+    if definition.outputs.is_empty() && definition.no_outputs_from.is_empty() {
+        errors.push(
+            "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_owned(),
+        );
+    }
+
     if !errors.is_empty() {
         Err(errors)
     } else {
@@ -434,6 +472,7 @@ fn build_unit_test(
             inputs,
             transforms,
             checks,
+            no_outputs_from: definition.no_outputs_from.clone(),
         })
     }
 }
@@ -563,6 +602,35 @@ mod tests {
             errs,
             vec![r#"Failed to build test 'broken test':
   must specify at least one input."#
+                .to_owned(),]
+        );
+    }
+
+    #[test]
+    fn parse_no_outputs() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = ["ignored"]
+  type = "add_fields"
+  [transforms.foo.fields]
+    my_string_field = "string value"
+
+[[tests]]
+  name = "broken test"
+
+  [tests.input]
+    insert_at = "foo"
+    value = "nah this doesnt matter"
+      "#,
+        )
+        .unwrap();
+
+        let errs = build_unit_tests(&config).err().unwrap();
+        assert_eq!(
+            errs,
+            vec![r#"Failed to build test 'broken test':
+  unit test must contain at least one of `outputs` or `no_outputs_from`."#
                 .to_owned(),]
         );
     }
@@ -947,6 +1015,84 @@ mod tests {
             type = "check_fields"
             "baz.equals" = "new field 3"
             "bar.equals" = "new field 2"
+      "#,
+        )
+        .unwrap();
+
+        let mut tests = build_unit_tests(&config).unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
+        assert_ne!(tests[1].run().1, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_no_outputs_from() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = [ "ignored" ]
+  type = "field_filter"
+  field = "message"
+  value = "foo"
+
+[[tests]]
+    name = "check_no_outputs_from_succeeds"
+    no_outputs_from = [ "foo" ]
+
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "not foo at all"
+
+[[tests]]
+    name = "check_no_outputs_from_fails"
+    no_outputs_from = [ "foo" ]
+
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "foo"
+      "#,
+        )
+        .unwrap();
+
+        let mut tests = build_unit_tests(&config).unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
+        assert_ne!(tests[1].run().1, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_no_outputs_from_chained() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = [ "ignored" ]
+  type = "field_filter"
+  field = "message"
+  value = "foo"
+
+[transforms.bar]
+  inputs = [ "foo" ]
+  type = "add_fields"
+  [transforms.bar.fields]
+    bar = "new field"
+
+[[tests]]
+    name = "check_no_outputs_from_succeeds"
+    no_outputs_from = [ "bar" ]
+
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "not foo at all"
+
+[[tests]]
+    name = "check_no_outputs_from_fails"
+    no_outputs_from = [ "bar" ]
+
+    [tests.input]
+        insert_at = "foo"
+        type = "raw"
+        value = "foo"
       "#,
         )
         .unwrap();

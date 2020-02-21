@@ -211,3 +211,10 @@ description = """\
 Check whether a field exists or does not exist, depending on the provided value\
 being `true` or `false` respectively.\
 """
+
+[tests.children.no_outputs_from]
+type = "[string]"
+common = false
+required = false
+description = "A list of transforms that must NOT output events in order for the test to pass."
+examples = [["foo"]]
