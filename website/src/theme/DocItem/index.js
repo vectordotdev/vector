@@ -42,7 +42,7 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({componentTitle, deliveryGuarantee, minVersion, operatingSystems, status, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, minVersion, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
@@ -89,7 +89,7 @@ function Statuses({componentTitle, deliveryGuarantee, minVersion, operatingSyste
         </div>}
       {minVersion &&
         <div className="text--primary">
-          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {componentTitle} versions</> : <>{componentTitle} >= {minVersion}</>}
+          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {serviceName} versions</> : <>{serviceName} >= {minVersion}</>}
         </div>}
       {operatingSystemsEls.length > 0 &&
         <div>
@@ -129,6 +129,7 @@ function DocItem(props) {
       min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
+      service_name: serviceName,
       source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
@@ -194,10 +195,10 @@ function DocItem(props) {
               <div className="col col--3">
                 <div className="table-of-contents">
                   <Statuses
-                    componentTitle={componentTitle}
                     deliveryGuarantee={deliveryGuarantee}
                     minVersion={minVersion}
                     operatingSystems={operatingSystems}
+                    serviceName={serviceName}
                     status={status}
                     unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&

@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_firehose%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS Kinesis Firehose"
 sidebar_label: "aws_kinesis_firehose|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_firehose.rs
 status: "beta"

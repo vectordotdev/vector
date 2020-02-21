@@ -4,6 +4,7 @@ description: "The Vector `logfmt_parser` transform accepts and outputs `log` eve
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
 min_version: null
+service_name: "Logfmt Parser"
 sidebar_label: "logfmt_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/logfmt_parser.rs
 status: "beta"

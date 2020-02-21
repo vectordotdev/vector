@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_pubsub%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "GCP PubSub"
 sidebar_label: "gcp_pubsub|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/pubsub.rs
 status: "beta"

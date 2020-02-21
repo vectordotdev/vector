@@ -4,6 +4,7 @@ description: "The Vector `tokenizer` transform accepts and outputs `log` events 
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
 min_version: null
+service_name: "Tokenizer"
 sidebar_label: "tokenizer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs
 status: "prod-ready"

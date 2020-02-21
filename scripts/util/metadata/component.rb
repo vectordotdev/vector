@@ -21,6 +21,7 @@ class Component
     :options,
     :posts,
     :requirements,
+    :service_name,
     :service_providers,
     :title,
     :type,
@@ -35,6 +36,7 @@ class Component
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
     @requirements = Requirements.new(hash["requirements"] || {})
+    @service_name = hash["service_name"] || hash.fetch("title")
     @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
@@ -44,7 +46,7 @@ class Component
     # Requirements
 
     if @min_version && @min_version != "0" && (!@requirements.additional || !@requirements.additional.include?(@min_version))
-      @requirements.additional = "* #{title} version >= #{@min_version} is required.\n#{@requirements.additional}"
+      @requirements.additional = "* #{@service_name} version >= #{@min_version} is required.\n#{@requirements.additional}"
     end
 
     # Operating Systems

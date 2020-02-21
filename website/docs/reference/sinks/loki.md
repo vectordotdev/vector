@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+loki%22
 min_version: "0"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "loki"
 sidebar_label: "loki|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/loki.rs
 status: "beta"

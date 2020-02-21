@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "GCP Stackdriver Logging"
 sidebar_label: "gcp_stackdriver_logging|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logging.rs
 status: "beta"

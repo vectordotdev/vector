@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "HTTP"
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"

@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
 min_version: "1.1.54378"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Clickhouse"
 sidebar_label: "clickhouse|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
 status: "beta"

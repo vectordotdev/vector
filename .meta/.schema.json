@@ -298,6 +298,10 @@
           "description": "A link to the target service's limits, if applicable.",
           "minLength": 1
         },
+        "service_name": {
+          "type": "string",
+          "description": "The name of the underlying service that this component integrates with."
+        },
         "service_providers": {
           "type": "array",
           "description": "A list of providers that offer this service.",
@@ -404,6 +408,10 @@
         "requirements": {
           "$ref": "#/definitions/requirements",
           "description": "Component requirements"
+        },
+        "service_name": {
+          "type": "string",
+          "description": "The name of the underlying service that this component integrates with."
         },
         "through_description": {
           "type": "string",

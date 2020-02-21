@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
 min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Kafka"
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
 status: "beta"

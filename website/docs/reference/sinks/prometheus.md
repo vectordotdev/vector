@@ -6,6 +6,7 @@ event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
 min_version: "1.0"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Prometheus"
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
 status: "beta"

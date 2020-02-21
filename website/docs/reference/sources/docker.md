@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
 min_version: "1.24"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Docker API"
 sidebar_label: "docker|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/docker.rs
 status: "beta"
@@ -78,7 +79,7 @@ import Alert from '@site/src/components/Alert';
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Docker version >= 1.24 is required.
+* Docker API version >= 1.24 is required.
 * The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
 
 
