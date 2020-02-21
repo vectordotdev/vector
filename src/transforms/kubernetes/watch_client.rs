@@ -1,4 +1,10 @@
-use crate::{dns::Resolver, sinks::util::http::https_client, tls::TlsSettings};
+use crate::{
+    dns::Resolver,
+    sinks::util::{
+        http::https_client,
+        tls::{TlsOptions, TlsSettings},
+    },
+};
 use futures::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body, Chunk};
@@ -9,6 +15,29 @@ use k8s_openapi::{
     RequestError, Response, ResponseError, WatchOptional,
 };
 use snafu::{futures01::future::FutureExt, ResultExt, Snafu};
+use std::{fs, io};
+
+// ************************ Defined by Kubernetes *********************** //
+// API access is mostly defined with
+// https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
+
+//// And Kubernetes service data with
+//// https://kubernetes.io/docs/concepts/containers/container-environment-variables/#cluster-information
+
+/// File in which Kubernetes stores service account token.
+const TOKEN_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+
+/// Kuberentes API should be reachable at this address
+const KUBERNETES_SERVICE_ADDRESS: &str = "kubernetes.default.svc";
+
+// /// Enviroment variable which contains host to Kubernetes API.
+// const HOST_ENV: &str = "KUBERNETES_SERVICE_HOST";
+
+// /// Enviroment variable which contains port to Kubernetes API.
+// const PORT_ENV: &str = "KUBERNETES_SERVICE_PORT";
+
+/// Path to certificate authority certificate
+const CA_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
 /// Config which could be loaded from kubeconfig or local kubernetes cluster.
 /// Used to build WatchClient which is in turn used to build Stream of metadata.
@@ -22,6 +51,41 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
+    /// Loads Kubernetes API access information available to Pods of cluster.  
+    pub fn in_cluster(node: String, resolver: Resolver) -> Result<Self, BuildError> {
+        // let kube_host = std::env::var(HOST_ENV).map_err(|_| BuildError::NoKubernetes {
+        //     reason: format!("Missing Kubernetes API host defined with {}", HOST_ENV),
+        // })?;
+
+        // let kube_port = std::env::var(PORT_ENV).map_err(|_| BuildError::NoKubernetes {
+        //     reason: format!("Missing Kubernetes API port defined with {}", PORT_ENV),
+        // })?;
+
+        let server = Uri::from_static(KUBERNETES_SERVICE_ADDRESS);
+
+        let token = fs::read(TOKEN_PATH)
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::NotFound {
+                    BuildError::MissingAccountToken
+                } else {
+                    BuildError::FailedReadingAccountToken { source: error }
+                }
+            })
+            .and_then(|bytes| String::from_utf8(bytes).context(AccountTokenCorrupted))?;
+
+        let mut options = TlsOptions::default();
+        options.ca_path = Some(CA_PATH.into());
+        let tls_settings = TlsSettings::from_options(&Some(options)).context(TlsError)?;
+
+        Ok(Self {
+            resolver,
+            token: Some(token),
+            server,
+            tls_settings,
+            node_name: Some(node),
+        })
+    }
+
     pub fn build(&self) -> Result<WatchClient, BuildError> {
         let client =
             https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
@@ -223,6 +287,14 @@ pub enum BuildError {
     InvalidUriParts { source: uri::InvalidUriParts },
     #[snafu(display("Authorization token is invalid: {}.", source))]
     InvalidToken { source: header::InvalidHeaderValue },
+    #[snafu(display("Missing Kubernetes service account token file. Probably because Vector isn't in Kubernetes Pod."))]
+    MissingAccountToken,
+    #[snafu(display("Failed reading Kubernetes service account token: {}.", source))]
+    FailedReadingAccountToken { source: io::Error },
+    #[snafu(display("Kubernetes service account token is corrupted: {}.", source))]
+    AccountTokenCorrupted { source: std::string::FromUtf8Error },
+    #[snafu(display("TLS construction errored {}.", source))]
+    TlsError { source: crate::Error },
 }
 
 #[derive(Debug, Snafu)]
