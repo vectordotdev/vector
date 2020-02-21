@@ -129,6 +129,7 @@ function DocItem(props) {
       min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
+      service_name: serviceName,
       source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
