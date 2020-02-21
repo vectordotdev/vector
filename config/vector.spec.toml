@@ -464,6 +464,53 @@ dns_servers = ["0.0.0.0:53"]
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
 
+  #
+  # Tls
+  #
+
+  [sources.kafka.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
   # The component type. This is a required field that tells Vector which
