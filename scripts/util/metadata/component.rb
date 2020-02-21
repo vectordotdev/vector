@@ -1,6 +1,7 @@
 #encoding: utf-8
 
 require_relative "field"
+require_relative "requirements"
 
 class Component
   DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
@@ -20,6 +21,7 @@ class Component
     :options,
     :posts,
     :requirements,
+    :service_name,
     :service_providers,
     :title,
     :type,
@@ -33,12 +35,19 @@ class Component
     @min_version = hash["min_version"]
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
-    @requirements = hash["requirements"]
+    @requirements = Requirements.new(hash["requirements"] || {})
+    @service_name = hash["service_name"] || hash.fetch("title")
     @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = (hash["options"] || {}).to_struct_with_name(Field)
+
+    # Requirements
+
+    if @min_version && @min_version != "0" && (!@requirements.additional || !@requirements.additional.include?(@min_version))
+      @requirements.additional = "* #{@service_name} version >= #{@min_version} is required.\n#{@requirements.additional}"
+    end
 
     # Operating Systems
 

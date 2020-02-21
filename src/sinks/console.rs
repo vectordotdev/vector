@@ -91,7 +91,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
 mod test {
     use super::{encode_event, Encoding};
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::event::Event;
+    use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
@@ -101,20 +101,37 @@ mod test {
     }
 
     #[test]
+    fn encodes_log_events() {
+        let mut event = Event::new_empty_log();
+        let log = event.as_mut_log();
+        log.insert("x", Value::from("23"));
+        log.insert("z", Value::from(25));
+        log.insert("a", Value::from("0"));
+
+        let encoded = encode_event(event, &Encoding::Json);
+        let expected = r#"{"a":"0","x":"23","z":25}"#.to_string();
+        assert_eq!(encoded, Ok(expected));
+    }
+
+    #[test]
     fn encodes_counter() {
         let event = Event::Metric(Metric {
             name: "foos".into(),
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
-                vec![("key".to_owned(), "value".to_owned())]
-                    .into_iter()
-                    .collect(),
+                vec![
+                    ("key2".to_owned(), "value2".to_owned()),
+                    ("key1".to_owned(), "value1".to_owned()),
+                    ("Key3".to_owned(), "Value3".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
             ),
             kind: MetricKind::Incremental,
             value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
+            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
             encode_event(event, &Encoding::Text)
         );
     }

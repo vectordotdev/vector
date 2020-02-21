@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "File"
 sidebar_label: "file|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/
 status: "prod-ready"

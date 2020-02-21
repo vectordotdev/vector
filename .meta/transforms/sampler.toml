@@ -6,6 +6,7 @@ common = true
 function_category = "filter"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "sampler") %>
 

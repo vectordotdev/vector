@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS S3"
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
 status: "beta"
@@ -514,7 +516,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
 
 ### filename_extension
 
-The extension to use in the object name.
+The filename extension to use in the object name.
 
 
 </Field>

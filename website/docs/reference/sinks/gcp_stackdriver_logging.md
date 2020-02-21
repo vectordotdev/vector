@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "GCP Stackdriver Logging"
 description: "The Vector `gcp_stackdriver_logging` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "GCP Stackdriver Logging"
 sidebar_label: "gcp_stackdriver_logging|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logging.rs
 status: "beta"
@@ -362,7 +364,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -928,7 +930,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -944,7 +946,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -1044,7 +1046,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects

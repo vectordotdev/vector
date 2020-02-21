@@ -1,12 +1,14 @@
 ---
 delivery_guarantee: "best_effort"
-description: "The Vector `sematext_logs` sink batches `log` events to Sematext via the Elasticsearch API."
+component_title: "Sematext"
+description: "The Vector `sematext` sink batches `log` events to Sematext via the Elasticsearch API."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+sematext_logs%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-sidebar_label: "sematext_logs|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/sematext_logs.rs
+service_name: "Sematext"
+sidebar_label: "sematext|[\"log\"]"
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/sematext.rs
 status: "beta"
 title: "Sematext Logs Sink"
 unsupported_operating_systems: []

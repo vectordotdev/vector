@@ -6,14 +6,10 @@
 
 <%= component_config_example(component) %>
 
-<%- if !component.requirements.nil? -%>
+<%- if component.requirements.any? -%>
 ## Requirements
 
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-<%= component.requirements %>
-
-</Alert>
+<%= component_requirements(component) %>
 
 <%- end -%>
 ## Options
@@ -35,5 +31,12 @@
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
+
+### librdkafka
+
+The `kafka` sink uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
+is a battle tested, performant, and reliabile library that facilitates
+communication with Kafka. And because Vector produces static MUSL builds,
+this dependency is packaged with Vector, meaning you do not need to install it.
 
 

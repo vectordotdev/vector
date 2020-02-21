@@ -9,6 +9,7 @@
  * https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
  */
 :root {
+  --ifm-alert-color: var(--ifm-heading-color);
   --ifm-background-color: white;
   --ifm-background-color-rgb: 255, 255, 255;
   --ifm-background-surface-color: var(--ifm-panel-background);
