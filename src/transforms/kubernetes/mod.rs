@@ -16,6 +16,7 @@ use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
@@ -42,7 +43,8 @@ inventory::submit! {
 impl TransformConfig for KubePodMetadata {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         // Main idea is to have a background task which will premptively
-        // acquire metadata for all pods on this node, and then maintaine that.
+        // acquire metadata for all pods on this node, and with it maintaine
+        // a map of extracted metadata.
 
         // Construct WatchClient
         let node = std::env::var(NODE_NAME_ENV)
@@ -52,7 +54,7 @@ impl TransformConfig for KubePodMetadata {
 
         // Construct MetadataClient
         let (reader, writer) = evmap::new();
-        let metadata_client = MetadataClient::new(self, writer, watch_client);
+        let metadata_client = MetadataClient::new(self, writer, watch_client)?;
 
         // Run background task
         cx.executor().spawn_std(async move {
@@ -92,9 +94,12 @@ enum BuildError {
         env
     ))]
     MissingNodeName { env: &'static str },
+    #[snafu(display("Unknown metadata fields: {:?}", fields))]
+    UnknownFields { fields: Vec<String> },
 }
 
-/// Background client which watches for Pod metadata changes and writes them to metadata map.
+/// Vlient which watches for Pod metadata changes, extracts fields,
+/// and writes them to the metadata map.
 struct MetadataClient {
     fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>>,
     metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
@@ -106,23 +111,33 @@ impl MetadataClient {
         trans_config: &KubePodMetadata,
         metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
         client: WatchClient,
-    ) -> Self {
-        // Select Pod metadata fields which are extracted and then added to Events.
-        let fields = all_fields()
-            .into_iter()
-            .filter(|(key, _)| {
-                trans_config
-                    .fields
-                    .iter()
-                    .any(|field| field.as_str() == *key)
-            })
-            .map(|(_, fun)| fun)
-            .collect();
+    ) -> Result<Self, BuildError> {
+        // Select Pod metadata fields that need to be extracted from
+        // Pod and then added to Events.
+        let mut add_fields = trans_config.fields.clone();
+        add_fields.sort();
+        add_fields.dedup();
 
-        Self {
-            fields,
-            metadata,
-            client,
+        let mut fields = Vec::new();
+        let mut unknown = Vec::new();
+        let mut all_fields = all_fields();
+
+        for field in add_fields {
+            if let Some(fun) = all_fields.remove(field.as_str()) {
+                fields.push(fun);
+            } else {
+                unknown.push(field.to_owned());
+            }
+        }
+
+        if unknown.is_empty() {
+            Ok(Self {
+                fields,
+                metadata,
+                client,
+            })
+        } else {
+            Err(BuildError::UnknownFields { fields: unknown })
         }
     }
 
@@ -131,12 +146,14 @@ impl MetadataClient {
         let mut version = None;
         let mut error = None;
         loop {
+            // Build watcher stream
             let mut watcher = match self.client.watch_metadata(version.clone(), error.take()) {
                 Ok(watcher) => watcher,
                 Err(error) => return BuildError::WatchStreamBuild { source: error },
             };
             info!("Watching Pod metadata.");
 
+            // Watch loop
             let runtime_error = loop {
                 break match watcher.into_future().compat().await {
                     Ok((Some(pod), tail)) => {
@@ -197,7 +214,7 @@ impl MetadataClient {
 #[derive(PartialEq, Debug, Clone)]
 struct FieldValue(Value);
 
-// Since we aren't using Eq feature in the evmap, we can add it.
+// Since we aren't using Eq feature in the evmap, we can impl Eq.
 impl Eq for FieldValue {}
 
 pub struct KubernetesPodMetadata {
@@ -210,15 +227,14 @@ impl Transform for KubernetesPodMetadata {
 
         if let Some(Value::Bytes(pod_uid)) = log.get(&POD_UID) {
             let pod_uid = pod_uid.clone();
-            if self
-                .metadata
-                .get_and(&pod_uid, |fields| {
-                    for pair in fields {
-                        log.insert(pair.0.clone(), (pair.1).0.clone());
-                    }
-                })
-                .is_none()
-            {
+
+            let found = self.metadata.get_and(&pod_uid, |fields| {
+                for pair in fields {
+                    log.insert(pair.0.clone(), (pair.1).0.clone());
+                }
+            });
+
+            if found.is_none() {
                 warn!(
                     message = "Metadata for pod not yet available.",
                     pod_uid = ?std::str::from_utf8(pod_uid.as_ref()),
@@ -237,6 +253,7 @@ impl Transform for KubernetesPodMetadata {
     }
 }
 
+/// Default included fields
 fn default_fields() -> Vec<String> {
     vec!["name", "namespace", "labels", "annotations", "node_name"]
         .into_iter()
@@ -245,10 +262,9 @@ fn default_fields() -> Vec<String> {
 }
 
 /// Returns list of all supported fields and their extraction function.
-fn all_fields() -> Vec<(
-    &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
-)> {
+fn all_fields(
+) -> HashMap<&'static str, Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>> {
+    // Support for new fields can be added by adding them in the bellow vector.
     vec![
         // ------------------------ ObjectMeta ------------------------ //
         field("name", |pod| pod.metadata.as_ref()?.name.clone()),
@@ -286,6 +302,8 @@ fn all_fields() -> Vec<(
         field("host_ip", |pod| pod.status.as_ref()?.host_ip.clone()),
         field("ip", |pod| pod.status.as_ref()?.pod_ip.clone()),
     ]
+    .into_iter()
+    .collect()
 }
 
 fn field<T: Into<Value>>(
@@ -325,13 +343,26 @@ fn collection_field(
 }
 
 fn with_prefix(name: &str) -> String {
-    event::log_schema()
-        .kubernetes_key()
-        .to_owned()
-        .as_ref()
-        .to_owned()
-        + "."
-        + name
+    event::log_schema().kubernetes_key().as_ref().to_owned() + "." + name
+}
+
+#[cfg(test)]
+mod regular_tests {
+    use super::{KubePodMetadata, TransformConfig, TransformContext};
+    use crate::test_util::runtime;
+
+    #[test]
+    fn unknown_fields() {
+        let config = KubePodMetadata {
+            fields: vec!["unknown".to_owned()],
+        };
+
+        let rt = runtime();
+
+        assert!(config
+            .build(TransformContext::new_test(rt.executor()))
+            .is_err());
+    }
 }
 
 #[cfg(test)]
@@ -339,6 +370,7 @@ mod tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
     use crate::sources::kubernetes::test::{echo, logs, user_namespace, Kube, VECTOR_YAML};
+    use crate::test_util::wait_for;
     use kube::api::{Api, RawApi};
     use uuid::Uuid;
 
@@ -449,11 +481,13 @@ data:
         );
         let _binding = kube.deleter(cluster_role_binding_api(), binding_name.as_str());
 
-        // Start vector
+        // Add Vector configuration
         kube.create(
             Api::v1ConfigMap,
             metadata_config_map(Some(vec![field])).as_str(),
         );
+
+        // Start vector
         let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
 
         // Wait for running state
@@ -463,15 +497,21 @@ data:
         let _echo = echo(&user, "echo", message);
 
         // Verify logs
-        // If any daemon logged message, done.
-        for line in logs(&kube, &vector) {
-            if line.get(super::with_prefix(field)).is_some() {
-                // DONE
-                return;
-            } else {
-                debug!(namespace=namespace.as_str(),log=%line);
+        wait_for(|| {
+            // If any daemon logged message, done.
+            for line in logs(&kube, &vector) {
+                if line
+                    .get(crate::event::log_schema().kubernetes_key().as_ref())
+                    .and_then(|kube| kube.get(field))
+                    .is_some()
+                {
+                    // DONE
+                    return true;
+                } else {
+                    debug!(namespace=namespace.as_str(),log=%line);
+                }
             }
-        }
-        panic!("Vector didn't find field: {:?}", field);
+            false
+        });
     }
 }

@@ -114,6 +114,7 @@ spec:
       - name: vector
         image: ktff/vector-kube-metadata:latest
         imagePullPolicy: Always
+        args: ["-vv"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/

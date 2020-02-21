@@ -18,23 +18,14 @@ use snafu::{futures01::future::FutureExt, ResultExt, Snafu};
 use std::{fs, io};
 
 // ************************ Defined by Kubernetes *********************** //
-// API access is mostly defined with
+// API access is defined with
 // https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
-
-//// And Kubernetes service data with
-//// https://kubernetes.io/docs/concepts/containers/container-environment-variables/#cluster-information
 
 /// File in which Kubernetes stores service account token.
 const TOKEN_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 
 /// Kuberentes API should be reachable at this address
-const KUBERNETES_SERVICE_ADDRESS: &str = "kubernetes.default.svc";
-
-// /// Enviroment variable which contains host to Kubernetes API.
-// const HOST_ENV: &str = "KUBERNETES_SERVICE_HOST";
-
-// /// Enviroment variable which contains port to Kubernetes API.
-// const PORT_ENV: &str = "KUBERNETES_SERVICE_PORT";
+const KUBERNETES_SERVICE_ADDRESS: &str = "https://kubernetes.default.svc";
 
 /// Path to certificate authority certificate
 const CA_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
@@ -53,14 +44,6 @@ pub struct ClientConfig {
 impl ClientConfig {
     /// Loads Kubernetes API access information available to Pods of cluster.  
     pub fn in_cluster(node: String, resolver: Resolver) -> Result<Self, BuildError> {
-        // let kube_host = std::env::var(HOST_ENV).map_err(|_| BuildError::NoKubernetes {
-        //     reason: format!("Missing Kubernetes API host defined with {}", HOST_ENV),
-        // })?;
-
-        // let kube_port = std::env::var(PORT_ENV).map_err(|_| BuildError::NoKubernetes {
-        //     reason: format!("Missing Kubernetes API port defined with {}", PORT_ENV),
-        // })?;
-
         let server = Uri::from_static(KUBERNETES_SERVICE_ADDRESS);
 
         let token = fs::read(TOKEN_PATH)
