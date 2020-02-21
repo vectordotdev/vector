@@ -1573,10 +1573,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-<<<<<<< HEAD
-# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
-=======
-# Accepts `log` events and allows you to route events across parallel streams using logical filters.
+# Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
 [transforms.swimlanes]
   #
   # General
@@ -1631,8 +1628,7 @@ end
       # * type: string
       "method.neq" = "POST"
 
-# Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
->>>>>>> Add docs for swimlanes
+# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General

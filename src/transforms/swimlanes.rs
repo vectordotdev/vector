@@ -2,8 +2,7 @@ use super::Transform;
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -22,7 +21,7 @@ pub struct SwimlaneConfig {
 
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
@@ -73,7 +72,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Err("this transform must be expanded".into())
     }
 

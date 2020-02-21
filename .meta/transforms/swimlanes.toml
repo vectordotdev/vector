@@ -6,6 +6,7 @@ common = false
 function_category = "filter"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "swimlanes") %>
 
@@ -31,36 +32,35 @@ description = "The identifier of a swimlane."
 label = "If/Else"
 body = """\
 The `swimlanes` transform, in it's simplest form, can act as a simple if/else \
-stream splitter. For example, let's split the `log` stream based on `level`
-equaling `"error"`:
+stream splitter. For example, we can route events from the host `gerry` to a \
+sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.error_splitter]
+[transforms.splitting_gerrys]
+  inputs = [ "somewhere" ]
   type = "swimlanes"
 
-  [transforms.error_splitter.lanes.errors]
+  [transforms.splitting_gerrys.lanes.only_gerrys]
     type = "check_fields"
-    "level.eq" = "error"
+    "host.eq" = "gerry"
 
-  [transforms.error_splitter.lanes.not_errors]
+  [transforms.splitting_gerrys.lanes.no_gerrys]
     type = "check_fields"
-    "level.neq" = "error"
+    "host.neq" = "gerry"
 
-[sinks.error_printer]
-  type = "console"
-  inputs = ["errors"]
-  target = "stderr"
+[sinks.only_loves_gerry]
+  inputs = [ "splitting_gerrys.only_gerrys" ]
+  type = "something"
 
-[sinks.not_errors_printer]
-  type = "console"
-  inputs = ["not_errors"]
-  target = "stdout"
+[sinks.hates_gerry]
+  inputs = [ "splitting_gerrys.no_gerrys" ]
+  type = "something_else"
 ```
 
-Notice how our conditions for each lane are mutually exclusive. You can see \
-why this approach is more powerful than a simple if/else transform.\
+This syntax makes it easy to create arbitrary numbers of swimlanes, each with \
+their own logic, and easily route them to downstream components.\
 """
 
 [[transforms.swimlanes.output.log.examples]]

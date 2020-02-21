@@ -95,7 +95,7 @@ impl UnitTest {
         let mut results = HashMap::new();
 
         for input in &self.inputs {
-            for target in input.0 {
+            for target in &input.0 {
                 walk(
                     target,
                     vec![input.1.clone()],
@@ -235,7 +235,10 @@ fn reduce_transforms(
     });
 }
 
-fn build_input(input: &TestInput, expansions: &IndexMap<String, Vec<String>>) -> Result<(Vec<String>, Event), String> {
+fn build_input(
+    input: &TestInput,
+    expansions: &IndexMap<String, Vec<String>>,
+) -> Result<(Vec<String>, Event), String> {
     let target = if let Some(children) = expansions.get(&input.insert_at) {
         children.clone()
     } else {
@@ -278,8 +281,8 @@ fn build_input(input: &TestInput, expansions: &IndexMap<String, Vec<String>>) ->
 }
 
 fn build_inputs(
-  definition: &TestDefinition,
-  expansions: &IndexMap<String, Vec<String>>,
+    definition: &TestDefinition,
+    expansions: &IndexMap<String, Vec<String>>,
 ) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
@@ -339,11 +342,11 @@ fn build_unit_test(
     });
 
     for (i, (input_target, _)) in inputs.iter().enumerate() {
-        for target in &input_target {
+        for target in input_target {
             if !transform_outputs.contains_key(target) {
                 errors.push(format!(
                     "inputs[{}]: unable to locate target transform '{}'",
-                    i, input_target
+                    i, target
                 ));
             }
         }
@@ -403,30 +406,32 @@ fn build_unit_test(
 
     definition.outputs.iter().for_each(|o| {
         if !transforms.contains_key(&o.extract_from) {
-            if inputs.len() == 1 {
+            let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
+            if targets.len() == 1 {
                 errors.push(format!(
                     "unable to complete topology between target transform '{}' and output target '{}'",
-                    inputs.first().map(|(i, _)| i).unwrap(), o.extract_from
+                    targets.first().unwrap(), o.extract_from
                 ));
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
-                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o.extract_from
+                    targets, o.extract_from
                 ));
             }
         }
     });
     definition.no_outputs_from.iter().for_each(|o| {
         if !transforms.contains_key(o) {
-            if inputs.len() == 1 {
+            let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
+            if targets.len() == 1 {
                 errors.push(format!(
                     "unable to complete topology between target transform '{}' and no_outputs_from target '{}'",
-                    inputs.first().map(|(i, _)| i).unwrap(), o,
+                    targets.first().unwrap(), o,
                 ));
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and no_outputs_from target '{}'",
-                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o,
+                    targets, o,
                 ));
             }
         }
@@ -555,7 +560,7 @@ mod tests {
                 .to_owned(),]
         );
 
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -582,7 +587,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -593,7 +598,7 @@ mod tests {
 
     #[test]
     fn parse_no_test_input() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -612,7 +617,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -623,7 +628,7 @@ mod tests {
 
     #[test]
     fn parse_no_outputs() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -641,7 +646,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -792,7 +797,7 @@ mod tests {
 
     #[test]
     fn test_success_multi_inputs() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -874,7 +879,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
@@ -1101,7 +1106,7 @@ mod tests {
 
     #[test]
     fn test_no_outputs_from() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = [ "ignored" ]
@@ -1130,14 +1135,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_no_outputs_from_chained() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = [ "ignored" ]
@@ -1172,7 +1177,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }

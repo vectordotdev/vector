@@ -52,6 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
+  no_outputs_from = ["foo"] # example
 
   # REQUIRED - Inputs
   [[tests.inputs]]
@@ -113,6 +114,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
+  no_outputs_from = ["foo"] # example
 
   # REQUIRED - Inputs
   [[tests.inputs]]
@@ -159,9 +161,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
       "message.eq" = "this is the content to match against"
       "host.exists" = true
       "method.neq" = "POST"
-
-  # OPTIONAL - General
-  no_outputs_from = ["foo"] # example, no default
 ```
 
 </TabItem>
@@ -184,6 +183,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["foo test"]}
+  groups={[]}
   name={"name"}
   path={null}
   relevantWhen={null}
@@ -251,8 +251,9 @@ The name of a transform, the input event will be delivered to this transform in 
   defaultValue={null}
   enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
   examples={["raw","log","metric"]}
+  groups={[]}
   name={"type"}
-  path={"input"}
+  path={"inputs"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -536,32 +537,6 @@ Amount to increment/decrement or gauge.
 <Field
   common={true}
   defaultValue={null}
-<<<<<<< HEAD
-  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
-  examples={["raw","log","metric"]}
-  groups={[]}
-  name={"type"}
-  path={"inputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The event type.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-=======
->>>>>>> Prioritize test fields
   enumValues={null}
   examples={["some message contents"]}
   groups={[]}
@@ -591,36 +566,12 @@ Specifies the log message field contents when the input type is 'raw'.
   common={true}
   defaultValue={null}
   enumValues={null}
-<<<<<<< HEAD
-  examples={["foo test"]}
-  groups={[]}
-  name={"name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### name
-
-A unique identifier for this test.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[["foo"]]}
   groups={[]}
   name={"no_outputs_from"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"[string]"}
   unit={null}
@@ -638,8 +589,6 @@ A list of transforms that must NOT output events in order for the test to pass.
   common={true}
   defaultValue={null}
   enumValues={null}
-=======
->>>>>>> Prioritize test fields
   examples={[]}
   groups={[]}
   name={"outputs"}
@@ -684,14 +633,9 @@ A table that defines a collection of conditions to check against the output of a
   common={true}
   defaultValue={null}
   enumValues={null}
-<<<<<<< HEAD
-  examples={[{"message.eq":"this is the content to match against"}]}
-  groups={[]}
-  name={"`<field_name>`.eq"}
-=======
   examples={["check_fields"]}
+  groups={[]}
   name={"type"}
->>>>>>> Prioritize test fields
   path={"outputs.conditions"}
   relevantWhen={null}
   required={true}
@@ -712,14 +656,9 @@ The type of the condition to execute. Currently only the `check_fields` type is 
   common={true}
   defaultValue={null}
   enumValues={null}
-<<<<<<< HEAD
-  examples={[{"host.exists":true}]}
-  groups={[]}
-  name={"`<field_name>`.exists"}
-=======
   examples={[{"message.eq":"this is the content to match against"}]}
+  groups={[]}
   name={"`<field_name>`.eq"}
->>>>>>> Prioritize test fields
   path={"outputs.conditions"}
   relevantWhen={null}
   required={false}
@@ -740,14 +679,9 @@ Check whether a fields contents exactly matches the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-<<<<<<< HEAD
-  examples={[{"method.neq":"POST"}]}
-  groups={[]}
-  name={"`<field_name>`.neq"}
-=======
   examples={[{"host.exists":true}]}
+  groups={[]}
   name={"`<field_name>`.exists"}
->>>>>>> Prioritize test fields
   path={"outputs.conditions"}
   relevantWhen={null}
   required={false}
@@ -768,14 +702,9 @@ Check whether a field exists or does not exist, depending on the provided valueb
   common={true}
   defaultValue={null}
   enumValues={null}
-<<<<<<< HEAD
-  examples={["check_fields"]}
-  groups={[]}
-  name={"type"}
-=======
   examples={[{"method.neq":"POST"}]}
+  groups={[]}
   name={"`<field_name>`.neq"}
->>>>>>> Prioritize test fields
   path={"outputs.conditions"}
   relevantWhen={null}
   required={false}
