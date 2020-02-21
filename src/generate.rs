@@ -283,6 +283,7 @@ dns_servers = []
 message_key = "message"
 timestamp_key = "timestamp"
 host_key = "host"
+kubernetes_key = "kubernetes"
 
 [sources.source0]
 max_length = 102400
@@ -316,6 +317,7 @@ dns_servers = []
 message_key = "message"
 timestamp_key = "timestamp"
 host_key = "host"
+kubernetes_key = "kubernetes"
 
 [sources.source0]
 max_length = 102400
@@ -349,6 +351,7 @@ dns_servers = []
 message_key = "message"
 timestamp_key = "timestamp"
 host_key = "host"
+kubernetes_key = "kubernetes"
 
 [sources.source0]
 max_length = 102400
@@ -376,6 +379,7 @@ dns_servers = []
 message_key = "message"
 timestamp_key = "timestamp"
 host_key = "host"
+kubernetes_key = "kubernetes"
 
 [sinks.sink0]
 healthcheck = true
@@ -399,6 +403,7 @@ dns_servers = []
 message_key = "message"
 timestamp_key = "timestamp"
 host_key = "host"
+kubernetes_key = "kubernetes"
 
 [transforms.transform0]
 inputs = []
