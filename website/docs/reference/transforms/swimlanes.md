@@ -44,16 +44,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     "method.neq" = "POST"
 ```
 
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert type="danger" fill={true} icon={false}>
-
-#<Requirements:0x000055b4d6984460>
-
-</Alert>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
