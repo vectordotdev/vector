@@ -161,7 +161,7 @@ impl Serialize for LogEvent {
     where
         S: Serializer,
     {
-        serializer.collect_map(self.fields.clone())
+        serializer.collect_map(self.fields.iter())
     }
 }
 
