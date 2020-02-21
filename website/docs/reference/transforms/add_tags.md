@@ -4,6 +4,7 @@ description: "The Vector `add_tags` transform accepts and outputs `metric` event
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
 min_version: null
+service_name: "Add Tags"
 sidebar_label: "add_tags|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
 status: "prod-ready"

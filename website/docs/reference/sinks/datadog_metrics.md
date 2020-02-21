@@ -6,6 +6,7 @@ event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Datadog Metrics"
 sidebar_label: "datadog_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
 status: "beta"

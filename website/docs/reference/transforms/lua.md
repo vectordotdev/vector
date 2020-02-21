@@ -4,6 +4,7 @@ description: "The Vector `lua` transform accepts and outputs `log` events allowi
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
 min_version: null
+service_name: "LUA"
 sidebar_label: "lua|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 status: "beta"

@@ -7,6 +7,7 @@ issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+lab
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 posts_path: /blog/tags/source-prometheus
+service_name: "Prometheus"
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
 status: "beta"

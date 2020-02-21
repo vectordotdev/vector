@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS Cloudwatch Logs"
 sidebar_label: "aws_cloudwatch_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/
 status: "prod-ready"

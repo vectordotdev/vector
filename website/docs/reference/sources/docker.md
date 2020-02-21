@@ -6,6 +6,7 @@ event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
 min_version: "1.24"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Docker API"
 sidebar_label: "docker|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/docker.rs
 status: "beta"
