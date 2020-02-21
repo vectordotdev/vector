@@ -210,7 +210,7 @@ mod tests {
         },
     };
     use futures::Stream;
-    use std::{collections::HashMap, path::PathBuf};
+    use std::{collections::BTreeMap, path::PathBuf};
 
     #[test]
     fn encode_text() {
@@ -230,7 +230,7 @@ mod tests {
         let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
 
         for (input, output) in input.into_iter().zip(output) {
-            let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
+            let output: BTreeMap<String, BTreeMap<String, BTreeMap<String, String>>> =
                 serde_json::from_str(&output[..]).unwrap();
 
             let deeper = input.into_log().unflatten().match_against(output).unwrap();

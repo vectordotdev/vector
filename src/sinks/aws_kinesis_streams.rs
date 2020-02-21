@@ -280,7 +280,7 @@ mod tests {
         event::{self, Event},
         test_util::random_string,
     };
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn kinesis_encode_event_text() {
@@ -297,7 +297,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &None, &Encoding::Json).unwrap();
 
-        let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());

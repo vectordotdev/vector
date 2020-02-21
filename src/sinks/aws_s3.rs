@@ -19,7 +19,7 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
@@ -62,7 +62,7 @@ struct S3Options {
     server_side_encryption: Option<S3ServerSideEncryption>,
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
-    tags: Option<HashMap<String, String>>,
+    tags: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -417,7 +417,7 @@ mod tests {
     use super::*;
     use crate::event::{self, Event};
 
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn s3_encode_event_text() {
@@ -441,7 +441,7 @@ mod tests {
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
 
         let (bytes, _) = bytes.into_parts();
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());

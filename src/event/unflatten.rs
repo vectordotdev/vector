@@ -2,7 +2,7 @@ use super::Value;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Serialize, Serializer};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 lazy_static! {
@@ -13,14 +13,14 @@ lazy_static! {
 #[derive(Debug, Clone, PartialEq)]
 enum MapValue {
     Value(Value),
-    Map(HashMap<Atom, MapValue>),
+    Map(BTreeMap<Atom, MapValue>),
     Array(Vec<MapValue>),
     Null,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unflatten {
-    map: HashMap<Atom, MapValue>,
+    map: BTreeMap<Atom, MapValue>,
 }
 
 impl Unflatten {
@@ -29,13 +29,13 @@ impl Unflatten {
     }
 }
 
-impl From<HashMap<Atom, Value>> for Unflatten {
-    fn from(log: HashMap<Atom, Value>) -> Self {
-        let log = log.into_iter().collect::<HashMap<_, _>>();
+impl From<BTreeMap<Atom, Value>> for Unflatten {
+    fn from(log: BTreeMap<Atom, Value>) -> Self {
+        let log = log.into_iter().collect::<BTreeMap<_, _>>();
 
         // We must wrap the outter map in a MapValue to support
         // the recursive merge.
-        let mut map = MapValue::Map(HashMap::new());
+        let mut map = MapValue::Map(BTreeMap::new());
         for (k, v) in log {
             let temp = unflatten(k, MapValue::Value(v));
             merge(&mut map, &temp);
@@ -55,7 +55,7 @@ impl From<HashMap<Atom, Value>> for Unflatten {
 fn unflatten(k: Atom, v: MapValue) -> MapValue {
     // Maps are delimited via `.`.
     let mut s = k.rsplit('.').peekable();
-    let mut map = HashMap::new();
+    let mut map = BTreeMap::new();
 
     // Temp value variable that ends up representing the overall path of the tree.
     let mut temp_v = Some(v);
@@ -97,7 +97,7 @@ fn unflatten(k: Atom, v: MapValue) -> MapValue {
         if s.peek().is_none() {
             map.insert(k.into(), temp_v.take().unwrap());
         } else {
-            let mut m = HashMap::new();
+            let mut m = BTreeMap::new();
             m.insert(k.into(), temp_v.take().unwrap());
             temp_v = Some(MapValue::Map(m));
         }
@@ -218,7 +218,7 @@ impl TestMapValue {
         }
     }
 
-    pub fn match_against_map<K, V>(&self, theirs: HashMap<K, V>) -> ShallowMatch<V>
+    pub fn match_against_map<K, V>(&self, theirs: BTreeMap<K, V>) -> ShallowMatch<V>
     where
         Atom: From<K>,
     {
@@ -249,8 +249,8 @@ impl TestMapValue {
     }
 
     fn match_map_against_map<K, V>(
-        this: &HashMap<Atom, MapValue>,
-        other: HashMap<K, V>,
+        this: &BTreeMap<Atom, MapValue>,
+        other: BTreeMap<K, V>,
     ) -> ShallowMatch<V>
     where
         Atom: From<K>,
@@ -278,7 +278,7 @@ impl TestMapValue {
 
 #[cfg(test)]
 impl Unflatten {
-    pub fn match_against<K, V>(&self, other: HashMap<K, V>) -> ShallowMatch<V>
+    pub fn match_against<K, V>(&self, other: BTreeMap<K, V>) -> ShallowMatch<V>
     where
         Atom: From<K>,
     {
@@ -297,12 +297,12 @@ mod tests {
         },
     };
     use serde::Deserialize;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn merge_array() {
-        let mut map1 = HashMap::new();
-        let mut map2 = HashMap::new();
+        let mut map1 = BTreeMap::new();
+        let mut map2 = BTreeMap::new();
 
         map1.insert("key1".into(), MapValue::Value("v1".into()));
         map2.insert("key2".into(), MapValue::Value("v2".into()));
@@ -312,7 +312,7 @@ mod tests {
 
         merge(&mut a, &b);
 
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert("key1".into(), MapValue::Value("v1".into()));
         map.insert("key2".into(), MapValue::Value("v2".into()));
 
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn nested_array() {
-        let mut m = HashMap::new();
+        let mut m = BTreeMap::new();
         let v = MapValue::Array(vec![MapValue::Array(vec![
             MapValue::Null,
             MapValue::Value("v1".into()),
@@ -367,30 +367,26 @@ mod tests {
 
     #[test]
     fn array() {
-        // We loop here as we want to ensure that we catch all corner cases
-        // of hashmap iteration ordering.
-        for _ in 0..100 {
-            let mut e = Event::new_empty_log().into_log();
-            e.insert("a.b[0]", "v1");
-            e.insert("a.b[1]", "v2");
+        let mut e = Event::new_empty_log().into_log();
+        e.insert("a.b[0]", "v1");
+        e.insert("a.b[1]", "v2");
 
-            #[derive(Deserialize, Debug)]
-            #[serde(rename_all = "snake_case")]
-            struct Expected {
-                a: A,
-            }
-
-            #[derive(Deserialize, Debug)]
-            #[serde(rename_all = "snake_case")]
-            struct A {
-                b: Vec<String>,
-            }
-
-            let json = serde_json::to_string(&e.unflatten()).unwrap();
-            let expected = serde_json::from_str::<Expected>(&json).unwrap();
-
-            assert_eq!(expected.a.b, vec!["v1", "v2"]);
+        #[derive(Deserialize, Debug)]
+        #[serde(rename_all = "snake_case")]
+        struct Expected {
+            a: A,
         }
+
+        #[derive(Deserialize, Debug)]
+        #[serde(rename_all = "snake_case")]
+        struct A {
+            b: Vec<String>,
+        }
+
+        let json = serde_json::to_string(&e.unflatten()).unwrap();
+        let expected = serde_json::from_str::<Expected>(&json).unwrap();
+
+        assert_eq!(expected.a.b, vec!["v1", "v2"]);
     }
 
     proptest::proptest! {
