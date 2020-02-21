@@ -34,13 +34,19 @@ function Contact() {
               <AnchoredH3 id="connect">Description</AnchoredH3>
 
               <p>
-                Vector is a high-performance, open-source tool for building flexible and robust pipelines for observability data. 
+                Vector is a high-performance, open-source tool for building flexible and robust pipelines for observability data.
               </p>
 
               <AnchoredH3 id="connect">Bio</AnchoredH3>
 
               <p>
-                Created by <a href="https://timber.io">Timber.io</a>, Vector was built with the vision of creating a single tool to collect, transform, and route <em>all</em> observability data. Released in July of 2019 Vector has grown to over 100,000 downloads per day and is used by Fortunate 500 companies and startups alike.
+                Created by <a href="https://timber.io">Timber.io</a>, Vector was built with the vision of deploying a single tool to collect, transform, and route <em>all</em> observability data, without sacrificing performance or flexibility.
+              </p>
+              <p>
+                Since its initial release in July of 2019 Vector has grown to over 100,000 downloads per day, empowering Fortune 500 companies and startups alike to leverage the latest and greatest observability tools and methodologies.
+              </p>
+              <p>
+                Vector's capabilities continue to expand at a rapid pace, aspiring to integrate with any and all observability products in a way that's simple, predictable and stable. No compromises.
               </p>
             </div>
           </div>
