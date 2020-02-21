@@ -404,10 +404,17 @@ fn build_unit_test(
     });
     definition.no_outputs_from.iter().for_each(|o| {
         if !transforms.contains_key(o) {
-            errors.push(format!(
-                "unable to complete topology between target transform '{}' and output target '{}'",
-                definition.input.insert_at, o
-            ));
+            if inputs.len() == 1 {
+                errors.push(format!(
+                    "unable to complete topology between target transform '{}' and no_outputs_from target '{}'",
+                    inputs.first().map(|(i, _)| i).unwrap(), o,
+                ));
+            } else {
+                errors.push(format!(
+                    "unable to complete topology between target transforms {:?} and no_outputs_from target '{}'",
+                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o,
+                ));
+            }
         }
     });
 
