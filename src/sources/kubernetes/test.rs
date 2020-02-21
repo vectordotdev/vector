@@ -8,7 +8,7 @@ use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
     api::{
         Api, DeleteParams, KubeObject, ListParams, Log, LogParams, Object, PostParams,
-        PropagationPolicy,
+        PropagationPolicy, RawApi,
     },
     client::APIClient,
     config,
@@ -75,7 +75,7 @@ data:
 "#;
 
 // TODO: use localy builded image of vector
-static VECTOR_YAML: &'static str = r#"
+pub static VECTOR_YAML: &'static str = r#"
 # Vector agent runned on each Node where it collects logs from pods.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -112,7 +112,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-kube-newline-bug:latest
+        image: ktff/vector-kube-metadata:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
@@ -125,6 +125,11 @@ spec:
           readOnly: true
         - name: tmp
           mountPath: /tmp/vector/
+        env:
+        - name: VECTOR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
 "#;
 
 static ECHO_YAML: &'static str = r#"
@@ -157,8 +162,8 @@ spec:
   restartPolicy: Never
 "#;
 
-type KubePod = Object<PodSpec, PodStatus>;
-type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
+pub type KubePod = Object<PodSpec, PodStatus>;
+pub type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
 
 pub struct Kube {
     client: APIClient,
@@ -184,7 +189,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
+    pub fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
@@ -201,6 +206,23 @@ impl Kube {
         let json = serde_json::to_vec(&map).unwrap();
         retry(|| {
             api.create(&PostParams::default(), json.clone())
+                .map_err(|error| {
+                    format!("Failed creating Kubernetes object with error: {:?}", error)
+                })
+        })
+    }
+
+    /// Will substitute NAMESPACE_MARKER
+    pub fn create_raw_with<K>(&self, api: &RawApi, yaml: &str) -> K
+    where
+        K: DeserializeOwned,
+    {
+        let yaml = yaml.replace(NAMESPACE_MARKER, self.namespace.as_str());
+        let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
+        let json = serde_json::to_vec(&map).unwrap();
+        retry(|| {
+            api.create(&PostParams::default(), json.clone())
+                .and_then(|request| self.client.request(request))
                 .map_err(|error| {
                     format!("Failed creating Kubernetes object with error: {:?}", error)
                 })
@@ -238,7 +260,7 @@ impl Kube {
         .collect()
     }
 
-    fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
+    pub fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
         retry(move || {
             object = api
@@ -281,6 +303,15 @@ impl Kube {
         })
     }
 
+    /// Deleter will delete given resource on drop.
+    pub fn deleter(&self, api: RawApi, name: &str) -> Deleter {
+        Deleter {
+            client: self.client.clone(),
+            api,
+            name: name.to_owned(),
+        }
+    }
+
     fn cleanup(&self) {
         let _ = Api::v1Namespace(self.client.clone()).delete(
             self.namespace.as_str(),
@@ -295,6 +326,28 @@ impl Kube {
 impl Drop for Kube {
     fn drop(&mut self) {
         self.cleanup();
+    }
+}
+
+pub struct Deleter {
+    client: APIClient,
+    name: String,
+    api: RawApi,
+}
+
+impl Drop for Deleter {
+    fn drop(&mut self) {
+        let _ = self
+            .api
+            .delete(
+                self.name.as_str(),
+                &DeleteParams {
+                    propagation_policy: Some(PropagationPolicy::Background),
+                    ..DeleteParams::default()
+                },
+            )
+            .and_then(|request| self.client.request_text(request))
+            .map_err(|error| error!(message = "Failed deleting Kubernetes object.",%error));
     }
 }
 
@@ -316,7 +369,7 @@ fn retry<F: FnMut() -> Result<R, E>, R, E: std::fmt::Debug>(mut f: F) -> R {
     panic!("Timed out while waiting. Last error: {:?}", last_error);
 }
 
-fn user_namespace<S: AsRef<str>>(namespace: S) -> String {
+pub fn user_namespace<S: AsRef<str>>(namespace: S) -> String {
     "user-".to_owned() + namespace.as_ref()
 }
 
@@ -383,7 +436,7 @@ fn start_vector<'a>(
     vector
 }
 
-fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
+pub fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
     let mut logs = Vec::new();
     for daemon_instance in kube.list(&vector) {
         debug!(message="daemon_instance",name=%daemon_instance.metadata.name);

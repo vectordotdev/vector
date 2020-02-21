@@ -149,7 +149,7 @@ impl WatchClient {
     ///  - `from` should contain latest `pod.metadata.resource_version`.
     ///  - `error` must contain RuntimeError with which last stream ended.
     pub fn watch_metadata(
-        &mut self,
+        &self,
         mut version: Option<Version>,
         error: Option<RuntimeError>,
     ) -> Result<impl Stream<Item = Pod, Error = RuntimeError>, BuildError> {
@@ -274,6 +274,14 @@ impl Decoder {
 /// Version of Kubernetes resource
 #[derive(Clone, Debug)]
 pub struct Version(String);
+
+impl Version {
+    pub fn from_pod(pod: &Pod) -> Option<Self> {
+        pod.metadata
+            .as_ref()
+            .and_then(|metadata| metadata.resource_version.clone().map(Version))
+    }
+}
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -499,7 +507,7 @@ mod kube_tests {
         let (sender, receiver) = channel();
 
         // May pickup other pods, which is fine.
-        let mut client =
+        let client =
             ClientConfig::load_kube_config(Resolver::new(Vec::new(), rt.executor()).unwrap())
                 .expect("Kubernetes configuration file not present.")
                 .build()
