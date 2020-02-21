@@ -1,0 +1,79 @@
+---
+title: Install Vector via Nix
+sidebar_label: Nix
+description: Install Vector through the Nix package manager
+---
+
+Vector can be installed through the [Nix package manager][urls.nix] via
+[Vector's Nix package][urls.vector_nix_package]. This package manager is
+generally used on [NixOS][urls.nixos].
+
+<Alert type="warning">
+
+Because Vector must be manually updated on Nix, new Vector releases will be
+delayed. Generally new Vector releases are made available within a few days.
+
+</Alert>
+
+## Install
+
+1.  Install Vector
+    
+    ```bash
+    nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
+    ```
+
+    <Alert icon={false} type="info">
+
+    * The `--file` flag ensures that you're installing the latest stable version
+      of Vector (<%= metadata.latest_version %>).
+    * The `--attr` improves installation speed.
+
+    </Alert>
+
+2.  Start Vector
+
+    ```bash
+    vector --config /path/to/vector.toml
+    ```
+
+    <Alert icon={false} type="info">
+
+    * `vector` is placed in your `$PATH`.
+    * You must create a [Vector configuration file][docs.configuration] to
+      successfully start Vector.
+
+    </Alert>
+
+### Previous Versions
+
+To our knowledge, historical or specific versions of nix packages cannot be
+installed. See [nixpkgs issue #9682][urls.nixpkgs_9682].
+
+## Configuring
+
+The [Vector nix package] does not install any configuration files by default.
+You'll need to create a [Vector configuration file][docs.configuration] and pass
+it to Vector via the `--config` flag when
+[starting][docs.process-management#starting] Vector.
+
+## Administering
+
+The Vector nix package does not use Systemd by default, but Vector does provide
+a [Systemd service file][urls.vector_systemd_file] that you can use as a
+starting point. How you manage the Vector process is up to you, and the
+process administration section covers how to do this:
+
+<Jump to="[[[docs.administration]]]">Administration</Jump>
+
+## Uninstalling
+
+```bash
+nix-env --uninstall vector
+```
+
+## Updating
+
+```bash
+nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --upgrade vector
+```

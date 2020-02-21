@@ -170,6 +170,12 @@ module.exports = {
         "package_manager": "Homebrew"
       },
       {
+        "id": "nixos",
+        "name": "NixOS",
+        "os": "Linux",
+        "package_manager": "nix"
+      },
+      {
         "id": "raspbian",
         "name": "Raspbian",
         "os": "Linux",
@@ -209,6 +215,13 @@ module.exports = {
         ],
         "id": "homebrew",
         "name": "Homebrew"
+      },
+      {
+        "archs": [
+          "x86_64"
+        ],
+        "id": "nix",
+        "name": "Nix"
       },
       {
         "archs": [
