@@ -13,6 +13,7 @@ must be enabled for this source to work. See the \
 [Docker Integration Strategy section](#docker-integration-strategy) \
 for more info.
 """
+service_name = "Docker API"
 through_description = "the [Docker engine daemon][urls.docker_daemon]"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
