@@ -1,6 +1,7 @@
 #encoding: utf-8
 
 require_relative "field"
+require_relative "requirements"
 
 class Component
   DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
@@ -14,11 +15,13 @@ class Component
     :env_vars,
     :function_category,
     :id,
+    :min_version,
     :name,
     :operating_systems,
     :options,
     :posts,
     :requirements,
+    :service_name,
     :service_providers,
     :title,
     :type,
@@ -29,14 +32,22 @@ class Component
     @common = hash["common"] == true
     @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
     @function_category = hash.fetch("function_category").downcase
+    @min_version = hash["min_version"]
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
-    @requirements = hash["requirements"]
+    @requirements = Requirements.new(hash["requirements"] || {})
+    @service_name = hash["service_name"] || hash.fetch("title")
     @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = (hash["options"] || {}).to_struct_with_name(Field)
+
+    # Requirements
+
+    if @min_version && @min_version != "0" && (!@requirements.additional || !@requirements.additional.include?(@min_version))
+      @requirements.additional = "* #{@service_name} version >= #{@min_version} is required.\n#{@requirements.additional}"
+    end
 
     # Operating Systems
 
@@ -97,6 +108,41 @@ class Component
     @options_list ||= options.to_h.values.sort
   end
 
+  def option_groups
+    @option_groups ||= options_list.collect(&:groups).flatten.uniq.sort
+  end
+
+  def option_example_groups
+    @option_example_groups ||=
+      begin
+        groups = {}
+
+        if option_groups.any?
+          option_groups.each do |group|
+            groups[group] = options_list.select do |option|
+              option.group?(group) && option.common?
+            end
+          end
+
+          if advanced_relevant?
+            option_groups.each do |group|
+              groups["#{group} (advanced)"] = options_list.select do |option|
+                option.group?(group)
+              end
+            end
+          end
+        else
+          groups["Common"] = options_list.select(&:common?)
+
+          if advanced_relevant?
+            groups["Advanced"] = options_list
+          end
+        end
+
+        groups
+      end
+  end
+
   def partition_options
     options_list.select(&:partition_key?)
   end
@@ -107,6 +153,16 @@ class Component
 
   def sink?
     type == "sink"
+  end
+
+  def sorted_option_group_keys
+    option_example_groups.keys.sort_by do |key|
+      if key.downcase.include?("advanced")
+        -1
+      else
+        1
+      end
+    end.reverse
   end
 
   def source?

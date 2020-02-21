@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Vector"
 sidebar_label: "vector|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/vector.rs
 status: "beta"
@@ -51,6 +54,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#1"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -74,6 +78,7 @@ The TCP address to listen for connections on, or `systemd#N to use the Nth socke
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"shutdown_timeout_secs"}
   path={null}
   relevantWhen={null}

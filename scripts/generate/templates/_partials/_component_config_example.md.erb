@@ -1,35 +1,26 @@
-<%- if component.advanced_relevant? -%>
+<%- keys = component.sorted_option_group_keys -%>
+<%- if keys.length > 1 -%>
 <Tabs
   block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  defaultValue="<%= keys.first.parameterize %>"
+  values={<%= keys.collect { |k| {label: k, value: k.parameterize} }.to_json %>}>
 
-<TabItem value="common">
 <%- end -%>
+<%- keys.each do |key| -%>
+<%- if keys.length > 1 -%>
+<TabItem value="<%= key.parameterize %>">
 
+<%- end -%>
 <CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>"/ >
 
 ```toml
-<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id", common: true) %>
+<%= config_example(component.option_example_groups.fetch(key), path: "#{component.type.pluralize}.my_#{component.type}_id") %>
 ```
-
-<%- if component.advanced_relevant? -%>
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>" />
-
-```toml
-<%= config_example(component.options_list, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
-```
+<%- if keys.length > 1 -%>
 
 </TabItem>
 <%- end -%>
-
-<% if component.advanced_relevant? -%>
+<%- end -%>
+<%- if keys.length > 1 -%>
 </Tabs>
 <%- end -%>

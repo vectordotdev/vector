@@ -13,6 +13,7 @@ class Field
     :display,
     :enum,
     :examples,
+    :groups,
     :partition_key,
     :prioritize,
     :relevant_when,
@@ -29,6 +30,7 @@ class Field
     @display = hash["display"]
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @groups = hash["groups"] || []
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
     @prioritize = hash["prioritize"] == true
@@ -167,6 +169,12 @@ class Field
     sections.select do |section|
       section.referenced_options.include?(name) ||
         section.referenced_options.any? { |o| o.end_with?(name) }
+    end
+  end
+
+  def group?(group_name)
+    groups.any? do |group|
+      group.downcase == group_name.downcase
     end
   end
 

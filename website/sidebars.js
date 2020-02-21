@@ -216,6 +216,8 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_cloud_storage",
+            
               "reference/sinks/gcp_pubsub",
             
               "reference/sinks/gcp_stackdriver_logging",
@@ -223,6 +225,8 @@ module.exports = {
               "reference/sinks/http",
             
               "reference/sinks/humio_logs",
+            
+              "reference/sinks/influxdb_metrics",
             
               "reference/sinks/kafka",
             

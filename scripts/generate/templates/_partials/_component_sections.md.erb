@@ -138,6 +138,24 @@ You'll notice that Vector's [template sytax][docs.reference.templating] is
 supported for these options, enabling you to use field values as partition keys.
 <%- end -%>
 <%- end -%>
+<%- if component.requirements.network -%>
+### Network Access
+
+The `<%= component.name %>` <%= component.type %> requires network access to
+operate correctly.
+
+#### Docker Network Access
+
+If you are running Vector within a Docker container then you should pass the
+`--net=host` flag when starting Docker:
+
+```bash
+docker run --net=host ...
+```
+
+Otherwise Vector will not be able to communicate with EC2 metadata service.
+Learn more in the [Docker networking docs][urls.docker_networking].
+<%- end -%>
 <%- if component.options.respond_to?(:request) -%>
 
 ### Rate Limits

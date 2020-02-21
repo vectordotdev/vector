@@ -7,6 +7,7 @@ function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
+requirements = {}
 service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]"
 
@@ -29,24 +30,7 @@ write_to_description = "[Google Cloud Platform's Stackdriver Logging service][ur
   timeout_secs: 60
 ) %>
 
-[sinks.gcp_stackdriver_logging.env_vars.GOOGLE_APPLICATION_CREDENTIALS]
-type = "string"
-required = false
-examples = ["/path/to/credentials.json"]
-description = """\
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication.\
-"""
-
-[sinks.gcp_stackdriver_logging.options.credentials_path]
-type = "string"
-required = true
-examples = ["/path/to/credentials.json"]
-description = """\
-The filename for a Google Cloud service account credentials JSON file \
-used to authenticate access to the stackdriver logging API. If this is unset, \
-Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for \
-a filename.\
-"""
+<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_stackdriver_logging", access: "Stackdriver Logging API", required: true) %>
 
 [sinks.gcp_stackdriver_logging.options.project_id]
 type = "string"

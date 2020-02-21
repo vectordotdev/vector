@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP or Unix domain socket."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+socket%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Socket"
 sidebar_label: "socket|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/socket.rs
 status: "prod-ready"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -61,7 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -100,7 +99,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -117,6 +115,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["92.12.333.224:5000"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={{"mode":"tcp"}}
@@ -139,6 +138,7 @@ The address to connect to. The address _must_ include a port.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -160,6 +160,7 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
@@ -182,6 +183,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -204,6 +206,7 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
@@ -226,6 +229,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -253,6 +257,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -275,6 +280,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -297,6 +303,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={{"tcp":"TCP Socket.","unix":"Unix Domain Socket."}}
   examples={["tcp","unix"]}
+  groups={[]}
   name={"mode"}
   path={null}
   relevantWhen={null}
@@ -319,6 +326,7 @@ The type of socket to use.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/socket"]}
+  groups={[]}
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
@@ -341,6 +349,7 @@ The unix socket path. This should be the absolute path.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -362,6 +371,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"enabled"}
   path={"tls"}
   relevantWhen={null}
@@ -384,6 +394,7 @@ Enable TLS during connections to the remote.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -406,6 +417,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -428,6 +440,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -450,6 +463,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -472,6 +486,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -494,6 +509,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_hostname"}
   path={"tls"}
   relevantWhen={null}

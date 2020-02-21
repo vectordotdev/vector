@@ -10,9 +10,9 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.41",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.41",
-    "@docusaurus/utils": "^2.0.0-alpha.41",
+    "@docusaurus/core": "^2.0.0-alpha.43",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.43",
+    "@docusaurus/utils": "^2.0.0-alpha.43",
     "axios": "^0.18.1",
     "cash-dom": "^4.1.5",
     "classnames": "^2.2.6",

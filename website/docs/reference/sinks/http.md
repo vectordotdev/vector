@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "HTTP"
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -77,7 +76,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -143,7 +142,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -160,6 +158,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"auth"}
   path={null}
   relevantWhen={null}
@@ -181,6 +180,7 @@ Options for the authentication strategy.
   defaultValue={null}
   enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["basic"]}
+  groups={[]}
   name={"strategy"}
   path={"auth"}
   relevantWhen={null}
@@ -203,6 +203,7 @@ The authentication strategy to use.
   defaultValue={null}
   enumValues={null}
   examples={["${PASSWORD_ENV_VAR}","password"]}
+  groups={[]}
   name={"password"}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
@@ -225,6 +226,7 @@ The basic authentication password.
   defaultValue={null}
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
+  groups={[]}
   name={"user"}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
@@ -252,6 +254,7 @@ The basic authentication user name.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -273,6 +276,7 @@ Configures the sink batching behavior.
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
@@ -295,6 +299,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
@@ -322,6 +327,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -343,6 +349,7 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
@@ -365,6 +372,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -387,6 +395,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
@@ -409,6 +418,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -436,6 +446,7 @@ The behavior when the buffer becomes full.
   defaultValue={"none"}
   enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
   examples={["none","gzip"]}
+  groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
@@ -458,6 +469,7 @@ The compression strategy used to compress the encoded event data before outputti
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","ndjson","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -480,6 +492,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"headers"}
   path={null}
   relevantWhen={null}
@@ -501,6 +514,7 @@ Options for custom headers. See [Authentication](#authentication) for more info.
   defaultValue={null}
   enumValues={null}
   examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
   name={"`[header-key]`"}
   path={"headers"}
   relevantWhen={null}
@@ -528,6 +542,7 @@ A custom header to be added to each outgoing HTTP request.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -550,6 +565,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={["https://10.22.212.22:9000/_health"]}
+  groups={[]}
   name={"healthcheck_uri"}
   path={null}
   relevantWhen={null}
@@ -572,6 +588,7 @@ A URI that Vector can request in order to determine the service health. See [Hea
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -593,6 +610,7 @@ Configures the sink request behavior.
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -615,6 +633,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -637,6 +656,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -659,6 +679,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -681,6 +702,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -703,6 +725,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -725,6 +748,7 @@ The maximum amount of time, in seconds, to wait between retries.
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -752,6 +776,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -773,6 +798,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -795,6 +821,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -817,6 +844,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -839,6 +867,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -861,6 +890,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -883,6 +913,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_hostname"}
   path={"tls"}
   relevantWhen={null}
@@ -910,6 +941,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
   defaultValue={null}
   enumValues={null}
   examples={["https://10.22.212.22:9000/endpoint"]}
+  groups={[]}
   name={"uri"}
   path={null}
   relevantWhen={null}

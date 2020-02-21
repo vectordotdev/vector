@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS Cloudwatch Metrics"
 sidebar_label: "aws_cloudwatch_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
 status: "beta"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -57,7 +56,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -79,7 +78,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -96,6 +94,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
   name={"assume_role"}
   path={null}
   relevantWhen={null}
@@ -118,6 +117,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authe
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -139,6 +139,7 @@ Configures the sink batching behavior.
   defaultValue={20}
   enumValues={null}
   examples={[20]}
+  groups={[]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
@@ -161,6 +162,7 @@ The maximum size of a batch, in events, before it is flushed.
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
@@ -188,6 +190,7 @@ The maximum age of a batch before it is flushed.
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
@@ -210,6 +213,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -232,6 +236,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}
@@ -254,6 +259,7 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
+  groups={[]}
   name={"region"}
   path={null}
   relevantWhen={{"host":""}}
@@ -283,6 +289,7 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -305,6 +312,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}
@@ -402,7 +410,7 @@ The following matrix outlines how Vector metric types are mapped into CloudWatch
 1. Gauge values are persisted between flushes. On Vector start up each gauge is assumed to have
 zero (0.0) value, that can be updated explicitly by the consequent absolute (not delta) gauge
 observation, or by delta increments/decrements. Delta gauges are considered an advanced feature
-useful in distributed setting, however it should be used with care.
+useful itn distributed setting, however it should be used with care.
 
 ### Streaming
 

@@ -745,7 +745,7 @@ dns_servers = ["0.0.0.0:53"]
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 
-# Accepts `log` events and allows you to add one or more log fields.
+# Accepts and outputs `log` events allowing you to add one or more log fields.
 [transforms.add_fields]
   #
   # General
@@ -784,7 +784,7 @@ dns_servers = ["0.0.0.0:53"]
     parent = {child = "child_value"}
     list_field = ["first", "second", "third"]
 
-# Accepts `metric` events and allows you to add one or more metric tags.
+# Accepts and outputs `metric` events allowing you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
@@ -817,7 +817,7 @@ dns_servers = ["0.0.0.0:53"]
     static_tag = "my value"
     env_tag = "${ENV_VAR}"
 
-# Accepts `log` events and allows you to strips ANSI escape sequences from the specified field.
+# Accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -840,7 +840,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   field = "message"
 
-# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+# Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -884,7 +884,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   refresh_interval_secs = 10
 
-# Accepts `log` events and allows you to coerce log fields into fixed types.
+# Accepts and outputs `log` events allowing you to coerce log fields into fixed types.
 [transforms.coercer]
   #
   # General
@@ -934,7 +934,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to concat (substrings) of other fields to a new one.
+# Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -973,7 +973,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "dest_field_name"
 
-# Accepts `log` and `metric` events and allows you to filter events by a log field's value.
+# Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1002,7 +1002,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   value = "/var/log/nginx.log"
 
-# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1042,7 +1042,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "geoip"
 
-# Accepts `log` events and allows you to parse a log field value with Grok.
+# Accepts and outputs `log` events allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
   #
   # General
@@ -1102,7 +1102,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to parse a log field value as JSON.
+# Accepts and outputs `log` events allowing you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1118,7 +1118,8 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If the specified `field` should be dropped (removed) after parsing.
+  # If the specified `field` should be dropped (removed) after parsing. If
+  # parsing fails, the field will not be removed, irrespective of this setting.
   #
   # * required
   # * default: true
@@ -1158,7 +1159,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target_field = "target"
 
-# Accepts `log` events and allows you to convert logs into one or more metrics.
+# Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
@@ -1226,7 +1227,7 @@ dns_servers = ["0.0.0.0:53"]
       region = "us-east-1"
       status = "{{status}}"
 
-# Accepts `log` events and allows you to extract data from a logfmt-formatted log field.
+# Accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field.
 [transforms.logfmt_parser]
   #
   # General
@@ -1280,7 +1281,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1320,7 +1321,7 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
-# Accepts `log` events and allows you to merge partial log events into a single event.
+# Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1366,7 +1367,7 @@ end
   # * type: [string]
   stream_discriminant_fields = []
 
-# Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
+# Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
   # General
@@ -1426,7 +1427,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to remove one or more log fields.
+# Accepts and outputs `log` events allowing you to remove one or more log fields.
 [transforms.remove_fields]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1448,7 +1449,7 @@ end
   # * type: [string]
   fields = ["field1", "field2"]
 
-# Accepts `metric` events and allows you to remove one or more metric tags.
+# Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1470,7 +1471,7 @@ end
   # * type: [string]
   tags = ["tag1", "tag2"]
 
-# Accepts `log` events and allows you to sample events with a configurable rate.
+# Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1503,7 +1504,7 @@ end
   # * type: [string]
   pass_list = ["[error]", "field2"]
 
-# Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
 [transforms.split]
   #
   # General
@@ -1545,10 +1546,11 @@ end
   field_names = ["timestamp", "level", "message"]
 
   # The separator to split the field on. If no separator is given, it will split
-  # on whitespace.
+  # on all whitespace. 'Whitespace' is defined according to the terms of the
+  # Unicode Derived Core Property `White_Space`.
   #
   # * required
-  # * default: "whitespace"
+  # * default: "[whitespace]"
   # * type: [string]
   separator = ","
 
@@ -1571,7 +1573,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General
@@ -2410,7 +2412,7 @@ end
   filename_append_uuid = true
   filename_append_uuid = false
 
-  # The extension to use in the object name.
+  # The filename extension to use in the object name.
   #
   # * required
   # * default: "log"
@@ -3506,6 +3508,330 @@ end
   encoding = "ndjson"
   encoding = "text"
 
+# Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
+[sinks.gcp_cloud_storage]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "gcp_cloud_storage"
+  type = "gcp_cloud_storage"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The GCS bucket name.
+  #
+  # * required
+  # * type: string
+  bucket = "my-bucket"
+
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the Cloud Storage API. If this is unset, Vector checks
+  # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+  #
+  # * required
+  # * type: string
+  credentials_path = "/path/to/credentials.json"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * required
+  # * default: true
+  # * type: bool
+  filename_append_uuid = true
+  filename_append_uuid = false
+
+  # The filename extension to use in the object name.
+  #
+  # * required
+  # * default: "log"
+  # * type: string
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * required
+  # * default: "%s"
+  # * type: string
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root GCS "folder".
+  #
+  # * optional
+  # * default: "date=%F/"
+  # * type: string
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  #
+  # Object Attributes
+  #
+
+  # Predefined ACL to apply to the created objects. For more information, see
+  # Predefined ACLs.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
+  acl = "authenticatedRead"
+  acl = "bucketOwnerFullControl"
+  acl = "bucketOwnerRead"
+  acl = "private"
+  acl = "projectPrivate"
+  acl = "publicRead"
+
+  # The set of metadata `key:value` pairs for the created objects. See the GCS
+  # custom metadata documentation for more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the GCP storage classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "STANDARD", "NEARLINE", "COLDLINE", and "ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "NEARLINE"
+  storage_class = "COLDLINE"
+  storage_class = "ARCHIVE"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_cloud_storage.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 10485760
+    # * type: int
+    # * unit: bytes
+    max_size = 10485760
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 300
+
+  #
+  # Buffer
+  #
+
+  [sinks.gcp_cloud_storage.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.gcp_cloud_storage.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 1000
+    # * type: int
+    rate_limit_num = 1000
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Tls
+  #
+
+  [sinks.gcp_cloud_storage.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface.
 [sinks.gcp_pubsub]
   #
@@ -3550,7 +3876,7 @@ end
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the pubsub project and topic. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-  # filename. Either this or `api_key` must be set.
+  # filename.
   #
   # * optional
   # * no default
@@ -3771,7 +4097,7 @@ end
   inputs = ["my-source-id"]
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the stackdriver logging API. If this is unset, Vector
+  # authenticate access to the Stackdriver Logging API. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
@@ -4470,6 +4796,205 @@ end
     # * default: 10
     # * type: int
     rate_limit_num = 10
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+# Batches `metric` events to InfluxDB using v1 or v2 HTTP API.
+[sinks.influxdb_metrics]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "influxdb_metrics"
+  type = "influxdb_metrics"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The destination bucket for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  bucket = "vector-bucket"
+  bucket = "4d2225e4d3d49f75"
+
+  # Sets the target database for the write into InfluxDB 1.
+  #
+  # * required
+  # * type: string
+  database = "vector-database"
+  database = "iot-store"
+
+  # InfluxDB endpoint to send metrics to.
+  #
+  # * required
+  # * type: string
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  endpoint = "http://localhost:8086/"
+
+  # A prefix that will be added to all metric names.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # auth
+  #
+
+  # Specifies the destination organization for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  org = "Organization"
+  org = "33f2cff0a28e5b63"
+
+  # Authentication token for InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  token = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # Sets the password for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "influxdb4ever"
+
+  # Sets the username for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  username = "todd"
+  username = "vector-source"
+
+  #
+  # persistence
+  #
+
+  # Sets the write consistency for the point for InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  consistency = "any"
+  consistency = "one"
+  consistency = "quorum"
+  consistency = "all"
+
+  # Sets the target retention policy for the write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  retention_policy_name = "autogen"
+  retention_policy_name = "one_day_only"
+
+  #
+  # Batch
+  #
+
+  [sinks.influxdb_metrics.batch]
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * required
+    # * default: 20
+    # * type: int
+    # * unit: events
+    max_events = 20
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Request
+  #
+
+  [sinks.influxdb_metrics.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
 
     # The maximum number of retries to make for failed requests.
     #
