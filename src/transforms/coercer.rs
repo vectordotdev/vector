@@ -58,9 +58,9 @@ impl Transform for Coercer {
             // conversion.
             let mut new_event = Event::new_empty_log();
             let new_log = new_event.as_mut_log();
-            for (field, value) in log.all_fields() {
+            for (field, value) in log.into_iter() {
                 if let Some(conv) = self.types.get(&field) {
-                    match conv.convert(value.clone()) {
+                    match conv.convert(value) {
                         Ok(converted) => new_log.insert(field, converted),
                         Err(error) => {
                             warn!(

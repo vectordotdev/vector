@@ -126,6 +126,10 @@ impl LogEvent {
         }
     }
 
+    pub fn into_iter(self) -> impl Iterator<Item = (Atom, Value)> {
+        self.fields.into_iter()
+    }
+
     pub fn unflatten(self) -> unflatten::Unflatten {
         unflatten::Unflatten::from(self.fields)
     }
