@@ -340,8 +340,8 @@
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb
-- name: "sink: sematext"
-  description: Anything `sematext` sink related
+- name: "sink: sematext_logs"
+  description: Anything `sematext_logs` sink related
   color: 4ddbfb
 - name: "sink: socket"
   description: Anything `socket` sink related

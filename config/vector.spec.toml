@@ -5946,7 +5946,7 @@ end
   healthcheck = false
 
 # Batches `log` events to Sematext via the Elasticsearch API.
-[sinks.sematext]
+[sinks.sematext_logs]
   #
   # General
   #
@@ -5956,8 +5956,8 @@ end
   #
   # * required
   # * type: string
-  # * must be: "sematext"
-  type = "sematext"
+  # * must be: "sematext_logs"
+  type = "sematext_logs"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -6002,7 +6002,7 @@ end
   # Batch
   #
 
-  [sinks.sematext.batch]
+  [sinks.sematext_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * required
@@ -6023,7 +6023,7 @@ end
   # Buffer
   #
 
-  [sinks.sematext.buffer]
+  [sinks.sematext_logs.buffer]
     # The buffer's type and storage mechanism.
     #
     # * required
@@ -6063,7 +6063,7 @@ end
   # Request
   #
 
-  [sinks.sematext.request]
+  [sinks.sematext_logs.request]
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional

@@ -1,5 +1,5 @@
-[sinks.sematext]
-title = "Sematext"
+[sinks.sematext_logs]
+title = "Sematext Logs"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
@@ -10,15 +10,15 @@ input_types = ["log"]
 requirements = {}
 write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "sematext") %>
+<%= render("_partials/_component_options.toml", type: "sink", name: "sematext_logs") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.sematext.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
+<%= render("_partials/_batch_options.toml", namespace: "sinks.sematext_logs.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.sematext.options") %>
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.sematext_logs.options") %>
 
 <%= render(
   "_partials/_request_options.toml",
-  namespace: "sinks.sematext.options",
+  namespace: "sinks.sematext_logs.options",
   common: false,
   in_flight_limit: 5,
   rate_limit_duration_secs: 1,
@@ -29,19 +29,19 @@ write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][ur
   timeout_secs: 60
 ) %>
 
-[sinks.sematext.options.region]
+[sinks.sematext_logs.options.region]
 type = "string"
 required = false
 examples = ["na", "eu"]
 description = "The region destination to send logs to. This option is required if `host` is not set."
 
-[sinks.sematext.options.host]
+[sinks.sematext_logs.options.host]
 type = "string"
 required = false
 examples = ["http://127.0.0.1", "http://example.com"]
 description = "The host that will be used to send logs to. This option is required if `region` is not set."
 
-[sinks.sematext.options.token]
+[sinks.sematext_logs.options.token]
 type = "string"
 required = true
 examples = ["${SEMATEXT_TOKEN_ENV_VAR}", "some-sematext-token"]

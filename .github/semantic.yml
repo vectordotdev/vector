@@ -123,7 +123,7 @@ scopes:
   - loki sink
   - new_relic_logs sink
   - prometheus sink
-  - sematext sink
+  - sematext_logs sink
   - socket sink
   - splunk_hec sink
   - statsd sink

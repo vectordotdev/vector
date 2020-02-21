@@ -8,7 +8,7 @@ use futures::{Future, Sink};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SematextConfig {
+pub struct SematextLogsConfig {
     region: Option<Region>,
     // TODO: replace this with `UriEncode` once that is on master.
     host: Option<String>,
@@ -22,7 +22,7 @@ pub struct SematextConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SematextConfig>("sematext")
+    SinkDescription::new_without_default::<SematextLogsConfig>("sematext")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -33,7 +33,7 @@ pub enum Region {
 }
 
 #[typetag::serde(name = "sematext")]
-impl SinkConfig for SematextConfig {
+impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let host = match (&self.host, &self.region) {
             (Some(host), None) => host.clone(),
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn smoke() {
-        let (mut config, cx, mut rt) = load_sink::<SematextConfig>(
+        let (mut config, cx, mut rt) = load_sink::<SematextLogsConfig>(
             r#"
             region = "na"
             token = "mylogtoken"
