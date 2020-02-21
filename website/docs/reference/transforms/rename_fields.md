@@ -4,6 +4,7 @@ description: "The Vector `rename_fields` transform accepts and outputs `log` eve
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
 min_version: null
+service_name: "Rename Fields"
 sidebar_label: "rename_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/rename_fields.rs
 status: "prod-ready"
@@ -43,7 +44,7 @@ import Alert from '@site/src/components/Alert';
 
 <Alert type="danger" fill={true} icon={false}>
 
-#<Requirements:0x0000564afb739190>
+#<Requirements:0x000055e2f473cd00>
 
 </Alert>
 

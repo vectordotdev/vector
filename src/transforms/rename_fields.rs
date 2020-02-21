@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -26,7 +25,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RenameFields::new(self.fields.clone())?))
     }
 
