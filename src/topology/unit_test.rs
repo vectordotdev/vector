@@ -2,7 +2,9 @@ use crate::{
     conditions::Condition,
     event::{Event, Value},
     runtime::Runtime,
-    topology::config::{TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext},
+    topology::config::{
+        TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext,
+    },
     transforms::Transform,
 };
 use indexmap::IndexMap;
@@ -245,7 +247,7 @@ fn build_input(input: &TestInput) -> Result<(String, Event), String> {
             if let Some(metric) = &input.metric {
                 Ok((target, Event::Metric(metric.clone())))
             } else {
-                Err("input type 'log' requires the field 'log_fields'".to_string())
+                Err("input type 'metric' requires the field 'metric'".to_string())
             }
         }
         _ => Err(format!(
@@ -312,11 +314,11 @@ fn build_unit_test(
         })
     });
 
-    for (input_target, _) in &inputs {
+    for (i, (input_target, _)) in inputs.iter().enumerate() {
         if !transform_outputs.contains_key(input_target) {
             errors.push(format!(
-                "unable to locate target transform '{}'",
-                input_target
+                "inputs[{}]: unable to locate target transform '{}'",
+                i, input_target
             ));
         }
     }
@@ -373,7 +375,7 @@ fn build_unit_test(
             if inputs.len() == 1 {
                 errors.push(format!(
                     "unable to complete topology between target transform '{}' and output target '{}'",
-                    inputs.first().map(|(i, _)| i).unwrap_or(&"".to_owned()), o.extract_from
+                    inputs.first().map(|(i, _)| i).unwrap(), o.extract_from
                 ));
             } else {
                 errors.push(format!(
@@ -495,7 +497,42 @@ mod tests {
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
-  unable to locate target transform 'foo'"#
+  inputs[0]: unable to locate target transform 'foo'"#
+                .to_owned(),]
+        );
+
+        let config: Config = toml::from_str(
+            r#"
+[transforms.bar]
+  inputs = ["foo"]
+  type = "add_fields"
+  [transforms.bar.fields]
+    my_string_field = "string value"
+
+[[tests]]
+  name = "broken test"
+
+  [[tests.inputs]]
+    insert_at = "bar"
+    value = "nah this doesnt matter"
+
+  [[tests.inputs]]
+    insert_at = "foo"
+    value = "nah this doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "bar"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "#,
+        )
+        .unwrap();
+
+        let errs = build_unit_tests(&config).err().unwrap();
+        assert_eq!(
+            errs,
+            vec![r#"Failed to build test 'broken test':
+  inputs[1]: unable to locate target transform 'foo'"#
                 .to_owned(),]
         );
     }
@@ -625,7 +662,7 @@ mod tests {
   unable to complete topology between target transform 'foo' and output target 'quz'"#
                     .to_owned(),
                 r#"Failed to build test 'broken test 2':
-  unable to locate target transform 'nope'"#
+  inputs[0]: unable to locate target transform 'nope'"#
                     .to_owned(),
                 r#"Failed to build test 'broken test 3':
   unable to complete topology between target transforms ["foo", "nah"] and output target 'baz'
