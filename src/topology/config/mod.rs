@@ -236,7 +236,9 @@ inventory::collect!(TransformDescription);
 #[serde(deny_unknown_fields)]
 pub struct TestDefinition {
     pub name: String,
-    pub input: TestInput,
+    pub input: Option<TestInput>,
+    #[serde(default)]
+    pub inputs: Vec<TestInput>,
     pub outputs: Vec<TestOutput>,
 }
 

@@ -2,7 +2,9 @@ use crate::{
     conditions::Condition,
     event::{Event, Value},
     runtime::Runtime,
-    topology::config::{TestCondition, TestDefinition, TestInputValue, TransformContext},
+    topology::config::{
+        TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext,
+    },
     transforms::Transform,
 };
 use indexmap::IndexMap;
@@ -22,7 +24,7 @@ pub struct UnitTestTransform {
 
 pub struct UnitTest {
     pub name: String,
-    input: (String, Event),
+    inputs: Vec<(String, Event)>,
     transforms: IndexMap<String, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
 }
@@ -91,12 +93,14 @@ impl UnitTest {
         let mut inspections = Vec::new();
         let mut results = HashMap::new();
 
-        walk(
-            &self.input.0,
-            vec![self.input.1.clone()],
-            &mut self.transforms,
-            &mut results,
-        );
+        for input in &self.inputs {
+            walk(
+                &input.0,
+                vec![input.1.clone()],
+                &mut self.transforms,
+                &mut results,
+            );
+        }
 
         for check in &self.checks {
             if let Some((inputs, outputs)) = results.get(&check.extract_from) {
@@ -190,46 +194,40 @@ fn links_to_a_leaf(
 /// Reduces a collection of transforms into a set that only contains those that
 /// link between our root (test input) and a set of leaves (test outputs).
 fn reduce_transforms(
-    root: &str,
+    roots: &Vec<String>,
     leaves: &IndexMap<String, ()>,
     transform_outputs: &mut IndexMap<String, IndexMap<String, ()>>,
 ) {
     let mut link_checked: IndexMap<String, bool> = IndexMap::new();
 
-    if !links_to_a_leaf(root, leaves, &mut link_checked, transform_outputs) {
+    if roots
+        .iter()
+        .all(|r| !links_to_a_leaf(r, leaves, &mut link_checked, transform_outputs))
+    {
         transform_outputs.clear();
     }
 
     transform_outputs.retain(|name, children| {
-        let linked = name == root || *link_checked.get(name).unwrap_or(&false);
+        let linked = roots.contains(name) || *link_checked.get(name).unwrap_or(&false);
         if linked {
             // Also remove all unlinked children.
             children.retain(|child_name, _| {
-                name == root || *link_checked.get(child_name).unwrap_or(&false)
+                roots.contains(child_name) || *link_checked.get(child_name).unwrap_or(&false)
             })
         }
         linked
     });
 }
 
-fn build_unit_test(
-    definition: &TestDefinition,
-    config: &super::Config,
-) -> Result<UnitTest, Vec<String>> {
-    let rt = Runtime::single_threaded().unwrap();
-    let mut errors = vec![];
-
-    // Build input event.
-    let input_event = match definition.input.type_str.as_ref() {
-        "raw" => match definition.input.value.as_ref() {
-            Some(v) => Event::from(v.clone()),
-            None => {
-                errors.push("input type 'raw' requires the field 'value'".to_string());
-                Event::from("")
-            }
+fn build_input(input: &TestInput) -> Result<(String, Event), String> {
+    let target = input.insert_at.clone();
+    match input.type_str.as_ref() {
+        "raw" => match input.value.as_ref() {
+            Some(v) => Ok((target, Event::from(v.clone()))),
+            None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
         "log" => {
-            if let Some(log_fields) = &definition.input.log_fields {
+            if let Some(log_fields) = &input.log_fields {
                 let mut event = Event::from("");
                 for (path, value) in log_fields {
                     let value: Value = match value {
@@ -240,26 +238,63 @@ fn build_unit_test(
                     };
                     event.as_mut_log().insert(path.to_owned(), value);
                 }
-                event
+                Ok((target, event))
             } else {
-                errors.push("input type 'log' requires the field 'log_fields'".to_string());
-                Event::from("")
+                Err("input type 'log' requires the field 'log_fields'".to_string())
             }
         }
         "metric" => {
-            if let Some(metric) = &definition.input.metric {
-                Event::Metric(metric.clone())
+            if let Some(metric) = &input.metric {
+                Ok((target, Event::Metric(metric.clone())))
             } else {
-                errors.push("input type 'log' requires the field 'log_fields'".to_string());
-                Event::from("")
+                Err("input type 'metric' requires the field 'metric'".to_string())
             }
         }
-        _ => {
-            errors.push(format!(
-                "unrecognized input type '{}', expected one of: 'raw', 'log' or 'metric'",
-                definition.input.type_str
-            ));
-            Event::from("")
+        _ => Err(format!(
+            "unrecognized input type '{}', expected one of: 'raw', 'log' or 'metric'",
+            input.type_str
+        )),
+    }
+}
+
+fn build_inputs(definition: &TestDefinition) -> Result<Vec<(String, Event)>, Vec<String>> {
+    let mut inputs = Vec::new();
+    let mut errors = vec![];
+
+    if let Some(input_def) = &definition.input {
+        match build_input(input_def) {
+            Ok(input_event) => inputs.push(input_event),
+            Err(err) => errors.push(err),
+        }
+    } else if definition.inputs.is_empty() {
+        errors.push("must specify at least one input.".to_owned());
+    }
+    for input_def in &definition.inputs {
+        match build_input(input_def) {
+            Ok(input_event) => inputs.push(input_event),
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(inputs)
+    } else {
+        Err(errors)
+    }
+}
+
+fn build_unit_test(
+    definition: &TestDefinition,
+    config: &super::Config,
+) -> Result<UnitTest, Vec<String>> {
+    let rt = Runtime::single_threaded().unwrap();
+    let mut errors = vec![];
+
+    let inputs = match build_inputs(&definition) {
+        Ok(inputs) => inputs,
+        Err(mut errs) => {
+            errors.append(&mut errs);
+            Vec::new()
         }
     };
 
@@ -279,11 +314,15 @@ fn build_unit_test(
         })
     });
 
-    if !transform_outputs.contains_key(&definition.input.insert_at) {
-        errors.push(format!(
-            "unable to locate target transform '{}'",
-            definition.input.insert_at,
-        ));
+    for (i, (input_target, _)) in inputs.iter().enumerate() {
+        if !transform_outputs.contains_key(input_target) {
+            errors.push(format!(
+                "inputs[{}]: unable to locate target transform '{}'",
+                i, input_target
+            ));
+        }
+    }
+    if !errors.is_empty() {
         return Err(errors);
     }
 
@@ -294,7 +333,14 @@ fn build_unit_test(
 
     // Reduce the configured transforms into just the ones connecting our test
     // target with output targets.
-    reduce_transforms(&definition.input.insert_at, &leaves, &mut transform_outputs);
+    reduce_transforms(
+        &inputs
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>(),
+        &leaves,
+        &mut transform_outputs,
+    );
 
     // Build reduced transforms.
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
@@ -326,10 +372,17 @@ fn build_unit_test(
 
     definition.outputs.iter().for_each(|o| {
         if !transforms.contains_key(&o.extract_from) {
-            errors.push(format!(
-                "unable to complete topology between target transform '{}' and output target '{}'",
-                definition.input.insert_at, o.extract_from
-            ));
+            if inputs.len() == 1 {
+                errors.push(format!(
+                    "unable to complete topology between target transform '{}' and output target '{}'",
+                    inputs.first().map(|(i, _)| i).unwrap(), o.extract_from
+                ));
+            } else {
+                errors.push(format!(
+                    "unable to complete topology between target transforms {:?} and output target '{}'",
+                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o.extract_from
+                ));
+            }
         }
     });
 
@@ -378,7 +431,7 @@ fn build_unit_test(
     } else {
         Ok(UnitTest {
             name: definition.name.clone(),
-            input: (definition.input.insert_at.clone(), input_event),
+            inputs,
             transforms,
             checks,
         })
@@ -444,7 +497,72 @@ mod tests {
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
-  unable to locate target transform 'foo'"#
+  inputs[0]: unable to locate target transform 'foo'"#
+                .to_owned(),]
+        );
+
+        let config: Config = toml::from_str(
+            r#"
+[transforms.bar]
+  inputs = ["foo"]
+  type = "add_fields"
+  [transforms.bar.fields]
+    my_string_field = "string value"
+
+[[tests]]
+  name = "broken test"
+
+  [[tests.inputs]]
+    insert_at = "bar"
+    value = "nah this doesnt matter"
+
+  [[tests.inputs]]
+    insert_at = "foo"
+    value = "nah this doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "bar"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "#,
+        )
+        .unwrap();
+
+        let errs = build_unit_tests(&config).err().unwrap();
+        assert_eq!(
+            errs,
+            vec![r#"Failed to build test 'broken test':
+  inputs[1]: unable to locate target transform 'foo'"#
+                .to_owned(),]
+        );
+    }
+
+    #[test]
+    fn parse_no_test_input() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.bar]
+  inputs = ["foo"]
+  type = "add_fields"
+  [transforms.bar.fields]
+    my_string_field = "string value"
+
+[[tests]]
+  name = "broken test"
+
+  [[tests.outputs]]
+    extract_from = "bar"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "#,
+        )
+        .unwrap();
+
+        let errs = build_unit_tests(&config).err().unwrap();
+        assert_eq!(
+            errs,
+            vec![r#"Failed to build test 'broken test':
+  must specify at least one input."#
                 .to_owned(),]
         );
     }
@@ -458,6 +576,12 @@ mod tests {
   type = "add_fields"
   [transforms.foo.fields]
     foo_field = "string value"
+
+[transforms.nah]
+  inputs = ["ignored"]
+  type = "add_fields"
+  [transforms.nah.fields]
+    new_field = "string value"
 
 [transforms.baz]
   inputs = ["bar"]
@@ -502,6 +626,29 @@ mod tests {
     [[tests.outputs.conditions]]
       type = "check_fields"
       "message.equals" = "not this"
+
+[[tests]]
+  name = "broken test 3"
+
+  [[tests.inputs]]
+    insert_at = "foo"
+    value = "nah this doesnt matter"
+
+  [[tests.inputs]]
+    insert_at = "nah"
+    value = "nah this doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "baz"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.equals" = "not this"
+
+  [[tests.outputs]]
+    extract_from = "quz"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.equals" = "not this"
       "#,
         )
         .unwrap();
@@ -515,7 +662,11 @@ mod tests {
   unable to complete topology between target transform 'foo' and output target 'quz'"#
                     .to_owned(),
                 r#"Failed to build test 'broken test 2':
-  unable to locate target transform 'nope'"#
+  inputs[0]: unable to locate target transform 'nope'"#
+                    .to_owned(),
+                r#"Failed to build test 'broken test 3':
+  unable to complete topology between target transforms ["foo", "nah"] and output target 'baz'
+  unable to complete topology between target transforms ["foo", "nah"] and output target 'quz'"#
                     .to_owned(),
             ]
         );
@@ -554,6 +705,94 @@ mod tests {
   unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"#
                 .to_owned(),]
         );
+    }
+
+    #[test]
+    fn test_success_multi_inputs() {
+        let config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = ["ignored"]
+  type = "add_fields"
+  [transforms.foo.fields]
+    new_field = "string value"
+
+[transforms.foo_two]
+  inputs = ["ignored"]
+  type = "add_fields"
+  [transforms.foo_two.fields]
+    new_field_two = "second string value"
+
+[transforms.bar]
+  inputs = ["foo", "foo_two"]
+  type = "add_fields"
+  [transforms.bar.fields]
+    second_new_field = "also a string value"
+
+[transforms.baz]
+  inputs = ["bar"]
+  type = "add_fields"
+  [transforms.baz.fields]
+    third_new_field = "also also a string value"
+
+[[tests]]
+  name = "successful test"
+
+  [[tests.inputs]]
+    insert_at = "foo"
+    value = "nah this doesnt matter"
+
+  [[tests.inputs]]
+    insert_at = "foo_two"
+    value = "nah this also doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "foo"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "new_field.equals" = "string value"
+      "message.equals" = "nah this doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "foo_two"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "new_field_two.equals" = "second string value"
+      "message.equals" = "nah this also doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "bar"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "new_field.equals" = "string value"
+      "second_new_field.equals" = "also a string value"
+      "message.equals" = "nah this doesnt matter"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "new_field_two.equals" = "second string value"
+      "second_new_field.equals" = "also a string value"
+      "message.equals" = "nah this also doesnt matter"
+
+  [[tests.outputs]]
+    extract_from = "baz"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "new_field.equals" = "string value"
+      "second_new_field.equals" = "also a string value"
+      "third_new_field.equals" = "also also a string value"
+      "message.equals" = "nah this doesnt matter"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "new_field_two.equals" = "second string value"
+      "second_new_field.equals" = "also a string value"
+      "third_new_field.equals" = "also also a string value"
+      "message.equals" = "nah this also doesnt matter"
+      "#,
+        )
+        .unwrap();
+
+        let mut tests = build_unit_tests(&config).unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]

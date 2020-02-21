@@ -11,13 +11,13 @@ common = true
 required = true
 description = "A unique identifier for this test."
 
-[tests.children.input]
-type = "table"
+[tests.children.inputs]
+type = "[table]"
 common = true
 required = true
 description = "A table that defines a unit test input event."
 
-[tests.children.input.children.insert_at]
+[tests.children.inputs.children.insert_at]
 type = "string"
 examples = ["foo"]
 common = true
@@ -27,32 +27,32 @@ The name of a transform, the input event will be delivered to this transform in 
 order to begin the test.\
 """
 
-[tests.children.input.children.type]
+[tests.children.inputs.children.type]
 type = "string"
 examples = ["raw", "log", "metric"]
 required = true
 common = true
 description = "The event type."
 
-[tests.children.input.children.type.enum]
+[tests.children.inputs.children.type.enum]
 raw = "Creates a log event where the message contents are specified in the field 'value'."
 log = "Creates a log event where log fields are specified in the table 'log_fields'."
 metric = "Creates a metric event, where its type and fields are specified in the table 'metric'."
 
-[tests.children.input.children.value]
+[tests.children.inputs.children.value]
 type = "string"
 examples = ["some message contents"]
 relevant_when = {type = "raw"}
 common = true
 description = "Specifies the log message field contents when the input type is 'raw'."
 
-[tests.children.input.children.log_fields]
+[tests.children.inputs.children.log_fields]
 type = "table"
 common = false
 relevant_when = {type = "log"}
 description = "Specifies the log fields when the input type is 'log'."
 
-[tests.children.input.children.log_fields.children."`[field-name]`"]
+[tests.children.inputs.children.log_fields.children."`[field-name]`"]
 type = "*"
 required = true
 examples = [
@@ -63,26 +63,26 @@ description = """\
 A key/value pair representing a field to be added to the input event.\
 """
 
-[tests.children.input.children.metric]
+[tests.children.inputs.children.metric]
 type = "table"
 common = false
 relevant_when = {type = "metric"}
 description = "Specifies the metric type when the input type is 'metric'."
 
-[tests.children.input.children.metric.children.type]
+[tests.children.inputs.children.metric.children.type]
 type = "string"
 required = true
 examples = ["counter"]
 common = true
 description = "The metric type."
 
-[tests.children.input.children.metric.children.type.enum]
+[tests.children.inputs.children.metric.children.type.enum]
 counter = "A [counter metric type][docs.data-model.metric#counter]."
 gauge = "A [gauge metric type][docs.data-model.metric#gauge]."
 histogram = "A [distribution metric type][docs.data-model.metric#distribution]."
 set = "A [set metric type][docs.data-model.metric#set]."
 
-[tests.children.input.children.metric.children.name]
+[tests.children.inputs.children.metric.children.name]
 type = "string"
 examples = ["duration_total"]
 required = true
@@ -92,12 +92,12 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
 """
 
-[tests.children.input.children.metric.children.tags]
+[tests.children.inputs.children.metric.children.tags]
 type = "table"
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
-[tests.children.input.children.metric.children.tags.children."`[tag-name]`"]
+[tests.children.inputs.children.metric.children.tags.children."`[tag-name]`"]
 type = "string"
 examples = [
   {host = "foohost"},
@@ -109,7 +109,7 @@ description = """\
 Key/value pairs representing [metric tags][docs.data-model.metric#tags].\
 """
 
-[tests.children.input.children.metric.children.val]
+[tests.children.inputs.children.metric.children.val]
 type = "float"
 examples = [10.2]
 required = true
@@ -117,7 +117,7 @@ description = """\
 Amount to increment/decrement or gauge.\
 """
 
-[tests.children.input.children.metric.children.timestamp]
+[tests.children.inputs.children.metric.children.timestamp]
 type = "string"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
@@ -125,20 +125,20 @@ description = """\
 Time metric was created/ingested.\
 """
 
-[tests.children.input.children.metric.children.sample_rate]
+[tests.children.inputs.children.metric.children.sample_rate]
 type = "float"
 examples = [1]
 description = """\
 The bucket/distribution the metric is a part of.\
 """
 
-[tests.children.input.children.metric.children.direction]
+[tests.children.inputs.children.metric.children.direction]
 type = "string"
 description = """\
 The direction to increase or decrease the gauge value.\
 """
 
-[tests.children.input.children.metric.children.direction.enum]
+[tests.children.inputs.children.metric.children.direction.enum]
 plus = "Increase the gauge"
 minus = "Decrease the gauge"
 
