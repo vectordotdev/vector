@@ -38,16 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     old field name = "new field name" # example
 ```
 
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert type="danger" fill={true} icon={false}>
-
-#<Requirements:0x0000556d623cc4c0>
-
-</Alert>
-
 ## Options
 
 import Fields from '@site/src/components/Fields';
