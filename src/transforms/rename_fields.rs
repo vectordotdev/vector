@@ -117,7 +117,7 @@ mod tests {
         fields.insert("to_move".into(), "moved".into());
         fields.insert("not_present".into(), "should_not_exist".into());
 
-        let mut transform = RenameFields::new(fields);
+        let mut transform = RenameFields::new(fields).unwrap();
 
         let new_event = transform.transform(event).unwrap();
 
