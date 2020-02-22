@@ -478,6 +478,7 @@ When [`message_start_indicator`](#message_start_indicator) is present, this sets
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"multiline"}
   path={null}
   relevantWhen={null}
@@ -499,6 +500,7 @@ Multiline parsing configuration. If not speicified, multiline parsing is disable
   defaultValue={null}
   enumValues={null}
   examples={["^[\\s]+","\\\\$","^(INFO|ERROR) ",";$"]}
+  groups={[]}
   name={"condition_pattern"}
   path={"multiline"}
   relevantWhen={null}
@@ -521,6 +523,7 @@ Condition pattern to look for. Exact behavior is configured via [`mode`](#mode).
   defaultValue={null}
   enumValues={{"continue_through":"All consecutive lines matching this pattern are included in the group. The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern. This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading whitespace) indicates that it is an extension of the preceeding line.","continue_past":"All consecutive lines matching this pattern, plus one additional line, are included in the group. This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating that the following line is part of the same message.","halt_before":"All consecutive lines not matching this pattern are included in the group. This is useful where a log line contains a marker indicating that it begins a new message.","halt_with":"All consecutive lines, up to and including the first line matching this pattern, are included in the group. This is useful where a log line ends with a termination marker, such as a semicolon."}}
   examples={["continue_through","continue_past","halt_before","halt_with"]}
+  groups={[]}
   name={"mode"}
   path={"multiline"}
   relevantWhen={null}
@@ -543,6 +546,7 @@ Mode of operation, specifies how the condition pattern is interpreted.
   defaultValue={null}
   enumValues={null}
   examples={["^[^\\s]","\\\\$","^(INFO|ERROR) ","[^;]$"]}
+  groups={[]}
   name={"start_pattern"}
   path={"multiline"}
   relevantWhen={null}
@@ -565,6 +569,7 @@ Start pattern to look for as a beginning of the message.
   defaultValue={null}
   enumValues={null}
   examples={[1000,600000]}
+  groups={[]}
   name={"timeout_ms"}
   path={"multiline"}
   relevantWhen={null}
