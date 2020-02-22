@@ -58,6 +58,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Priority
   oldest_first = false # default
+
+  # OPTIONAL - Multiline
+  [sources.my_source_id.multiline]
+    condition_pattern = "^[\\s]+" # example
+    mode = "continue_through" # example, enum
+    start_pattern = "^[^\\s]" # example
+    timeout_ms = 1000 # example, milliseconds
 ```
 
 </TabItem>
@@ -83,7 +90,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   file_key = "file" # default
   host_key = "host" # default
 
-  # OPTIONAL - Multi-line
+  # OPTIONAL - Multi-line (deprecated)
   message_start_indicator = "^(INFO|ERROR)" # example, no default
   multi_line_timeout = 1000 # default, milliseconds
 
@@ -96,6 +103,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
     fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
     ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
     strategy = "checksum" # default, enum
+
+  # OPTIONAL - Multiline
+  [sources.my_source_id.multiline]
+    condition_pattern = "^[\\s]+" # example
+    mode = "continue_through" # example, enum
+    start_pattern = "^[^\\s]" # example
+    timeout_ms = 1000 # example, milliseconds
 ```
 
 </TabItem>
@@ -455,6 +469,120 @@ When present, Vector will aggregate multiple lines into a single event, using th
 
 When [`message_start_indicator`](#message_start_indicator) is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
 
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  name={"multiline"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### multiline
+
+Multiline parsing configuration. If not speicified, multiline parsing is disabled.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["^[\\s]+","\\\\$","^(INFO|ERROR) ",";$"]}
+  name={"condition_pattern"}
+  path={"multiline"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### condition_pattern
+
+Condition pattern to look for. Exact behavior is configured via [`mode`](#mode).
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"continue_through":"All consecutive lines matching this pattern are included in the group. The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern. This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading whitespace) indicates that it is an extension of the preceeding line.","continue_past":"All consecutive lines matching this pattern, plus one additional line, are included in the group. This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating that the following line is part of the same message.","halt_before":"All consecutive lines not matching this pattern are included in the group. This is useful where a log line contains a marker indicating that it begins a new message.","halt_with":"All consecutive lines, up to and including the first line matching this pattern, are included in the group. This is useful where a log line ends with a termination marker, such as a semicolon."}}
+  examples={["continue_through","continue_past","halt_before","halt_with"]}
+  name={"mode"}
+  path={"multiline"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### mode
+
+Mode of operation, specifies how the condition pattern is interpreted.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["^[^\\s]","\\\\$","^(INFO|ERROR) ","[^;]$"]}
+  name={"start_pattern"}
+  path={"multiline"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### start_pattern
+
+Start pattern to look for as a beginning of the message.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[1000,600000]}
+  name={"timeout_ms"}
+  path={"multiline"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"milliseconds"}
+  >
+
+#### timeout_ms
+
+The maximum time to wait for the continuation. Once this timeout is reached, the buffered message is guaraneed to be flushed, even if incomplete.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 

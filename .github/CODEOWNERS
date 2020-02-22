@@ -42,7 +42,8 @@
 /src/sinks/tcp.rs @lukesteensen
 
 /src/sources/docker.rs @LucioFranco
-/src/sources/file.rs @LucioFranco
+/src/sources/file/mod.rs @LucioFranco
+/src/sources/file/line_agg.rs @MOZGIII
 /src/sources/journald.rs @bruceg
 /src/sources/kafka.rs @a-rodin
 /src/sources/stdin.rs @bruceg
