@@ -17538,7 +17538,7 @@ module.exports = {
 
       ]
     },
-    "sematext": {
+    "sematext_logs": {
       "beta": true,
       "delivery_guarantee": "best_effort",
       "description": "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es].",
@@ -17546,8 +17546,8 @@ module.exports = {
         "log"
       ],
       "function_category": "transmit",
-      "id": "sematext_sink",
-      "name": "sematext",
+      "id": "sematext_logs_sink",
+      "name": "sematext_logs",
       "operating_systems": [
         "Linux",
         "MacOS",
