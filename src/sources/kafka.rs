@@ -1,5 +1,6 @@
 use crate::{
     event::Event,
+    kafka::KafkaTlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -42,6 +43,7 @@ pub struct KafkaSourceConfig {
     host_key: Option<String>,
     key_field: Option<String>,
     librdkafka_options: Option<HashMap<String, String>>,
+    tls: Option<KafkaTlsConfig>,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -160,6 +162,10 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
         .set("enable.auto.offset.store", "false")
         .set("client.id", "vector");
 
+    if let Some(tls) = &config.tls {
+        tls.apply(&mut client_config)?;
+    }
+
     if let Some(librdkafka_options) = config.librdkafka_options {
         for (key, value) in librdkafka_options.into_iter() {
             client_config.set(key.as_str(), value.as_str());
@@ -205,6 +211,7 @@ mod test {
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             librdkafka_options: None,
+            tls: None,
         }
     }
 
@@ -276,6 +283,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             librdkafka_options: None,
+            tls: None,
         };
 
         let mut rt = runtime();

@@ -7,7 +7,6 @@ pub mod service;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
-pub mod tls;
 #[cfg(unix)]
 pub mod unix;
 pub mod uri;

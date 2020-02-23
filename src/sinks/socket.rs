@@ -1,8 +1,8 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    sinks::util::tcp::{TcpSinkConfig, TlsConfig},
-    sinks::util::Encoding,
+    sinks::util::{tcp::TcpSinkConfig, Encoding},
+    tls::TlsConfig,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};

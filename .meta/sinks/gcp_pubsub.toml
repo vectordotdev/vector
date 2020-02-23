@@ -47,7 +47,7 @@ required = true
 examples = ["vector-123456"]
 description = "The project name to which to publish logs."
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.gcp_pubsub.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_pubsub.options", can_enable: false, can_verify: true) %>
 
 [sinks.gcp_pubsub.options.topic]
 type = "string"

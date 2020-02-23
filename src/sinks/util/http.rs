@@ -1,12 +1,14 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    tls::{TlsConnectorExt, TlsSettings},
     Batch, BatchSettings, BatchSink,
 };
-use crate::dns::Resolver;
-use crate::event::Event;
-use crate::topology::config::SinkContext;
+use crate::{
+    dns::Resolver,
+    event::Event,
+    tls::{TlsConnectorExt, TlsSettings},
+    topology::config::SinkContext,
+};
 use bytes::Bytes;
 use futures::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::{Request, StatusCode};
