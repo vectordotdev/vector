@@ -665,7 +665,7 @@ The current hostname, equivalent to the `gethostname` command. This can be renam
 
 ### message
 
-The raw log message, unaltered.
+The raw log message, unaltered. This can be renamed via the [global `message_key` option][docs.reference.global-options#message_key].
 
 
 </Field>
@@ -688,7 +688,7 @@ The raw log message, unaltered.
 
 ### timestamp
 
-The exact time the event was ingested.
+The exact time the event was ingested. This can be renamed via the [global `timestamp_key` option][docs.reference.global-options#timestamp_key].
 
 
 </Field>
@@ -705,9 +705,9 @@ Vector provides a set of [`multiline`](#multiline) options. These options were c
 thought through and will allow you to solve the simplest and most complex
 cases. Let's look at a few examples:
 
-#### Ruby Exceptions
+#### Example 1: Ruby Exceptions
 
-Ruby exceptions, when logged, consis of multiple lines:
+Ruby exceptions, when logged, consist of multiple lines:
 
 ```
 foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
@@ -726,18 +726,18 @@ configuration:
 
   [sources.my_file_source.multiline]
     start_pattern = "^[^\\s]"
-    condition_pattern = "^[\\s]+from"
     mode = "continue_through"
+    condition_pattern = "^[\\s]+from"
 ```
 
 * [`start_pattern`](#start_pattern), set to `^[^\\s]`, tells Vector that the start of new events
   should _not_ start  with white-space.
-* [`condition_pattern`](#condition_pattern), set to `^[\\s]+from`, tells Vector to continue
-  aggregating lines if they start with white-space followed by `from`.
 * [`mode`](#mode), set to `continue_through`, tells Vector continue aggregating lines
   until the [`condition_pattern`](#condition_pattern) is no longer valid (exluding the invalid line).
+* [`condition_pattern`](#condition_pattern), set to `^[\\s]+from`, tells Vector to continue
+  aggregating lines if they start with white-space followed by `from`.
 
-#### Line Continuations
+#### Example 2: Line Continuations
 
 Some programming languages use the backslash (`\`) character to signal that a
 line will continue on the next line:
@@ -757,18 +757,18 @@ configuration:
 
   [sources.my_file_source.multiline]
     start_pattern = "^[^\\s]"
-    condition_pattern = "\\$"
     mode = "continue_past"
+    condition_pattern = "\\$"
 ```
 
 * [`start_pattern`](#start_pattern), set to `^[^\\s]`, tells Vector that the start of new events
   should _not_ start  with white-space.
-* [`condition_pattern`](#condition_pattern), set to `\\$`, tells Vector to continue aggregating lines
-  if they _end_ with a `/` character.
 * [`mode`](#mode), set to `continue_past`, tells Vector continue aggregating lines, plus
   one additional line, until [`condition_pattern`](#condition_pattern) is false.
+* [`condition_pattern`](#condition_pattern), set to `\\$`, tells Vector to continue aggregating lines
+  if they _end_ with a `/` character.
 
-#### Timestamps
+#### Example 3: Timestamps
 
 Activity logs from services such as Elasticsearch typically begin with a
 timestamp, followed by information on the specific activity, as in this example:
@@ -788,16 +788,16 @@ configuration:
 
   [sources.my_file_source.multiline]
     start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
     mode = "halt_before"
+    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
 ```
 
 * [`start_pattern`](#start_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector that
   the start of new events should start with a timestamp sequence.
-* [`condition_pattern`](#condition_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector to
-  continue aggregating lines if they do _not_ start with a timestamp sequence.
 * [`mode`](#mode), set to `halt_before`, tells Vector continue aggregating lines as long
   as the [`condition_pattern`](#condition_pattern) does not match.
+* [`condition_pattern`](#condition_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector to
+  continue aggregating lines if they do _not_ start with a timestamp sequence.
 
 ### Auto Discovery
 
@@ -938,6 +938,8 @@ read position will resume from the last checkpoint.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
+[docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
+[docs.reference.global-options#timestamp_key]: /docs/reference/global-options/#timestamp_key
 [pages.index#correctness]: /#correctness
 [urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
