@@ -187,8 +187,8 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
         .collect::<LogEvent>();
 
     json!({
-        "fields": fields.unflatten(),
-        "event": event.unflatten(),
+        "fields": fields,
+        "event": event,
         "time": timestamp
     })
 }

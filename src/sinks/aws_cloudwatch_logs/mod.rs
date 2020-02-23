@@ -256,7 +256,7 @@ impl CloudwatchLogsSvc {
 
         match self.encoding {
             Encoding::Json => {
-                let message = serde_json::to_string(&log.unflatten()).unwrap();
+                let message = serde_json::to_string(&log).unwrap();
                 InputLogEvent { message, timestamp }
             }
             Encoding::Text => {
