@@ -233,30 +233,6 @@ dns_servers = ["0.0.0.0:53"]
   host_key = "host"
 
   #
-  # Multi-line (deprecated)
-  #
-
-  # When present, Vector will aggregate multiple lines into a single event, using
-  # this pattern as the indicator that the previous lines should be flushed and a
-  # new event started. The pattern will be matched against entire lines as a
-  # regular expression, so remember to anchor as appropriate.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  message_start_indicator = "^(INFO|ERROR)"
-
-  # When `message_start_indicator` is present, this sets the amount of time
-  # Vector will buffer lines into a single event before flushing, regardless of
-  # whether or not it has seen a line indicating the start of a new message.
-  #
-  # * optional
-  # * default: 1000
-  # * type: int
-  # * unit: milliseconds
-  multi_line_timeout = 1000
-
-  #
   # Priority
   #
 
@@ -319,7 +295,7 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.file.multiline]
-    # Condition pattern to look for. Exact behavior is configured via `mode`.
+    # Condition regex pattern to look for. Exact behavior is configured via `mode`.
     #
     # * required
     # * type: string
@@ -328,7 +304,7 @@ dns_servers = ["0.0.0.0:53"]
     condition_pattern = "^(INFO|ERROR) "
     condition_pattern = ";$"
 
-    # Mode of operation, specifies how the condition pattern is interpreted.
+    # Mode of operation, specifies how the `condition_pattern` is interpreted.
     #
     # * required
     # * type: string
@@ -338,7 +314,7 @@ dns_servers = ["0.0.0.0:53"]
     mode = "halt_before"
     mode = "halt_with"
 
-    # Start pattern to look for as a beginning of the message.
+    # Start regex pattern to look for as a beginning of the message.
     #
     # * required
     # * type: string

@@ -58,13 +58,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Priority
   oldest_first = false # default
-
-  # OPTIONAL - Multiline
-  [sources.my_source_id.multiline]
-    condition_pattern = "^[\\s]+" # example
-    mode = "continue_through" # example, enum
-    start_pattern = "^[^\\s]" # example
-    timeout_ms = 1000 # example, milliseconds
 ```
 
 </TabItem>
@@ -89,10 +82,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
-
-  # OPTIONAL - Multi-line (deprecated)
-  message_start_indicator = "^(INFO|ERROR)" # example, no default
-  multi_line_timeout = 1000 # default, milliseconds
 
   # OPTIONAL - Priority
   max_read_bytes = 2048 # default, bytes
@@ -255,7 +244,7 @@ The strategy used to uniquely identify files. This is important for [checkpointi
 
 #### fingerprint_bytes
 
-The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.
+The number of bytes read off the head of the file to generate a unique fingerprint. See [Fingerprinting](#fingerprinting) for more info.
 
 
 </Field>
@@ -278,7 +267,7 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 
 #### ignored_header_bytes
 
-The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.
+The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [Fingerprinting](#fingerprinting) for more info.
 
 
 </Field>
@@ -431,52 +420,6 @@ An approximate limit on the amount of data read from a single file at a given ti
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["^(INFO|ERROR)"]}
-  groups={[]}
-  name={"message_start_indicator"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### message_start_indicator
-
-When present, Vector will aggregate multiple lines into a single event, using this pattern as the indicator that the previous lines should be flushed and a new event started. The pattern will be matched against entire lines as a regular expression, so remember to anchor as appropriate.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={1000}
-  enumValues={null}
-  examples={[1000]}
-  groups={[]}
-  name={"multi_line_timeout"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"milliseconds"}
-  >
-
-### multi_line_timeout
-
-When [`message_start_indicator`](#message_start_indicator) is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"multiline"}
@@ -490,7 +433,8 @@ When [`message_start_indicator`](#message_start_indicator) is present, this sets
 
 ### multiline
 
-Multiline parsing configuration. If not speicified, multiline parsing is disabled.
+Multiline parsing configuration (per file).
+If not speicified, multiline parsing is disabled. See [ Multi-Line Messages](#-multi-line-messages) for more info.
 
 <Fields filters={false}>
 
@@ -512,7 +456,7 @@ Multiline parsing configuration. If not speicified, multiline parsing is disable
 
 #### condition_pattern
 
-Condition pattern to look for. Exact behavior is configured via [`mode`](#mode).
+Condition regex pattern to look for. Exact behavior is configured via [`mode`](#mode). See [ Multi-Line Messages](#-multi-line-messages) for more info.
 
 
 </Field>
@@ -535,7 +479,7 @@ Condition pattern to look for. Exact behavior is configured via [`mode`](#mode).
 
 #### mode
 
-Mode of operation, specifies how the condition pattern is interpreted.
+Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) is interpreted. See [ Multi-Line Messages](#-multi-line-messages) for more info.
 
 
 </Field>
@@ -558,7 +502,7 @@ Mode of operation, specifies how the condition pattern is interpreted.
 
 #### start_pattern
 
-Start pattern to look for as a beginning of the message.
+Start regex pattern to look for as a beginning of the message. See [ Multi-Line Messages](#-multi-line-messages) for more info.
 
 
 </Field>
@@ -754,6 +698,107 @@ The exact time the event was ingested.
 
 ## How It Works
 
+###  Multi-Line Messages
+
+Sometimes a single log event will appear as multiple log lines. To handle this,
+Vector provides a set of [`multiline`](#multiline) options. These options were carefully
+thought through and will allow you to solve the simplest and most complex
+cases. Let's look at a few examples:
+
+#### Ruby Exceptions
+
+Ruby exceptions, when logged, consis of multiple lines:
+
+```
+foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
+	from foobar.rb:6:in `bar'
+  from foobar.rb:2:in `foo'
+  from foobar.rb:9:in `<main>'
+```
+
+To consume these lines as a single event with Vector use the following
+configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^[^\\s]"
+    condition_pattern = "^[\\s]+from"
+    mode = "continue_through"
+```
+
+* [`start_pattern`](#start_pattern), set to `^[^\\s]`, tells Vector that the start of new events
+  should _not_ start  with white-space.
+* [`condition_pattern`](#condition_pattern), set to `^[\\s]+from`, tells Vector to continue
+  aggregating lines if they start with white-space followed by `from`.
+* [`mode`](#mode), set to `continue_through`, tells Vector continue aggregating lines
+  until the [`condition_pattern`](#condition_pattern) is no longer valid (exluding the invalid line).
+
+#### Line Continuations
+
+Some programming languages use the backslash (`\`) character to signal that a
+line will continue on the next line:
+
+```
+This is a line that is\
+continued to the next line
+```
+
+To consume these lines as a single event with Vector use the following
+configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^[^\\s]"
+    condition_pattern = "\\$"
+    mode = "continue_past"
+```
+
+* [`start_pattern`](#start_pattern), set to `^[^\\s]`, tells Vector that the start of new events
+  should _not_ start  with white-space.
+* [`condition_pattern`](#condition_pattern), set to `\\$`, tells Vector to continue aggregating lines
+  if they _end_ with a `/` character.
+* [`mode`](#mode), set to `continue_past`, tells Vector continue aggregating lines, plus
+  one additional line, until [`condition_pattern`](#condition_pattern) is false.
+
+#### Timestamps
+
+Activity logs from services such as Elasticsearch typically begin with a
+timestamp, followed by information on the specific activity, as in this example:
+
+```
+[2015-08-24 11:49:14,389][ INFO ][env                      ] [Letha] using [1] data paths, mounts [[/
+(/dev/disk1)]], net usable_space [34.5gb], net total_space [118.9gb], types [hfs]
+```
+
+To consume these lines as a single event with Vector use the following
+configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    mode = "halt_before"
+```
+
+* [`start_pattern`](#start_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector that
+  the start of new events should start with a timestamp sequence.
+* [`condition_pattern`](#condition_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector to
+  continue aggregating lines if they do _not_ start with a timestamp sequence.
+* [`mode`](#mode), set to `halt_before`, tells Vector continue aggregating lines as long
+  as the [`condition_pattern`](#condition_pattern) does not match.
+
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
@@ -806,19 +851,9 @@ section.
 ### File Deletion
 
 When a watched file is deleted, Vector will maintain its open file handle and
-continue reading until it reaches EOF. When a file is no longer findable in the
-`includes` glob and the reader has reached EOF, that file's reader is discarded.
-
-### File Identification
-
-By default, Vector identifies files by creating a [cyclic redundancy check
-(CRC)][urls.crc] on the first 256 bytes of the file. This serves as a
-fingerprint to uniquely identify the file. The amount of bytes read can be
-controlled via the [`fingerprint_bytes`](#fingerprint_bytes) and [`ignored_header_bytes`](#ignored_header_bytes) options.
-
-This strategy avoids the common pitfalls of using device and inode names since
-inode names can be reused across files. This enables Vector to [properly tail
-files across various rotation strategies][pages.index#correctness].
+continue reading until it reaches `EOF`. When a file is no longer findable in
+the `includes` glob and the reader has reached EOF, that file's reader is
+discarded.
 
 ### File Read Order
 
@@ -868,6 +903,17 @@ side and including the first rotated file in Vector's [`include`](#include) opti
 allows Vector to find the file after rotation, read it uncompressed to identify
 it, and then ensure it has all of the data, including any written in a gap
 between Vector's last read and the actual rotation event.
+
+### Fingerprinting
+
+By default, Vector identifies files by creating a [cyclic redundancy check
+(CRC)][urls.crc] on the first 256 bytes of the file. This serves as a
+fingerprint to uniquely identify the file. The amount of bytes read can be
+controlled via the [`fingerprint_bytes`](#fingerprint_bytes) and [`ignored_header_bytes`](#ignored_header_bytes) options.
+
+This strategy avoids the common pitfalls of using device and inode names since
+inode names can be reused across files. This enables Vector to [properly tail
+files across various rotation strategies][pages.index#correctness].
 
 ### Globbing
 
