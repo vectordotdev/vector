@@ -216,6 +216,8 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_cloud_storage",
+            
               "reference/sinks/gcp_pubsub",
             
               "reference/sinks/gcp_stackdriver_logging",
@@ -236,7 +238,7 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
-              "reference/sinks/sematext",
+              "reference/sinks/sematext_logs",
             
               "reference/sinks/socket",
             

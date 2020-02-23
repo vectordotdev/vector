@@ -1,11 +1,8 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        encode_event,
-        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
-        Encoding, SinkExt,
-    },
+    sinks::util::{encode_event, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
+    tls::{TlsConfig, TlsConnectorExt, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -47,14 +44,6 @@ pub struct TcpSinkConfig {
     pub address: String,
     pub encoding: Encoding,
     pub tls: Option<TlsConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct TlsConfig {
-    pub enabled: Option<bool>,
-    #[serde(flatten)]
-    pub options: TlsOptions,
 }
 
 impl TcpSinkConfig {

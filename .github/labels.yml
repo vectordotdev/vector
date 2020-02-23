@@ -307,6 +307,9 @@
 - name: "sink: file"
   description: Anything `file` sink related
   color: 4ddbfb
+- name: "sink: gcp_cloud_storage"
+  description: Anything `gcp_cloud_storage` sink related
+  color: 4ddbfb
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
@@ -337,8 +340,8 @@
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb
-- name: "sink: sematext"
-  description: Anything `sematext` sink related
+- name: "sink: sematext_logs"
+  description: Anything `sematext_logs` sink related
   color: 4ddbfb
 - name: "sink: socket"
   description: Anything `socket` sink related

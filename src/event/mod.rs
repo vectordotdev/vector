@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::{hash_map::Drain, HashMap};
+use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
@@ -28,6 +28,11 @@ pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
 lazy_static! {
     pub static ref PARTIAL: Atom = Atom::from("_partial");
+    static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
+        message_key: Atom::from("message"),
+        timestamp_key: Atom::from("timestamp"),
+        host_key: Atom::from("host"),
+    };
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -38,13 +43,13 @@ pub enum Event {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
-    fields: HashMap<Atom, Value>,
+    fields: BTreeMap<Atom, Value>,
 }
 
 impl Event {
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent {
-            fields: HashMap::new(),
+            fields: BTreeMap::new(),
         })
     }
 
@@ -126,12 +131,12 @@ impl LogEvent {
         }
     }
 
-    pub fn unflatten(self) -> unflatten::Unflatten {
-        unflatten::Unflatten::from(self.fields)
+    pub fn into_iter(self) -> impl Iterator<Item = (Atom, Value)> {
+        self.fields.into_iter()
     }
 
-    pub fn drain(&mut self) -> Drain<Atom, Value> {
-        self.fields.drain()
+    pub fn unflatten(self) -> unflatten::Unflatten {
+        unflatten::Unflatten::from(self.fields)
     }
 }
 
@@ -160,18 +165,17 @@ impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     }
 }
 
-pub fn log_schema() -> &'static LogSchema {
-    // TODO: Help Rust project support before_each
-    // Support uninitialized schemas in tests to help our contributors.
-    // Don't do it in release because that is scary.
-    #[cfg(debug_assertions)]
+impl Serialize for LogEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
     {
-        if LOG_SCHEMA.get().is_none() {
-            error!("You are not initializing a schema in this test -- This could fail in release");
-            LOG_SCHEMA.set(LogSchema::default()).ok(); // If this fails it means some other test set it while we were trying to.
-        }
+        serializer.collect_map(self.fields.iter())
     }
-    LOG_SCHEMA.get().expect("Schema was not initialized")
+}
+
+pub fn log_schema() -> &'static LogSchema {
+    LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
@@ -201,6 +205,8 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
+    Map(BTreeMap<Atom, Value>),
+    Array(Vec<Value>),
 }
 
 impl Serialize for Value {
@@ -212,7 +218,11 @@ impl Serialize for Value {
             Value::Integer(i) => serializer.serialize_i64(*i),
             Value::Float(f) => serializer.serialize_f64(*f),
             Value::Boolean(b) => serializer.serialize_bool(*b),
-            _ => serializer.serialize_str(&self.to_string_lossy()),
+            Value::Bytes(_) | Value::Timestamp(_) => {
+                serializer.serialize_str(&self.to_string_lossy())
+            }
+            Value::Map(m) => serializer.collect_map(m),
+            Value::Array(a) => serializer.collect_seq(a),
         }
     }
 }
@@ -265,6 +275,18 @@ impl From<f64> for Value {
     }
 }
 
+impl From<BTreeMap<Atom, Value>> for Value {
+    fn from(value: BTreeMap<Atom, Value>) -> Self {
+        Value::Map(value)
+    }
+}
+
+impl From<Vec<Value>> for Value {
+    fn from(value: Vec<Value>) -> Self {
+        Value::Array(value)
+    }
+}
+
 macro_rules! impl_valuekind_from_integer {
     ($t:ty) => {
         impl From<$t> for Value {
@@ -296,6 +318,8 @@ impl Value {
             Value::Integer(num) => format!("{}", num),
             Value::Float(num) => format!("{}", num),
             Value::Boolean(b) => format!("{}", b),
+            Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
+            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
         }
     }
 
@@ -306,6 +330,10 @@ impl Value {
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
             Value::Boolean(b) => Bytes::from(format!("{}", b)),
+            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
+            Value::Array(arr) => {
+                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
+            }
         }
     }
 
@@ -325,6 +353,30 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
+fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
+    let mut accum: BTreeMap<Atom, Value> = BTreeMap::new();
+    for (key, value) in fields {
+        match decode_value(value) {
+            Some(value) => {
+                accum.insert(Atom::from(key), value);
+            }
+            None => return None,
+        }
+    }
+    Some(Value::Map(accum))
+}
+
+fn decode_array(items: Vec<proto::Value>) -> Option<Value> {
+    let mut accum = Vec::with_capacity(items.len());
+    for value in items {
+        match decode_value(value) {
+            Some(value) => accum.push(value),
+            None => return None,
+        }
+    }
+    Some(Value::Array(accum))
+}
+
 fn decode_value(input: proto::Value) -> Option<Value> {
     match input.kind {
         Some(proto::value::Kind::RawBytes(data)) => Some(Value::Bytes(data.into())),
@@ -334,6 +386,8 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Integer(value)) => Some(Value::Integer(value)),
         Some(proto::value::Kind::Float(value)) => Some(Value::Float(value)),
         Some(proto::value::Kind::Boolean(value)) => Some(Value::Boolean(value)),
+        Some(proto::value::Kind::Map(map)) => decode_map(map.fields),
+        Some(proto::value::Kind::Array(array)) => decode_array(array.items),
         None => {
             error!("encoded event contains unknown value kind");
             None
@@ -351,7 +405,7 @@ impl From<proto::EventWrapper> for Event {
                     .fields
                     .into_iter()
                     .filter_map(|(k, v)| decode_value(v).map(|value| (Atom::from(k), value)))
-                    .collect::<HashMap<_, _>>();
+                    .collect::<BTreeMap<_, _>>();
 
                 Event::Log(LogEvent { fields })
             }
@@ -411,30 +465,46 @@ impl From<proto::EventWrapper> for Event {
     }
 }
 
+fn encode_value(value: Value) -> proto::Value {
+    proto::Value {
+        kind: match value {
+            Value::Bytes(b) => Some(proto::value::Kind::RawBytes(b.to_vec())),
+            Value::Timestamp(ts) => Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
+                seconds: ts.timestamp(),
+                nanos: ts.timestamp_subsec_nanos() as i32,
+            })),
+            Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
+            Value::Float(value) => Some(proto::value::Kind::Float(value)),
+            Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
+            Value::Map(fields) => Some(proto::value::Kind::Map(encode_map(fields))),
+            Value::Array(items) => Some(proto::value::Kind::Array(encode_array(items))),
+        },
+    }
+}
+
+fn encode_map(fields: BTreeMap<Atom, Value>) -> proto::ValueMap {
+    proto::ValueMap {
+        fields: fields
+            .into_iter()
+            .map(|(key, value)| (key.to_string(), encode_value(value)))
+            .collect(),
+    }
+}
+
+fn encode_array(items: Vec<Value>) -> proto::ValueArray {
+    proto::ValueArray {
+        items: items.into_iter().map(|value| encode_value(value)).collect(),
+    }
+}
+
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
             Event::Log(LogEvent { fields }) => {
                 let fields = fields
                     .into_iter()
-                    .map(|(k, v)| {
-                        let value = proto::Value {
-                            kind: match v {
-                                Value::Bytes(b) => Some(proto::value::Kind::RawBytes(b.to_vec())),
-                                Value::Timestamp(ts) => {
-                                    Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
-                                        seconds: ts.timestamp(),
-                                        nanos: ts.timestamp_subsec_nanos() as i32,
-                                    }))
-                                }
-                                Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
-                                Value::Float(value) => Some(proto::value::Kind::Float(value)),
-                                Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
-                            },
-                        };
-                        (k.to_string(), value)
-                    })
-                    .collect::<HashMap<_, _>>();
+                    .map(|(k, v)| (k.to_string(), encode_value(v)))
+                    .collect::<BTreeMap<_, _>>();
 
                 let event = EventProto::Log(Log { fields });
 
@@ -528,7 +598,7 @@ impl From<Event> for Vec<u8> {
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
-            fields: HashMap::new(),
+            fields: BTreeMap::new(),
         });
 
         event
@@ -568,7 +638,7 @@ impl From<Metric> for Event {
 
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
-    inner: std::collections::hash_map::Iter<'a, Atom, Value>,
+    inner: std::collections::btree_map::Iter<'a, Atom, Value>,
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
@@ -590,7 +660,7 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::Event;
+    use super::{Atom, Event, Value};
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -661,6 +731,25 @@ mod test {
             ]
             .into_iter()
             .collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn event_iteration_order() {
+        let mut event = Event::new_empty_log();
+        let log = event.as_mut_log();
+        log.insert(&Atom::from("lZDfzKIL"), Value::from("tOVrjveM"));
+        log.insert(&Atom::from("o9amkaRY"), Value::from("pGsfG7Nr"));
+        log.insert(&Atom::from("YRjhxXcg"), Value::from("nw8iM5Jr"));
+
+        let collected: Vec<_> = log.all_fields().collect();
+        assert_eq!(
+            collected,
+            vec![
+                (&Atom::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
+                (&Atom::from("lZDfzKIL"), &Value::from("tOVrjveM")),
+                (&Atom::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+            ]
         );
     }
 }

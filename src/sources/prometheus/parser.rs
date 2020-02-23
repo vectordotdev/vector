@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use regex::Regex;
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::num::ParseFloatError;
 
 lazy_static! {
@@ -28,7 +28,7 @@ struct ParserHeader {
 struct ParserMetric {
     name: String,
     value: f64,
-    tags: HashMap<String, String>,
+    tags: BTreeMap<String, String>,
 }
 
 struct ParserAggregate {
@@ -37,7 +37,7 @@ struct ParserAggregate {
     values: Vec<f64>,
     count: u32,
     sum: f64,
-    tags: HashMap<String, String>,
+    tags: BTreeMap<String, String>,
 }
 
 fn is_header(input: &str) -> bool {
@@ -91,9 +91,9 @@ fn parse_value(input: &str) -> Result<f64, ParserError> {
     Ok(value)
 }
 
-fn parse_tags(input: &str) -> Result<HashMap<String, String>, ParserError> {
+fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParserError> {
     let input = input.trim();
-    let mut result = HashMap::new();
+    let mut result = BTreeMap::new();
 
     if input.is_empty() {
         return Ok(result);
@@ -168,7 +168,7 @@ fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
         Ok(ParserMetric {
             name: name.to_string(),
             value,
-            tags: HashMap::new(),
+            tags: BTreeMap::new(),
         })
     }
 }

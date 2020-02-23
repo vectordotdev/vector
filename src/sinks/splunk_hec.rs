@@ -3,9 +3,9 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -232,13 +232,13 @@ mod tests {
     use super::*;
     use crate::event::{self, Event};
     use serde::Deserialize;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
     struct HecEvent {
         time: i64,
-        event: HashMap<String, String>,
-        fields: HashMap<String, String>,
+        event: BTreeMap<String, String>,
+        fields: BTreeMap<String, String>,
     }
 
     #[test]

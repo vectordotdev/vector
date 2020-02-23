@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::event::Event;
-use crate::runtime::TaskExecutor;
-use crate::topology::config::{DataType, TransformConfig, TransformDescription};
+use crate::topology::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -22,7 +21,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer {
             types,
@@ -56,11 +55,12 @@ impl Transform for Coercer {
             // below, as it will be fewer steps to fully recreate the
             // event than to scan the event for extraneous fields after
             // conversion.
-            let drain = log.drain().collect::<Vec<_>>();
-            for (field, value) in drain {
+            let mut new_event = Event::new_empty_log();
+            let new_log = new_event.as_mut_log();
+            for (field, value) in log.into_iter() {
                 if let Some(conv) = self.types.get(&field) {
                     match conv.convert(value) {
-                        Ok(converted) => log.insert(field, converted),
+                        Ok(converted) => new_log.insert(field, converted),
                         Err(error) => {
                             warn!(
                                 message = "Could not convert types.",
@@ -72,6 +72,7 @@ impl Transform for Coercer {
                     }
                 }
             }
+            return Some(new_event);
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
@@ -97,7 +98,10 @@ impl Transform for Coercer {
 mod tests {
     use super::CoercerConfig;
     use crate::event::{flatten::flatten, LogEvent, Value};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
 
@@ -123,7 +127,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }

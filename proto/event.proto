@@ -15,6 +15,14 @@ message Log {
   map<string, Value> fields = 1;
 }
 
+message ValueMap {
+  map<string, Value> fields = 1;
+}
+
+message ValueArray {
+  repeated Value items = 1;
+}
+
 message Value {
   reserved 3;
   oneof kind {
@@ -23,6 +31,8 @@ message Value {
     int64 integer = 4;
     double float = 5;
     bool boolean = 6;
+    ValueMap map = 7;
+    ValueArray array = 8;
   }
 }
 

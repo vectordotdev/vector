@@ -1,12 +1,14 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    tls::{TlsConnectorExt, TlsSettings},
     Batch, BatchSettings, BatchSink,
 };
-use crate::dns::Resolver;
-use crate::event::Event;
-use crate::topology::config::SinkContext;
+use crate::{
+    dns::Resolver,
+    event::Event,
+    tls::{TlsConnectorExt, TlsSettings},
+    topology::config::SinkContext,
+};
 use bytes::Bytes;
 use futures::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::{Request, StatusCode};
@@ -22,6 +24,7 @@ use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type Response = hyper::Response<Bytes>;
 pub type Error = hyper::Error;
+pub type HttpsClient = hyper::Client<HttpsConnector<HttpConnector<Resolver>>>;
 
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
@@ -215,10 +218,7 @@ pub fn connector(
     Ok(https)
 }
 
-pub fn https_client(
-    resolver: Resolver,
-    tls: TlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector<Resolver>>>> {
+pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<HttpsClient> {
     let https = connector(resolver, tls)?;
     Ok(hyper::Client::builder().build(https))
 }
