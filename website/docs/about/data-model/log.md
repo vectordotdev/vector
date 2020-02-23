@@ -260,7 +260,7 @@ stored as UTC.
 
 #### Null Values
 
-For compatibility with JSON log events also support `null` values.
+For compatibility with JSON log events, Vector also supports `null` values.
 
 
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
