@@ -23,6 +23,10 @@ message ValueArray {
   repeated Value items = 1;
 }
 
+enum ValueNull {
+  NULL_VALUE = 0;
+}
+
 message Value {
   reserved 3;
   oneof kind {
@@ -33,6 +37,7 @@ message Value {
     bool boolean = 6;
     ValueMap map = 7;
     ValueArray array = 8;
+    ValueNull null = 9;
   }
 }
 

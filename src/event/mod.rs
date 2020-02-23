@@ -207,6 +207,7 @@ pub enum Value {
     Timestamp(DateTime<Utc>),
     Map(BTreeMap<Atom, Value>),
     Array(Vec<Value>),
+    Null,
 }
 
 impl Serialize for Value {
@@ -223,6 +224,7 @@ impl Serialize for Value {
             }
             Value::Map(m) => serializer.collect_map(m),
             Value::Array(a) => serializer.collect_seq(a),
+            Value::Null => serializer.serialize_none(),
         }
     }
 }
@@ -320,6 +322,7 @@ impl Value {
             Value::Boolean(b) => format!("{}", b),
             Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
             Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
+            Value::Null => "<null>".to_string(),
         }
     }
 
@@ -334,6 +337,7 @@ impl Value {
             Value::Array(arr) => {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
+            Value::Null => Bytes::from("<null>"),
         }
     }
 
@@ -388,6 +392,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Boolean(value)) => Some(Value::Boolean(value)),
         Some(proto::value::Kind::Map(map)) => decode_map(map.fields),
         Some(proto::value::Kind::Array(array)) => decode_array(array.items),
+        Some(proto::value::Kind::Null(_)) => Some(Value::Null),
         None => {
             error!("encoded event contains unknown value kind");
             None
@@ -478,6 +483,7 @@ fn encode_value(value: Value) -> proto::Value {
             Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
             Value::Map(fields) => Some(proto::value::Kind::Map(encode_map(fields))),
             Value::Array(items) => Some(proto::value::Kind::Array(encode_array(items))),
+            Value::Null => Some(proto::value::Kind::Null(proto::ValueNull::NullValue as i32)),
         },
     }
 }

@@ -105,6 +105,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         Value::Float(val) => hash_f64(hasher, val),
         Value::Array(val) => hash_array(hasher, val),
         Value::Map(val) => hash_map(hasher, val),
+        Value::Null => hash_null(hasher),
     }
 }
 
@@ -124,6 +125,10 @@ fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<Atom, Value>) {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);
     }
+}
+
+fn hash_null<H: Hasher>(hasher: &mut H) {
+    hasher.write_u8(0);
 }
 
 #[cfg(test)]
