@@ -28,7 +28,8 @@ Or [choose your preferred installation method][docs.installation].
 Vector runs with a [configuration file][docs.configuration] that tells it which
 components to run and how they should interact. Let's create one that reads
 unstructured Apache logs over TCP using a [`socket` source][docs.sources.socket]
-and then writes them to an [`elasticsearch` sink][docs.sinks.elasticsearch]:
+and then writes them to an [`elasticsearch` sink][docs.sinks.elasticsearch].
+We'll do this all without having to setup a local Elasticsearch cluster:
 
 <CodeHeader fileName="vector.toml" />
 
