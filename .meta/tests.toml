@@ -8,7 +8,6 @@ description = "A table that defines a unit test."
 type = "string"
 examples = ["foo test"]
 common = true
-prioritize = true
 required = true
 description = "A unique identifier for this test."
 
@@ -33,7 +32,6 @@ type = "string"
 examples = ["raw", "log", "metric"]
 required = true
 common = true
-prioritize = true
 description = "The event type."
 
 [tests.children.inputs.children.type.enum]
