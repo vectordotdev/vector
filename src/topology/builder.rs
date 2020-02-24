@@ -118,7 +118,12 @@ pub fn build_pieces(
 
         let typetag = source.source_type();
 
-        let shutdown = ShutdownSignals { fake: true };
+        let (global_shutdown_begun_trigger, global_shutdown_begun_tripwire) = Tripwire::new();
+        let (local_shutdown_complete_trigger, local_shutdown_complete_tripwire) = Tripwire::new();
+        let shutdown = ShutdownSignals {
+            begin_shutdown: global_shutdown_begun_tripwire.clone(),
+            shutdown_complete: local_shutdown_complete_trigger,
+        };
 
         let server = match source.build(&name, &config.global, shutdown, tx) {
             Err(error) => {
@@ -128,19 +133,21 @@ pub fn build_pieces(
             Ok(server) => server,
         };
 
-        let (trigger, tripwire) = Tripwire::new();
-
         let (output, control) = Fanout::new();
         let pump = rx.forward(output).map(|_| ());
         let pump = Task::new(&name, &typetag, pump);
 
-        let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+        // TODO: Remove this line once all Sources do this internally.
+        let server = server
+            .select(global_shutdown_begun_tripwire)
+            .map(|_| ())
+            .map_err(|_| ());
         let server = Task::new(&name, &typetag, server);
 
         outputs.insert(name.clone(), control);
         tasks.insert(name.clone(), pump);
         source_tasks.insert(name.clone(), server);
-        shutdown_triggers.insert(name.clone(), trigger);
+        shutdown_triggers.insert(name.clone(), global_shutdown_begun_trigger);
     }
 
     // Build transforms
