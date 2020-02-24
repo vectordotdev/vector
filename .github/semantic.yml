@@ -96,6 +96,7 @@ scopes:
   - regex_parser transform
   - remove_fields transform
   - remove_tags transform
+  - rename_fields transform
   - sampler transform
   - split transform
   - tokenizer transform

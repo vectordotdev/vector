@@ -54,5 +54,5 @@ relevant_when = {mode = "unix"}
 description = """The unix socket path. This should be the absolute path.\
 """
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.socket.options", can_enable: true, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.socket.options", can_enable: true, can_verify: true) %>
 

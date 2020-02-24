@@ -19,6 +19,7 @@ pub mod merge;
 pub mod regex_parser;
 pub mod remove_fields;
 pub mod remove_tags;
+pub mod rename_fields;
 pub mod sampler;
 pub mod split;
 pub mod tokenizer;

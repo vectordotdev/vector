@@ -55,7 +55,14 @@ enum TlsError {
     },
 }
 
-/// Standard TLS connector options
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct TlsConfig {
+    pub enabled: Option<bool>,
+    #[serde(flatten)]
+    pub options: TlsOptions,
+}
+
+/// Standard TLS options
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsOptions {
     pub verify_certificate: Option<bool>,
@@ -69,8 +76,8 @@ pub struct TlsOptions {
 /// Directly usable settings for TLS connectors
 #[derive(Clone, Default)]
 pub struct TlsSettings {
-    accept_invalid_certificates: bool,
-    accept_invalid_hostnames: bool,
+    verify_certificate: bool,
+    verify_hostname: bool,
     authority: Option<Certificate>,
     identity: Option<IdentityStore>, // native_tls::Identity doesn't implement Clone yet
 }
@@ -133,8 +140,8 @@ impl TlsSettings {
         };
 
         Ok(Self {
-            accept_invalid_certificates: !options.verify_certificate.unwrap_or(true),
-            accept_invalid_hostnames: !options.verify_hostname.unwrap_or(true),
+            verify_certificate: options.verify_certificate.unwrap_or(true),
+            verify_hostname: options.verify_hostname.unwrap_or(true),
             authority,
             identity,
         })
@@ -144,11 +151,8 @@ impl TlsSettings {
 impl fmt::Debug for TlsSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TlsSettings")
-            .field(
-                "accept_invalid_certificates",
-                &self.accept_invalid_certificates,
-            )
-            .field("accept_invalid_hostnames", &self.accept_invalid_hostnames)
+            .field("verify_certificate", &self.verify_certificate)
+            .field("verify_hostname", &self.verify_hostname)
             .finish()
     }
 }
@@ -159,8 +163,8 @@ pub trait TlsConnectorExt {
 
 impl TlsConnectorExt for TlsConnectorBuilder {
     fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self {
-        self.danger_accept_invalid_certs(settings.accept_invalid_certificates);
-        self.danger_accept_invalid_hostnames(settings.accept_invalid_hostnames);
+        self.danger_accept_invalid_certs(!settings.verify_certificate);
+        self.danger_accept_invalid_hostnames(!settings.verify_hostname);
         if let Some(certificate) = settings.authority {
             self.add_root_certificate(certificate);
         }

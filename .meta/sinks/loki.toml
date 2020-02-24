@@ -30,7 +30,7 @@ write_to_description = "[Loki][urls.loki]"
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.loki.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.loki.options", can_enable: false, can_verify: true) %>
 
 [sinks.loki.options.endpoint]
 type = "string"

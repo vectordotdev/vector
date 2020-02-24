@@ -4,11 +4,11 @@ use crate::{
     sinks::{
         util::{
             http::{https_client, HttpRetryLogic, HttpService},
-            tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink, UriParseError,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::{BufMut, BytesMut};

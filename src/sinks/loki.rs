@@ -17,9 +17,9 @@ use crate::{
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::tls::{TlsOptions, TlsSettings},
     sinks::util::{BatchBytesConfig, TowerRequestConfig, UriSerde},
     template::Template,
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;

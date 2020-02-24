@@ -264,6 +264,9 @@
 - name: "transform: remove_tags"
   description: Anything `remove_tags` transform related
   color: 54a0ff
+- name: "transform: rename_fields"
+  description: Anything `rename_fields` transform related
+  color: 54a0ff
 - name: "transform: sampler"
   description: Anything `sampler` transform related
   color: 54a0ff

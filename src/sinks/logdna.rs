@@ -2,8 +2,8 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::tls::TlsSettings,
     sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
+    tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures03::{compat::Future01CompatExt, TryFutureExt};
