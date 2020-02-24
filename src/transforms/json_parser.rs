@@ -383,7 +383,10 @@ mod test {
         let event = parser.transform(event).unwrap();
 
         assert_eq!(event.as_log()[&Atom::from("string")], "this is text".into());
-        assert_eq!(event.as_log()[&Atom::from("null")], "".into());
+        assert_eq!(
+            event.as_log()[&Atom::from("null")],
+            crate::event::Value::Null
+        );
         assert_eq!(event.as_log()[&Atom::from("float")], 12.34.into());
         assert_eq!(event.as_log()[&Atom::from("int")], 56.into());
         assert_eq!(event.as_log()[&Atom::from("bool true")], true.into());
