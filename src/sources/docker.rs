@@ -1,6 +1,7 @@
 use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, Value},
+    shutdown::ShutdownSignals,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
@@ -104,6 +105,7 @@ impl SourceConfig for DockerConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignals,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
         DockerSource::new(

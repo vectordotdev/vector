@@ -6,6 +6,7 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignals,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use futures::sync::mpsc;
@@ -70,6 +71,7 @@ impl SourceConfig for SocketConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         match self.mode.clone() {

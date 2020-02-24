@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignals,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Buf;
@@ -25,6 +26,7 @@ impl SourceConfig for LogplexConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();

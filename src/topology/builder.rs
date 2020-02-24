@@ -3,7 +3,7 @@ use super::{
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::{buffers, dns::Resolver, runtime};
+use crate::{buffers, dns::Resolver, runtime, shutdown::ShutdownSignals};
 use futures::{
     future::{lazy, Either},
     sync::mpsc,
@@ -118,7 +118,9 @@ pub fn build_pieces(
 
         let typetag = source.source_type();
 
-        let server = match source.build(&name, &config.global, tx) {
+        let shutdown = ShutdownSignals { fake: true };
+
+        let server = match source.build(&name, &config.global, shutdown, tx) {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;

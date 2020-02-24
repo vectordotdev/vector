@@ -1,6 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
+    shutdown::ShutdownSignals,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
@@ -42,6 +43,7 @@ impl SourceConfig for VectorConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;

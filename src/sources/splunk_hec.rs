@@ -1,5 +1,6 @@
 use crate::{
     event::{self, flatten::flatten, Event, LogEvent, Value},
+    shutdown::ShutdownSignals,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
@@ -58,6 +59,7 @@ impl SourceConfig for SplunkConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();

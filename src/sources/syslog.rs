@@ -3,6 +3,7 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
+    shutdown::ShutdownSignals,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 
@@ -72,6 +73,7 @@ impl SourceConfig for SyslogConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let host_key = self

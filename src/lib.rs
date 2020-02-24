@@ -21,6 +21,7 @@ pub mod metrics;
 pub mod region;
 pub mod runtime;
 pub mod serde;
+pub mod shutdown;
 pub mod sinks;
 pub mod sources;
 pub mod template;
