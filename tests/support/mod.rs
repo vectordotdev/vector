@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::event::{self, metric::MetricValue, Event, Value};
+use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
@@ -58,6 +59,7 @@ impl SourceConfig for MockSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: Sender<Event>,
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();

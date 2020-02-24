@@ -6,6 +6,7 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     tls::TlsSettings,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -71,6 +72,7 @@ impl SourceConfig for SocketConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         match self.mode.clone() {
@@ -79,14 +81,20 @@ impl SourceConfig for SocketConfig {
                     config: config.clone(),
                 };
                 let tls = TlsSettings::from_config(&config.tls, true)?;
-                tcp.run(config.address, config.shutdown_timeout_secs, tls, out)
+                tcp.run(
+                    config.address,
+                    config.shutdown_timeout_secs,
+                    tls,
+                    shutdown,
+                    out,
+                )
             }
             Mode::Udp(config) => {
                 let host_key = config
                     .host_key
                     .clone()
                     .unwrap_or(event::log_schema().host_key().clone());
-                Ok(udp::udp(config.address, host_key, out))
+                Ok(udp::udp(config.address, host_key, shutdown, out))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
@@ -117,6 +125,7 @@ mod test {
     use super::SocketConfig;
     use crate::event;
     use crate::runtime;
+    use crate::shutdown::ShutdownSignal;
     use crate::test_util::{
         block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp,
     };
@@ -146,7 +155,12 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build("default", &GlobalOptions::default(), tx)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -172,7 +186,12 @@ mod test {
         config.max_length = 10;
 
         let server = SocketConfig::from(config)
-            .build("default", &GlobalOptions::default(), tx)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -217,7 +236,12 @@ mod test {
         });
 
         let server = SocketConfig::from(config)
-            .build("default", &GlobalOptions::default(), tx)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -281,7 +305,12 @@ mod test {
         let addr = next_addr();
 
         let server = SocketConfig::from(UdpConfig::new(addr))
-            .build("default", &GlobalOptions::default(), sender)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
             .unwrap();
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -366,7 +395,12 @@ mod test {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
-            .build("default", &GlobalOptions::default(), sender)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
             .unwrap();
 
         let mut rt = runtime::Runtime::new().unwrap();

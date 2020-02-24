@@ -1,6 +1,7 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
+    shutdown::ShutdownSignal,
     tls::{TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
@@ -45,11 +46,12 @@ impl SourceConfig for VectorConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         let tls = TlsSettings::from_config(&self.tls, true)?;
-        vector.run(self.address, self.shutdown_timeout_secs, tls, out)
+        vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -92,6 +94,7 @@ impl TcpSource for VectorSource {
 #[cfg(test)]
 mod test {
     use super::VectorConfig;
+    use crate::shutdown::ShutdownSignal;
     use crate::{
         sinks::vector::VectorSinkConfig,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
@@ -106,7 +109,12 @@ mod test {
 
         let addr = next_addr();
         let server = VectorConfig::new(addr.into())
-            .build("default", &GlobalOptions::default(), tx)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);

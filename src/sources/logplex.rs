@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
@@ -27,6 +28,7 @@ impl SourceConfig for LogplexConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();
@@ -59,8 +61,8 @@ impl SourceConfig for LogplexConfig {
                         // shut down the http server if someone hasn't already
                         trigger.try_lock().ok().take().map(drop);
                         warp::reject::custom("shutting down")
-                })
-                .map(|_| warp::reply())
+                    })
+                    .map(|_| warp::reply())
             });
 
         let ping = warp::get2().and(warp::path("ping")).map(|| "pong");
@@ -133,6 +135,7 @@ fn line_to_event(line: String) -> Event {
 #[cfg(test)]
 mod tests {
     use super::LogplexConfig;
+    use crate::shutdown::ShutdownSignal;
     use crate::{
         event::{self, Event},
         runtime::Runtime,
@@ -151,7 +154,12 @@ mod tests {
         let address = test_util::next_addr();
         rt.spawn(
             LogplexConfig { address, tls: None }
-                .build("default", &GlobalOptions::default(), sender)
+                .build(
+                    "default",
+                    &GlobalOptions::default(),
+                    ShutdownSignal::noop(),
+                    sender,
+                )
                 .unwrap(),
         );
         (recv, address)
