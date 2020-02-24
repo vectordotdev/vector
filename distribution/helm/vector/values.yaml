@@ -1,0 +1,105 @@
+image:
+  repository: timberio/vector
+  tag: latest-alpine
+  pullPolicy: IfNotPresent
+
+config: |-
+  data_dir = "/var/lib/vector"
+
+  [sources.kubernetes]
+    type = "kubernetes"
+
+  [sinks.console]
+    type = "console"
+    inputs = ["kubernetes"]
+
+# Path on the host to mount to /var/lib/vector in the container.
+data:
+  hostPath: /var/lib/vector
+
+# pass custom command. This is equivalent of Entrypoint in docker
+command: []
+
+# pass custom args. This is equivalent of Cmd in docker
+args: []
+
+# A list of additional environment variables
+extraVars: []
+  # - name: TEST1
+  #   value: TEST2
+  # - name: TEST3
+  #   valueFrom:
+  #     configMapKeyRef:
+  #       name: configmap
+  #       key: config.key
+
+# Add additional volumes and mounts, for example to read other log files on the host
+extraVolumes: []
+  # - hostPath:
+  #     path: /var/log
+  #   name: varlog
+extraVolumeMounts: []
+  # - name: varlog
+  #   mountPath: /host/var/log
+  #   readOnly: true
+extraSecrets: {}
+  # secret: "TEST1"
+
+extraInitContainers: []
+  # - name: echo
+  #   image: busybox
+  #   imagePullPolicy: Always
+  #   args:
+  #     - echo
+  #     - hello
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 200Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 100Mi
+
+priorityClassName: ""
+
+nodeSelector: {}
+
+annotations: {}
+
+tolerations: []
+  # - operator: Exists
+
+affinity: {}
+
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created
+  create: true
+  # The name of the ServiceAccount to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+## Specify if a Pod Security Policy for vector must be created
+## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+##
+podSecurityPolicy:
+  enabled: False
+  annotations: {}
+    ## Specify pod annotations
+    ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
+    ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#seccomp
+    ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#sysctl
+    ##
+    # seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+    # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
+    # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+
+privileged: false

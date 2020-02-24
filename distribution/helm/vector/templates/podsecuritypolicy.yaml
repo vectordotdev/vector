@@ -1,0 +1,53 @@
+{{- if .Values.rbac.create -}}
+{{- if .Values.podSecurityPolicy.enabled }}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "vector.fullname" . }}
+  annotations:
+{{- if .Values.podSecurityPolicy.annotations }}
+{{ toYaml .Values.podSecurityPolicy.annotations | indent 4 }}
+{{- end }}
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  allowedHostPaths:
+    - pathPrefix: /var/log
+      readOnly: true
+    - pathPrefix: /var/lib/docker/containers
+      readOnly: true
+    - pathPrefix: {{ .Values.data.hostPath }}
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - configMap
+    - secret
+    - hostPath
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: MustRunAs
+    ranges:
+      - min: 0
+        max: 0
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      # Forbid adding the root group.
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      # Forbid adding the root group.
+      - min: 1
+        max: 65535
+  hostPorts:
+    - min: 1
+      max: 65535
+  readOnlyRootFilesystem: false
+{{- end -}}
+{{- end -}}

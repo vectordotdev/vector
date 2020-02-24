@@ -1,0 +1,12 @@
+apiVersion: v1
+description: A Helm chart to collect Kubernetes logs with vector
+icon: https://vector.dev/press/vector-icon.svg
+name: vector
+version: 0.0.1
+appVersion: 0.7.2
+home: https://vector.dev/
+sources:
+- https://vector.dev/docs/
+maintainers:
+- name: sciyoshi
+  email: samuel@cormier-iijima.com

@@ -1,0 +1,20 @@
+{{- if .Values.rbac.create }}
+{{- if .Values.podSecurityPolicy.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: {{ template "vector.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ template "vector.name" . }}
+    helm.sh/chart: {{ template "vector.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups: ['extensions']
+  resources: ['podsecuritypolicies']
+  verbs:     ['use']
+  resourceNames:
+  - {{ template "vector.fullname" . }}
+{{- end }}
+{{- end }}

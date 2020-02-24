@@ -1,0 +1,3 @@
+To verify that Vector has started, run:
+
+  kubectl --namespace={{ .Release.Namespace }} get pods -l "app={{ template "vector.name" . }},release={{ .Release.Name }}"

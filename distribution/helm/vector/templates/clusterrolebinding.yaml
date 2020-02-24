@@ -1,0 +1,19 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "vector.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ template "vector.name" . }}
+    helm.sh/chart: {{ template "vector.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "vector.fullname" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "vector.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end -}}
