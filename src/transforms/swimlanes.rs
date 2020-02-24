@@ -12,9 +12,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
-    #[serde(skip)]
-    name: String,
-
     #[serde(flatten)]
     condition: Box<dyn ConditionConfig>,
 }
@@ -80,13 +77,7 @@ impl TransformConfig for SwimlanesConfig {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         while let Some((k, v)) = self.lanes.pop() {
-            map.insert(
-                k.clone(),
-                Box::new(SwimlaneConfig {
-                    name: k,
-                    condition: v,
-                }),
-            );
+            map.insert(k.clone(), Box::new(SwimlaneConfig { condition: v }));
         }
 
         if !map.is_empty() {

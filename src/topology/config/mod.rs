@@ -196,13 +196,6 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    /// Allows a transform configuration to expand itself into multiple "child"
-    /// transformations to replace it. This allows a transform to act as a macro
-    /// for various patterns.
-    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
-        Ok(None)
-    }
-
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
@@ -210,6 +203,13 @@ pub trait TransformConfig: core::fmt::Debug {
     fn output_type(&self) -> DataType;
 
     fn transform_type(&self) -> &'static str;
+
+    /// Allows a transform configuration to expand itself into multiple "child"
+    /// transformations to replace it. This allows a transform to act as a macro
+    /// for various patterns.
+    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+        Ok(None)
+    }
 }
 
 #[derive(Debug, Clone)]
