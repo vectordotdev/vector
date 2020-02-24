@@ -19,7 +19,8 @@ pub struct Pieces {
     pub tasks: HashMap<String, Task>,
     pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
-    pub shutdown_triggers: HashMap<String, Trigger>,
+    pub shutdown_begun_triggers: HashMap<String, Trigger>,
+    pub shutdown_complete_tripwires: HashMap<String, Tripwire>,
 }
 
 pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
@@ -97,7 +98,8 @@ pub fn build_pieces(
     let mut tasks = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
-    let mut shutdown_triggers = HashMap::new();
+    let mut shutdown_begun_triggers = HashMap::new();
+    let mut shutdown_complete_tripwires = HashMap::new();
 
     let mut errors = vec![];
     let mut warnings = vec![];
@@ -147,7 +149,8 @@ pub fn build_pieces(
         outputs.insert(name.clone(), control);
         tasks.insert(name.clone(), pump);
         source_tasks.insert(name.clone(), server);
-        shutdown_triggers.insert(name.clone(), global_shutdown_begun_trigger);
+        shutdown_begun_triggers.insert(name.clone(), global_shutdown_begun_trigger);
+        shutdown_complete_tripwires.insert(name.clone(), local_shutdown_complete_tripwire);
     }
 
     // Build transforms
@@ -259,7 +262,8 @@ pub fn build_pieces(
             tasks,
             source_tasks,
             healthchecks,
-            shutdown_triggers,
+            shutdown_begun_triggers,
+            shutdown_complete_tripwires,
         };
 
         Ok((pieces, warnings))

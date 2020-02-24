@@ -20,7 +20,8 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
-use stream_cancel::Trigger;
+use stream_cancel::{Trigger, Tripwire};
+use tokio::prelude::FutureExt;
 use tokio::timer;
 use tracing_futures::Instrument;
 
@@ -30,7 +31,8 @@ pub struct RunningTopology {
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
-    shutdown_triggers: HashMap<String, Trigger>,
+    shutdown_begun_triggers: HashMap<String, Trigger>,
+    shutdown_complete_tripwires: HashMap<String, Tripwire>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
@@ -56,7 +58,8 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_triggers: HashMap::new(),
+        shutdown_begun_triggers: HashMap::new(),
+        shutdown_complete_tripwires: HashMap::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -227,24 +230,33 @@ impl RunningTopology {
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
 
-        for name in sources_to_remove {
+        // First pass to tell the sources to shut down.
+        for name in &sources_to_remove {
             info!("Removing source {:?}", name);
 
-            self.tasks.remove(&name).unwrap().forget();
+            self.tasks.remove(name).unwrap().forget();
 
-            self.remove_outputs(&name);
-            self.shutdown_source(&name);
+            self.remove_outputs(name);
+            self.shutdown_source_begin(name);
+        }
+        // Second pass to wait for the shutdowns to complete
+        for name in &sources_to_remove {
+            self.shutdown_source_end(name);
         }
 
-        for name in sources_to_change {
+        // First pass
+        for name in &sources_to_change {
             info!("Rebuilding source {:?}", name);
 
-            self.remove_outputs(&name);
-            self.shutdown_source(&name);
+            self.remove_outputs(name);
+            self.shutdown_source_begin(name);
+        }
+        // Second pass
+        for name in &sources_to_change {
+            self.shutdown_source_end(name);
 
-            self.setup_outputs(&name, &mut new_pieces);
-
-            self.spawn_source(&name, &mut new_pieces, rt);
+            self.setup_outputs(name, &mut new_pieces);
+            self.spawn_source(name, &mut new_pieces, rt);
         }
 
         for name in sources_to_add {
@@ -364,9 +376,13 @@ impl RunningTopology {
             previous.forget();
         }
 
-        let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
-        self.shutdown_triggers
-            .insert(name.to_string(), shutdown_trigger);
+        let shutdown_begun_trigger = new_pieces.shutdown_begun_triggers.remove(name).unwrap();
+        self.shutdown_begun_triggers
+            .insert(name.to_string(), shutdown_begun_trigger);
+        let shutdown_complete_tripwire =
+            new_pieces.shutdown_complete_tripwires.remove(name).unwrap();
+        self.shutdown_complete_tripwires
+            .insert(name.to_string(), shutdown_complete_tripwire);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task.instrument(span), self.abort_tx.clone());
@@ -376,9 +392,23 @@ impl RunningTopology {
         );
     }
 
-    fn shutdown_source(&mut self, name: &str) {
-        self.shutdown_triggers.remove(name).unwrap().cancel();
+    // Informs a Source that it should shut down, but does not wait for the shutdown to complete.
+    fn shutdown_source_begin(&mut self, name: &str) {
+        self.shutdown_begun_triggers.remove(name).unwrap().cancel();
+    }
+
+    // Waits for the Source to finish shutting down for up to 30 seconds and then forcibly shuts
+    // down the source if it hasn't finished by then.
+    fn shutdown_source_end(&mut self, name: &str) {
+        info!("Waiting for Source {} to shutdown", name);
+        // TODO: add better logging for whether it succeeds or fails.
+        self.shutdown_complete_tripwires
+            .remove(name)
+            .unwrap()
+            .timeout(Duration::from_secs(30))
+            .wait();
         self.source_tasks.remove(name).wait().unwrap();
+        // TODO: "force" the shutdown of the source... not sure how to do this...
     }
 
     fn remove_outputs(&mut self, name: &str) {
