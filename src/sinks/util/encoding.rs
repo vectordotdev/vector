@@ -92,12 +92,10 @@ where
     }
 
     // Derived from https://serde.rs/string-or-struct.html
-    pub(crate) fn from_deserializer<'de, D>(
-        deserializer: D,
-    ) -> std::result::Result<Self, D::Error>
-        where
-            E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
-            D: Deserializer<'de>,
+    pub(crate) fn from_deserializer<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
+        D: Deserializer<'de>,
     {
         // This is a Visitor that forwards string types to T's `FromStr` impl and
         // forwards map types to T's `Deserialize` impl. The `PhantomData` is to
@@ -109,8 +107,8 @@ where
         );
 
         impl<'de, T> Visitor<'de> for StringOrStruct<T>
-            where
-                T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone,
+        where
+            T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone,
         {
             type Value = EncodingConfig<T>;
 
@@ -119,8 +117,8 @@ where
             }
 
             fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
-                where
-                    E: de::Error,
+            where
+                E: de::Error,
             {
                 Ok(Self::Value {
                     format: T::deserialize(value.into_deserializer())?,
@@ -130,8 +128,8 @@ where
             }
 
             fn visit_map<M>(self, map: M) -> std::result::Result<Self::Value, M::Error>
-                where
-                    M: MapAccess<'de>,
+            where
+                M: MapAccess<'de>,
             {
                 // `MapAccessDeserializer` is a wrapper that turns a `MapAccess`
                 // into a `Deserializer`, allowing it to be used as the input to T's

@@ -685,12 +685,12 @@ mod tests {
     use crate::test_util::{self, collect_n};
     use crate::{
         event::{self, Event},
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
-            util::{Compression, encoding::EncodingConfig},
-            Healthcheck, RouterSink
+            util::{encoding::EncodingConfig, Compression},
+            Healthcheck, RouterSink,
         },
+        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
     use futures::{stream, sync::mpsc, Sink};
     use http::Method;

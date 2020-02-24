@@ -2,9 +2,9 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
+        encoding::EncodingConfig,
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
-        encoding::EncodingConfig,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

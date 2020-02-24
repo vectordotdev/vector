@@ -3,9 +3,8 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchBytesConfig, Buffer, PartitionBuffer,
-        PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
-        encoding::EncodingConfig,
+        encoding::EncodingConfig, retries::RetryLogic, rusoto, BatchBytesConfig, Buffer,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -427,8 +426,12 @@ mod tests {
     fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes =
-            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text.into()).unwrap();
+        let bytes = encode_event(
+            message.clone().into(),
+            &batch_time_format,
+            &Encoding::Text.into(),
+        )
+        .unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();

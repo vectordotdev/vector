@@ -3,10 +3,10 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
+        encoding::EncodingConfig,
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, SinkExt, TowerRequestConfig,
-        encoding::EncodingConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };

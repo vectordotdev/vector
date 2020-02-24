@@ -1,6 +1,6 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig, encoding::EncodingConfig},
+    sinks::util::{encoding::EncodingConfig, BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
