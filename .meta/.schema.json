@@ -110,10 +110,6 @@
           "type": "boolean",
           "description": "If this option can be used to partition data. For example, the `path` option in the `aws_s3` sink."
         },
-        "prioritize": {
-          "type": "boolean",
-          "description": "Should this option be prioritized and moved to the top when displayed?"
-        },
         "relevant_when": {
           "type": "object",
           "description": "An object representing the conditions when an option is relevant. This is commonly used in conjuntion with `type` or `strategy` options."
@@ -121,6 +117,10 @@
         "required": {
           "type": "boolean",
           "description": "If this option is required."
+        },
+        "sort": {
+          "type": "int",
+          "description": "Manual sorting option."
         },
         "templateable": {
           "type": "boolean",

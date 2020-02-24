@@ -31,14 +31,14 @@ module PostProcessors
     def define!
       verify_no_direct_links!
 
-      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]\]\]/).flatten.uniq
+      link_ids = content.scan(/\[\[\[([a-zA-Z0-9_\-\.\/#\?=]*)\]\]\]/).flatten.uniq
 
       link_ids.each do |link_id|
         definition = get_path_or_url(link_id)
         content.gsub!("[[[#{link_id}]]]", definition)
       end
 
-      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/#\?= ]*)\]/).flatten.uniq
+      link_ids = content.scan(/\]\[([a-zA-Z0-9_\-\.\/#\?=]*)\]/).flatten.uniq
 
       footer_links = []
 
