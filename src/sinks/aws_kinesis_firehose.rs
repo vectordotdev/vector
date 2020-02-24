@@ -292,7 +292,7 @@ mod integration_tests {
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
-            encoding: Encoding::Json, // required for ES destination w/ localstack
+            encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
             batch: BatchEventsConfig {
                 max_events: Some(2),
                 timeout_secs: None,
