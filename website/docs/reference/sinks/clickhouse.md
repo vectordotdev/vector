@@ -52,10 +52,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - General
   database = "mydatabase" # example, no default
   healthcheck = true # default
-  timestamp_format = "unix" # no default, must be: "unix" (if supplied)
 
   # OPTIONAL - requests
   compression = "none" # default, enum
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
@@ -74,7 +77,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - General
   database = "mydatabase" # example, no default
   healthcheck = true # default
-  timestamp_format = "unix" # no default, must be: "unix" (if supplied)
 
   # OPTIONAL - requests
   compression = "none" # default, enum
@@ -99,6 +101,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    timestamp_format = "rfc3339" # default, enum
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
@@ -479,6 +485,56 @@ The database that contains the stable that data will be inserted into.
 
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Customize how events are encoded.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps. Formats such as unix can be parsed as a Clickhouse DateTime, however, this loses precision as DateTimes are defined in seconds.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -729,29 +785,6 @@ The maximum time a request can take before being aborted. It is highly recommend
 ### table
 
 The table that data will be inserted into.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"unix":"Format as a unix timestamp"}}
-  examples={["unix"]}
-  groups={[]}
-  name={"timestamp_format"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### timestamp_format
-
-Optionally convert timestamps into a format that can be parsed as a Clickhouse DateTime. This loses precision as DateTimes are defined in seconds.
 
 
 </Field>

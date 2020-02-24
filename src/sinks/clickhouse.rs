@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    event::{Event, Value, TIMESTAMP},
+    event::{Event, Value},
     sinks::util::{
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
@@ -21,6 +21,13 @@ use snafu::ResultExt;
 #[serde(rename_all = "lowercase")]
 pub enum TimestampFormat {
     Unix,
+    RFC3339,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct EncodingConfig {
+    pub timestamp_format: Option<TimestampFormat>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -30,7 +37,7 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
-    pub timestamp_format: Option<TimestampFormat>,
+    pub encoding: EncodingConfig,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
@@ -122,16 +129,20 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
 }
 
 fn encode_event(config: &ClickhouseConfig, mut event: Event) -> Option<Vec<u8>> {
-    match config.timestamp_format {
+    match config.encoding.timestamp_format {
         Some(TimestampFormat::Unix) => {
-            if let Some(unix) = match event.as_log().get(&TIMESTAMP) {
-                Some(Value::Timestamp(ts)) => Some(ts.timestamp()),
-                _ => None,
-            } {
-                event.as_mut_log().insert(TIMESTAMP.clone(), unix);
+            let mut unix_timestamps = Vec::new();
+            for (k, v) in event.as_log().all_fields() {
+                if let Value::Timestamp(ts) = v {
+                    unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
+                }
+            }
+            for (k, v) in unix_timestamps.pop() {
+                event.as_mut_log().insert(k, v);
             }
         }
-        None => {}
+        // RFC3339 is the default serialization of a timestamp.
+        Some(TimestampFormat::RFC3339) | None => {}
     }
     let mut body =
         serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
@@ -244,6 +255,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        event,
         event::Event,
         test_util::{random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
@@ -306,7 +318,9 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            timestamp_format: Some(TimestampFormat::Unix),
+            encoding: EncodingConfig {
+                timestamp_format: Some(TimestampFormat::Unix),
+            },
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,
@@ -337,11 +351,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            TIMESTAMP.clone(),
+            event::log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&TIMESTAMP)
+                    .get(&event::log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()

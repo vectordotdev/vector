@@ -2841,15 +2841,6 @@ end
   healthcheck = true
   healthcheck = false
 
-  # Optionally convert timestamps into a format that can be parsed as a
-  # Clickhouse DateTime. This loses precision as DateTimes are defined in seconds.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * must be: "unix" (if supplied)
-  timestamp_format = "unix"
-
   #
   # requests
   #
@@ -2952,6 +2943,22 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.clickhouse.encoding]
+    # How to format event timestamps. Formats such as unix can be parsed as a
+    # Clickhouse DateTime, however, this loses precision as DateTimes are defined
+    # in seconds.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
