@@ -58,10 +58,6 @@ struct RootOpts {
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
 
-    /// Set the logging format. Options are "text" or "json". Defaults to "text".
-    #[structopt(long)]
-    log_format: Option<LogFormat>,
-
     /// Control when ANSI terminal formatting is used.
     ///
     /// By default `vector` will try and detect if `stdout` is a terminal, if it is
@@ -119,12 +115,6 @@ enum Color {
     Never,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum LogFormat {
-    Text,
-    Json,
-}
-
 impl std::str::FromStr for Color {
     type Err = String;
 
@@ -135,21 +125,6 @@ impl std::str::FromStr for Color {
             "never" => Ok(Color::Never),
             s => Err(format!(
                 "{} is not a valid option, expected `auto`, `always` or `never`",
-                s
-            )),
-        }
-    }
-}
-
-impl std::str::FromStr for LogFormat {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "text" => Ok(LogFormat::Text),
-            "json" => Ok(LogFormat::Json),
-            s => Err(format!(
-                "{} is not a valid option, expected `text` or `json`",
                 s
             )),
         }
@@ -220,14 +195,8 @@ fn main() {
 
     let (metrics_controller, metrics_sink) = metrics::build();
 
-    let json = match &opts.log_format.unwrap_or(LogFormat::Text) {
-        LogFormat::Text => false,
-        LogFormat::Json => true,
-    };
-
     trace::init(
         color,
-        json,
         levels.as_str(),
         opts.metrics_addr.map(|_| metrics_sink),
     );
