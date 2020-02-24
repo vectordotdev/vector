@@ -25,8 +25,8 @@ description = "The maximum size of the buffer on the disk."
 [<%= namespace %>.buffer.children.type]
 type = "string"
 default = "memory"
-prioritize = true
 required = true
+sort = 1
 description = "The buffer's type and storage mechanism."
 
 [<%= namespace %>.buffer.children.type.enum]

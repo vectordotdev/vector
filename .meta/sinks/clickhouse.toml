@@ -37,8 +37,8 @@ description = "Options for the authentication strategy."
 
 [sinks.clickhouse.options.auth.children.strategy]
 type = "string"
-prioritize = true
 required = true
+sort = 1
 description = "The authentication strategy to use."
 
 [sinks.clickhouse.options.auth.children.strategy.enum]

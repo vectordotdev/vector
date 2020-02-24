@@ -40,8 +40,8 @@ description = "Options for the authentication strategy."
 
 [sinks.elasticsearch.options.auth.children.strategy]
 type = "string"
-prioritize = true
 required = true
+sort = 1
 description = "The authentication strategy to use."
 
 [sinks.elasticsearch.options.auth.children.strategy.enum]

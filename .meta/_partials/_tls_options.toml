@@ -7,7 +7,7 @@ description = "Configures the TLS options for connections from this sink."
 [<%= namespace %>.tls.children.enabled]
 type = "bool"
 default = false
-prioritize = true
+sort = 1
 description = "Enable TLS during connections to the remote."
 <%- end -%>
 
