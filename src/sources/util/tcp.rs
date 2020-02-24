@@ -11,12 +11,12 @@ use std::{
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     codec::{Decoder, FramedRead},
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     reactor::Handle,
     timer,
 };
 use tokio_tls::TlsAcceptor;
-use tracing::field;
+use tracing::{field, Span};
 use tracing_futures::Instrument;
 
 pub trait TcpSource: Clone + Send + 'static {
@@ -113,54 +113,16 @@ pub trait TcpSource: Clone + Send + 'static {
 
                     let source = self.clone();
                     span.in_scope(|| {
-                        debug!("accepted a new socket.");
-
-                        let out = out.clone();
-
-                        if let Some(tls) = tls.clone() {
-                            match tls.acceptor() {
-                                Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
-                                Ok(acceptor) => {
-                                    let inner_span = span.clone();
-                                    let handler = TlsAcceptor::from(acceptor)
-                                        .accept(socket)
-                                        .map_err(
-                                            |error| warn!(message = "TLS connection accept error.", %error),
-                                        )
-                                        .map(|socket| {
-                                            let handler = FramedRead::new(socket, source.decoder())
-                                                .take_until(tripwire)
-                                                .filter_map(move |frame| {
-                                                    let host = host.clone();
-                                                    source.build_event(frame, host)
-                                                })
-                                                .map_err(
-                                                    |error| warn!(message = "connection error.", %error),
-                                                )
-                                                .forward(out)
-                                                .map(|_| debug!("TLS connection closed."));
-                                            tokio::spawn(handler.instrument(inner_span));
-                                        });
-
-                                    tokio::spawn(handler.instrument(span.clone()));
-                                }
-                            }
-                        } else {
-                            let events_in = FramedRead::new(socket, source.decoder())
-                                .take_until(tripwire)
-                                .filter_map(move |frame| {
-                                    let host = host.clone();
-                                    source.build_event(frame, host)
-                                })
-                                .map_err(|error| warn!(message = "connection error.", %error));
-
-                            let handler =
-                                events_in.forward(out).map(|_| debug!("connection closed."));
-
-                            tokio::spawn(handler.instrument(span.clone()));
-                        }
+                        accept_socket(
+                            span.clone(),
+                            socket,
+                            source,
+                            tripwire,
+                            host,
+                            out.clone(),
+                            tls.clone(),
+                        )
                     });
-
                     Ok(())
                 })
                 .inspect(|_| trigger.cancel());
@@ -168,6 +130,57 @@ pub trait TcpSource: Clone + Send + 'static {
         });
 
         Ok(Box::new(source))
+    }
+}
+
+fn accept_socket(
+    span: Span,
+    socket: TcpStream,
+    source: impl TcpSource,
+    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
+    host: Option<Bytes>,
+    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
+    tls: Option<TlsSettings>,
+) {
+    debug!("accepted a new socket.");
+
+    match tls {
+        Some(tls) => match tls.acceptor() {
+            Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
+            Ok(acceptor) => {
+                let inner_span = span.clone();
+                let handler = TlsAcceptor::from(acceptor)
+                    .accept(socket)
+                    .map_err(|error| warn!(message = "TLS connection accept error.", %error))
+                    .map(|socket| {
+                        let handler = FramedRead::new(socket, source.decoder())
+                            .take_until(tripwire)
+                            .filter_map(move |frame| {
+                                let host = host.clone();
+                                source.build_event(frame, host)
+                            })
+                            .map_err(|error| warn!(message = "connection error.", %error))
+                            .forward(out)
+                            .map(|_| debug!("TLS connection closed."));
+                        tokio::spawn(handler.instrument(inner_span));
+                    });
+
+                tokio::spawn(handler.instrument(span.clone()));
+            }
+        },
+        None => {
+            let events_in = FramedRead::new(socket, source.decoder())
+                .take_until(tripwire)
+                .filter_map(move |frame| {
+                    let host = host.clone();
+                    source.build_event(frame, host)
+                })
+                .map_err(|error| warn!(message = "connection error.", %error));
+
+            let handler = events_in.forward(out).map(|_| debug!("connection closed."));
+
+            tokio::spawn(handler.instrument(span));
+        }
     }
 }
 
