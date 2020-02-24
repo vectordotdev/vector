@@ -120,7 +120,8 @@ pub trait TcpSource: Clone + Send + 'static {
                         if let Some(tls) = tls.clone() {
                             match tls.acceptor() {
                                 Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
-                                Ok(acceptor)=> {
+                                Ok(acceptor) => {
+                                    let inner_span = span.clone();
                                     let handler = TlsAcceptor::from(acceptor)
                                         .accept(socket)
                                         .map_err(
@@ -138,7 +139,7 @@ pub trait TcpSource: Clone + Send + 'static {
                                                 )
                                                 .forward(out)
                                                 .map(|_| debug!("TLS connection closed."));
-                                            tokio::spawn(handler);
+                                            tokio::spawn(handler.instrument(inner_span));
                                         });
 
                                     tokio::spawn(handler.instrument(span.clone()));
