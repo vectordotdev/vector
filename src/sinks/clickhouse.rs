@@ -41,7 +41,7 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
-    #[serde(flatten)]
+    #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
 }
@@ -331,6 +331,64 @@ mod integration_tests {
             },
             ..Default::default()
         };
+
+        let client = ClickhouseClient::new(host);
+        client.create_table(
+            &table,
+            "host String, timestamp DateTime('Europe/London'), message String",
+        );
+
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+
+        let mut input_event = Event::from("raw log line");
+        input_event.as_mut_log().insert("host", "example.com");
+
+        let pump = sink.send(input_event.clone());
+        rt.block_on(pump).unwrap();
+
+        let output = client.select_all(&table);
+        assert_eq!(1, output.rows);
+
+        let exp_event = input_event.as_mut_log();
+        exp_event.insert(
+            event::log_schema().timestamp_key().clone(),
+            format!(
+                "{}",
+                exp_event
+                    .get(&event::log_schema().timestamp_key())
+                    .unwrap()
+                    .as_timestamp()
+                    .unwrap()
+                    .format("%Y-%m-%d %H:%M:%S")
+            ),
+        );
+
+        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        assert_eq!(expected, output.data[0]);
+    }
+
+    #[test]
+    fn insert_events_unix_timestamps_toml_config() {
+        crate::test_util::trace_init();
+        let mut rt = runtime();
+
+        let table = gen_table();
+        let host = String::from("http://localhost:8123");
+
+        let config: ClickhouseConfig = toml::from_str(&format!(
+            r#"
+host = "{}"
+table = "{}"
+compression = "none"
+[request]
+  retry_attempts = 1
+[batch]
+  max_size = 1
+[encoding]
+  timestamp_format = "unix""#,
+            host, table
+        ))
+        .unwrap();
 
         let client = ClickhouseClient::new(host);
         client.create_table(
