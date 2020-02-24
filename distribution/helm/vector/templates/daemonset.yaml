@@ -13,8 +13,6 @@ spec:
       app.kubernetes.io/name: {{ template "vector.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   minReadySeconds: 10
-  updateStrategy:
-    type: RollingUpdate
   template:
     metadata:
       labels:
