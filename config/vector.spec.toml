@@ -1995,12 +1995,16 @@ end
   #
 
   [transforms.rename_fields.fields]
-    # The name of the field to move. Use `.` for adding nested fields.
+    # The name of the field to move. Use `.` for nested fields.
     #
     # * required
     # * type: *
     old_field_name = "new_field_name"
+<<<<<<< HEAD
     parent = {old_child_name = "parent.new_child_name"}
+=======
+    parent = {old_child = "parent.new_child"}
+>>>>>>> docs(rename_fields transform): Fix examples and clarify nested behavior
 
 # Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]

@@ -34,9 +34,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "rename_fields" # required
   inputs = ["my-source-id"] # required
 
+<<<<<<< HEAD
   # Fields
   fields.old_field_name = "new_field_name" # example
   fields.parent.old_child_name = "parent.new_child_name" # example
+=======
+  # REQUIRED - Fields
+  [transforms.my_transform_id.fields]
+    old_field_name = "new_field_name" # example
+    parent = {old_child = "parent.new_child"} # example
+>>>>>>> docs(rename_fields transform): Fix examples and clarify nested behavior
 ```
 
 ## Options
@@ -74,7 +81,11 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
   common={true}
   defaultValue={null}
   enumValues={null}
+<<<<<<< HEAD
   examples={[{"old_field_name":"new_field_name"},{"parent":{"old_child_name":"parent.new_child_name"}}]}
+=======
+  examples={[{"old_field_name":"new_field_name"},{"parent":{"old_child":"parent.new_child"}}]}
+>>>>>>> docs(rename_fields transform): Fix examples and clarify nested behavior
   groups={[]}
   name={"`[field-name]`"}
   path={"fields"}
@@ -87,7 +98,7 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 #### `[field-name]`
 
-The name of the field to move. Use `.` for adding nested fields.
+The name of the field to move. Use `.` for nested fields.
 
 
 </Field>
@@ -106,7 +117,20 @@ The `rename_fields` transform accepts and [outputs `log` events](#output) allowi
 For example:
 
 
-Given the following configuration:
+Given the following `log` event:
+
+```js
+{
+  // ...
+  "old_field": "root_value",
+  "old_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
+```
+
+And a Vector configuration like:
 
 <CodeHeader fileName="vector.toml" />
 
@@ -117,6 +141,19 @@ Given the following configuration:
 
   fields.old_field = "new_field"
   fields.old_nested.nested = "new_nested.nested",
+```
+
+Will result in the following `log` event:
+
+```js
+{
+  // ...
+  "new_field": "root_value",
+  "new_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
 ```
 
 ## How It Works
@@ -134,7 +171,20 @@ section.
 
 ### Key Conflicts
 
-Keys specified in this transform will replace existing keys.
+Keys specified in this transform will replace existing keys _in full_. For
+example, if a target key contains an object value it will be replaced _entirely_
+by the new key's value, even if the new value is an object itself. Vector will
+_not_ perform a deep merge.
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="warning">
+
+Vector makes no guarantee on the order of execution. If two rename operations
+conflict, it is recommended to split them up across two separate rename
+transforms.
+
+</Alert>
 
 ### Nested Fields
 
@@ -147,14 +197,14 @@ verbose for this usecase:
   # ...
 
   [transforms.<transform-id>.fields]
-    parent.child.grandchild = "other_parent.child"
+    parent.child.grandchild = "other_parent.child.grandchild"
 ```
 
 Results in:
 
 ```json
 {
-  "parent.child.grandchild": "other_parent.child"
+  "other_parent.child.grandchild": "value"
 }
 ```
 
