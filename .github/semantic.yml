@@ -99,6 +99,7 @@ scopes:
   - rename_fields transform
   - sampler transform
   - split transform
+  - swimlanes transform
   - tokenizer transform
 
   # sinks

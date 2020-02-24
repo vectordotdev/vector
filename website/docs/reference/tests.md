@@ -52,6 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
+  no_outputs_from = ["foo"] # example
 
   # REQUIRED - Inputs
   [[tests.inputs]]
@@ -113,6 +114,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
+  no_outputs_from = ["foo"] # example
 
   # REQUIRED - Inputs
   [[tests.inputs]]
@@ -159,9 +161,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
       "message.eq" = "this is the content to match against"
       "host.exists" = true
       "method.neq" = "POST"
-
-  # OPTIONAL - General
-  no_outputs_from = ["foo"] # example, no default
 ```
 
 </TabItem>
@@ -177,6 +176,29 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["foo test"]}
+  groups={[]}
+  name={"name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### name
+
+A unique identifier for this test.
+
+
+</Field>
 
 
 <Field
@@ -219,6 +241,29 @@ A table that defines a unit test input event.
 #### insert_at
 
 The name of a transform, the input event will be delivered to this transform in order to begin the test.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
+  examples={["raw","log","metric"]}
+  groups={[]}
+  name={"type"}
+  path={"inputs"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The event type.
 
 
 </Field>
@@ -492,29 +537,6 @@ Amount to increment/decrement or gauge.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
-  examples={["raw","log","metric"]}
-  groups={[]}
-  name={"type"}
-  path={"inputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The event type.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
   enumValues={null}
   examples={["some message contents"]}
   groups={[]}
@@ -544,35 +566,12 @@ Specifies the log message field contents when the input type is 'raw'.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["foo test"]}
-  groups={[]}
-  name={"name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### name
-
-A unique identifier for this test.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[["foo"]]}
   groups={[]}
   name={"no_outputs_from"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"[string]"}
   unit={null}
@@ -628,6 +627,29 @@ A table that defines a unit test expected output.
 A table that defines a collection of conditions to check against the output of a transform. A test is considered to have passed when each condition has resolved true for one or more events extracted from the target transform.An expected output without conditions instead prints the input and output of a target without checking its values.
 
 <Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["check_fields"]}
+  groups={[]}
+  name={"type"}
+  path={"outputs.conditions"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### type
+
+The type of the condition to execute. Currently only the `check_fields` type is available.
+
+
+</Field>
 
 
 <Field
@@ -694,29 +716,6 @@ Check whether a field exists or does not exist, depending on the provided valueb
 ##### `<field_name>`.neq
 
 Check whether a fields contents does not match the value specified.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["check_fields"]}
-  groups={[]}
-  name={"type"}
-  path={"outputs.conditions"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### type
-
-The type of the condition to execute. Currently only the `check_fields` type is available.
 
 
 </Field>

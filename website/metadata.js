@@ -18458,6 +18458,28 @@ module.exports = {
 
       ]
     },
+    "swimlanes": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to route events across parallel streams using logical filters.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "filter",
+      "id": "swimlanes_transform",
+      "name": "swimlanes",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "tokenizer": {
       "beta": false,
       "delivery_guarantee": null,

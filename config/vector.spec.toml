@@ -1669,6 +1669,61 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+# Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
+[transforms.swimlanes]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "swimlanes"
+  type = "swimlanes"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Lanes
+  #
+
+  [transforms.swimlanes.lanes]
+    [transforms.swimlanes.lanes.`<swimlane_id>`]
+      # The type of the condition to execute. Currently only the `check_fields` type
+      # is available.
+      #
+      # * required
+      # * type: string
+      type = "check_fields"
+
+      # Check whether a fields contents exactly matches the value specified.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      "message.eq" = "this is the content to match against"
+
+      # Check whether a field exists or does not exist, depending on the provided
+      # valuebeing `true` or `false` respectively.
+      #
+      # * optional
+      # * no default
+      # * type: bool
+      "host.exists" = true
+
+      # Check whether a fields contents does not match the value specified.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      "method.neq" = "POST"
+
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #

@@ -8,6 +8,7 @@ description = "A table that defines a unit test."
 type = "string"
 examples = ["foo test"]
 common = true
+prioritize = true
 required = true
 description = "A unique identifier for this test."
 
@@ -32,6 +33,7 @@ type = "string"
 examples = ["raw", "log", "metric"]
 required = true
 common = true
+prioritize = true
 description = "The event type."
 
 [tests.children.inputs.children.type.enum]
@@ -171,50 +173,11 @@ An expected output without conditions instead prints the input and output of a \
 target without checking its values.\
 """
 
-[tests.children.outputs.children.conditions.children.type]
-type = "string"
-required = true
-examples = ["check_fields"]
-common = true
-description = """\
-The type of the condition to execute. Currently only the `check_fields` type is \
-available.\
-"""
-
-[tests.children.outputs.children.conditions.children."`<field_name>`.eq"]
-type = "string"
-examples = [
-  { "message.eq" = "this is the content to match against" }
-]
-common = true
-description = """\
-Check whether a fields contents exactly matches the value specified.\
-"""
-
-[tests.children.outputs.children.conditions.children."`<field_name>`.neq"]
-type = "string"
-examples = [
-  { "method.neq" = "POST" }
-]
-common = true
-description = """\
-Check whether a fields contents does not match the value specified.\
-"""
-
-[tests.children.outputs.children.conditions.children."`<field_name>`.exists"]
-type = "bool"
-examples = [
-  { "host.exists" = true }
-]
-common = true
-description = """\
-Check whether a field exists or does not exist, depending on the provided value\
-being `true` or `false` respectively.\
-"""
+<%= render("_partials/_conditions.toml", namespace: "tests.children.outputs.children.conditions.children") %>
 
 [tests.children.no_outputs_from]
 type = "[string]"
 common = false
-required = false
+required = true
 description = "A list of transforms that must NOT output events in order for the test to pass."
 examples = [["foo"]]

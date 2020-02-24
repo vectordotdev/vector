@@ -1,0 +1,105 @@
+[transforms.swimlanes]
+title = "Swimlanes"
+allow_you_to_description = "route events across parallel streams using logical filters"
+beta = true
+common = false
+function_category = "filter"
+input_types = ["log"]
+output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "swimlanes") %>
+
+[transforms.swimlanes.options.lanes]
+type = "table"
+common = true
+required = true
+description = """\
+A table of swimlane identifiers to logical conditions representing the filter of \
+the swimlane. Each swimlane can then be referenced as an input by other components \
+with the name `<transform_name>.<swimlane_id>`.\
+"""
+
+[transforms.swimlanes.options.lanes.children."`<swimlane_id>`"]
+type = "table"
+required = true
+common = true
+description = "The identifier of a swimlane."
+
+<%= render("_partials/_conditions.toml", namespace: "transforms.swimlanes.options.lanes.children.\"`<swimlane_id>`\".children") %>
+
+[[transforms.swimlanes.output.log.examples]]
+label = "If/Else"
+body = """\
+The `swimlanes` transform, in it's simplest form, can act as a simple if/else \
+stream splitter. For example, we can route events from the host `gerry` to a \
+sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.splitting_gerrys]
+  inputs = [ "somewhere" ]
+  type = "swimlanes"
+
+  [transforms.splitting_gerrys.lanes.only_gerrys]
+    type = "check_fields"
+    "host.eq" = "gerry"
+
+  [transforms.splitting_gerrys.lanes.no_gerrys]
+    type = "check_fields"
+    "host.neq" = "gerry"
+
+[sinks.only_loves_gerry]
+  inputs = [ "splitting_gerrys.only_gerrys" ]
+  type = "something"
+
+[sinks.hates_gerry]
+  inputs = [ "splitting_gerrys.no_gerrys" ]
+  type = "something_else"
+```
+
+This syntax makes it easy to create arbitrary numbers of swimlanes, each with \
+their own logic, and easily route them to downstream components.\
+"""
+
+[[transforms.swimlanes.output.log.examples]]
+label = "Splitting"
+body = """\
+To follow up with the previous `If/Else` example, let's say we want to split \
+a log stream based on all of the log `level` values:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.error_splitter]
+  type = "swimlanes"
+
+  [transforms.error_splitter.lanes.debug_events]
+    type = "check_fields"
+    "level.eq" = "debug"
+
+  [transforms.error_splitter.lanes.info_events]
+    type = "check_fields"
+    "level.neq" = "info"
+
+  [transforms.error_splitter.lanes.warn_events]
+    type = "check_fields"
+    "level.neq" = "warn"
+
+  [transforms.error_splitter.lanes.error_events]
+    type = "check_fields"
+    "level.neq" = "error_events"
+
+[sinks.error_printer]
+  type = "console"
+  inputs = ["error_events"]
+  target = "stderr"
+
+# Add more sinks or transforms that use the `debug_events`, `info_events`,
+# and `warn_events` streams
+```
+
+Notice how we must define mutually exclusive conditions for each `level` \
+value. If a log `level` does not match any of the lanes it will be dropped.\
+"""

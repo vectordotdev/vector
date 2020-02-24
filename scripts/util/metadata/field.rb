@@ -110,6 +110,10 @@ class Field
     end
   end
 
+  def object_of_object?
+    object? && children_list.length == 1 && children_list[0].object?
+  end
+
   def children?
     children.any?
   end
