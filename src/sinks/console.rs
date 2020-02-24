@@ -73,9 +73,9 @@ impl SinkConfig for ConsoleSinkConfig {
 }
 
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Result<String, ()> {
-    encoding.apply(&mut event);
+    encoding.apply_rules(&mut event);
     match event {
-        Event::Log(log) => match encoding.format() {
+        Event::Log(log) => match encoding.format {
             Encoding::Json => {
                 serde_json::to_string(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
             }

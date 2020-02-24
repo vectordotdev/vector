@@ -6,6 +6,7 @@ use crate::{
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, SinkExt, TowerRequestConfig,
+        encoding::EncodingConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -38,7 +39,8 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
     #[serde(default)]
@@ -98,6 +100,7 @@ impl KinesisService {
         let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
+        encoding.validate()?;
         let partition_key_field = config.partition_key_field.clone();
 
         let kinesis = KinesisService { client, config };
@@ -218,10 +221,11 @@ fn create_client(
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     partition_key_field: &Option<Atom>,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
+    encoding.apply_rules(&mut event);
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = event.as_log().get(&partition_key_field) {
             v.to_string_lossy()
@@ -244,7 +248,7 @@ fn encode_event(
     };
 
     let log = event.into_log();
-    let data = match encoding {
+    let data = match encoding.format {
         Encoding::Json => {
             serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
         }
@@ -285,7 +289,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &None, &Encoding::Text).unwrap();
+        let event = encode_event(message.clone().into(), &None, &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -295,7 +299,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &None, &Encoding::Json).unwrap();
+        let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
@@ -307,7 +311,7 @@ mod tests {
     fn kinesis_encode_event_custom_partition_key() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "some_key");
-        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
+        let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(&event.partition_key, &"some_key".to_string());
@@ -317,7 +321,7 @@ mod tests {
     fn kinesis_encode_event_custom_partition_key_limit() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", random_string(300));
-        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
+        let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(event.partition_key.len(), 256);

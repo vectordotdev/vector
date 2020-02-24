@@ -15,12 +15,21 @@ use string_cache::DefaultAtom as Atom;
 /// Currently, we don't have a defined ordering, since all options are mutually exclusive.
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Getters, Setters)]
 pub struct EncodingConfig<E> {
-    #[getset(get = "pub", set = "pub")]
-    format: E,
+    pub(crate) format: E,
     #[serde(default)]
     only_fields: Option<Vec<Atom>>,
     #[serde(default)]
     except_fields: Option<Vec<Atom>>,
+}
+
+impl<E: Default> Default for EncodingConfig<E> {
+    fn default() -> Self {
+        Self {
+            format: Default::default(),
+            only_fields: Default::default(),
+            except_fields: Default::default(),
+        }
+    }
 }
 
 impl<E> From<E> for EncodingConfig<E> {
@@ -45,7 +54,7 @@ where
         }
         Ok(())
     }
-    pub(crate) fn apply(&self, event: &mut Event) {
+    pub(crate) fn apply_rules(&self, event: &mut Event) {
         // Ordering in here should not matter.
         self.except_fields(event);
         self.only_fields(event);
@@ -200,7 +209,7 @@ mod tests {
             log.insert("Doop", 1);
             log.insert("Beep", 1);
         }
-        config.encoding.apply(&mut event);
+        config.encoding.apply_rules(&mut event);
         assert!(!event.as_mut_log().contains(&Atom::from("Doop")));
         assert!(event.as_mut_log().contains(&Atom::from("Beep")));
     }
@@ -219,7 +228,7 @@ mod tests {
             log.insert("Doop", 1);
             log.insert("Beep", 1);
         }
-        config.encoding.apply(&mut event);
+        config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains(&Atom::from("Doop")));
         assert!(!event.as_mut_log().contains(&Atom::from("Beep")));
     }

@@ -682,12 +682,15 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
 mod tests {
     use super::SplunkConfig;
     use crate::runtime::{Runtime, TaskExecutor};
-    use crate::sinks::splunk_hec::{Encoding, HecSinkConfig};
-    use crate::sinks::{util::Compression, Healthcheck, RouterSink};
     use crate::test_util::{self, collect_n};
     use crate::{
         event::{self, Event},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        sinks::{
+            splunk_hec::{Encoding, HecSinkConfig},
+            util::{Compression, encoding::EncodingConfig},
+            Healthcheck, RouterSink
+        },
     };
     use futures::{stream, sync::mpsc, Sink};
     use http::Method;
@@ -716,14 +719,14 @@ mod tests {
 
     fn sink(
         address: SocketAddr,
-        encoding: Encoding,
+        encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
         exec: TaskExecutor,
     ) -> (RouterSink, Healthcheck) {
         HecSinkConfig {
             host: format!("http://{}", address),
             token: TOKEN.to_owned(),
-            encoding,
+            encoding: encoding.into(),
             compression: Some(compression),
             ..HecSinkConfig::default()
         }
@@ -732,7 +735,7 @@ mod tests {
     }
 
     fn start(
-        encoding: Encoding,
+        encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
         let mut rt = test_util::runtime();

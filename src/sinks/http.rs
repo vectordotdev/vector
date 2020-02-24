@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        encoding::EncodingConfig,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -42,7 +43,8 @@ pub struct HttpSinkConfig {
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -89,6 +91,7 @@ impl SinkConfig for HttpSinkConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
 
         let mut config = self.clone();
+        config.encoding.validate()?;
 
         config.uri = build_uri(config.uri.clone()).into();
         let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -132,10 +135,11 @@ impl HttpSink for HttpSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
-        let body = match &self.encoding {
+        let body = match &self.encoding.format {
             Encoding::Text => {
                 if let Some(v) = event.get(&event::log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
@@ -183,7 +187,7 @@ impl HttpSink for HttpSinkConfig {
         let uri: Uri = self.uri.clone().into();
         builder.uri(uri);
 
-        match self.encoding {
+        match self.encoding.format {
             Encoding::Text => builder.header("Content-Type", "text/plain"),
             Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
             Encoding::Json => {
@@ -290,7 +294,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let encoding = Encoding::Text;
+        let encoding = EncodingConfig::from(Encoding::Text);
         let event = Event::from("hello world");
 
         let mut config = HttpSinkConfig::default();
@@ -302,7 +306,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_json() {
-        let encoding = Encoding::Ndjson;
+        let encoding = EncodingConfig::from(Encoding::Ndjson);
         let event = Event::from("hello world");
 
         let mut config = HttpSinkConfig::default();

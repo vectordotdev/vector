@@ -1,6 +1,6 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
+    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig, encoding::EncodingConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
@@ -97,7 +97,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
-            encoding: Encoding::Json,
+            encoding: EncodingConfig::from(Encoding::Json),
 
             batch,
             request,
@@ -148,7 +148,7 @@ mod tests {
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding, Encoding::Json);
+        assert_eq!(http_config.encoding, Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(5u64) as usize)
@@ -179,7 +179,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding, Encoding::Json);
+        assert_eq!(http_config.encoding, Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)
@@ -216,7 +216,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding, Encoding::Json);
+        assert_eq!(http_config.encoding, Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)

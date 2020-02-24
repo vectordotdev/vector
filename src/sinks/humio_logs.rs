@@ -1,6 +1,6 @@
 use crate::{
     sinks::splunk_hec::{Encoding, HecSinkConfig},
-    sinks::util::{BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{BatchBytesConfig, TowerRequestConfig, encoding::EncodingConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ impl SinkConfig for HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             host,
-            encoding: Encoding::Json,
+            encoding: EncodingConfig::from(Encoding::Json),
             batch: self.batch.clone(),
             request: self.request.clone(),
             ..Default::default()

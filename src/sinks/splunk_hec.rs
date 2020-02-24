@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        encoding::EncodingConfig,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -33,7 +34,8 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -50,7 +52,7 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
@@ -71,6 +73,7 @@ inventory::submit! {
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
+        self.encoding.validate()?;
         let healthcheck = healthcheck(&self, cx.resolver())?;
         let sink = hec(self.clone(), cx)?;
 
@@ -195,10 +198,11 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
 
 fn encode_event(
     host_field: &Atom,
-    event: Event,
+    mut event: Event,
     indexed_fields: &[Atom],
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<Vec<u8>> {
+    encoding.apply_rules(&mut event);
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
@@ -209,7 +213,7 @@ fn encode_event(
             chrono::Utc::now().timestamp()
         };
 
-    let mut body = match encoding {
+    let mut body = match encoding.format {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
             "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
@@ -247,7 +251,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let bytes = encode_event(&host, event, &vec![], &Encoding::Json).unwrap();
+        let bytes = encode_event(&host, event, &vec![], &Encoding::Json.into()).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
