@@ -12,6 +12,7 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     codec::{Decoder, FramedRead},
     net::{TcpListener, TcpStream},
+    prelude::AsyncRead,
     reactor::Handle,
     timer,
 };
@@ -152,36 +153,33 @@ fn accept_socket(
                 let handler = TlsAcceptor::from(acceptor)
                     .accept(socket)
                     .map_err(|error| warn!(message = "TLS connection accept error.", %error))
-                    .map(|socket| {
-                        let handler = FramedRead::new(socket, source.decoder())
-                            .take_until(tripwire)
-                            .filter_map(move |frame| {
-                                let host = host.clone();
-                                source.build_event(frame, host)
-                            })
-                            .map_err(|error| warn!(message = "connection error.", %error))
-                            .forward(out)
-                            .map(|_| debug!("TLS connection closed."));
-                        tokio::spawn(handler.instrument(inner_span));
-                    });
+                    .map(|socket| handle_stream(inner_span, socket, source, tripwire, host, out));
 
                 tokio::spawn(handler.instrument(span.clone()));
             }
         },
-        None => {
-            let events_in = FramedRead::new(socket, source.decoder())
-                .take_until(tripwire)
-                .filter_map(move |frame| {
-                    let host = host.clone();
-                    source.build_event(frame, host)
-                })
-                .map_err(|error| warn!(message = "connection error.", %error));
-
-            let handler = events_in.forward(out).map(|_| debug!("connection closed."));
-
-            tokio::spawn(handler.instrument(span));
-        }
+        None => handle_stream(span, socket, source, tripwire, host, out),
     }
+}
+
+fn handle_stream(
+    span: Span,
+    socket: impl AsyncRead + Send + 'static,
+    source: impl TcpSource,
+    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
+    host: Option<Bytes>,
+    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
+) {
+    let handler = FramedRead::new(socket, source.decoder())
+        .take_until(tripwire)
+        .filter_map(move |frame| {
+            let host = host.clone();
+            source.build_event(frame, host)
+        })
+        .map_err(|error| warn!(message = "connection error.", %error))
+        .forward(out)
+        .map(|_| debug!("connection closed."));
+    tokio::spawn(handler.instrument(span));
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
