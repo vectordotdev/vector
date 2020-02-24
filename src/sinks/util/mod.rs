@@ -1,5 +1,6 @@
 pub mod batch;
 pub mod buffer;
+pub mod encoding;
 pub mod http;
 pub mod retries;
 pub mod rusoto;

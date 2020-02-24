@@ -550,7 +550,7 @@ mod tests {
             &[&"in"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
-                encoding: Encoding::Text,
+                encoding: Encoding::Text.into(),
             },
         );
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());

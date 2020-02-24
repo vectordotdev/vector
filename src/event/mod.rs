@@ -18,6 +18,7 @@ pub mod metric;
 mod unflatten;
 
 pub use metric::Metric;
+use std::collections::btree_map::Entry;
 pub use unflatten::Unflatten;
 
 pub mod proto {
@@ -133,6 +134,10 @@ impl LogEvent {
 
     pub fn into_iter(self) -> impl Iterator<Item = (Atom, Value)> {
         self.fields.into_iter()
+    }
+
+    pub fn entry(&mut self, key: Atom) -> Entry<Atom, Value> {
+        self.fields.entry(key)
     }
 
     pub fn unflatten(self) -> unflatten::Unflatten {

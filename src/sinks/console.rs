@@ -1,3 +1,4 @@
+use super::util::encoding::{deserialize_encoding_config, EncodingConfig};
 use super::util::SinkExt;
 use crate::{
     event::{self, Event},
@@ -28,7 +29,8 @@ impl Default for Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "deserialize_encoding_config")]
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -45,6 +47,7 @@ inventory::submit! {
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        self.encoding.validate()?;
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
@@ -69,9 +72,10 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
-fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Result<String, ()> {
+    encoding.apply(&mut event);
     match event {
-        Event::Log(log) => match encoding {
+        Event::Log(log) => match encoding.format() {
             Encoding::Json => {
                 serde_json::to_string(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
             }
@@ -89,7 +93,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
 
 #[cfg(test)]
 mod test {
-    use super::{encode_event, Encoding};
+    use super::{encode_event, Encoding, EncodingConfig};
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
@@ -97,7 +101,10 @@ mod test {
     #[test]
     fn encodes_raw_logs() {
         let event = Event::from("foo");
-        assert_eq!(Ok("foo".to_string()), encode_event(event, &Encoding::Text));
+        assert_eq!(
+            Ok("foo".to_string()),
+            encode_event(event, &EncodingConfig::from(Encoding::Text))
+        );
     }
 
     #[test]
@@ -108,7 +115,7 @@ mod test {
         log.insert("z", Value::from(25));
         log.insert("a", Value::from("0"));
 
-        let encoded = encode_event(event, &Encoding::Json);
+        let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
         let expected = r#"{"a":"0","x":"23","z":25}"#.to_string();
         assert_eq!(encoded, Ok(expected));
     }
@@ -132,7 +139,7 @@ mod test {
         });
         assert_eq!(
             Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
-            encode_event(event, &Encoding::Text)
+            encode_event(event, &EncodingConfig::from(Encoding::Text))
         );
     }
 
@@ -149,7 +156,7 @@ mod test {
         });
         assert_eq!(
             Ok(r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#.to_string()),
-            encode_event(event, &Encoding::Text)
+            encode_event(event, &EncodingConfig::from(Encoding::Text))
         );
     }
 
@@ -167,7 +174,7 @@ mod test {
         });
         assert_eq!(
             Ok(r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#.to_string()),
-            encode_event(event, &Encoding::Text)
+            encode_event(event, &EncodingConfig::from(Encoding::Text))
         );
     }
 }
