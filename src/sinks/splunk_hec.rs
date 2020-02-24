@@ -549,13 +549,16 @@ mod integration_tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config(encoding: Encoding, indexed_fields: Vec<Atom>) -> super::HecSinkConfig {
+    fn config(
+        encoding: impl Into<EncodingConfig<Encoding>>,
+        indexed_fields: Vec<Atom>,
+    ) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
-            encoding,
+            encoding: encoding.into(),
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,
