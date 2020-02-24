@@ -14,7 +14,6 @@ pub use tracing_tower::{InstrumentableService, InstrumentedService};
 pub fn init(color: bool, json: bool, levels: &str, metrics: Option<metrics::Sink>) {
     let dispatch = if json {
         let subscriber = FmtSubscriber::builder()
-            .with_ansi(color)
             .with_env_filter(levels)
             .json()
             .finish()

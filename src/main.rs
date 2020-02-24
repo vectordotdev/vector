@@ -220,10 +220,9 @@ fn main() {
 
     let (metrics_controller, metrics_sink) = metrics::build();
 
-    let json = match &opts.log_format {
-        Some(LogFormat::Text) => false,
-        Some(LogFormat::Json) => true,
-        None => false,
+    let json = match &opts.log_format.unwrap_or(LogFormat::Text) {
+        LogFormat::Text => false,
+        LogFormat::Json => true,
     };
 
     trace::init(
