@@ -18392,6 +18392,28 @@ module.exports = {
 
       ]
     },
+    "rename_fields": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to rename one or more log fields.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "shape",
+      "id": "rename_fields_transform",
+      "name": "rename_fields",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "sampler": {
       "beta": true,
       "delivery_guarantee": null,

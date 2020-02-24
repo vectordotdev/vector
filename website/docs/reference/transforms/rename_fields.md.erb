@@ -1,0 +1,63 @@
+<%- component = metadata.transforms.rename_fields -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+## Options
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+<%- if component.output.log -%>
+## Output
+
+<%= component_output(component, component.output.log, heading_depth: 3) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+### Nested Fields
+
+The `rename_fields` transform will support dotted keys or [TOML
+tables][urls.toml_table]. We recommend the dotted key syntax since it is less
+verbose for this usecase:
+
+```
+[transforms.<transform-id>]
+  # ...
+
+  [transforms.<transform-id>.fields]
+    parent.child.grandchild = "other_parent.child"
+```
+
+Results in:
+
+```json
+{
+  "parent.child.grandchild": "other_parent.child"
+}
+```
+
+Learn more about how [`log` events][docs.data-model.log] are structured.
+
+<%= component_sections(component) %>
+
+

@@ -1560,6 +1560,37 @@ end
   # * type: [string]
   tags = ["tag1", "tag2"]
 
+# Accepts and outputs `log` events allowing you to rename one or more log fields.
+[transforms.rename_fields]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "rename_fields"
+  type = "rename_fields"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Fields
+  #
+
+  [transforms.rename_fields.fields]
+    # The name of the field to move. Use `.` for adding nested fields.
+    #
+    # * required
+    # * type: *
+    old field name = "new field name"
+
 # Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type. This is a required field that tells Vector which
