@@ -49,8 +49,8 @@ impl<'a> FileSourceBuilder<'a> {
         // oldest_first false, having all pods equaly serviced is of greater importance
         //                     than having time order guarantee.
 
-        // CRI standard ensures unique naming.
-        self.file_config.fingerprinting = FingerprintingConfig::DevInode;
+        // CRI standard ensures unique naming, but Docker log rotation tends to re-use inodes,
+        // so we keep the default checksum fingerprinting strategy.
 
         // Have a subdirectory for this source to avoid collision of naming its file source.
         self.file_config.data_dir = Some(globals.resolve_and_make_data_subdir(None, kube_name)?);
