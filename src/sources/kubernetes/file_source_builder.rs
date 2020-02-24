@@ -1,9 +1,6 @@
 use crate::{
     event::Event,
-    sources::{
-        file::{FileConfig, FingerprintingConfig},
-        Source,
-    },
+    sources::{file::FileConfig, Source},
     topology::config::{GlobalOptions, SourceConfig},
 };
 use futures::sync::mpsc;
