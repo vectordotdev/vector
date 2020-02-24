@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    event::Event,
+    event::{Event, Value},
     sinks::util::{
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
@@ -17,6 +17,19 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum TimestampFormat {
+    Unix,
+    RFC3339,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct EncodingConfig {
+    pub timestamp_format: Option<TimestampFormat>,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
@@ -24,6 +37,7 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
+    pub encoding: EncodingConfig,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
@@ -109,12 +123,27 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
             cx.acker(),
         )
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
+        .with_flat_map(move |event: Event| iter_ok(encode_event(&config, event)));
 
     Ok(Box::new(sink))
 }
 
-fn encode_event(event: Event) -> Option<Vec<u8>> {
+fn encode_event(config: &ClickhouseConfig, mut event: Event) -> Option<Vec<u8>> {
+    match config.encoding.timestamp_format {
+        Some(TimestampFormat::Unix) => {
+            let mut unix_timestamps = Vec::new();
+            for (k, v) in event.as_log().all_fields() {
+                if let Value::Timestamp(ts) = v {
+                    unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
+                }
+            }
+            for (k, v) in unix_timestamps.pop() {
+                event.as_mut_log().insert(k, v);
+            }
+        }
+        // RFC3339 is the default serialization of a timestamp.
+        Some(TimestampFormat::RFC3339) | None => {}
+    }
     let mut body =
         serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
     body.push(b'\n');
@@ -226,6 +255,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        event,
         event::Event,
         test_util::{random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
@@ -273,6 +303,67 @@ mod integration_tests {
         assert_eq!(1, output.rows);
 
         let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
+        assert_eq!(expected, output.data[0]);
+    }
+
+    #[test]
+    fn insert_events_unix_timestamps() {
+        crate::test_util::trace_init();
+        let mut rt = runtime();
+
+        let table = gen_table();
+        let host = String::from("http://localhost:8123");
+
+        let config = ClickhouseConfig {
+            host: host.clone(),
+            table: table.clone(),
+            compression: Some(Compression::None),
+            encoding: EncodingConfig {
+                timestamp_format: Some(TimestampFormat::Unix),
+            },
+            batch: BatchBytesConfig {
+                max_size: Some(1),
+                timeout_secs: None,
+            },
+            request: TowerRequestConfig {
+                retry_attempts: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let client = ClickhouseClient::new(host);
+        client.create_table(
+            &table,
+            "host String, timestamp DateTime('Europe/London'), message String",
+        );
+
+        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+
+        let mut input_event = Event::from("raw log line");
+        input_event.as_mut_log().insert("host", "example.com");
+
+        let pump = sink.send(input_event.clone());
+        rt.block_on(pump).unwrap();
+
+        let output = client.select_all(&table);
+        assert_eq!(1, output.rows);
+
+        let exp_event = input_event.as_mut_log();
+        exp_event.insert(
+            event::log_schema().timestamp_key().clone(),
+            format!(
+                "{}",
+                exp_event
+                    .get(&event::log_schema().timestamp_key())
+                    .unwrap()
+                    .as_timestamp()
+                    .unwrap()
+                    .format("%Y-%m-%d %H:%M:%S")
+            ),
+        );
+
+        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -334,7 +425,6 @@ mod integration_tests {
                     "CREATE TABLE {}
                      ({})
                      ENGINE = MergeTree()
-                     PARTITION BY substring(timestamp, 1, 7)
                      ORDER BY (host, timestamp);",
                     table, schema
                 ))
