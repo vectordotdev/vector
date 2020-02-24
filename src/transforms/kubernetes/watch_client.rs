@@ -1,9 +1,7 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        http::https_client,
-        tls::{TlsOptions, TlsSettings},
-    },
+    sinks::util::http::https_client,
+    tls::{TlsOptions, TlsSettings},
 };
 use futures::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
@@ -42,7 +40,7 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    /// Loads Kubernetes API access information available to Pods of cluster.  
+    /// Loads Kubernetes API access information available to Pods of cluster.
     pub fn in_cluster(node: String, resolver: Resolver) -> Result<Self, BuildError> {
         let server = Uri::from_static(KUBERNETES_SERVICE_ADDRESS);
 

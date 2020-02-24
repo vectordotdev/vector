@@ -32,6 +32,7 @@ lazy_static! {
         message_key: Atom::from("message"),
         timestamp_key: Atom::from("timestamp"),
         host_key: Atom::from("host"),
+        kubernetes_key: Atom::from("kubernetes"),
     };
 }
 
