@@ -1,4 +1,4 @@
-use super::util::encoding::{deserialize_encoding_config, EncodingConfig};
+use super::util::encoding::{EncodingConfig};
 use super::util::SinkExt;
 use crate::{
     event::{self, Event},
@@ -29,7 +29,7 @@ impl Default for Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    #[serde(deserialize_with = "deserialize_encoding_config")]
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
 }
 
