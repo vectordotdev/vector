@@ -112,7 +112,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-kube-watch-client:latest
+        image: ktff/vector-kube-newline-bug:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
