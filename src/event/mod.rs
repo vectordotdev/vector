@@ -762,7 +762,7 @@ mod test {
 
     #[test]
     fn partial_log_schema() {
-        let toml = r#"     
+        let toml = r#"
 message_key = "message"
 timestamp_key = "timestamp"
 "#;
