@@ -1,4 +1,4 @@
-use futures::future::{ExecuteError, Executor, Future};
+use futures01::future::{ExecuteError, Executor, Future};
 use std::io;
 use std::pin::Pin;
 use tokio::runtime::Builder;

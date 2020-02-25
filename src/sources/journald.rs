@@ -4,7 +4,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
-use futures::{future, sync::mpsc, Future, Sink};
+use futures01::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -412,7 +412,7 @@ mod checkpointer_tests {
 mod tests {
     use super::*;
     use crate::test_util::{block_on, runtime, shutdown_on_idle};
-    use futures::stream::Stream;
+    use futures01::stream::Stream;
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
     use std::time::Duration;
@@ -462,7 +462,7 @@ mod tests {
     }
 
     fn run_journal(units: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =

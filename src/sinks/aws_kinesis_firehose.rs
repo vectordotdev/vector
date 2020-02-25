@@ -10,7 +10,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_firehose::{
@@ -263,7 +263,7 @@ mod integration_tests {
         test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,

@@ -3,7 +3,7 @@ use crate::{
     sources::{file::FileConfig, Source},
     topology::config::{GlobalOptions, SourceConfig},
 };
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use std::iter::FromIterator;
 
 use super::{BuildError, KubernetesConfig, LOG_DIRECTORY};

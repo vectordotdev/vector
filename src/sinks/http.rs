@@ -8,7 +8,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, Future};
+use futures01::{future, Future};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -281,7 +281,7 @@ mod tests {
         topology::config::SinkContext,
     };
     use bytes::Buf;
-    use futures::{sync::mpsc, Future, Sink, Stream};
+    use futures01::{sync::mpsc, Future, Sink, Stream};
     use headers::{Authorization, HeaderMapExt};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};

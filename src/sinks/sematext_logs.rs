@@ -4,7 +4,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -84,7 +84,7 @@ fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
         log.insert("os.host", host);
     }
 
-    futures::future::ok(event)
+    futures01::future::ok(event)
 }
 
 #[cfg(test)]
@@ -94,7 +94,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use crate::topology::config::SinkConfig;
-    use futures::{Sink, Stream};
+    use futures01::{Sink, Stream};
 
     #[test]
     fn smoke() {
