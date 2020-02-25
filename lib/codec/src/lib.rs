@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate tracing;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{buf::ext::BufExt, Buf, BufMut, Bytes, BytesMut};
 use std::{cmp, io, usize};
-use tokio_codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BytesDelimitedCodec {
@@ -77,16 +77,17 @@ impl Decoder for BytesDelimitedCodec {
 
                     let newpos_index = pos + self.next_index;
                     self.next_index = 0;
-                    let frame = buf.split_to(newpos_index + 1);
+                    let mut frame = buf.split_to(newpos_index + 1);
 
                     trace!(
                         message = "decoding the frame.",
                         bytes_proccesed = frame.len()
                     );
 
-                    let frame = &frame[..frame.len() - 1];
+                    // Cut last char
+                    frame.truncate(frame.len() - 1);
 
-                    Ok(Some(frame.into()))
+                    Ok(Some(frame.freeze()))
                 } else if buf.len() > self.max_length {
                     // We reached the max length without finding the
                     // delimiter so must discard the rest until we
@@ -113,10 +114,10 @@ impl Decoder for BytesDelimitedCodec {
         let frame = match self.decode(buf)? {
             Some(frame) => Some(frame),
             None if !buf.is_empty() && !self.is_discarding => {
-                let frame = buf.take();
+                let frame = buf.take(buf.len()).to_bytes();
                 self.next_index = 0;
 
-                Some(frame.into())
+                Some(frame)
             }
             _ => None,
         };

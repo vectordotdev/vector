@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use codec::BytesDelimitedCodec;
 use std::collections::HashMap;
-use tokio_codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[test]
 fn bytes_delim_decod() {
