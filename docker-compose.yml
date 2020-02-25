@@ -87,7 +87,7 @@ services:
     check-component-features:
       build:
         context: .
-        dockerfile: scripts/ci-docker-images/checker/Dockerfile
+        dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
       environment:
         RUSTFLAGS: "-D warnings"
         CARGO_TERM_COLOR: always

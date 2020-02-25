@@ -6,6 +6,8 @@ RUN apt-get update && \
   curl \
   git \
   jq \
+  libssl-dev \
+  pkg-config \
   python3-pip
 
 # Install Rust

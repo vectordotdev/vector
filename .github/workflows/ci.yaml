@@ -21,4 +21,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: "cd tests && make check-component-features"
+    - run: "cd tests && make check-component-features"
