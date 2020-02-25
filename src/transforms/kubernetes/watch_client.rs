@@ -284,9 +284,9 @@ mod kube_tests {
     use super::ClientConfig;
     use crate::{
         dns::Resolver,
-        sinks::util::tls::{TlsOptions, TlsSettings},
         sources::kubernetes::test::{echo, Kube},
         test_util::{runtime, temp_file},
+        tls::{TlsOptions, TlsSettings},
     };
     use dirs;
     use futures::{future::Future, stream::Stream};
