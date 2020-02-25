@@ -4801,7 +4801,6 @@ dependencies = [
  "tokio-openssl",
  "tokio-retry",
  "tokio-signal",
- "tokio-threadpool",
  "tokio-uds",
  "tokio01-test",
  "toml 0.4.10",
