@@ -250,18 +250,18 @@ module.exports = {
         "deletions_count": 1,
         "description": "Make sorting of blog posts stable",
         "files_count": 1,
-        "group": "docs",
+        "group": "chore",
         "insertions_count": 1,
-        "message": "docs: Make sorting of blog posts stable (#1566)",
+        "message": "chore(website): Make sorting of blog posts stable (#1566)",
         "pr_number": 1566,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "core"
+          "name": "website"
         },
         "sha": "c5ad7d22f8f3b02c5fd8bc784c7c5cf54dd7b694",
-        "type": "docs"
+        "type": "chore"
       },
       {
         "author": "Alexander Rodin",
@@ -308,11 +308,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-01-22 11:36:26 +0000",
         "deletions_count": 1,
-        "description": "Poll inner service in `Map` svc",
+        "description": "Fix a bug with `retry_limit` is set to 1",
         "files_count": 1,
         "group": "fix",
         "insertions_count": 31,
-        "message": "fix(aws_s3 sink): Poll inner service in `Map` svc (#1569)",
+        "message": "fix(aws_s3 sink): Fix a bug with `retry_limit` is set to 1 (#1569)",
         "pr_number": 1569,
         "scope": {
           "category": "sink",
@@ -328,17 +328,17 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-01-22 16:11:44 +0000",
         "deletions_count": 7,
-        "description": "enable more logging by default",
+        "description": "Enable more logging by default",
         "files_count": 3,
         "group": "enhancement",
         "insertions_count": 8,
-        "message": "enhancement(observability): enable more logging by default (#1564)",
+        "message": "enhancement(aws_cloudwatch_logs sink): Enable more logging by default (#1564)",
         "pr_number": 1564,
         "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "observability"
+          "category": "sink",
+          "component_name": "aws_cloudwatch_logs",
+          "component_type": "sink",
+          "name": "aws_cloudwatch_logs sink"
         },
         "sha": "203efcd8071edc4e6986968d3c8ff9b2e36f341d",
         "type": "enhancement"
@@ -368,11 +368,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-01-22 19:30:47 +0000",
         "deletions_count": 118,
-        "description": "Improve DNS resolution",
+        "description": "Allow for non-IP address host names",
         "files_count": 9,
         "group": "fix",
         "insertions_count": 117,
-        "message": "fix(socket sink): Improve DNS resolution (#1575)",
+        "message": "fix(socket sink): Allow for non-IP address host names (#1575)",
         "pr_number": 1575,
         "scope": {
           "category": "sink",
@@ -388,11 +388,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-01-23 13:28:37 +0000",
         "deletions_count": 22,
-        "description": "Fix `aws_kinesis_firehose` sink healthcheck",
+        "description": "Use `describe_delivery_stream` AWS API method for healthcheck",
         "files_count": 1,
         "group": "fix",
         "insertions_count": 13,
-        "message": "fix(aws_kinesis_firehose sink): Fix `aws_kinesis_firehose` sink healthcheck (#1573)",
+        "message": "fix(aws_kinesis_firehose sink): Use `describe_delivery_stream` AWS API method for healthcheck (#1573)",
         "pr_number": 1573,
         "scope": {
           "category": "sink",
@@ -472,13 +472,13 @@ module.exports = {
         "files_count": 27,
         "group": "chore",
         "insertions_count": 130,
-        "message": "chore: Check that all blog articles are signed in CI (#1459)",
+        "message": "chore(website): Check that all blog articles are signed in CI (#1459)",
         "pr_number": 1459,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "core"
+          "name": "website"
         },
         "sha": "9aac838ff2bd09aacbb58cec79bebda54c0ba4ca",
         "type": "chore"
@@ -510,18 +510,18 @@ module.exports = {
         "deletions_count": 6,
         "description": "Fix socket sink docs",
         "files_count": 5,
-        "group": "chore",
+        "group": "docs",
         "insertions_count": 6,
-        "message": "chore(docs): Fix socket sink docs (#1585)",
+        "message": "docs(socket sink): Fix socket sink docs (#1585)",
         "pr_number": 1585,
         "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "docs"
+          "category": "sink",
+          "component_name": "socket",
+          "component_type": "sink",
+          "name": "socket sink"
         },
         "sha": "26539079cb5a5b3c2e530191297f70a05f3db024",
-        "type": "chore"
+        "type": "docs"
       },
       {
         "author": "Alexander Rodin",
@@ -532,13 +532,13 @@ module.exports = {
         "files_count": 1,
         "group": "fix",
         "insertions_count": 11,
-        "message": "fix(platforms): Create `vector` user when installing RPM package (#1583)",
+        "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
         "pr_number": 1583,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "platforms"
+          "name": "rpm platform"
         },
         "sha": "4e6fc6b240c23651e3b7323f9a0f3de6fdb7468b",
         "type": "fix"
@@ -572,13 +572,13 @@ module.exports = {
         "files_count": 3,
         "group": "chore",
         "insertions_count": 0,
-        "message": "chore: Redo blog sigs",
+        "message": "chore(website): Redo blog sigs",
         "pr_number": null,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "core"
+          "name": "website"
         },
         "sha": "6179310868047ceff60e46172e452c54b55e8aa1",
         "type": "chore"
@@ -832,13 +832,13 @@ module.exports = {
         "files_count": 31,
         "group": "docs",
         "insertions_count": 76,
-        "message": "docs: Fix socket address documentation (#1607)",
+        "message": "docs(socket source): Fix socket address documentation (#1607)",
         "pr_number": 1607,
         "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "core"
+          "category": "source",
+          "component_name": "socket",
+          "component_type": "source",
+          "name": "socket source"
         },
         "sha": "d06926ce8b74263d92e2f019a652c4e54ca78626",
         "type": "docs"
@@ -1270,9 +1270,9 @@ module.exports = {
         "deletions_count": 25,
         "description": "Add new `drop_unspecified` option to drop unspecified fields",
         "files_count": 5,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 165,
-        "message": "feat(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
+        "message": "enhancement(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
         "pr_number": 1636,
         "scope": {
           "category": "transform",
@@ -1281,7 +1281,7 @@ module.exports = {
           "name": "coercer transform"
         },
         "sha": "51b5a2f43942d3a270475c2d24cb52ce4f9db59f",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Luke Steensen",
@@ -1432,13 +1432,13 @@ module.exports = {
         "files_count": 1,
         "group": "fix",
         "insertions_count": 1,
-        "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
+        "message": "fix(rpm platform): Fix group creation in the RPM package (#1654)",
         "pr_number": 1654,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "platforms"
+          "name": "rpm platform"
         },
         "sha": "4f429e00b63a5cddfdd725cd3868f04d094f9e2f",
         "type": "fix"
@@ -2030,18 +2030,18 @@ module.exports = {
         "deletions_count": 13,
         "description": "Fixup versions in tracing-metrics",
         "files_count": 2,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 4,
-        "message": "fix(dependencies): Fixup versions in tracing-metrics (#1690)",
+        "message": "chore(operations): Fixup versions in tracing-metrics (#1690)",
         "pr_number": 1690,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "dependencies"
+          "name": "operations"
         },
         "sha": "465af0b75988ffa0c613be5eeb30b4f549295d6f",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Bruce Guenter",
@@ -2050,9 +2050,9 @@ module.exports = {
         "deletions_count": 7,
         "description": "Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more)",
         "files_count": 6,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 638,
-        "message": "feat(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
+        "message": "enhancement(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
         "pr_number": 1689,
         "scope": {
           "category": "sink",
@@ -2061,7 +2061,7 @@ module.exports = {
           "name": "aws_s3 sink"
         },
         "sha": "5a368f34983394c5159b398b7810ac1f62591094",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Alexander Rodin",
@@ -2150,18 +2150,18 @@ module.exports = {
         "deletions_count": 0,
         "description": "Warn log for non retryable requests",
         "files_count": 1,
-        "group": "fix",
+        "group": "enhancement",
         "insertions_count": 1,
-        "message": "fix(networking): Warn log for non retryable requests (#1706)",
+        "message": "enhancement(observability): Warn log for non retryable requests (#1706)",
         "pr_number": 1706,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "networking"
+          "name": "observability"
         },
         "sha": "0c22ca5c5e00313a12aef3dd1d2abba311ad890c",
-        "type": "fix"
+        "type": "enhancement"
       },
       {
         "author": "Lucio Franco",
@@ -2170,9 +2170,9 @@ module.exports = {
         "deletions_count": 52,
         "description": "Rename cloud and add host",
         "files_count": 5,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 126,
-        "message": "fix(sematext sink): Rename cloud and add host (#1704)",
+        "message": "chore(sematext sink): Rename cloud and add host (#1704)",
         "pr_number": 1704,
         "scope": {
           "category": "sink",
@@ -2181,7 +2181,7 @@ module.exports = {
           "name": "sematext sink"
         },
         "sha": "99899e35d43fbd8b5301ecdce327a7764f6eeceb",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Lucio Franco",
@@ -2252,13 +2252,13 @@ module.exports = {
         "files_count": 16,
         "group": "feat",
         "insertions_count": 1389,
-        "message": "feat(sinks): Initial `logdna` sink implementation (#1668)",
+        "message": "feat(new sink): Initial `logdna` sink implementation (#1668)",
         "pr_number": 1668,
         "scope": {
-          "category": "core",
+          "category": "sink",
           "component_name": null,
-          "component_type": null,
-          "name": "sinks"
+          "component_type": "sink",
+          "name": "new sink"
         },
         "sha": "0d5db5d71f210fca4667cacc19b3d35276a3897e",
         "type": "feat"
@@ -2330,18 +2330,18 @@ module.exports = {
         "deletions_count": 27,
         "description": "Add proper non retry messages",
         "files_count": 3,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 76,
-        "message": "feat(networking): Add proper non retry messages (#1712)",
+        "message": "enhancement(observability): Add proper non retry messages (#1712)",
         "pr_number": 1712,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "networking"
+          "name": "observability"
         },
         "sha": "2414924f69e4845f85e596f5bb9ef3db0b04c13a",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Ashley Jeffs",
@@ -2612,13 +2612,13 @@ module.exports = {
         "files_count": 4,
         "group": "enhancement",
         "insertions_count": 98,
-        "message": "enhancement(cli): Improve cyclic deps error message (#1728)",
+        "message": "enhancement(topology): Improve cyclic deps error message (#1728)",
         "pr_number": 1728,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "cli"
+          "name": "topology"
         },
         "sha": "6f290d3e55d78438100b1bd31747c6c4b1630184",
         "type": "enhancement"
@@ -2630,9 +2630,9 @@ module.exports = {
         "deletions_count": 82,
         "description": "Add support for `assume_role` to all AWS sinks",
         "files_count": 13,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 330,
-        "message": "feat(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
+        "message": "enhancement(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
         "pr_number": 1722,
         "scope": {
           "category": "core",
@@ -2641,7 +2641,7 @@ module.exports = {
           "name": "aws provider"
         },
         "sha": "ce326530da9235233355a86dcc5c27b626f40a10",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Alexander Rodin",
@@ -2790,9 +2790,9 @@ module.exports = {
         "deletions_count": 7,
         "description": "Fix encoding docs",
         "files_count": 3,
-        "group": "fix",
+        "group": "docs",
         "insertions_count": 7,
-        "message": "fix(splunk_hec sink): Fix encoding docs (#1768)",
+        "message": "docs(splunk_hec sink): Fix encoding docs (#1768)",
         "pr_number": 1768,
         "scope": {
           "category": "sink",
@@ -2801,7 +2801,7 @@ module.exports = {
           "name": "splunk_hec sink"
         },
         "sha": "7a693547f4b1fcdc58fca3b0679410c53584cda7",
-        "type": "fix"
+        "type": "docs"
       },
       {
         "author": "Lucio Franco",
@@ -3950,18 +3950,18 @@ module.exports = {
         "deletions_count": 135,
         "description": "Allow multiple unit test inputs",
         "files_count": 5,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 376,
-        "message": "feat(cli): Allow multiple unit test inputs (#1824)",
+        "message": "enhancement(config): Allow multiple unit test inputs (#1824)",
         "pr_number": 1824,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "cli"
+          "name": "config"
         },
         "sha": "f2742dbd5b1d073436fd07af664e38930b36d587",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Ashley Jeffs",
@@ -3970,18 +3970,18 @@ module.exports = {
         "deletions_count": 0,
         "description": "Add `no_outputs_from` field to unit tests",
         "files_count": 4,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 182,
-        "message": "feat(cli): Add `no_outputs_from` field to unit tests (#1817)",
+        "message": "enhancement(config): Add `no_outputs_from` field to unit tests (#1817)",
         "pr_number": 1817,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "cli"
+          "name": "config"
         },
         "sha": "3b090aa80416d55679b543cdec3f361aa9869659",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Alexander Rodin",
@@ -3990,9 +3990,9 @@ module.exports = {
         "deletions_count": 121,
         "description": "Use `BTreeMap` instead of `HashMap` for logs and metrics",
         "files_count": 23,
-        "group": "enhancement",
+        "group": "chore",
         "insertions_count": 158,
-        "message": "enhancement(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
+        "message": "chore(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
         "pr_number": 1838,
         "scope": {
           "category": "core",
@@ -4001,7 +4001,7 @@ module.exports = {
           "name": "log data model"
         },
         "sha": "17340e26b0845ed95519027950a0bd9d388df71d",
-        "type": "enhancement"
+        "type": "chore"
       },
       {
         "author": "Binary Logic",
@@ -4028,11 +4028,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-02-21 12:26:59 +0000",
         "deletions_count": 13,
-        "description": "respect Lua types when converting back to events (#857)",
+        "description": "Respect Lua types when converting back to events (#857)",
         "files_count": 3,
         "group": "fix",
         "insertions_count": 78,
-        "message": "fix(lua transform): respect Lua types when converting back to events (#857) (#1886)",
+        "message": "fix(lua transform): Respect Lua types when converting back to events (#857) (#1886)",
         "pr_number": 1886,
         "scope": {
           "category": "transform",
@@ -4270,9 +4270,9 @@ module.exports = {
         "deletions_count": 4,
         "description": "Add `timestamp_format` field",
         "files_count": 4,
-        "group": "feat",
+        "group": "enhancement",
         "insertions_count": 185,
-        "message": "feat(clickhouse sink): Add `timestamp_format` field (#1634)",
+        "message": "enhancement(clickhouse sink): Add `timestamp_format` field (#1634)",
         "pr_number": 1634,
         "scope": {
           "category": "sink",
@@ -4281,7 +4281,7 @@ module.exports = {
           "name": "clickhouse sink"
         },
         "sha": "992b4930b9d3052714cf90b66bfa6ead1d7855b2",
-        "type": "feat"
+        "type": "enhancement"
       },
       {
         "author": "Ashley Jeffs",
@@ -4290,9 +4290,9 @@ module.exports = {
         "deletions_count": 1,
         "description": "Nest request fields",
         "files_count": 1,
-        "group": "fix",
+        "group": "chore",
         "insertions_count": 59,
-        "message": "fix(clickhouse sink): Nest request fields",
+        "message": "chore(clickhouse sink): Nest request fields",
         "pr_number": null,
         "scope": {
           "category": "sink",
@@ -4301,7 +4301,7 @@ module.exports = {
           "name": "clickhouse sink"
         },
         "sha": "0aab35eda9ca3f12fd3deaf31890e5c373e58185",
-        "type": "fix"
+        "type": "chore"
       },
       {
         "author": "Ashley Jeffs",
@@ -4506,7 +4506,7 @@ module.exports = {
     ],
     "compare_url": "https://github.com/timberio/vector/compare/v0.7.2...v0.8.0",
     "date": "2020-02-20",
-    "deletions_count": 20399,
+    "deletions_count": 20387,
     "description": "The features for this release have been pouring in. Clearly the\nVector team need better hobbies.",
     "highlights": [
       {
@@ -4540,7 +4540,7 @@ module.exports = {
         "title": "Lots of New Sinks"
       }
     ],
-    "insertions_count": 53963,
+    "insertions_count": 53951,
     "last_version": "0.7.2",
     "posts": [
 
@@ -21083,18 +21083,18 @@ module.exports = {
           "deletions_count": 1,
           "description": "Make sorting of blog posts stable",
           "files_count": 1,
-          "group": "docs",
+          "group": "chore",
           "insertions_count": 1,
-          "message": "docs: Make sorting of blog posts stable (#1566)",
+          "message": "chore(website): Make sorting of blog posts stable (#1566)",
           "pr_number": 1566,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "core"
+            "name": "website"
           },
           "sha": "c5ad7d22f8f3b02c5fd8bc784c7c5cf54dd7b694",
-          "type": "docs"
+          "type": "chore"
         },
         {
           "author": "Alexander Rodin",
@@ -21141,11 +21141,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2020-01-22 11:36:26 +0000",
           "deletions_count": 1,
-          "description": "Poll inner service in `Map` svc",
+          "description": "Fix a bug with `retry_limit` is set to 1",
           "files_count": 1,
           "group": "fix",
           "insertions_count": 31,
-          "message": "fix(aws_s3 sink): Poll inner service in `Map` svc (#1569)",
+          "message": "fix(aws_s3 sink): Fix a bug with `retry_limit` is set to 1 (#1569)",
           "pr_number": 1569,
           "scope": {
             "category": "sink",
@@ -21161,17 +21161,17 @@ module.exports = {
           "breaking_change": false,
           "date": "2020-01-22 16:11:44 +0000",
           "deletions_count": 7,
-          "description": "enable more logging by default",
+          "description": "Enable more logging by default",
           "files_count": 3,
           "group": "enhancement",
           "insertions_count": 8,
-          "message": "enhancement(observability): enable more logging by default (#1564)",
+          "message": "enhancement(aws_cloudwatch_logs sink): Enable more logging by default (#1564)",
           "pr_number": 1564,
           "scope": {
-            "category": "core",
-            "component_name": null,
-            "component_type": null,
-            "name": "observability"
+            "category": "sink",
+            "component_name": "aws_cloudwatch_logs",
+            "component_type": "sink",
+            "name": "aws_cloudwatch_logs sink"
           },
           "sha": "203efcd8071edc4e6986968d3c8ff9b2e36f341d",
           "type": "enhancement"
@@ -21201,11 +21201,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2020-01-22 19:30:47 +0000",
           "deletions_count": 118,
-          "description": "Improve DNS resolution",
+          "description": "Allow for non-IP address host names",
           "files_count": 9,
           "group": "fix",
           "insertions_count": 117,
-          "message": "fix(socket sink): Improve DNS resolution (#1575)",
+          "message": "fix(socket sink): Allow for non-IP address host names (#1575)",
           "pr_number": 1575,
           "scope": {
             "category": "sink",
@@ -21221,11 +21221,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2020-01-23 13:28:37 +0000",
           "deletions_count": 22,
-          "description": "Fix `aws_kinesis_firehose` sink healthcheck",
+          "description": "Use `describe_delivery_stream` AWS API method for healthcheck",
           "files_count": 1,
           "group": "fix",
           "insertions_count": 13,
-          "message": "fix(aws_kinesis_firehose sink): Fix `aws_kinesis_firehose` sink healthcheck (#1573)",
+          "message": "fix(aws_kinesis_firehose sink): Use `describe_delivery_stream` AWS API method for healthcheck (#1573)",
           "pr_number": 1573,
           "scope": {
             "category": "sink",
@@ -21305,13 +21305,13 @@ module.exports = {
           "files_count": 27,
           "group": "chore",
           "insertions_count": 130,
-          "message": "chore: Check that all blog articles are signed in CI (#1459)",
+          "message": "chore(website): Check that all blog articles are signed in CI (#1459)",
           "pr_number": 1459,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "core"
+            "name": "website"
           },
           "sha": "9aac838ff2bd09aacbb58cec79bebda54c0ba4ca",
           "type": "chore"
@@ -21343,18 +21343,18 @@ module.exports = {
           "deletions_count": 6,
           "description": "Fix socket sink docs",
           "files_count": 5,
-          "group": "chore",
+          "group": "docs",
           "insertions_count": 6,
-          "message": "chore(docs): Fix socket sink docs (#1585)",
+          "message": "docs(socket sink): Fix socket sink docs (#1585)",
           "pr_number": 1585,
           "scope": {
-            "category": "core",
-            "component_name": null,
-            "component_type": null,
-            "name": "docs"
+            "category": "sink",
+            "component_name": "socket",
+            "component_type": "sink",
+            "name": "socket sink"
           },
           "sha": "26539079cb5a5b3c2e530191297f70a05f3db024",
-          "type": "chore"
+          "type": "docs"
         },
         {
           "author": "Alexander Rodin",
@@ -21365,13 +21365,13 @@ module.exports = {
           "files_count": 1,
           "group": "fix",
           "insertions_count": 11,
-          "message": "fix(platforms): Create `vector` user when installing RPM package (#1583)",
+          "message": "fix(rpm platform): Create `vector` user when installing RPM package (#1583)",
           "pr_number": 1583,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "platforms"
+            "name": "rpm platform"
           },
           "sha": "4e6fc6b240c23651e3b7323f9a0f3de6fdb7468b",
           "type": "fix"
@@ -21405,13 +21405,13 @@ module.exports = {
           "files_count": 3,
           "group": "chore",
           "insertions_count": 0,
-          "message": "chore: Redo blog sigs",
+          "message": "chore(website): Redo blog sigs",
           "pr_number": null,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "core"
+            "name": "website"
           },
           "sha": "6179310868047ceff60e46172e452c54b55e8aa1",
           "type": "chore"
@@ -21665,13 +21665,13 @@ module.exports = {
           "files_count": 31,
           "group": "docs",
           "insertions_count": 76,
-          "message": "docs: Fix socket address documentation (#1607)",
+          "message": "docs(socket source): Fix socket address documentation (#1607)",
           "pr_number": 1607,
           "scope": {
-            "category": "core",
-            "component_name": null,
-            "component_type": null,
-            "name": "core"
+            "category": "source",
+            "component_name": "socket",
+            "component_type": "source",
+            "name": "socket source"
           },
           "sha": "d06926ce8b74263d92e2f019a652c4e54ca78626",
           "type": "docs"
@@ -22103,9 +22103,9 @@ module.exports = {
           "deletions_count": 25,
           "description": "Add new `drop_unspecified` option to drop unspecified fields",
           "files_count": 5,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 165,
-          "message": "feat(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
+          "message": "enhancement(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
           "pr_number": 1636,
           "scope": {
             "category": "transform",
@@ -22114,7 +22114,7 @@ module.exports = {
             "name": "coercer transform"
           },
           "sha": "51b5a2f43942d3a270475c2d24cb52ce4f9db59f",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Luke Steensen",
@@ -22265,13 +22265,13 @@ module.exports = {
           "files_count": 1,
           "group": "fix",
           "insertions_count": 1,
-          "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
+          "message": "fix(rpm platform): Fix group creation in the RPM package (#1654)",
           "pr_number": 1654,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "platforms"
+            "name": "rpm platform"
           },
           "sha": "4f429e00b63a5cddfdd725cd3868f04d094f9e2f",
           "type": "fix"
@@ -22863,18 +22863,18 @@ module.exports = {
           "deletions_count": 13,
           "description": "Fixup versions in tracing-metrics",
           "files_count": 2,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 4,
-          "message": "fix(dependencies): Fixup versions in tracing-metrics (#1690)",
+          "message": "chore(operations): Fixup versions in tracing-metrics (#1690)",
           "pr_number": 1690,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "dependencies"
+            "name": "operations"
           },
           "sha": "465af0b75988ffa0c613be5eeb30b4f549295d6f",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Bruce Guenter",
@@ -22883,9 +22883,9 @@ module.exports = {
           "deletions_count": 7,
           "description": "Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more)",
           "files_count": 6,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 638,
-          "message": "feat(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
+          "message": "enhancement(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
           "pr_number": 1689,
           "scope": {
             "category": "sink",
@@ -22894,7 +22894,7 @@ module.exports = {
             "name": "aws_s3 sink"
           },
           "sha": "5a368f34983394c5159b398b7810ac1f62591094",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Alexander Rodin",
@@ -22983,18 +22983,18 @@ module.exports = {
           "deletions_count": 0,
           "description": "Warn log for non retryable requests",
           "files_count": 1,
-          "group": "fix",
+          "group": "enhancement",
           "insertions_count": 1,
-          "message": "fix(networking): Warn log for non retryable requests (#1706)",
+          "message": "enhancement(observability): Warn log for non retryable requests (#1706)",
           "pr_number": 1706,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "networking"
+            "name": "observability"
           },
           "sha": "0c22ca5c5e00313a12aef3dd1d2abba311ad890c",
-          "type": "fix"
+          "type": "enhancement"
         },
         {
           "author": "Lucio Franco",
@@ -23003,9 +23003,9 @@ module.exports = {
           "deletions_count": 52,
           "description": "Rename cloud and add host",
           "files_count": 5,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 126,
-          "message": "fix(sematext sink): Rename cloud and add host (#1704)",
+          "message": "chore(sematext sink): Rename cloud and add host (#1704)",
           "pr_number": 1704,
           "scope": {
             "category": "sink",
@@ -23014,7 +23014,7 @@ module.exports = {
             "name": "sematext sink"
           },
           "sha": "99899e35d43fbd8b5301ecdce327a7764f6eeceb",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Lucio Franco",
@@ -23085,13 +23085,13 @@ module.exports = {
           "files_count": 16,
           "group": "feat",
           "insertions_count": 1389,
-          "message": "feat(sinks): Initial `logdna` sink implementation (#1668)",
+          "message": "feat(new sink): Initial `logdna` sink implementation (#1668)",
           "pr_number": 1668,
           "scope": {
-            "category": "core",
+            "category": "sink",
             "component_name": null,
-            "component_type": null,
-            "name": "sinks"
+            "component_type": "sink",
+            "name": "new sink"
           },
           "sha": "0d5db5d71f210fca4667cacc19b3d35276a3897e",
           "type": "feat"
@@ -23163,18 +23163,18 @@ module.exports = {
           "deletions_count": 27,
           "description": "Add proper non retry messages",
           "files_count": 3,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 76,
-          "message": "feat(networking): Add proper non retry messages (#1712)",
+          "message": "enhancement(observability): Add proper non retry messages (#1712)",
           "pr_number": 1712,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "networking"
+            "name": "observability"
           },
           "sha": "2414924f69e4845f85e596f5bb9ef3db0b04c13a",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Ashley Jeffs",
@@ -23445,13 +23445,13 @@ module.exports = {
           "files_count": 4,
           "group": "enhancement",
           "insertions_count": 98,
-          "message": "enhancement(cli): Improve cyclic deps error message (#1728)",
+          "message": "enhancement(topology): Improve cyclic deps error message (#1728)",
           "pr_number": 1728,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "cli"
+            "name": "topology"
           },
           "sha": "6f290d3e55d78438100b1bd31747c6c4b1630184",
           "type": "enhancement"
@@ -23463,9 +23463,9 @@ module.exports = {
           "deletions_count": 82,
           "description": "Add support for `assume_role` to all AWS sinks",
           "files_count": 13,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 330,
-          "message": "feat(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
+          "message": "enhancement(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
           "pr_number": 1722,
           "scope": {
             "category": "core",
@@ -23474,7 +23474,7 @@ module.exports = {
             "name": "aws provider"
           },
           "sha": "ce326530da9235233355a86dcc5c27b626f40a10",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Alexander Rodin",
@@ -23623,9 +23623,9 @@ module.exports = {
           "deletions_count": 7,
           "description": "Fix encoding docs",
           "files_count": 3,
-          "group": "fix",
+          "group": "docs",
           "insertions_count": 7,
-          "message": "fix(splunk_hec sink): Fix encoding docs (#1768)",
+          "message": "docs(splunk_hec sink): Fix encoding docs (#1768)",
           "pr_number": 1768,
           "scope": {
             "category": "sink",
@@ -23634,7 +23634,7 @@ module.exports = {
             "name": "splunk_hec sink"
           },
           "sha": "7a693547f4b1fcdc58fca3b0679410c53584cda7",
-          "type": "fix"
+          "type": "docs"
         },
         {
           "author": "Lucio Franco",
@@ -24783,18 +24783,18 @@ module.exports = {
           "deletions_count": 135,
           "description": "Allow multiple unit test inputs",
           "files_count": 5,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 376,
-          "message": "feat(cli): Allow multiple unit test inputs (#1824)",
+          "message": "enhancement(config): Allow multiple unit test inputs (#1824)",
           "pr_number": 1824,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "cli"
+            "name": "config"
           },
           "sha": "f2742dbd5b1d073436fd07af664e38930b36d587",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Ashley Jeffs",
@@ -24803,18 +24803,18 @@ module.exports = {
           "deletions_count": 0,
           "description": "Add `no_outputs_from` field to unit tests",
           "files_count": 4,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 182,
-          "message": "feat(cli): Add `no_outputs_from` field to unit tests (#1817)",
+          "message": "enhancement(config): Add `no_outputs_from` field to unit tests (#1817)",
           "pr_number": 1817,
           "scope": {
             "category": "core",
             "component_name": null,
             "component_type": null,
-            "name": "cli"
+            "name": "config"
           },
           "sha": "3b090aa80416d55679b543cdec3f361aa9869659",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Alexander Rodin",
@@ -24823,9 +24823,9 @@ module.exports = {
           "deletions_count": 121,
           "description": "Use `BTreeMap` instead of `HashMap` for logs and metrics",
           "files_count": 23,
-          "group": "enhancement",
+          "group": "chore",
           "insertions_count": 158,
-          "message": "enhancement(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
+          "message": "chore(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
           "pr_number": 1838,
           "scope": {
             "category": "core",
@@ -24834,7 +24834,7 @@ module.exports = {
             "name": "log data model"
           },
           "sha": "17340e26b0845ed95519027950a0bd9d388df71d",
-          "type": "enhancement"
+          "type": "chore"
         },
         {
           "author": "Binary Logic",
@@ -24861,11 +24861,11 @@ module.exports = {
           "breaking_change": false,
           "date": "2020-02-21 12:26:59 +0000",
           "deletions_count": 13,
-          "description": "respect Lua types when converting back to events (#857)",
+          "description": "Respect Lua types when converting back to events (#857)",
           "files_count": 3,
           "group": "fix",
           "insertions_count": 78,
-          "message": "fix(lua transform): respect Lua types when converting back to events (#857) (#1886)",
+          "message": "fix(lua transform): Respect Lua types when converting back to events (#857) (#1886)",
           "pr_number": 1886,
           "scope": {
             "category": "transform",
@@ -25103,9 +25103,9 @@ module.exports = {
           "deletions_count": 4,
           "description": "Add `timestamp_format` field",
           "files_count": 4,
-          "group": "feat",
+          "group": "enhancement",
           "insertions_count": 185,
-          "message": "feat(clickhouse sink): Add `timestamp_format` field (#1634)",
+          "message": "enhancement(clickhouse sink): Add `timestamp_format` field (#1634)",
           "pr_number": 1634,
           "scope": {
             "category": "sink",
@@ -25114,7 +25114,7 @@ module.exports = {
             "name": "clickhouse sink"
           },
           "sha": "992b4930b9d3052714cf90b66bfa6ead1d7855b2",
-          "type": "feat"
+          "type": "enhancement"
         },
         {
           "author": "Ashley Jeffs",
@@ -25123,9 +25123,9 @@ module.exports = {
           "deletions_count": 1,
           "description": "Nest request fields",
           "files_count": 1,
-          "group": "fix",
+          "group": "chore",
           "insertions_count": 59,
-          "message": "fix(clickhouse sink): Nest request fields",
+          "message": "chore(clickhouse sink): Nest request fields",
           "pr_number": null,
           "scope": {
             "category": "sink",
@@ -25134,7 +25134,7 @@ module.exports = {
             "name": "clickhouse sink"
           },
           "sha": "0aab35eda9ca3f12fd3deaf31890e5c373e58185",
-          "type": "fix"
+          "type": "chore"
         },
         {
           "author": "Ashley Jeffs",
@@ -25339,7 +25339,7 @@ module.exports = {
       ],
       "compare_url": "https://github.com/timberio/vector/compare/v0.7.2...v0.8.0",
       "date": "2020-02-20",
-      "deletions_count": 20399,
+      "deletions_count": 20387,
       "description": "The features for this release have been pouring in. Clearly the\nVector team need better hobbies.",
       "highlights": [
         {
@@ -25373,7 +25373,7 @@ module.exports = {
           "title": "Lots of New Sinks"
         }
       ],
-      "insertions_count": 53963,
+      "insertions_count": 53951,
       "last_version": "0.7.2",
       "posts": [
 
