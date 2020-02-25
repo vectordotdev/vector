@@ -11,7 +11,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{Future, Sink};
+use futures::Future;
 use http::Uri;
 use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
@@ -197,6 +197,7 @@ mod integration_tests {
         runtime::Runtime,
         test_util::{block_on, random_events_with_stream, random_string},
     };
+    use futures::Sink;
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
