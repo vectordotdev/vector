@@ -428,6 +428,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-datadog_metrics` | Enables building of [`datadog_metrics` sink][docs.sinks.datadog_metrics].  |
 | `sinks-elasticsearch` | Enables building of [`elasticsearch` sink][docs.sinks.elasticsearch].  |
 | `sinks-file` | Enables building of [`file` sink][docs.sinks.file].  |
+| `sinks-gcp_bigquery` | Enables building of [`gcp_bigquery` sink][docs.sinks.gcp_bigquery].  |
 | `sinks-gcp_cloud_storage` | Enables building of [`gcp_cloud_storage` sink][docs.sinks.gcp_cloud_storage].  |
 | `sinks-gcp_pubsub` | Enables building of [`gcp_pubsub` sink][docs.sinks.gcp_pubsub].  |
 | `sinks-gcp_stackdriver_logs` | Enables building of [`gcp_stackdriver_logs` sink][docs.sinks.gcp_stackdriver_logs].  |
@@ -470,6 +471,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.datadog_metrics]: /docs/reference/sinks/datadog_metrics/
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
 [docs.sinks.file]: /docs/reference/sinks/file/
+[docs.sinks.gcp_bigquery]: /docs/reference/sinks/gcp_bigquery/
 [docs.sinks.gcp_cloud_storage]: /docs/reference/sinks/gcp_cloud_storage/
 [docs.sinks.gcp_pubsub]: /docs/reference/sinks/gcp_pubsub/
 [docs.sinks.gcp_stackdriver_logs]: /docs/reference/sinks/gcp_stackdriver_logs/

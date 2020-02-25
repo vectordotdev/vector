@@ -231,6 +231,8 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_bigquery",
+            
               "reference/sinks/gcp_cloud_storage",
             
               "reference/sinks/gcp_pubsub",

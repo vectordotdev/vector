@@ -114,6 +114,7 @@ scopes:
   - datadog_metrics sink
   - elasticsearch sink
   - file sink
+  - gcp_bigquery sink
   - gcp_cloud_storage sink
   - gcp_pubsub sink
   - gcp_stackdriver_logs sink

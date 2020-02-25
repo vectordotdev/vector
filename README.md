@@ -68,7 +68,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [18 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [25 more...][docs.sinks]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_bigquery][docs.sinks.gcp_bigquery], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [26 more...][docs.sinks]
 
 ### Administration
 
@@ -236,8 +236,8 @@ Or use your own [preferred method][docs.installation].
 [docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3/
 [docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse/
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch/
+[docs.sinks.gcp_bigquery]: https://vector.dev/docs/reference/sinks/gcp_bigquery/
 [docs.sinks.gcp_cloud_storage]: https://vector.dev/docs/reference/sinks/gcp_cloud_storage/
-[docs.sinks.gcp_pubsub]: https://vector.dev/docs/reference/sinks/gcp_pubsub/
 [docs.sinks]: https://vector.dev/docs/reference/sinks/
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker/
 [docs.sources.file#multiline]: https://vector.dev/docs/reference/sources/file/#multiline

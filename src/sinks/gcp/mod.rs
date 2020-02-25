@@ -13,9 +13,10 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio01::timer::Interval;
 
-pub mod cloud_storage;
-pub mod pubsub;
-pub mod stackdriver_logs;
+pub(crate) mod bigquery;
+pub(crate) mod cloud_storage;
+pub(crate) mod pubsub;
+pub(crate) mod stackdriver_logs;
 
 #[derive(Debug, Snafu)]
 enum GcpError {

@@ -1,0 +1,56 @@
+[sinks.gcp_bigquery]
+title = "GCP BigQuery"
+beta = true
+common = true
+delivery_guarantee = "best_effort"
+function_category = "transmit"
+healthcheck = true
+egress_method = "batching"
+input_types = ["log"]
+requirements = {}
+service_providers = ["Google"]
+write_to_description = "[Google Cloud Platform's BigQuery service][urls.gcp_bigquery] via the [REST Interface][urls.gcp_bigquery_rest]"
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_bigquery") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_bigquery.options", common: false, max_events: nil, max_size: 10485760, timeout_secs: 1) %>
+
+<%= render("_partials/_buffer_options.toml", namespace: "sinks.gcp_bigquery.options") %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.gcp_bigquery.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 100,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
+
+<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_bigquery", access: "bigquery project, dataset, and table", required: true) %>
+
+[sinks.gcp_bigquery.options.project]
+type = "string"
+common = false
+required = true
+examples = ["vector-123456"]
+description = "The project name to which to publish log records."
+
+[sinks.gcp_bigquery.options.dataset]
+type = "string"
+common = false
+required = true
+examples = ["example-dataset"]
+description = "The dataset within the project to which to publish logs."
+
+[sinks.gcp_bigquery.options.table]
+type = "string"
+common = false
+required = true
+examples = ["example-table"]
+description = "The table within the project to which to publish log records."
+
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_bigquery.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>

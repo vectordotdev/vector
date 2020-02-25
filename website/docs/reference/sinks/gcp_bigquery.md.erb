@@ -1,0 +1,21 @@
+<%- component = metadata.sinks.gcp_bigquery -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+<%= component_sections(component) %>

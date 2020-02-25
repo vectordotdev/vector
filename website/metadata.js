@@ -21633,6 +21633,30 @@ module.exports = {
 
       ]
     },
+    "gcp_bigquery": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Batches log events to [Google Cloud Platform's BigQuery service][urls.gcp_bigquery] via the [REST Interface][urls.gcp_bigquery_rest].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "gcp_bigquery_sink",
+      "name": "gcp_bigquery",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "Google"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "gcp_cloud_storage": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
