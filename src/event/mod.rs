@@ -179,6 +179,7 @@ pub fn log_schema() -> &'static LogSchema {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
+#[serde(default)]
 pub struct LogSchema {
     #[getset(get = "pub", set = "pub(crate)")]
     message_key: Atom,
@@ -666,7 +667,7 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::{Atom, Event, Value};
+    use super::{Atom, Event, LogSchema, Value};
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -757,5 +758,14 @@ mod test {
                 (&Atom::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
+    }
+
+    #[test]
+    fn partial_log_schema() {
+        let toml = r#"
+message_key = "message"
+timestamp_key = "timestamp"
+"#;
+        let _ = toml::from_str::<LogSchema>(toml).unwrap();
     }
 }
