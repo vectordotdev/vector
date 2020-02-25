@@ -218,7 +218,10 @@ fn reduce_transforms(
 
     if roots
         .iter()
-        .all(|r| !links_to_a_leaf(r, leaves, &mut link_checked, transform_outputs))
+        .map(|r| links_to_a_leaf(r, leaves, &mut link_checked, transform_outputs))
+        .collect::<Vec<_>>() // Ensure we map each element.
+        .iter()
+        .all(|b| !b)
     {
         transform_outputs.clear();
     }
@@ -416,22 +419,6 @@ fn build_unit_test(
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
                     targets, o.extract_from
-                ));
-            }
-        }
-    });
-    definition.no_outputs_from.iter().for_each(|o| {
-        if !transforms.contains_key(o) {
-            let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
-            if targets.len() == 1 {
-                errors.push(format!(
-                    "unable to complete topology between target transform '{}' and no_outputs_from target '{}'",
-                    targets.first().unwrap(), o,
-                ));
-            } else {
-                errors.push(format!(
-                    "unable to complete topology between target transforms {:?} and no_outputs_from target '{}'",
-                    targets, o,
                 ));
             }
         }

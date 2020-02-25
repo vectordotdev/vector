@@ -16,8 +16,9 @@
 
 [[tests]]
   name = "swimlanes test 1"
+  no_outputs_from = [ "foo.second" ]
 
-  [tests.input]
+  [[tests.inputs]]
     insert_at = "foo"
     value = "test swimlane 1"
 
@@ -36,8 +37,9 @@
 
 [[tests]]
   name = "swimlanes test 2"
+  no_outputs_from = [ "foo.first", "bar" ]
 
-  [tests.input]
+  [[tests.inputs]]
     insert_at = "foo"
     value = "test swimlane 2"
 
