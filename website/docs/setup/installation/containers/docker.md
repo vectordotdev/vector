@@ -22,7 +22,7 @@ for x86_64, ARM64, and ARMv7 architectures.
 ## Running
 
 ```bash
-docker run timberio/vector:0.7.2-alpine
+docker run timberio/vector:0.8.0-alpine
 ```
 
 * The `vector` binary is located at `/usr/local/bin/vector`, which should be in your `$PATH`.
@@ -41,7 +41,7 @@ To use your own configuration file:
    ```bash
    docker run \
     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-    timberio/vector:0.7.2-alpine
+    timberio/vector:0.8.0-alpine
    ```
 
    Modify `$PWD` to the directory where you store your local `vector.toml` file.
@@ -56,7 +56,7 @@ smaller in size than other Docker images and statically links libraries. This
 is the image we recommend due to it's small size and reliability.
 
 ```bash
-docker run timberio/vector:0.7.2-alpine
+docker run timberio/vector:0.8.0-alpine
 ```
 
 ### debian
@@ -65,7 +65,7 @@ This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
 
 ```bash
-docker run timberio/vector:0.7.2-debian
+docker run timberio/vector:0.8.0-debian
 ```
 
 ## Versions

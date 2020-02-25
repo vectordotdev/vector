@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.7.2<a/>
+    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.0<a/>
   </strong>
 </p>
 
@@ -62,7 +62,7 @@ companies and engineering teams trying to tame observability pipelines.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.7.2 (latest)][urls.v0.7.2]
+* [**Releases**][urls.vector_releases] - [v0.8.0 (latest)][urls.v0.8.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -205,7 +205,7 @@ Or use your own [preferred method][docs.installation].
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
-[urls.v0.7.2]: https://vector.dev/releases/0.7.2/download
+[urls.v0.8.0]: https://vector.dev/releases/0.8.0/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

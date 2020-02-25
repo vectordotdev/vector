@@ -11,6 +11,7 @@ class Release
     :last_date,
     :last_version,
     :posts,
+    :highlights,
     :upgrade_guides,
     :version
 
@@ -24,6 +25,11 @@ class Release
     @posts =
       all_posts.select do |p|
         last_date && p.date > last_date && p.date <= @date && p.type?("announcement")
+      end
+
+    @highlights =
+      (release_hash["highlights"] || []).collect do |highlight_hash|
+        OpenStruct.new(highlight_hash)
       end
 
     @upgrade_guides =
@@ -134,6 +140,7 @@ class Release
       insertions_count: insertions_count,
       last_version: last_version,
       posts: posts.deep_to_h,
+      highlights: highlights.deep_to_h,
       type: type,
       type_url: type_url,
       upgrade_guides: upgrade_guides.deep_to_h,

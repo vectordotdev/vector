@@ -244,6 +244,426 @@ module.exports = {
   "latest_release": {
     "commits": [
       {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-22 17:53:08 +0000",
+        "deletions_count": 1,
+        "description": "Make sorting of blog posts stable",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 1,
+        "message": "docs: Make sorting of blog posts stable (#1566)",
+        "pr_number": 1566,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "c5ad7d22f8f3b02c5fd8bc784c7c5cf54dd7b694",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-22 18:00:10 +0000",
+        "deletions_count": 1,
+        "description": "Add AWS API key for Windows tests in CI",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 5,
+        "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
+        "pr_number": 1565,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "3469bfcfeb39997c977c300399b8f2562f4c7730",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-22 18:00:26 +0000",
+        "deletions_count": 0,
+        "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
+        "pr_number": 1567,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "b9584fae31e6809be62b912b4162454fad688485",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-22 11:36:26 +0000",
+        "deletions_count": 1,
+        "description": "Poll inner service in `Map` svc",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 31,
+        "message": "fix(aws_s3 sink): Poll inner service in `Map` svc (#1569)",
+        "pr_number": 1569,
+        "scope": {
+          "category": "sink",
+          "component_name": "aws_s3",
+          "component_type": "sink",
+          "name": "aws_s3 sink"
+        },
+        "sha": "641cb48a13d46556448a18e5d4e6400a33a1e78b",
+        "type": "fix"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-01-22 16:11:44 +0000",
+        "deletions_count": 7,
+        "description": "enable more logging by default",
+        "files_count": 3,
+        "group": "enhancement",
+        "insertions_count": 8,
+        "message": "enhancement(observability): enable more logging by default (#1564)",
+        "pr_number": 1564,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "observability"
+        },
+        "sha": "203efcd8071edc4e6986968d3c8ff9b2e36f341d",
+        "type": "enhancement"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-01-22 14:38:52 +0000",
+        "deletions_count": 96,
+        "description": "Allow building on Windows Stable Rust",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 180,
+        "message": "chore(operations): Allow building on Windows Stable Rust (#1560)",
+        "pr_number": 1560,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "e3afda368582dd51f3518eaf2af3d5d82873b52a",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-22 19:30:47 +0000",
+        "deletions_count": 118,
+        "description": "Improve DNS resolution",
+        "files_count": 9,
+        "group": "fix",
+        "insertions_count": 117,
+        "message": "fix(socket sink): Improve DNS resolution (#1575)",
+        "pr_number": 1575,
+        "scope": {
+          "category": "sink",
+          "component_name": "socket",
+          "component_type": "sink",
+          "name": "socket sink"
+        },
+        "sha": "708d6228b09c2a3e84da635f21cef068555844d9",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 13:28:37 +0000",
+        "deletions_count": 22,
+        "description": "Fix `aws_kinesis_firehose` sink healthcheck",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 13,
+        "message": "fix(aws_kinesis_firehose sink): Fix `aws_kinesis_firehose` sink healthcheck (#1573)",
+        "pr_number": 1573,
+        "scope": {
+          "category": "sink",
+          "component_name": "aws_kinesis_firehose",
+          "component_type": "sink",
+          "name": "aws_kinesis_firehose sink"
+        },
+        "sha": "1c78da516d5d9769753c1a7194d0cb45271afcc4",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 10:47:08 +0000",
+        "deletions_count": 1,
+        "description": "Bump version to 0.8.0 to fix `make check-version`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore: Bump version to 0.8.0 to fix `make check-version`",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "a1cac868c9f4303cdb3258ded509a3889fc30f1a",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 11:16:54 +0000",
+        "deletions_count": 1,
+        "description": "Update `Cargo.lock`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Update `Cargo.lock`",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "c960f953f93c2b717337033c8589fd8512278a08",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 14:51:32 +0000",
+        "deletions_count": 53,
+        "description": "Escape special characters in options descriptions",
+        "files_count": 26,
+        "group": "chore",
+        "insertions_count": 53,
+        "message": "chore(website): Escape special characters in options descriptions (#1580)",
+        "pr_number": 1580,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "f996505eaaff329d1e7360ceca97fac2e8b12aa3",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 19:18:46 +0000",
+        "deletions_count": 38,
+        "description": "Check that all blog articles are signed in CI",
+        "files_count": 27,
+        "group": "chore",
+        "insertions_count": 130,
+        "message": "chore: Check that all blog articles are signed in CI (#1459)",
+        "pr_number": 1459,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "9aac838ff2bd09aacbb58cec79bebda54c0ba4ca",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-23 11:36:35 +0000",
+        "deletions_count": 20,
+        "description": "Fix broken s3 link",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 454,
+        "message": "chore(website): Fix broken s3 link",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "c084001fc871db231bcb999f3946b7ad6b2319df",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-23 11:39:15 +0000",
+        "deletions_count": 6,
+        "description": "Fix socket sink docs",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 6,
+        "message": "chore(docs): Fix socket sink docs (#1585)",
+        "pr_number": 1585,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "docs"
+        },
+        "sha": "26539079cb5a5b3c2e530191297f70a05f3db024",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 19:44:22 +0000",
+        "deletions_count": 2,
+        "description": "Create `vector` user when installing RPM package",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 11,
+        "message": "fix(platforms): Create `vector` user when installing RPM package (#1583)",
+        "pr_number": 1583,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "platforms"
+        },
+        "sha": "4e6fc6b240c23651e3b7323f9a0f3de6fdb7468b",
+        "type": "fix"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-23 11:56:59 +0000",
+        "deletions_count": 1,
+        "description": "Fix avatar on blog list page",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(website): Fix avatar on blog list page",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "8eb88242da06eb14795957b0fb9d46b6ec8d7681",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-01-23 16:58:32 +0000",
+        "deletions_count": 0,
+        "description": "Redo blog sigs",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 0,
+        "message": "chore: Redo blog sigs",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "6179310868047ceff60e46172e452c54b55e8aa1",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 21:44:23 +0000",
+        "deletions_count": 5,
+        "description": "Support bug fixing releases",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 18,
+        "message": "chore(operations): Support bug fixing releases (#1587)",
+        "pr_number": 1587,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "c057c0f70876ac2404ae1d59ced6ca3c3e29b96d",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 22:26:44 +0000",
+        "deletions_count": 1,
+        "description": "Add all generated files to the release commit",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Add all generated files to the release commit (#1588)",
+        "pr_number": 1588,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "3adfc70416aa3cc078257a3192b148cd530dc770",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 23:31:55 +0000",
+        "deletions_count": 2,
+        "description": "Do not require `systemd` as an RPM dependency",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 0,
+        "message": "chore(operations): Do not require `systemd` as an RPM dependency (#1590)",
+        "pr_number": 1590,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "895fb9b2022df7708eec6fbd28e5bede710f3321",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-23 23:37:55 +0000",
+        "deletions_count": 0,
+        "description": "Add `release-push` target to the Makefile",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 30,
+        "message": "chore(operations): Add `release-push` target to the Makefile (#1589)",
+        "pr_number": 1589,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "eab9ea663dd5bc52a4db4c99aa1518454d026a29",
+        "type": "chore"
+      },
+      {
         "author": "Ashley Jeffs",
         "breaking_change": false,
         "date": "2020-01-24 09:40:28 +0000",
@@ -260,7 +680,7 @@ module.exports = {
           "component_type": null,
           "name": "core"
         },
-        "sha": "eee9300712181a6be96f894952bca55290f68947",
+        "sha": "372287922d98e4ebe48c2518eeaa35cc9ca77d86",
         "type": "docs"
       },
       {
@@ -280,7 +700,7 @@ module.exports = {
           "component_type": null,
           "name": "testing"
         },
-        "sha": "e1f71a59ab4d3839297938e5937bb2c60722844f",
+        "sha": "8d2126dae5af5d6b8ea426e74758e3eba27f8a79",
         "type": "chore"
       },
       {
@@ -288,11 +708,11 @@ module.exports = {
         "breaking_change": false,
         "date": "2020-01-24 13:17:59 +0000",
         "deletions_count": 59,
-        "description": "Ensure that own logs are always ignored",
+        "description": "Always check containers for self",
         "files_count": 1,
         "group": "fix",
         "insertions_count": 53,
-        "message": "fix(docker source): Ensure that own logs are always ignored (#1525)",
+        "message": "fix(docker source): Always check containers for self (#1525)",
         "pr_number": 1525,
         "scope": {
           "category": "source",
@@ -300,7 +720,7 @@ module.exports = {
           "component_type": "source",
           "name": "docker source"
         },
-        "sha": "dada48a66c814c0fd3e031a709e07db4b81b3e71",
+        "sha": "135d2504ccf3a7efdc6e664cb306ef830c31f7fd",
         "type": "fix"
       },
       {
@@ -320,7 +740,27 @@ module.exports = {
           "component_type": null,
           "name": "operations"
         },
-        "sha": "eae248d09318af9f14319ee42c5a81a800dcce44",
+        "sha": "f1e1a06ffdcf9bd24df232a928750f23ce16ec39",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-24 18:15:48 +0000",
+        "deletions_count": 56,
+        "description": "Run `make generate`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore: Run `make generate`",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "f2a0df640cbbef34c4df17f1fc7bdc04b6d14ce0",
         "type": "chore"
       },
       {
@@ -340,7 +780,47 @@ module.exports = {
           "component_type": null,
           "name": "operations"
         },
-        "sha": "fca31a736b4056f2150b6e4abfcea1d87b5a97db",
+        "sha": "cc59c392b253daf83cb8d2a231a749fa1df0d2b7",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 13:21:26 +0000",
+        "deletions_count": 1,
+        "description": "Add Netlify _redirects file",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 4,
+        "message": "chore(website): Add Netlify _redirects file",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "7fce71cf21dc5af5fa4db2de480589263468c03f",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 13:35:45 +0000",
+        "deletions_count": 11,
+        "description": "Force netlify redirects",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 14,
+        "message": "chore(website): Force netlify redirects",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "7b4721053c9284c8ef2ebc0335d565620ff0c098",
         "type": "chore"
       },
       {
@@ -360,48 +840,348 @@ module.exports = {
           "component_type": null,
           "name": "core"
         },
-        "sha": "bf1386cc151b130efde27c60122baa98b69cab61",
+        "sha": "d06926ce8b74263d92e2f019a652c4e54ca78626",
         "type": "docs"
       },
       {
-        "author": "Alexander Rodin",
+        "author": "binarylogic",
         "breaking_change": false,
-        "date": "2020-01-31 18:30:48 +0000",
-        "deletions_count": 1,
-        "description": "Fix group creation in the RPM package",
-        "files_count": 1,
-        "group": "fix",
-        "insertions_count": 1,
-        "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
-        "pr_number": 1654,
-        "scope": {
-          "category": "core",
-          "component_name": null,
-          "component_type": null,
-          "name": "platforms"
-        },
-        "sha": "201b9584d5c48d6bd687fa98749d9ab7ec46376d",
-        "type": "fix"
-      },
-      {
-        "author": "Alexander Rodin",
-        "breaking_change": false,
-        "date": "2020-01-31 21:56:09 +0000",
-        "deletions_count": 2,
-        "description": "Bump version in `Cargo.toml` and `Cargo.lock`",
-        "files_count": 2,
-        "group": "chore",
-        "insertions_count": 2,
-        "message": "chore(operations): Bump version in `Cargo.toml` and `Cargo.lock`",
+        "date": "2020-01-25 15:25:27 +0000",
+        "deletions_count": 27,
+        "description": "Remove unused guides attribute",
+        "files_count": 27,
+        "group": "docs",
+        "insertions_count": 0,
+        "message": "docs: Remove unused guides attribute",
         "pr_number": null,
         "scope": {
           "category": "core",
           "component_name": null,
           "component_type": null,
-          "name": "operations"
+          "name": "core"
         },
-        "sha": "3245ad9c62ed4dcebb8482d8a9ac0fa045e44a1c",
+        "sha": "59cd776e661b72e7728401333ffe611cfcf0b27e",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 15:40:05 +0000",
+        "deletions_count": 200,
+        "description": "Fix service provider filters in components section",
+        "files_count": 41,
+        "group": "chore",
+        "insertions_count": 995,
+        "message": "chore(website): Fix service provider filters in components section",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "7fa4a9ef2c322e0ac0ce6a66ca328c0161241acf",
         "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 15:58:22 +0000",
+        "deletions_count": 350,
+        "description": "Cleanup authentication options",
+        "files_count": 24,
+        "group": "docs",
+        "insertions_count": 315,
+        "message": "docs: Cleanup authentication options",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "0521ac92685ef18b093a076041767493484189c8",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 16:03:45 +0000",
+        "deletions_count": 204,
+        "description": "Make region for AWS services a required option",
+        "files_count": 9,
+        "group": "docs",
+        "insertions_count": 212,
+        "message": "docs: Make region for AWS services a required option",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "8be035e86eaf2e1fc6b40313b94b21e9232ae84a",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 16:19:23 +0000",
+        "deletions_count": 24,
+        "description": "The region option is only requried for AWS exclusive sinks",
+        "files_count": 4,
+        "group": "docs",
+        "insertions_count": 28,
+        "message": "docs: The region option is only requried for AWS exclusive sinks",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "c228164f54fcba7ff211a506776e17b8d7ca19a6",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 16:39:05 +0000",
+        "deletions_count": 236,
+        "description": "Nest source building steps under platform tabs",
+        "files_count": 4,
+        "group": "docs",
+        "insertions_count": 274,
+        "message": "docs: Nest source building steps under platform tabs",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "26ab28bc49cb9e6dbbe1c8f245892f44b5ddb1de",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 16:51:51 +0000",
+        "deletions_count": 0,
+        "description": "Add all vector.dev redirects to netlify.toml",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 46,
+        "message": "docs: Add all vector.dev redirects to netlify.toml",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "d6c85157af4cf189b8d0b29b26cf0468e32ce36c",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 17:21:32 +0000",
+        "deletions_count": 5,
+        "description": "Fix journald supported operating systems",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 4,
+        "message": "docs: Fix journald supported operating systems",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "ccaf8e450fb1d83e2e249ee5ce8870e60816ba57",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 18:01:02 +0000",
+        "deletions_count": 1,
+        "description": "Add \"requirements\" section for relevant components",
+        "files_count": 56,
+        "group": "docs",
+        "insertions_count": 550,
+        "message": "docs: Add \"requirements\" section for relevant components",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "36b68149b36fe9768b5757c6eda43bea588a567e",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-25 18:03:35 +0000",
+        "deletions_count": 5,
+        "description": "Add address example to logplex source",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 7,
+        "message": "docs: Add address example to logplex source",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "c4ef618e6b5c9437f24b48934c7563afe74827f2",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-26 13:27:41 +0000",
+        "deletions_count": 3,
+        "description": "Fix format errors",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 3,
+        "message": "chore: Fix format errors",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "c8999e5465a567ad27d51fd4a78a3ba31e3460a7",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-26 15:40:19 +0000",
+        "deletions_count": 3,
+        "description": "Setup Netlify proxy for test-results subdomain",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 9,
+        "message": "chore(website): Setup Netlify proxy for test-results subdomain",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "623c75377522ae5ad02095d3426fb15f9d4621f6",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-01-26 15:47:59 +0000",
+        "deletions_count": 0,
+        "description": "Setup Netlify proxy for sh subdomain",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 6,
+        "message": "chore(website): Setup Netlify proxy for sh subdomain",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "ffac8b6cedee84217c779b5947910f0cabae1c8b",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-01-27 12:42:08 +0000",
+        "deletions_count": 8,
+        "description": "Add checkpointing and communication strategy to journald source docs",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 48,
+        "message": "docs: Add checkpointing and communication strategy to journald source docs (#1611)",
+        "pr_number": 1611,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "61032b6b175e3e19b531c3e014c823f656f24aa0",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-27 21:00:26 +0000",
+        "deletions_count": 7,
+        "description": "Document adding the Vector user to a group which can use `journalctl`",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 33,
+        "message": "docs: Document adding the Vector user to a group which can use `journalctl` (#1584)",
+        "pr_number": 1584,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "3780652b48caf7550252a662956e669d638590d5",
+        "type": "docs"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-01-27 17:41:37 +0000",
+        "deletions_count": 1,
+        "description": "Fix the journalctl start date to work across all timezones",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(journald source): Fix the journalctl start date to work across all timezones (#1627)",
+        "pr_number": 1627,
+        "scope": {
+          "category": "source",
+          "component_name": "journald",
+          "component_type": "source",
+          "name": "journald source"
+        },
+        "sha": "c85c759b2d28315dc05b117f3a610cf8f632b614",
+        "type": "fix"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-01-28 15:30:54 +0000",
+        "deletions_count": 120,
+        "description": "Initial `gcp_stackdriver_logging` sink implementation",
+        "files_count": 23,
+        "group": "feat",
+        "insertions_count": 2095,
+        "message": "feat(new sink): Initial `gcp_stackdriver_logging` sink implementation (#1555)",
+        "pr_number": 1555,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "219b1a8447fe03f56dacc314c7d5366fb87ca3ad",
+        "type": "feat"
       },
       {
         "author": "Lucio Franco",
@@ -420,7 +1200,347 @@ module.exports = {
           "component_type": null,
           "name": "testing"
         },
-        "sha": "87f0f732e988c936093477ce6fe630b4b830b61a",
+        "sha": "eb6b0a137944e356c31c14d8bf2422bc99b09256",
+        "type": "chore"
+      },
+      {
+        "author": "Evan Cameron",
+        "breaking_change": false,
+        "date": "2020-01-29 11:16:50 +0000",
+        "deletions_count": 22,
+        "description": "Event::extend use FromIter",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 18,
+        "message": "chore(event): Event::extend use FromIter (#1631)",
+        "pr_number": 1631,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "event"
+        },
+        "sha": "3149dcc9fef288db77ae765ec4166a959c5d5830",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-29 12:03:49 +0000",
+        "deletions_count": 1,
+        "description": "Introduce `JsonArrayBuffer` buffer",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 89,
+        "message": "chore(buffers): Introduce `JsonArrayBuffer` buffer (#1633)",
+        "pr_number": 1633,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "buffers"
+        },
+        "sha": "bb3aaa5d7d67adbacb4f77a684a9e66088a6d842",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-01-29 17:31:53 +0000",
+        "deletions_count": 31,
+        "description": "Cleanup generate and check Dockerfiles",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 15,
+        "message": "chore(operations): Cleanup generate and check Dockerfiles (#1623)",
+        "pr_number": 1623,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "5c1e38c61e8b66961d8b38685dc990ef468829d9",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-01-29 19:52:01 +0000",
+        "deletions_count": 25,
+        "description": "Add new `drop_unspecified` option to drop unspecified fields",
+        "files_count": 5,
+        "group": "feat",
+        "insertions_count": 165,
+        "message": "feat(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
+        "pr_number": 1636,
+        "scope": {
+          "category": "transform",
+          "component_name": "coercer",
+          "component_type": "transform",
+          "name": "coercer transform"
+        },
+        "sha": "51b5a2f43942d3a270475c2d24cb52ce4f9db59f",
+        "type": "feat"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-01-29 21:02:44 +0000",
+        "deletions_count": 94,
+        "description": "upgrade http and prost-build deps",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 27,
+        "message": "chore(security): upgrade http and prost-build deps (#1638)",
+        "pr_number": 1638,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "security"
+        },
+        "sha": "b51b1735c4cf348f5e33e2764d1e5b099561ab67",
+        "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-01-30 09:50:21 +0000",
+        "deletions_count": 0,
+        "description": "add cargo-deny check for advisories",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 20,
+        "message": "chore(security): add cargo-deny check for advisories (#1640)",
+        "pr_number": 1640,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "security"
+        },
+        "sha": "cf06460aba1f02cc74d65e12af635515530e3dad",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-30 12:59:24 +0000",
+        "deletions_count": 4,
+        "description": "Upgrade to rustc `1.41.0`",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 4,
+        "message": "chore: Upgrade to rustc `1.41.0` (#1646)",
+        "pr_number": 1646,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "f6626605e8b97af54bebe8bca6a373163a73a631",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-01-30 13:56:50 +0000",
+        "deletions_count": 25,
+        "description": "Add run.sh to run commands through Docker based on the `USE_DOCKER` env var",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 68,
+        "message": "chore(operations): Add run.sh to run commands through Docker based on the `USE_DOCKER` env var (#1637)",
+        "pr_number": 1637,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "37edb080ec7a5d20e141e5813d0475c59927d366",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-30 16:59:35 +0000",
+        "deletions_count": 3,
+        "description": "Initial `sematext` sink implementation",
+        "files_count": 14,
+        "group": "chore",
+        "insertions_count": 1079,
+        "message": "chore(new sink): Initial `sematext` sink implementation (#1562)",
+        "pr_number": 1562,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "c85022190fe0ca137e958aa58366b56a39d2a359",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-30 17:25:26 +0000",
+        "deletions_count": 655,
+        "description": "Upgrade all dependencies",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 810,
+        "message": "chore: Upgrade all dependencies (#1648)",
+        "pr_number": 1648,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "a9b7950a0f198bc0c87289d048a39b97cc915f4c",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-01-30 17:43:19 +0000",
+        "deletions_count": 0,
+        "description": "Add Ana 🎉",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 12,
+        "message": "chore(website): Add Ana 🎉 (#1649)",
+        "pr_number": 1649,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "525225524bb1e21121563f386a046bc68da5ac86",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-31 18:30:48 +0000",
+        "deletions_count": 1,
+        "description": "Fix group creation in the RPM package",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
+        "pr_number": 1654,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "platforms"
+        },
+        "sha": "4f429e00b63a5cddfdd725cd3868f04d094f9e2f",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-31 11:29:02 +0000",
+        "deletions_count": 1931,
+        "description": "Update to new lockfile format",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1921,
+        "message": "chore: Update to new lockfile format (#1655)",
+        "pr_number": 1655,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "0a8b0c8043081afb2e01b36f7ebdd3c72c521961",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-31 12:38:14 +0000",
+        "deletions_count": 4,
+        "description": "Fix EU endpoint and docs",
+        "files_count": 4,
+        "group": "fix",
+        "insertions_count": 4,
+        "message": "fix(sematext sink): Fix EU endpoint and docs (#1657)",
+        "pr_number": 1657,
+        "scope": {
+          "category": "sink",
+          "component_name": "sematext",
+          "component_type": "sink",
+          "name": "sematext sink"
+        },
+        "sha": "c1bf8b9a0a0c5f3e3b257e3b8749c114909363f6",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-01-31 12:38:38 +0000",
+        "deletions_count": 132,
+        "description": "Refactor internal http sink to use new helper API",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 327,
+        "message": "chore(http sink): Refactor internal http sink to use new helper API (#1641)",
+        "pr_number": 1641,
+        "scope": {
+          "category": "sink",
+          "component_name": "http",
+          "component_type": "sink",
+          "name": "http sink"
+        },
+        "sha": "47a981f1677a1325c86cf1edbbaf8031126fc833",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-01-31 21:27:55 +0000",
+        "deletions_count": 9,
+        "description": "Add ability to verify RPM artifacts locally",
+        "files_count": 7,
+        "group": "chore",
+        "insertions_count": 170,
+        "message": "chore(testing): Add ability to verify RPM artifacts locally (#1647)",
+        "pr_number": 1647,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "b894cf441ceb22ea0f2f8f27b02a05c608b1910c",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-01-31 13:55:36 +0000",
+        "deletions_count": 9,
+        "description": "Update Twitter handle to vectordotdev",
+        "files_count": 6,
+        "group": "chore",
+        "insertions_count": 9,
+        "message": "chore(website): Update Twitter handle to vectordotdev (#1664)",
+        "pr_number": 1664,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "ecf14f9a5b48694f45fad8569a47d34e3c4431b8",
         "type": "chore"
       },
       {
@@ -440,7 +1560,7 @@ module.exports = {
           "component_type": null,
           "name": "operations"
         },
-        "sha": "c1b8f5ee96de2503cd10d2967d33131d99189ac1",
+        "sha": "e24087a4273e80f4dbbff1e29ee65b0a2b85cdf5",
         "type": "chore"
       },
       {
@@ -460,7 +1580,7 @@ module.exports = {
           "component_type": null,
           "name": "operations"
         },
-        "sha": "25d5fa64a565ac8ab26b5a10ddce9f24df1d5a62",
+        "sha": "1d21d4e27b940a32c505f673ccfefe6434ec3890",
         "type": "chore"
       },
       {
@@ -480,26 +1600,2958 @@ module.exports = {
           "component_type": null,
           "name": "core"
         },
-        "sha": "1020b033b2bb14ed2e135835abd4533ccd52f7ce",
+        "sha": "a1dcc9679eba564f35a92d850080d0970a05fab6",
         "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-01 00:38:11 +0000",
+        "deletions_count": 11,
+        "description": "Update README header links",
+        "files_count": 6,
+        "group": "docs",
+        "insertions_count": 11,
+        "message": "docs: Update README header links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "00653bfc5bdee996811277cc3246665cbccb7710",
+        "type": "docs"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-01 13:36:12 +0000",
+        "deletions_count": 37,
+        "description": "Fix nix verifier step (and nightly builds)",
+        "files_count": 7,
+        "group": "chore",
+        "insertions_count": 16,
+        "message": "chore(operations): Fix nix verifier step (and nightly builds) (#1669)",
+        "pr_number": 1669,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "1cc654284addd2e0774d486e27e6d742158029b6",
+        "type": "chore"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-02-01 17:27:23 +0000",
+        "deletions_count": 89,
+        "description": "flesh out security policy",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 443,
+        "message": "chore(security): flesh out security policy (#1642)",
+        "pr_number": 1642,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "security"
+        },
+        "sha": "ae6f1a975f9e71d6331790f4f78334d37e99f940",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-01 18:28:40 +0000",
+        "deletions_count": 2,
+        "description": "Fox SECURITY.md vulnerability link",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Fox SECURITY.md vulnerability link",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "cb3f8c1d4eddff297747df65d312810bb672cf99",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-01 18:29:30 +0000",
+        "deletions_count": 35,
+        "description": "Fix SECURITY.md TOC links",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 35,
+        "message": "docs: Fix SECURITY.md TOC links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "06670c9c42b79193962dd0995017177d5bac68d5",
+        "type": "docs"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-02 08:28:05 +0000",
+        "deletions_count": 6,
+        "description": "Colourize help",
+        "files_count": 1,
+        "group": "enhancement",
+        "insertions_count": 10,
+        "message": "enhancement(cli): Colourize help (#1660)",
+        "pr_number": 1660,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "ed4b46a58712b589175abceb1b41d80294c431ea",
+        "type": "enhancement"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-02 11:46:54 +0000",
+        "deletions_count": 0,
+        "description": "Add team member social profiles",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 11,
+        "message": "docs: Add team member social profiles",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "df4c4bba3f24815bcf2ca5bf977e8498ddaf1916",
+        "type": "docs"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-02 11:50:01 +0000",
+        "deletions_count": 1,
+        "description": "Fix COPY path for armv7 Docker image",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Fix COPY path for armv7 Docker image (#1671)",
+        "pr_number": 1671,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "49dd7519e68d6034b96ac62dea31e5b3804e2e0a",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-02 13:46:33 +0000",
+        "deletions_count": 12,
+        "description": "Add assume_role docs",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 42,
+        "message": "docs: Add assume_role docs",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "f220a281ae5f451f55c589cd736b3403848d08c2",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-02 14:24:49 +0000",
+        "deletions_count": 148,
+        "description": "Fix broken links",
+        "files_count": 54,
+        "group": "docs",
+        "insertions_count": 144,
+        "message": "docs: Fix broken links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "d3ea7122ea63142e9c21026b59c2f0a4a72c167a",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-02 14:26:49 +0000",
+        "deletions_count": 3,
+        "description": "Clarify SECURITY.md requirements on 2fa and commit signing",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 3,
+        "message": "docs: Clarify SECURITY.md requirements on 2fa and commit signing",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5b97e4c247340cc553b2359f9cdcd63ee02d4f28",
+        "type": "docs"
+      },
+      {
+        "author": "Anton Ryzhov",
+        "breaking_change": false,
+        "date": "2020-02-02 21:48:59 +0000",
+        "deletions_count": 27,
+        "description": "fix typos",
+        "files_count": 15,
+        "group": "docs",
+        "insertions_count": 27,
+        "message": "docs: fix typos (#1577)",
+        "pr_number": 1577,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "eaad0fc503937a37b3ec935e4cb66499b8310c36",
+        "type": "docs"
+      },
+      {
+        "author": "Spencer T Brody",
+        "breaking_change": false,
+        "date": "2020-02-02 16:04:04 +0000",
+        "deletions_count": 50,
+        "description": "Add unix domain socket support to the `socket` sink",
+        "files_count": 9,
+        "group": "feat",
+        "insertions_count": 379,
+        "message": "feat(socket sink): Add unix domain socket support to the `socket` sink (#1561)",
+        "pr_number": 1561,
+        "scope": {
+          "category": "sink",
+          "component_name": "socket",
+          "component_type": "sink",
+          "name": "socket sink"
+        },
+        "sha": "14e2d5aca28ed7e0bdcbc3ccf005a4bd054332d5",
+        "type": "feat"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-02 16:40:59 +0000",
+        "deletions_count": 36,
+        "description": "Add .github/labels.yml for syncing labels",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 547,
+        "message": "chore(operations): Add .github/labels.yml for syncing labels (#1677)",
+        "pr_number": 1677,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "a04a584bbb61c936b10a3224c06b36b8e361448c",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-02 16:44:49 +0000",
+        "deletions_count": 1,
+        "description": "Fix labels.yml path in label-syncer workflow",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operation): Fix labels.yml path in label-syncer workflow",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operation"
+        },
+        "sha": "ac874f883088f2c23642f7563a69be4b0397ff50",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-02 16:47:27 +0000",
+        "deletions_count": 14,
+        "description": "Cleanup unused labels",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 9,
+        "message": "chore(operations): Cleanup unused labels",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "7ddd195b31a331ce17cfb18d287463469b48f56c",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-02 23:13:07 +0000",
+        "deletions_count": 111,
+        "description": "Define a JSON schema for the .meta/**/*.toml files",
+        "files_count": 55,
+        "group": "chore",
+        "insertions_count": 733,
+        "message": "chore(operations): Define a JSON schema for the .meta/**/*.toml files (#1678)",
+        "pr_number": 1678,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "1c912204572e5b5e32096247baf94870f3f25b25",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-03 12:14:14 +0000",
+        "deletions_count": 8,
+        "description": "Upgrade `tracing-subscriber 0.2.0-alpha.5`",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 29,
+        "message": "chore: Upgrade `tracing-subscriber 0.2.0-alpha.5` (#1681)",
+        "pr_number": 1681,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "fcdddbc0dbe062c44643f3be3ce6644e4ff40525",
+        "type": "chore"
+      },
+      {
+        "author": "MOZGIII",
+        "breaking_change": false,
+        "date": "2020-02-03 20:30:15 +0000",
+        "deletions_count": 1,
+        "description": "Fix the SECURITY.md link at CONTRIBUTING.md",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore: Fix the SECURITY.md link at CONTRIBUTING.md (#1682)",
+        "pr_number": 1682,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "74290db698ab6290c3f39437cb34586289d0778f",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-03 21:21:18 +0000",
+        "deletions_count": 3,
+        "description": "Fix `aws_s3` sink examples",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 6,
+        "message": "docs: Fix `aws_s3` sink examples (#1683)",
+        "pr_number": 1683,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "ba7a11caaac2c3c1812e3de6f0cb831a73c573dc",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-03 17:53:56 +0000",
+        "deletions_count": 9,
+        "description": "Remove background checks on security page",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 4,
+        "message": "chore: Remove background checks on security page",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "36fad64b72c177f5d1d4c477e9dc8dda4839917e",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-03 16:46:24 +0000",
+        "deletions_count": 13,
+        "description": "Fixup versions in tracing-metrics",
+        "files_count": 2,
+        "group": "fix",
+        "insertions_count": 4,
+        "message": "fix(dependencies): Fixup versions in tracing-metrics (#1690)",
+        "pr_number": 1690,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "dependencies"
+        },
+        "sha": "465af0b75988ffa0c613be5eeb30b4f549295d6f",
+        "type": "fix"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-04 12:11:08 +0000",
+        "deletions_count": 7,
+        "description": "Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more)",
+        "files_count": 6,
+        "group": "feat",
+        "insertions_count": 638,
+        "message": "feat(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
+        "pr_number": 1689,
+        "scope": {
+          "category": "sink",
+          "component_name": "aws_s3",
+          "component_type": "sink",
+          "name": "aws_s3 sink"
+        },
+        "sha": "5a368f34983394c5159b398b7810ac1f62591094",
+        "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-04 23:46:41 +0000",
+        "deletions_count": 20,
+        "description": "Use `rust-toolchain` file when building CI Docker images",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 10,
+        "message": "chore(operations): Use `rust-toolchain` file when building CI Docker images (#1691)",
+        "pr_number": 1691,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "6575e3836672d6111fa8b958e5cb67f46595002e",
+        "type": "chore"
+      },
+      {
+        "author": "MOZGIII",
+        "breaking_change": false,
+        "date": "2020-02-05 08:14:34 +0000",
+        "deletions_count": 38,
+        "description": "New `merge` transform",
+        "files_count": 23,
+        "group": "feat",
+        "insertions_count": 1539,
+        "message": "feat(new transform): New `merge` transform (#1504)",
+        "pr_number": 1504,
+        "scope": {
+          "category": "transform",
+          "component_name": null,
+          "component_type": "transform",
+          "name": "new transform"
+        },
+        "sha": "c285303bc5f403629060d3498b8e2cdf20c6ad9a",
+        "type": "feat"
+      },
+      {
+        "author": "MOZGIII",
+        "breaking_change": false,
+        "date": "2020-02-05 08:14:34 +0000",
+        "deletions_count": 38,
+        "description": "Add `auto_partial_merge` to automatically merge partial events",
+        "files_count": 23,
+        "group": "enhancement",
+        "insertions_count": 1539,
+        "message": "enhancement(docker source): Add `auto_partial_merge` to automatically merge partial events (#1504)",
+        "pr_number": 1504,
+        "scope": {
+          "category": "source",
+          "component_name": "docker",
+          "component_type": "source",
+          "name": "docker source"
+        },
+        "sha": "c285303bc5f403629060d3498b8e2cdf20c6ad9a",
+        "type": "enhancement"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-05 00:32:03 +0000",
+        "deletions_count": 5,
+        "description": "Fix auto_partial_merge option name",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 5,
+        "message": "docs(docker source): Fix auto_partial_merge option name",
+        "pr_number": null,
+        "scope": {
+          "category": "source",
+          "component_name": "docker",
+          "component_type": "source",
+          "name": "docker source"
+        },
+        "sha": "44099cdf794dc3cac6926002253f2120e3af0c01",
+        "type": "docs"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-05 10:32:25 +0000",
+        "deletions_count": 0,
+        "description": "Warn log for non retryable requests",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 1,
+        "message": "fix(networking): Warn log for non retryable requests (#1706)",
+        "pr_number": 1706,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "networking"
+        },
+        "sha": "0c22ca5c5e00313a12aef3dd1d2abba311ad890c",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-05 10:33:00 +0000",
+        "deletions_count": 52,
+        "description": "Rename cloud and add host",
+        "files_count": 5,
+        "group": "fix",
+        "insertions_count": 126,
+        "message": "fix(sematext sink): Rename cloud and add host (#1704)",
+        "pr_number": 1704,
+        "scope": {
+          "category": "sink",
+          "component_name": "sematext",
+          "component_type": "sink",
+          "name": "sematext sink"
+        },
+        "sha": "99899e35d43fbd8b5301ecdce327a7764f6eeceb",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-05 11:00:20 +0000",
+        "deletions_count": 6,
+        "description": "Upgrade to `tracing-subscriber 0.2.0`",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 6,
+        "message": "chore: Upgrade to `tracing-subscriber 0.2.0` (#1707)",
+        "pr_number": 1707,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "08d629cb79d55fb49c305f1a8866baa4a921c2fa",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-05 11:51:30 +0000",
+        "deletions_count": 12,
+        "description": "Fixup security language",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 9,
+        "message": "docs: Fixup security language (#1711)",
+        "pr_number": 1711,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "ca196b70101bd8d5a0868e27c58ae20b36f67709",
+        "type": "docs"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-05 14:42:12 +0000",
+        "deletions_count": 81,
+        "description": "Allow partials in /.meta/*.toml files",
+        "files_count": 17,
+        "group": "chore",
+        "insertions_count": 105,
+        "message": "chore(website): Allow partials in /.meta/*.toml files (#1715)",
+        "pr_number": 1715,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "aa54e7fff0507560372cf313fb115f957adc0645",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-05 15:05:42 +0000",
+        "deletions_count": 4,
+        "description": "Initial `logdna` sink implementation",
+        "files_count": 16,
+        "group": "feat",
+        "insertions_count": 1389,
+        "message": "feat(sinks): Initial `logdna` sink implementation (#1668)",
+        "pr_number": 1668,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "sinks"
+        },
+        "sha": "0d5db5d71f210fca4667cacc19b3d35276a3897e",
+        "type": "feat"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": true,
+        "date": "2020-02-05 14:06:54 +0000",
+        "deletions_count": 384,
+        "description": "Drop aws endpoint and region options",
+        "files_count": 21,
+        "group": "breaking change",
+        "insertions_count": 137,
+        "message": "chore(elasticsearch sink)!: Drop aws endpoint and region options (#1703)",
+        "pr_number": 1703,
+        "scope": {
+          "category": "sink",
+          "component_name": "elasticsearch",
+          "component_type": "sink",
+          "name": "elasticsearch sink"
+        },
+        "sha": "7e502fb3ca35afa935758985d633de6fc4c7bbfd",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-05 15:21:52 +0000",
+        "deletions_count": 8,
+        "description": "Add ENV_VAR api key examples first",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 10,
+        "message": "docs: Add ENV_VAR api key examples first",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "bcd97a0ae482dadc392afe2ca2a8ab651ee1acac",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-05 15:26:57 +0000",
+        "deletions_count": 2,
+        "description": "Fix LogDNA casing",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Fix LogDNA casing",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "033de8bdbcd8913a410f354310f0f09474285110",
+        "type": "docs"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-05 15:27:58 +0000",
+        "deletions_count": 27,
+        "description": "Add proper non retry messages",
+        "files_count": 3,
+        "group": "feat",
+        "insertions_count": 76,
+        "message": "feat(networking): Add proper non retry messages (#1712)",
+        "pr_number": 1712,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "networking"
+        },
+        "sha": "2414924f69e4845f85e596f5bb9ef3db0b04c13a",
+        "type": "feat"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-05 20:41:25 +0000",
+        "deletions_count": 0,
+        "description": "Add a (super secret) vic page",
+        "files_count": 12,
+        "group": "docs",
+        "insertions_count": 738,
+        "message": "docs: Add a (super secret) vic page (#1710)",
+        "pr_number": 1710,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "fb88fdd211b25fd5c21be881e7a9c920626d614a",
+        "type": "docs"
+      },
+      {
+        "author": "Luke Steensen",
+        "breaking_change": false,
+        "date": "2020-02-05 16:10:37 +0000",
+        "deletions_count": 20,
+        "description": "make host calculation more explicit",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 13,
+        "message": "chore(sematext sink): make host calculation more explicit (#1720)",
+        "pr_number": 1720,
+        "scope": {
+          "category": "sink",
+          "component_name": "sematext",
+          "component_type": "sink",
+          "name": "sematext sink"
+        },
+        "sha": "68dc4b099d7f4f1bac6f43ad27282d31aaaa7fd8",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-05 20:14:01 +0000",
+        "deletions_count": 43,
+        "description": "Add providers to labels and semantic PR scopes",
+        "files_count": 8,
+        "group": "chore",
+        "insertions_count": 153,
+        "message": "chore: Add providers to labels and semantic PR scopes",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "7529fb88ace3d60b697e0c856e85d855b97a7070",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-06 20:32:18 +0000",
+        "deletions_count": 172,
+        "description": "Allow running all tests locally",
+        "files_count": 15,
+        "group": "chore",
+        "insertions_count": 636,
+        "message": "chore(operations): Allow running all tests locally (#1701)",
+        "pr_number": 1701,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "a70758f52937217662f7906e5140f92757623213",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-06 17:37:30 +0000",
+        "deletions_count": 4,
+        "description": "Clarify topology warnings",
+        "files_count": 3,
+        "group": "enhancement",
+        "insertions_count": 4,
+        "message": "enhancement(config): Clarify topology warnings (#1726)",
+        "pr_number": 1726,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "config"
+        },
+        "sha": "8fb49eec4a8096635e83a88f909b1892359b020f",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-06 20:56:43 +0000",
+        "deletions_count": 77,
+        "description": "Restore `rust-toolchain` file in the project root",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 79,
+        "message": "chore(operations): Restore `rust-toolchain` file in the project root (#1729)",
+        "pr_number": 1729,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "d4c28115af4bbea56e5e7dc5ee137c682290ebe1",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-06 20:59:34 +0000",
+        "deletions_count": 1,
+        "description": "Fix `test-stable` CI job",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Fix `test-stable` CI job (#1730)",
+        "pr_number": 1730,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "13c7e9a296769b83ea939e0d248b30df83c12615",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-06 13:42:41 +0000",
+        "deletions_count": 6,
+        "description": "Replace Alexey with Luke",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 6,
+        "message": "chore: Replace Alexey with Luke (#1723)",
+        "pr_number": 1723,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "0d5287bd47524e00725d50b60fc0e7cc1f2c0432",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-06 17:09:54 +0000",
+        "deletions_count": 3,
+        "description": "Set `beta` to true",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 4,
+        "message": "docs(merge transform): Set `beta` to true",
+        "pr_number": null,
+        "scope": {
+          "category": "transform",
+          "component_name": "merge",
+          "component_type": "transform",
+          "name": "merge transform"
+        },
+        "sha": "bfbe58cf1d25c905c27080a447f5e9a4fe356a98",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-06 17:15:21 +0000",
+        "deletions_count": 15,
+        "description": "Require `beta` attribute for all components",
+        "files_count": 34,
+        "group": "docs",
+        "insertions_count": 45,
+        "message": "docs: Require `beta` attribute for all components",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5f8769d9c8ea52e4b39b4cf5f410bfbbf8c3755e",
+        "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-07 10:27:17 +0000",
+        "deletions_count": 40,
+        "description": "Support multiple configuration files.",
+        "files_count": 5,
+        "group": "feat",
+        "insertions_count": 208,
+        "message": "feat(cli): Support multiple configuration files. (#1725)",
+        "pr_number": 1725,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "93b2c1510f2b8151722ab6dc9cc687dc796a4e2a",
+        "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-07 14:01:19 +0000",
+        "deletions_count": 5,
+        "description": "Improve `docker-run.sh` script",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 18,
+        "message": "chore(operations): Improve `docker-run.sh` script (#1733)",
+        "pr_number": 1733,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "9c3b12b700c9f408c03db63d014db6e27e2ff87b",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-07 09:09:22 +0000",
+        "deletions_count": 21,
+        "description": "Add support for running containers under Podman",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 28,
+        "message": "chore(operations): Add support for running containers under Podman (#1736)",
+        "pr_number": 1736,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "52e2c85cd7d5f7c190edaa0c345c7a5208f5cc4c",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-07 16:02:56 +0000",
+        "deletions_count": 77,
+        "description": "Improve cyclic deps error message",
+        "files_count": 4,
+        "group": "enhancement",
+        "insertions_count": 98,
+        "message": "enhancement(cli): Improve cyclic deps error message (#1728)",
+        "pr_number": 1728,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "6f290d3e55d78438100b1bd31747c6c4b1630184",
+        "type": "enhancement"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-07 14:51:44 +0000",
+        "deletions_count": 82,
+        "description": "Add support for `assume_role` to all AWS sinks",
+        "files_count": 13,
+        "group": "feat",
+        "insertions_count": 330,
+        "message": "feat(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
+        "pr_number": 1722,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "aws provider"
+        },
+        "sha": "ce326530da9235233355a86dcc5c27b626f40a10",
+        "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-08 15:06:56 +0000",
+        "deletions_count": 6,
+        "description": "Disable failing CI check",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 0,
+        "message": "chore(operations): Disable failing CI check",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "a931f0ddca833eee9f1a5113e458f468fecaa221",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-08 10:23:15 +0000",
+        "deletions_count": 1,
+        "description": "Fix loading of private keys in separate files for sinks",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 44,
+        "message": "chore(operations): Fix loading of private keys in separate files for sinks (#1749)",
+        "pr_number": 1749,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "46e0df96231b2b04e3b29263f4e73ae1d79a09ca",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-08 10:24:00 +0000",
+        "deletions_count": 5,
+        "description": "Use the \"minimal\" profile when installing with rustup",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 7,
+        "message": "chore(operations): Use the \"minimal\" profile when installing with rustup (#1747)",
+        "pr_number": 1747,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "d128ab8eb163f1aca92db3093f86fd1a447ab64c",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-09 18:59:07 +0000",
+        "deletions_count": 3018,
+        "description": "Move \"magic\" component fields up to the /.meta directory",
+        "files_count": 181,
+        "group": "docs",
+        "insertions_count": 2766,
+        "message": "docs: Move \"magic\" component fields up to the /.meta directory (#1758)",
+        "pr_number": 1758,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "350f5aa9be81ff271b46e86ced6ec820e4cf4024",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-10 16:13:51 +0000",
+        "deletions_count": 2,
+        "description": "Fix `verify-nixos` CI check",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 8,
+        "message": "chore(operations): Fix `verify-nixos` CI check (#1760)",
+        "pr_number": 1760,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "20fc32b0674bf40897011b3fe7ce3e4335b31358",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-10 14:16:42 +0000",
+        "deletions_count": 21,
+        "description": "Fix nested field documentation",
+        "files_count": 10,
+        "group": "chore",
+        "insertions_count": 193,
+        "message": "chore(website): Fix nested field documentation (#1765)",
+        "pr_number": 1765,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "2ee1b8867e5c79057ed4467d9d4ce3984dd73599",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-10 16:28:09 +0000",
+        "deletions_count": 1,
+        "description": "Initial `humio_logs` sink implementation",
+        "files_count": 12,
+        "group": "feat",
+        "insertions_count": 1022,
+        "message": "feat(new sink): Initial `humio_logs` sink implementation (#1716)",
+        "pr_number": 1716,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "0eb6c9804f4be108960fb48921fdbd87e150d946",
+        "type": "feat"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-10 17:31:15 +0000",
+        "deletions_count": 7,
+        "description": "Fix encoding docs",
+        "files_count": 3,
+        "group": "fix",
+        "insertions_count": 7,
+        "message": "fix(splunk_hec sink): Fix encoding docs (#1768)",
+        "pr_number": 1768,
+        "scope": {
+          "category": "sink",
+          "component_name": "splunk_hec",
+          "component_type": "sink",
+          "name": "splunk_hec sink"
+        },
+        "sha": "7a693547f4b1fcdc58fca3b0679410c53584cda7",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-10 17:36:25 +0000",
+        "deletions_count": 58,
+        "description": "Remove encoding option",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(humio_logs sink): Remove encoding option (#1767)",
+        "pr_number": 1767,
+        "scope": {
+          "category": "sink",
+          "component_name": "humio_logs",
+          "component_type": "sink",
+          "name": "humio_logs sink"
+        },
+        "sha": "fec6798e1a70b6ae8513286b568b6437bf4191d0",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-02-10 23:37:31 +0000",
+        "deletions_count": 1,
+        "description": "Option to reload config on file change",
+        "files_count": 7,
+        "group": "feat",
+        "insertions_count": 260,
+        "message": "feat(config): Option to reload config on file change (#1330)",
+        "pr_number": 1330,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "config"
+        },
+        "sha": "0075ea61060bb57701c821eb835071f303d31d51",
+        "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-11 17:27:10 +0000",
+        "deletions_count": 2,
+        "description": "Fix typo",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Fix typo",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "d986d809c937d800fbca0c55f146284fac8154c4",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-11 18:43:16 +0000",
+        "deletions_count": 5,
+        "description": "Fix example `host` values for `splunk_hec` sink",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 5,
+        "message": "docs: Fix example `host` values for `splunk_hec` sink",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "12ecd000ba7bd8642ae51fa391eb1bde3f9fba87",
+        "type": "docs"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-11 09:48:50 +0000",
+        "deletions_count": 10,
+        "description": "Support conditionally rebuilding the docker images",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 16,
+        "message": "chore(operations): Support conditionally rebuilding the docker images (#1744)",
+        "pr_number": 1744,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "1b24dd1833d41a3fdac741a1190033b6d49cb6f0",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-11 13:02:20 +0000",
+        "deletions_count": 32,
+        "description": "Fix unit tests reference",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 646,
+        "message": "docs: Fix unit tests reference (#1777)",
+        "pr_number": 1777,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5fc373ea5d48eb40a7610673804f30475617e375",
+        "type": "docs"
+      },
+      {
+        "author": "FungusHumungus",
+        "breaking_change": false,
+        "date": "2020-02-11 21:59:52 +0000",
+        "deletions_count": 143,
+        "description": "Improve best effort support for Syslog formats (5424, 3164, nginx style, etc)",
+        "files_count": 8,
+        "group": "enhancement",
+        "insertions_count": 200,
+        "message": "enhancement(syslog source): Improve best effort support for Syslog formats (5424, 3164, nginx style, etc) (#1757)",
+        "pr_number": 1757,
+        "scope": {
+          "category": "source",
+          "component_name": "syslog",
+          "component_type": "source",
+          "name": "syslog source"
+        },
+        "sha": "9a1422efc56fac61e39ff0f33fd73091bc1728de",
+        "type": "enhancement"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-12 10:32:13 +0000",
+        "deletions_count": 23,
+        "description": "Improve `vector generate` syntax and formatting",
+        "files_count": 1,
+        "group": "enhancement",
+        "insertions_count": 195,
+        "message": "enhancement(cli): Improve `vector generate` syntax and formatting (#1773)",
+        "pr_number": 1773,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "2535012cb81d0fa5a4ea0ede00a2f21e1a71d192",
+        "type": "enhancement"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-12 11:05:34 +0000",
+        "deletions_count": 183,
+        "description": "Test sub command improvements",
+        "files_count": 11,
+        "group": "enhancement",
+        "insertions_count": 329,
+        "message": "enhancement(cli): Test sub command improvements (#1739)",
+        "pr_number": 1739,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "8570e00229424e48227be654798ffb06ee6dc184",
+        "type": "enhancement"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-12 12:21:42 +0000",
+        "deletions_count": 5,
+        "description": "Add units to default value examples",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 11,
+        "message": "chore(website): Add units to default value examples",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "955cc18652449cb63e69ceba839511dd4d262427",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-12 13:00:41 +0000",
+        "deletions_count": 27,
+        "description": "Simplify docker example values",
+        "files_count": 6,
+        "group": "docs",
+        "insertions_count": 29,
+        "message": "docs: Simplify docker example values",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "424a6a0f359db1e3cb398be8567f5be757b290bb",
+        "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-12 20:13:45 +0000",
+        "deletions_count": 5,
+        "description": "Clarify generate error messages with type",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 12,
+        "message": "chore: Clarify generate error messages with type (#1780)",
+        "pr_number": 1780,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "93f43cab6331f5f9de41b55c036337beec7a2d9f",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-13 18:51:08 +0000",
+        "deletions_count": 223,
+        "description": "Global default log schemas",
+        "files_count": 49,
+        "group": "feat",
+        "insertions_count": 715,
+        "message": "feat(config): Global default log schemas (#1769)",
+        "pr_number": 1769,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "config"
+        },
+        "sha": "15e69c8c2392f17104037cf94645231a874244d4",
+        "type": "feat"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-14 13:23:37 +0000",
+        "deletions_count": 132,
+        "description": "Add new global `log_schema` throughout the docs",
+        "files_count": 24,
+        "group": "docs",
+        "insertions_count": 445,
+        "message": "docs: Add new global `log_schema` throughout the docs (#1795)",
+        "pr_number": 1795,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "dcc7a593cbaae72212af56b3e562e15d246556fc",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-14 13:43:56 +0000",
+        "deletions_count": 1,
+        "description": "Reduce homepage animation refresh rate",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(website): Reduce homepage animation refresh rate",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "b4b3ebf18cdef172b037a717a1d6b723fcb7ed28",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-14 22:00:31 +0000",
+        "deletions_count": 1,
+        "description": "Add behavior tests for `add_fields` and `remove_fields` transforms",
+        "files_count": 6,
+        "group": "chore",
+        "insertions_count": 144,
+        "message": "chore(testing): Add behavior tests for `add_fields` and `remove_fields` transforms (#1781)",
+        "pr_number": 1781,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "9d2f3c06c1aabad9b726ae26e21c69c531bd4d6e",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-14 14:12:51 +0000",
+        "deletions_count": 7,
+        "description": "Stop homepage animation after a timeout",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 24,
+        "message": "chore(website): Stop homepage animation after a timeout",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "22f2e6d8822537b991e7ca7a6b81b7f0ee3d4571",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-14 19:14:51 +0000",
+        "deletions_count": 3,
+        "description": "Support schema settings in unit tests",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 8,
+        "message": "chore(cli): Support schema settings in unit tests (#1793)",
+        "pr_number": 1793,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "61f9f3356bfdc266d6841d42344dd5dee194b766",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-08 15:06:56 +0000",
+        "deletions_count": 6,
+        "description": "Disable failing CI check",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 0,
+        "message": "chore(operations): Disable failing CI check",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "497e6bddca534e2ef64de676d24b4ba54709f9d6",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-15 14:12:10 +0000",
+        "deletions_count": 22,
+        "description": "Add templating as a domain",
+        "files_count": 4,
+        "group": "chore",
+        "insertions_count": 29,
+        "message": "chore: Add templating as a domain",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "3233202cd457dd256a052ffe8037361dcac6d236",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-15 12:58:34 +0000",
+        "deletions_count": 31,
+        "description": "Correct lints and tests",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 57,
+        "message": "chore(windows platform): Correct lints and tests (#1789)",
+        "pr_number": 1789,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "windows platform"
+        },
+        "sha": "513851364635457395c81bd38eea13297b8f37ec",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-15 16:19:31 +0000",
+        "deletions_count": 333,
+        "description": "Update README and add templating reference",
+        "files_count": 35,
+        "group": "docs",
+        "insertions_count": 601,
+        "message": "docs: Update README and add templating reference (#1805)",
+        "pr_number": 1805,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "dc8009b78de156c9aed07eccf2498749f69ade4e",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-15 16:40:36 +0000",
+        "deletions_count": 24,
+        "description": "Fix generate check",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 24,
+        "message": "chore: Fix generate check",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "612450368e28882ebd31efcd9e2c7e26d3ac69b3",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-15 17:08:35 +0000",
+        "deletions_count": 10,
+        "description": "Update README language",
+        "files_count": 4,
+        "group": "docs",
+        "insertions_count": 8,
+        "message": "docs: Update README language",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "98623e329ae1796259a85db98af96882a1911ce1",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-15 17:09:59 +0000",
+        "deletions_count": 2,
+        "description": "Short README bullet point",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 2,
+        "message": "docs: Short README bullet point",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "c1c529a4397262b60917d825f905fedb97f02434",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-16 19:23:39 +0000",
+        "deletions_count": 4,
+        "description": "Fix typo in `concat` transform example",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 4,
+        "message": "docs: Fix typo in `concat` transform example",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "a366c6fa6d33e50aff378d605a245c72d7bfbcae",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-16 20:26:15 +0000",
+        "deletions_count": 8,
+        "description": "Clarify description of `ansi_stripper` transform",
+        "files_count": 4,
+        "group": "docs",
+        "insertions_count": 8,
+        "message": "docs: Clarify description of `ansi_stripper` transform (#1809)",
+        "pr_number": 1809,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "a96b7288d17d949a983b5756f3b94ea9d4f60918",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-17 13:02:38 +0000",
+        "deletions_count": 0,
+        "description": "Add more behavior tests for transforms",
+        "files_count": 9,
+        "group": "chore",
+        "insertions_count": 320,
+        "message": "chore(testing): Add more behavior tests for transforms (#1811)",
+        "pr_number": 1811,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "8e06920249f8da33cb23fa2ae76088d4a65ef04d",
+        "type": "chore"
+      },
+      {
+        "author": "MOZGIII",
+        "breaking_change": false,
+        "date": "2020-02-17 21:05:22 +0000",
+        "deletions_count": 0,
+        "description": "Add field order test at src/event/discriminant.rs",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 18,
+        "message": "chore: Add field order test at src/event/discriminant.rs (#1822)",
+        "pr_number": 1822,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "93a68f0a7e7a0b3b164a5cb69d2a00ba4e50cf8a",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-17 16:28:39 +0000",
+        "deletions_count": 2779,
+        "description": "Update to docusaurus 2.0.0-alpha.41",
+        "files_count": 13,
+        "group": "chore",
+        "insertions_count": 1599,
+        "message": "chore(website): Update to docusaurus 2.0.0-alpha.41 (#1831)",
+        "pr_number": 1831,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "32105959ee83aa160a830570245614fea864d001",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-18 00:42:28 +0000",
+        "deletions_count": 7,
+        "description": "Support advanced `librdkafka` options",
+        "files_count": 4,
+        "group": "enhancement",
+        "insertions_count": 207,
+        "message": "enhancement(kafka source): Support advanced `librdkafka` options (#1830)",
+        "pr_number": 1830,
+        "scope": {
+          "category": "source",
+          "component_name": "kafka",
+          "component_type": "source",
+          "name": "kafka source"
+        },
+        "sha": "1e85b5bf151ab4ec6f0cab140d79b038aaa02844",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-18 00:45:57 +0000",
+        "deletions_count": 2,
+        "description": "Support advanced `librdkafka` options",
+        "files_count": 4,
+        "group": "enhancement",
+        "insertions_count": 185,
+        "message": "enhancement(kafka sink): Support advanced `librdkafka` options (#1829)",
+        "pr_number": 1829,
+        "scope": {
+          "category": "sink",
+          "component_name": "kafka",
+          "component_type": "sink",
+          "name": "kafka sink"
+        },
+        "sha": "4dfc382fdeb4e81c21e4a526c6917070127eec6f",
+        "type": "enhancement"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-17 14:54:27 +0000",
+        "deletions_count": 9,
+        "description": "Support templating for dynamic values",
+        "files_count": 5,
+        "group": "enhancement",
+        "insertions_count": 147,
+        "message": "enhancement(add_fields transform): Support templating for dynamic values (#1799)",
+        "pr_number": 1799,
+        "scope": {
+          "category": "transform",
+          "component_name": "add_fields",
+          "component_type": "transform",
+          "name": "add_fields transform"
+        },
+        "sha": "88963ef85ffcd431ff3f0b66d213831fa1c8ab2d",
+        "type": "enhancement"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-17 17:55:46 +0000",
+        "deletions_count": 1,
+        "description": "Initial `loki` sink",
+        "files_count": 19,
+        "group": "feat",
+        "insertions_count": 2106,
+        "message": "feat(new sink): Initial `loki` sink (#1783)",
+        "pr_number": 1783,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "19f06ebee8b35058b7248b381924b8b102028ca2",
+        "type": "feat"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-02-18 03:32:37 +0000",
+        "deletions_count": 314,
+        "description": "Add more `include_container_names`, `include_pod_uids`, and `include_namespaces` filters",
+        "files_count": 7,
+        "group": "feat",
+        "insertions_count": 1091,
+        "message": "feat(kubernetes source): Add more `include_container_names`, `include_pod_uids`, and `include_namespaces` filters (#1501)",
+        "pr_number": 1501,
+        "scope": {
+          "category": "source",
+          "component_name": "kubernetes",
+          "component_type": "source",
+          "name": "kubernetes source"
+        },
+        "sha": "5d6dc45f0c3a5c139ba5c2ae345862984e172c7e",
+        "type": "feat"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-18 11:03:17 +0000",
+        "deletions_count": 2,
+        "description": "Ensure zero output event tests fail",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 115,
+        "message": "chore: Ensure zero output event tests fail (#1814)",
+        "pr_number": 1814,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "5d97a1e36fd24d7ccfffc1ef5c225892d81e7118",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-18 11:46:28 +0000",
+        "deletions_count": 108,
+        "description": "Update to docusaurus 2.0.0-alpha.43",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 102,
+        "message": "chore(website): Update to docusaurus 2.0.0-alpha.43",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "website"
+        },
+        "sha": "7c3149fc5d989e689a0b5fb94ec03ff0634e2eba",
+        "type": "chore"
+      },
+      {
+        "author": "Jakub Bednář",
+        "breaking_change": false,
+        "date": "2020-02-19 04:28:36 +0000",
+        "deletions_count": 3,
+        "description": "Initial `influxdb_metrics` sink implementation",
+        "files_count": 16,
+        "group": "feat",
+        "insertions_count": 2554,
+        "message": "feat(new sink): Initial `influxdb_metrics` sink implementation (#1759)",
+        "pr_number": 1759,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "b89aded488ca1a9bfeea06cad92365ee99586c66",
+        "type": "feat"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-02-19 09:08:41 +0000",
+        "deletions_count": 16,
+        "description": "Make token optional",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 54,
+        "message": "chore: Make token optional (#1837)",
+        "pr_number": 1837,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "841a8f8666ead89443dd7c98e8aa4b241537bac6",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-19 15:56:27 +0000",
+        "deletions_count": 378,
+        "description": "Add support for option groups and versions ",
+        "files_count": 82,
+        "group": "docs",
+        "insertions_count": 1155,
+        "message": "docs: Add support for option groups and versions  (#1859)",
+        "pr_number": 1859,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "a7aa9e4cb29402942b0b97dd28fe25d4ff598aa4",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-19 20:05:22 +0000",
+        "deletions_count": 1,
+        "description": "Fix influxdb_metrics common options groups",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 25,
+        "message": "docs: Fix influxdb_metrics common options groups",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "f2b4a30db0dacef5be4fded5c36ad4a56a7088ff",
+        "type": "docs"
+      },
+      {
+        "author": "Samuel Cormier-Iijima",
+        "breaking_change": false,
+        "date": "2020-02-19 23:04:07 +0000",
+        "deletions_count": 8,
+        "description": "only drop source field if JSON parse succeeds",
+        "files_count": 4,
+        "group": "fix",
+        "insertions_count": 33,
+        "message": "fix(json_parser transform): only drop source field if JSON parse succeeds (#1863)",
+        "pr_number": 1863,
+        "scope": {
+          "category": "transform",
+          "component_name": "json_parser",
+          "component_type": "transform",
+          "name": "json_parser transform"
+        },
+        "sha": "9e6cc795f90c39fdb63819cf1bbbe3648eb71dc1",
+        "type": "fix"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-20 01:55:18 +0000",
+        "deletions_count": 111,
+        "description": "Update logging driver support",
+        "files_count": 120,
+        "group": "docs",
+        "insertions_count": 342,
+        "message": "docs(docker source): Update logging driver support (#1741)",
+        "pr_number": 1741,
+        "scope": {
+          "category": "source",
+          "component_name": "docker",
+          "component_type": "source",
+          "name": "docker source"
+        },
+        "sha": "799709ac07cc1acb3cd10f142e586cc1af7a241f",
+        "type": "docs"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-02-20 13:24:22 +0000",
+        "deletions_count": 87,
+        "description": "Add transform context",
+        "files_count": 26,
+        "group": "chore",
+        "insertions_count": 120,
+        "message": "chore(transforms): Add transform context (#1855)",
+        "pr_number": 1855,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "transforms"
+        },
+        "sha": "93100d4a6ffd67e1ab8c88ab35d61a791b2693f9",
+        "type": "chore"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-02-20 14:37:00 +0000",
+        "deletions_count": 8,
+        "description": "Inital Kubernetes `WatchClient`",
+        "files_count": 7,
+        "group": "chore",
+        "insertions_count": 490,
+        "message": "chore(transforms): Inital Kubernetes `WatchClient` (#1746)",
+        "pr_number": 1746,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "transforms"
+        },
+        "sha": "2bba79917996a94eab1dee4c742e1ab4c89b1c19",
+        "type": "chore"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": true,
+        "date": "2020-02-20 22:07:29 +0000",
+        "deletions_count": 19,
+        "description": "Support `Array` and `Map` kinds in `Value`",
+        "files_count": 3,
+        "group": "breaking change",
+        "insertions_count": 123,
+        "message": "enhancement(log data model)!: Support `Array` and `Map` kinds in `Value` (#1836)",
+        "pr_number": 1836,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "log data model"
+        },
+        "sha": "657e658117d38f56bdb64b7d9bbbfee554c7d5d5",
+        "type": "enhancement"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-20 14:39:54 +0000",
+        "deletions_count": 171,
+        "description": "Add min_version to relevant components",
+        "files_count": 77,
+        "group": "docs",
+        "insertions_count": 341,
+        "message": "docs: Add min_version to relevant components",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "49afdba04d682b48dd91beae49800e590c2ce0ab",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-20 14:49:46 +0000",
+        "deletions_count": 39,
+        "description": "Run `make generate`",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 39,
+        "message": "chore: Run `make generate`",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "ead893c445a121b73aee48987a3cce1ca974a303",
+        "type": "chore"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-20 14:04:26 +0000",
+        "deletions_count": 100,
+        "description": "Initial `gcp_cloud_storage` sink implementation",
+        "files_count": 26,
+        "group": "feat",
+        "insertions_count": 2483,
+        "message": "feat(new sink): Initial `gcp_cloud_storage` sink implementation (#1794)",
+        "pr_number": 1794,
+        "scope": {
+          "category": "sink",
+          "component_name": null,
+          "component_type": "sink",
+          "name": "new sink"
+        },
+        "sha": "269616777cef4466755dfd5a9d80f2ce3a1ac03f",
+        "type": "feat"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-20 15:47:39 +0000",
+        "deletions_count": 217,
+        "description": "Add docker info",
+        "files_count": 177,
+        "group": "docs",
+        "insertions_count": 325,
+        "message": "docs(aws_ec2_metadata transform): Add docker info (#1862)",
+        "pr_number": 1862,
+        "scope": {
+          "category": "transform",
+          "component_name": "aws_ec2_metadata",
+          "component_type": "transform",
+          "name": "aws_ec2_metadata transform"
+        },
+        "sha": "f377e79e472096d6dc2eb91cd7b6e6b2e9e74f03",
+        "type": "docs"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-20 16:04:52 +0000",
+        "deletions_count": 16,
+        "description": "Advance to `prod-ready` status",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 18,
+        "message": "docs(cloudwatch_logs sink): Advance to `prod-ready` status (#1875)",
+        "pr_number": 1875,
+        "scope": {
+          "category": "sink",
+          "component_name": "cloudwatch_logs",
+          "component_type": "sink",
+          "name": "cloudwatch_logs sink"
+        },
+        "sha": "cebd0eb183c75872a5bb6f52905e4fde61773423",
+        "type": "docs"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-20 15:15:38 +0000",
+        "deletions_count": 214,
+        "description": "Re-run `make generate` to fix GCS docs",
+        "files_count": 61,
+        "group": "chore",
+        "insertions_count": 14,
+        "message": "chore(docs): Re-run `make generate` to fix GCS docs (#1877)",
+        "pr_number": 1877,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "docs"
+        },
+        "sha": "8f70eff1f8526be3931c97e662d3da9d26821e03",
+        "type": "chore"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-20 16:23:04 +0000",
+        "deletions_count": 2,
+        "description": "Set `min_version` to `1.1.54378`",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 13,
+        "message": "docs(clickhouse sink): Set `min_version` to `1.1.54378` (#1879)",
+        "pr_number": 1879,
+        "scope": {
+          "category": "sink",
+          "component_name": "clickhouse",
+          "component_type": "sink",
+          "name": "clickhouse sink"
+        },
+        "sha": "4b0492c8a040b4fe7d6ea71bc6d6a0f2d0bb3cd6",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-21 00:36:47 +0000",
+        "deletions_count": 2,
+        "description": "Add feature `disable-resolv-conf` to make Vector tests pass on NixOS",
+        "files_count": 3,
+        "group": "chore",
+        "insertions_count": 9,
+        "message": "chore(testing): Add feature `disable-resolv-conf` to make Vector tests pass on NixOS (#1874)",
+        "pr_number": 1874,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "e9c3466ba6beecd30a3c1ffc304d384c7f665592",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-20 17:01:04 +0000",
+        "deletions_count": 14,
+        "description": "Clarify `split` transform behavior",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 18,
+        "message": "docs: Clarify `split` transform behavior",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "fa3fc07d703aa125075739459d72b7a12ca02027",
+        "type": "docs"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-20 19:19:11 +0000",
+        "deletions_count": 45,
+        "description": "Fix example",
+        "files_count": 3,
+        "group": "docs",
+        "insertions_count": 59,
+        "message": "docs(split transform): Fix example",
+        "pr_number": null,
+        "scope": {
+          "category": "transform",
+          "component_name": "split",
+          "component_type": "transform",
+          "name": "split transform"
+        },
+        "sha": "4f1b5d884acd577ea8060f2d029c4270da82e4f0",
+        "type": "docs"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-20 19:38:50 +0000",
+        "deletions_count": 5,
+        "description": "Refer to docker API",
+        "files_count": 64,
+        "group": "docs",
+        "insertions_count": 77,
+        "message": "docs(docker source): Refer to docker API (#1885)",
+        "pr_number": 1885,
+        "scope": {
+          "category": "source",
+          "component_name": "docker",
+          "component_type": "source",
+          "name": "docker source"
+        },
+        "sha": "415429deae6c3d8d287546ab845af3c29bb559f1",
+        "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-21 11:35:27 +0000",
+        "deletions_count": 135,
+        "description": "Allow multiple unit test inputs",
+        "files_count": 5,
+        "group": "feat",
+        "insertions_count": 376,
+        "message": "feat(cli): Allow multiple unit test inputs (#1824)",
+        "pr_number": 1824,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "f2742dbd5b1d073436fd07af664e38930b36d587",
+        "type": "feat"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-21 13:08:34 +0000",
+        "deletions_count": 0,
+        "description": "Add `no_outputs_from` field to unit tests",
+        "files_count": 4,
+        "group": "feat",
+        "insertions_count": 182,
+        "message": "feat(cli): Add `no_outputs_from` field to unit tests (#1817)",
+        "pr_number": 1817,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
+        },
+        "sha": "3b090aa80416d55679b543cdec3f361aa9869659",
+        "type": "feat"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-21 16:11:05 +0000",
+        "deletions_count": 121,
+        "description": "Use `BTreeMap` instead of `HashMap` for logs and metrics",
+        "files_count": 23,
+        "group": "enhancement",
+        "insertions_count": 158,
+        "message": "enhancement(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
+        "pr_number": 1838,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "log data model"
+        },
+        "sha": "17340e26b0845ed95519027950a0bd9d388df71d",
+        "type": "enhancement"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-21 11:16:29 +0000",
+        "deletions_count": 1,
+        "description": "Add description and bio to press page",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 26,
+        "message": "chore: Add description and bio to press page (#1884)",
+        "pr_number": 1884,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "df8e103b937cc86d9ef12cf6b2638a4003f75b47",
+        "type": "chore"
+      },
+      {
+        "author": "Samuel Cormier-Iijima",
+        "breaking_change": false,
+        "date": "2020-02-21 12:26:59 +0000",
+        "deletions_count": 13,
+        "description": "respect Lua types when converting back to events (#857)",
+        "files_count": 3,
+        "group": "fix",
+        "insertions_count": 78,
+        "message": "fix(lua transform): respect Lua types when converting back to events (#857) (#1886)",
+        "pr_number": 1886,
+        "scope": {
+          "category": "transform",
+          "component_name": "lua",
+          "component_type": "transform",
+          "name": "lua transform"
+        },
+        "sha": "650ce582e2eab05f585505e5b66197eb672c556c",
+        "type": "fix"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-21 14:01:52 +0000",
+        "deletions_count": 11,
+        "description": "Fixup benches",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 6,
+        "message": "docs: Fixup benches (#1883)",
+        "pr_number": 1883,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "e8e0d23db92a6714d45966f0ca5075262e2ca912",
+        "type": "docs"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-21 17:07:37 +0000",
+        "deletions_count": 42,
+        "description": "Rename to `sematext_logs`",
+        "files_count": 10,
+        "group": "chore",
+        "insertions_count": 42,
+        "message": "chore(sematext_logs sink): Rename to `sematext_logs` (#1871)",
+        "pr_number": 1871,
+        "scope": {
+          "category": "sink",
+          "component_name": "sematext_logs",
+          "component_type": "sink",
+          "name": "sematext_logs sink"
+        },
+        "sha": "d4c0d54627d3773a44bb3decb3d385d4ec2606af",
+        "type": "chore"
+      },
+      {
+        "author": "MOZGIII",
+        "breaking_change": false,
+        "date": "2020-02-22 04:10:13 +0000",
+        "deletions_count": 103,
+        "description": "Better multi-line support",
+        "files_count": 6,
+        "group": "enhancement",
+        "insertions_count": 915,
+        "message": "enhancement(file source): Better multi-line support (#1852)",
+        "pr_number": 1852,
+        "scope": {
+          "category": "source",
+          "component_name": "file",
+          "component_type": "source",
+          "name": "file source"
+        },
+        "sha": "89026d0a9a0dc99022ab116f71ef561995b78c69",
+        "type": "enhancement"
+      },
+      {
+        "author": "MOZGIII",
+        "breaking_change": false,
+        "date": "2020-02-22 04:46:43 +0000",
+        "deletions_count": 0,
+        "description": "File doc fix",
+        "files_count": 1,
+        "group": "docs",
+        "insertions_count": 5,
+        "message": "docs: File doc fix (#1896)",
+        "pr_number": 1896,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "7c6995401ca2e7f94a9d82cf0137d9dc45b415ba",
+        "type": "docs"
+      },
+      {
+        "author": "Bruce Guenter",
+        "breaking_change": false,
+        "date": "2020-02-22 20:32:58 +0000",
+        "deletions_count": 122,
+        "description": "Add support for TLS",
+        "files_count": 44,
+        "group": "enhancement",
+        "insertions_count": 341,
+        "message": "enhancement(kafka source): Add support for TLS (#1893)",
+        "pr_number": 1893,
+        "scope": {
+          "category": "source",
+          "component_name": "kafka",
+          "component_type": "source",
+          "name": "kafka source"
+        },
+        "sha": "a00295e59ca789f9c1f100a99f6f06c5c772bb84",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": true,
+        "date": "2020-02-24 12:20:59 +0000",
+        "deletions_count": 2,
+        "description": "Support null values in log events",
+        "files_count": 8,
+        "group": "breaking change",
+        "insertions_count": 45,
+        "message": "enhancement(log data model)!: Support null values in log events (#1898)",
+        "pr_number": 1898,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "log data model"
+        },
+        "sha": "452dcc8d97790a1edccd60fddd1281a801bb48b1",
+        "type": "enhancement"
+      },
+      {
+        "author": "Kruno Tomola Fabro",
+        "breaking_change": false,
+        "date": "2020-02-24 16:06:03 +0000",
+        "deletions_count": 2,
+        "description": "Change `timestamp_key` back to `message_key`",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 2,
+        "message": "chore(kubernetes source): Change `timestamp_key` back to `message_key` (#1887)",
+        "pr_number": 1887,
+        "scope": {
+          "category": "source",
+          "component_name": "kubernetes",
+          "component_type": "source",
+          "name": "kubernetes source"
+        },
+        "sha": "ce1231fda37d50969745ca027b2f17bdd16fe283",
+        "type": "chore"
+      },
+      {
+        "author": "Ana Hobden",
+        "breaking_change": false,
+        "date": "2020-02-24 07:17:16 +0000",
+        "deletions_count": 201,
+        "description": "Initial `rename_fields` transform implementation",
+        "files_count": 13,
+        "group": "feat",
+        "insertions_count": 520,
+        "message": "feat(new transform): Initial `rename_fields` transform implementation (#1800)",
+        "pr_number": 1800,
+        "scope": {
+          "category": "transform",
+          "component_name": null,
+          "component_type": "transform",
+          "name": "new transform"
+        },
+        "sha": "794e473cc6e1834f28ba2681b6de35f5b346672e",
+        "type": "feat"
+      },
+      {
+        "author": "Binary Logic",
+        "breaking_change": false,
+        "date": "2020-02-24 11:17:49 +0000",
+        "deletions_count": 198,
+        "description": "Add multiline examples",
+        "files_count": 20,
+        "group": "docs",
+        "insertions_count": 406,
+        "message": "docs(file source): Add multiline examples (#1899)",
+        "pr_number": 1899,
+        "scope": {
+          "category": "source",
+          "component_name": "file",
+          "component_type": "source",
+          "name": "file source"
+        },
+        "sha": "66d1434e5b46cbc3696fa63b97d3f58f329a9286",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-24 19:31:53 +0000",
+        "deletions_count": 0,
+        "description": "Reduce RAM usage when running `make test`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(testing): Reduce RAM usage when running `make test` (#1901)",
+        "pr_number": 1901,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "2984ae6575e1f5dfb034e68dc49e5e7ef7a08bf4",
+        "type": "chore"
+      },
+      {
+        "author": "binarylogic",
+        "breaking_change": false,
+        "date": "2020-02-24 11:55:17 +0000",
+        "deletions_count": 2,
+        "description": "Make note that prod-ready means a stable API",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 4,
+        "message": "docs: Make note that prod-ready means a stable API",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "9e963e5fea682f5a56dcba936258d6b9c1371a97",
+        "type": "docs"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-24 17:13:10 +0000",
+        "deletions_count": 4,
+        "description": "Add `timestamp_format` field",
+        "files_count": 4,
+        "group": "feat",
+        "insertions_count": 185,
+        "message": "feat(clickhouse sink): Add `timestamp_format` field (#1634)",
+        "pr_number": 1634,
+        "scope": {
+          "category": "sink",
+          "component_name": "clickhouse",
+          "component_type": "sink",
+          "name": "clickhouse sink"
+        },
+        "sha": "992b4930b9d3052714cf90b66bfa6ead1d7855b2",
+        "type": "feat"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-24 18:28:13 +0000",
+        "deletions_count": 1,
+        "description": "Nest request fields",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 59,
+        "message": "fix(clickhouse sink): Nest request fields",
+        "pr_number": null,
+        "scope": {
+          "category": "sink",
+          "component_name": "clickhouse",
+          "component_type": "sink",
+          "name": "clickhouse sink"
+        },
+        "sha": "0aab35eda9ca3f12fd3deaf31890e5c373e58185",
+        "type": "fix"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-24 19:38:46 +0000",
+        "deletions_count": 179,
+        "description": "Add `swimlanes` transform",
+        "files_count": 21,
+        "group": "feat",
+        "insertions_count": 1003,
+        "message": "feat(new transform): Add `swimlanes` transform (#1785)",
+        "pr_number": 1785,
+        "scope": {
+          "category": "transform",
+          "component_name": null,
+          "component_type": "transform",
+          "name": "new transform"
+        },
+        "sha": "d5ef3cdf0c1cdf3bcc660440ac8a52fae0824309",
+        "type": "feat"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-24 20:08:08 +0000",
+        "deletions_count": 90,
+        "description": "Fix swimlanes documentation",
+        "files_count": 5,
+        "group": "chore",
+        "insertions_count": 87,
+        "message": "chore: Fix swimlanes documentation",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "f6408958fa06d199f0f03789e250828e0b23c6f2",
+        "type": "chore"
+      },
+      {
+        "author": "Samuel Cormier-Iijima",
+        "breaking_change": false,
+        "date": "2020-02-24 17:02:16 +0000",
+        "deletions_count": 2,
+        "description": "Use checksum fingerprinting",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 2,
+        "message": "fix(kubernetes source): Use checksum fingerprinting (#1912)",
+        "pr_number": 1912,
+        "scope": {
+          "category": "source",
+          "component_name": "kubernetes",
+          "component_type": "source",
+          "name": "kubernetes source"
+        },
+        "sha": "6a2ab77beab26cf266a9f60a3e48289cefa9f4f3",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-25 11:06:25 +0000",
+        "deletions_count": 4,
+        "description": "Fix `make check-code`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore: Fix `make check-code`",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "84e59e5505ec3756351aa43e334771437555f6fb",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-20 11:22:04 +0000",
+        "deletions_count": 9442,
+        "description": "Prepare v0.8.0 release",
+        "files_count": 16,
+        "group": "chore",
+        "insertions_count": 16467,
+        "message": "chore: Prepare v0.8.0 release",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "11c11c568b1f87f290cab60e70c6d25493eb403d",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-25 14:53:12 +0000",
+        "deletions_count": 19,
+        "description": "Relax the requirements for `no_outputs_from` unit test targets",
+        "files_count": 2,
+        "group": "chore",
+        "insertions_count": 8,
+        "message": "chore: Relax the requirements for `no_outputs_from` unit test targets (#1921)",
+        "pr_number": 1921,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "bdad2880e86ebcda84d3f126bb62bd21a86ead00",
+        "type": "chore"
+      },
+      {
+        "author": "Ashley Jeffs",
+        "breaking_change": false,
+        "date": "2020-02-25 15:08:26 +0000",
+        "deletions_count": 22,
+        "description": "Clean up swimlanes examples",
+        "files_count": 2,
+        "group": "docs",
+        "insertions_count": 32,
+        "message": "docs: Clean up swimlanes examples",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "856bd2803d6766d335210cc562587fdae3f9a204",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-25 18:31:10 +0000",
+        "deletions_count": 0,
+        "description": "Enable `rdkafka` by default",
+        "files_count": 1,
+        "group": "enhancement",
+        "insertions_count": 1,
+        "message": "enhancement(observability): Enable `rdkafka` by default (#1918)",
+        "pr_number": 1918,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "observability"
+        },
+        "sha": "b5ffd12d3cfb8921d44b8b7782de02738e32cf51",
+        "type": "enhancement"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-02-25 18:35:47 +0000",
+        "deletions_count": 0,
+        "description": "Fix build with `--no-default-features`",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(operations): Fix build with `--no-default-features` (#1920)",
+        "pr_number": 1920,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "operations"
+        },
+        "sha": "775dc92674bcdb5b1c6773675e6e88e0cba70ad6",
+        "type": "chore"
+      },
+      {
+        "author": "Lucio Franco",
+        "breaking_change": false,
+        "date": "2020-02-25 11:20:16 +0000",
+        "deletions_count": 1,
+        "description": "Allow kubernetes tests to compile",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(testing): Allow kubernetes tests to compile (#1911)",
+        "pr_number": 1911,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "dbb870bd5ceddb64d09f8458e2582cf768a266a3",
+        "type": "chore"
       }
     ],
-    "compare_url": "https://github.com/timberio/vector/compare/v0.7.1...v0.7.2",
-    "date": "2020-01-31",
-    "deletions_count": 114,
-    "description": "",
-    "insertions_count": 104,
-    "last_version": "0.7.1",
+    "compare_url": "https://github.com/timberio/vector/compare/v0.7.2...v0.8.0",
+    "date": "2020-02-20",
+    "deletions_count": 20399,
+    "description": "The features for this release have been pouring in. Clearly the\nVector team need better hobbies.",
+    "highlights": [
+      {
+        "body": "<p>\nAnyone that was worked with Docker logs knows how frustrating this problem\ncan be. Docker, by default, splits log messages that exceed 16kb. While 16kb\nseems like a lot, it can easily be exceeded if you're logging rich structured\nevents. This can be a very difficult and frustrating problem to solve with\nother tools (we speak from experience). In this release Vector solves this\nautomatically with a new `auto_partial_merge` option in the `docker` source.\n</p>\n<p>\nWe love assimilation and look forward to a future where our individualistic\nhuman personalities can also be merged into a societal hive mind.\n</p>\n",
+        "id": "merge-docker-events",
+        "title": "Automatically Merge Split Docker Events!"
+      },
+      {
+        "body": "<p>\nThe new <a href=\"/docs/reference/transforms/swimlanes/\"><code>swimlanes</code>\ntransform</a> makes it much easier to configure conditional branches of\ntransforms and sinks. For example, you can easily create\n<a href=\"/docs/reference/transforms/swimlanes/#output\">if/else pipelines</a>.\n</p>\n<p>\nRemember to occasionally let your branches mingle so that they don't completely\nlose touch.\n</p>\n",
+        "id": "improved-control-flow",
+        "title": "Improved Control Flow With Swimlanes"
+      },
+      {
+        "body": "<p>\nUnit testing your configuration files has been supported by Vector for a while\nnow. Based on feedback we've received and some healthy dog-fooding we've\nexpanded their functionality and made a lot of improvements to how they work.\n</p>\n<p>\nIf you aren't yet using unit tests in your configs we strongly recommend you try\nit out. You can find out more in <a href=\"/docs/setup/guides/unit-testing/\">this guide</a>.\n</p>\n",
+        "id": "unit-test-improvements",
+        "title": "Config Unit Test Improvements"
+      },
+      {
+        "body": "<p>\nNot everyone enjoys Marmite, we get it, some people have\n<span style=\"text-decoration: line-through;\">wrong</span> different tastes.\nSimilarly, not everyone is going to want to follow our default field schema\n(`host`, `message`, `timestamp`). Rather than making you work around this with\ntransforms we've added some handy global options to set these universally:\n</p>\n<pre>\n# OPTIONAL - Log schema\n[log_schema]\n  host_key = \"host\" # default\n  message_key = \"message\" # default\n  timestamp_key = \"timestamp\" # default\n</pre>\n",
+        "id": "custom-schemas",
+        "title": "Custom Field Schemas"
+      },
+      {
+        "body": "<p>\nVector is now able to execute a topology spread across multiple config files,\nwhich allows you to break large pipelines down into bite size, easier managed,\nchunks. Running them is as simple as:\n</p>\n<pre>\nvector -c ./configs/first.toml -c ./configs/second.toml -c ./more/*.toml\n</pre>\n<p>\nSubscribe to our newsletter and you'll be notified when we learn how to do this\nwith human emotions.\n</p>\n",
+        "id": "multi-config-files",
+        "title": "Support for Multiple Config Files"
+      },
+      {
+        "body": "<p>\nWe all love a good sink. Now you can enjoy our latest offerings:\n<a href=\"/docs/reference/sinks/gcp_stackdriver_logging\"><code>gcp_stackdriver_logging</code></a>,\n<a href=\"/docs/reference/sinks/gcp_cloud_storage\"><code>gcp_cloud_storage</code></a>,\n<a href=\"/docs/reference/sinks/logdna\"><code>logdna</code></a>,\n<a href=\"/docs/reference/sinks/humio_logs\"><code>humio_logs</code></a>,\n<a href=\"/docs/reference/sinks/loki\"><code>loki</code></a> and\n<a href=\"/docs/reference/sinks/influxdb_metrics\"><code>influxdb_metrics</code></a>.\n</p>\n",
+        "id": "lots-of-new-sinks",
+        "title": "Lots of New Sinks"
+      }
+    ],
+    "insertions_count": 53963,
+    "last_version": "0.7.2",
     "posts": [
 
     ],
-    "subtitle": "",
+    "subtitle": "A wholesome platter of features",
     "type": "initial dev",
     "type_url": "https://semver.org/#spec-item-4",
     "upgrade_guides": [
 
     ],
-    "version": "0.7.2"
+    "version": "0.8.0"
   },
   "post_tags": [
     "type: announcement",
@@ -6794,6 +10846,9 @@ module.exports = {
       "date": "2019-09-24",
       "deletions_count": 8605,
       "description": "",
+      "highlights": [
+
+      ],
       "insertions_count": 27640,
       "last_version": null,
       "posts": [
@@ -8074,6 +12129,9 @@ module.exports = {
       "date": "2019-10-09",
       "deletions_count": 3038,
       "description": "",
+      "highlights": [
+
+      ],
       "insertions_count": 6839,
       "last_version": "0.4.0",
       "posts": [
@@ -13014,6 +17072,9 @@ module.exports = {
       "date": "2019-12-09",
       "deletions_count": 9213,
       "description": "",
+      "highlights": [
+
+      ],
       "insertions_count": 22141,
       "last_version": "0.5.0",
       "posts": [
@@ -16369,6 +20430,9 @@ module.exports = {
       "date": "2020-01-22",
       "deletions_count": 11774,
       "description": "You can't make an omelet without cracking some eggs. We have our eyes set on version 1 and a backlog of breaking changes we wanted to merge before we reach it. Version 0.7.0 is our attempt to cluster as many breaking changes as we can into a single release.",
+      "highlights": [
+
+      ],
       "insertions_count": 24373,
       "last_version": "0.6.0",
       "posts": [
@@ -16731,6 +20795,9 @@ module.exports = {
       "date": "2020-01-23",
       "deletions_count": 206,
       "description": "",
+      "highlights": [
+
+      ],
       "insertions_count": 281,
       "last_version": "0.7.0",
       "posts": [
@@ -16991,6 +21058,9 @@ module.exports = {
       "date": "2020-01-31",
       "deletions_count": 114,
       "description": "",
+      "highlights": [
+
+      ],
       "insertions_count": 104,
       "last_version": "0.7.1",
       "posts": [
@@ -17003,6 +21073,4318 @@ module.exports = {
 
       ],
       "version": "0.7.2"
+    },
+    "0.8.0": {
+      "commits": [
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-22 17:53:08 +0000",
+          "deletions_count": 1,
+          "description": "Make sorting of blog posts stable",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 1,
+          "message": "docs: Make sorting of blog posts stable (#1566)",
+          "pr_number": 1566,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "c5ad7d22f8f3b02c5fd8bc784c7c5cf54dd7b694",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-22 18:00:10 +0000",
+          "deletions_count": 1,
+          "description": "Add AWS API key for Windows tests in CI",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 5,
+          "message": "chore(operations): Add AWS API key for Windows tests in CI (#1565)",
+          "pr_number": 1565,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "3469bfcfeb39997c977c300399b8f2562f4c7730",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-22 18:00:26 +0000",
+          "deletions_count": 0,
+          "description": "Pass `CIRCLE_SHA1` environment variable to `release-github` job",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Pass `CIRCLE_SHA1` environment variable to `release-github` job (#1567)",
+          "pr_number": 1567,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "b9584fae31e6809be62b912b4162454fad688485",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-22 11:36:26 +0000",
+          "deletions_count": 1,
+          "description": "Poll inner service in `Map` svc",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 31,
+          "message": "fix(aws_s3 sink): Poll inner service in `Map` svc (#1569)",
+          "pr_number": 1569,
+          "scope": {
+            "category": "sink",
+            "component_name": "aws_s3",
+            "component_type": "sink",
+            "name": "aws_s3 sink"
+          },
+          "sha": "641cb48a13d46556448a18e5d4e6400a33a1e78b",
+          "type": "fix"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-01-22 16:11:44 +0000",
+          "deletions_count": 7,
+          "description": "enable more logging by default",
+          "files_count": 3,
+          "group": "enhancement",
+          "insertions_count": 8,
+          "message": "enhancement(observability): enable more logging by default (#1564)",
+          "pr_number": 1564,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "observability"
+          },
+          "sha": "203efcd8071edc4e6986968d3c8ff9b2e36f341d",
+          "type": "enhancement"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-01-22 14:38:52 +0000",
+          "deletions_count": 96,
+          "description": "Allow building on Windows Stable Rust",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 180,
+          "message": "chore(operations): Allow building on Windows Stable Rust (#1560)",
+          "pr_number": 1560,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "e3afda368582dd51f3518eaf2af3d5d82873b52a",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-22 19:30:47 +0000",
+          "deletions_count": 118,
+          "description": "Improve DNS resolution",
+          "files_count": 9,
+          "group": "fix",
+          "insertions_count": 117,
+          "message": "fix(socket sink): Improve DNS resolution (#1575)",
+          "pr_number": 1575,
+          "scope": {
+            "category": "sink",
+            "component_name": "socket",
+            "component_type": "sink",
+            "name": "socket sink"
+          },
+          "sha": "708d6228b09c2a3e84da635f21cef068555844d9",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 13:28:37 +0000",
+          "deletions_count": 22,
+          "description": "Fix `aws_kinesis_firehose` sink healthcheck",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 13,
+          "message": "fix(aws_kinesis_firehose sink): Fix `aws_kinesis_firehose` sink healthcheck (#1573)",
+          "pr_number": 1573,
+          "scope": {
+            "category": "sink",
+            "component_name": "aws_kinesis_firehose",
+            "component_type": "sink",
+            "name": "aws_kinesis_firehose sink"
+          },
+          "sha": "1c78da516d5d9769753c1a7194d0cb45271afcc4",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 10:47:08 +0000",
+          "deletions_count": 1,
+          "description": "Bump version to 0.8.0 to fix `make check-version`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore: Bump version to 0.8.0 to fix `make check-version`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "a1cac868c9f4303cdb3258ded509a3889fc30f1a",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 11:16:54 +0000",
+          "deletions_count": 1,
+          "description": "Update `Cargo.lock`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Update `Cargo.lock`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "c960f953f93c2b717337033c8589fd8512278a08",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 14:51:32 +0000",
+          "deletions_count": 53,
+          "description": "Escape special characters in options descriptions",
+          "files_count": 26,
+          "group": "chore",
+          "insertions_count": 53,
+          "message": "chore(website): Escape special characters in options descriptions (#1580)",
+          "pr_number": 1580,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "f996505eaaff329d1e7360ceca97fac2e8b12aa3",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 19:18:46 +0000",
+          "deletions_count": 38,
+          "description": "Check that all blog articles are signed in CI",
+          "files_count": 27,
+          "group": "chore",
+          "insertions_count": 130,
+          "message": "chore: Check that all blog articles are signed in CI (#1459)",
+          "pr_number": 1459,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "9aac838ff2bd09aacbb58cec79bebda54c0ba4ca",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-23 11:36:35 +0000",
+          "deletions_count": 20,
+          "description": "Fix broken s3 link",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 454,
+          "message": "chore(website): Fix broken s3 link",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "c084001fc871db231bcb999f3946b7ad6b2319df",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-23 11:39:15 +0000",
+          "deletions_count": 6,
+          "description": "Fix socket sink docs",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 6,
+          "message": "chore(docs): Fix socket sink docs (#1585)",
+          "pr_number": 1585,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "docs"
+          },
+          "sha": "26539079cb5a5b3c2e530191297f70a05f3db024",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 19:44:22 +0000",
+          "deletions_count": 2,
+          "description": "Create `vector` user when installing RPM package",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 11,
+          "message": "fix(platforms): Create `vector` user when installing RPM package (#1583)",
+          "pr_number": 1583,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "platforms"
+          },
+          "sha": "4e6fc6b240c23651e3b7323f9a0f3de6fdb7468b",
+          "type": "fix"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-23 11:56:59 +0000",
+          "deletions_count": 1,
+          "description": "Fix avatar on blog list page",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(website): Fix avatar on blog list page",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "8eb88242da06eb14795957b0fb9d46b6ec8d7681",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-01-23 16:58:32 +0000",
+          "deletions_count": 0,
+          "description": "Redo blog sigs",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 0,
+          "message": "chore: Redo blog sigs",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "6179310868047ceff60e46172e452c54b55e8aa1",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 21:44:23 +0000",
+          "deletions_count": 5,
+          "description": "Support bug fixing releases",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 18,
+          "message": "chore(operations): Support bug fixing releases (#1587)",
+          "pr_number": 1587,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "c057c0f70876ac2404ae1d59ced6ca3c3e29b96d",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 22:26:44 +0000",
+          "deletions_count": 1,
+          "description": "Add all generated files to the release commit",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Add all generated files to the release commit (#1588)",
+          "pr_number": 1588,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "3adfc70416aa3cc078257a3192b148cd530dc770",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 23:31:55 +0000",
+          "deletions_count": 2,
+          "description": "Do not require `systemd` as an RPM dependency",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 0,
+          "message": "chore(operations): Do not require `systemd` as an RPM dependency (#1590)",
+          "pr_number": 1590,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "895fb9b2022df7708eec6fbd28e5bede710f3321",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-23 23:37:55 +0000",
+          "deletions_count": 0,
+          "description": "Add `release-push` target to the Makefile",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 30,
+          "message": "chore(operations): Add `release-push` target to the Makefile (#1589)",
+          "pr_number": 1589,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "eab9ea663dd5bc52a4db4c99aa1518454d026a29",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-01-24 09:40:28 +0000",
+          "deletions_count": 2,
+          "description": "Fix typo",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Fix typo",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "372287922d98e4ebe48c2518eeaa35cc9ca77d86",
+          "type": "docs"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-01-24 05:10:35 +0000",
+          "deletions_count": 3,
+          "description": "Wrap failing test in feature flag",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 2,
+          "message": "chore(testing): Wrap failing test in feature flag (#1595)",
+          "pr_number": 1595,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "8d2126dae5af5d6b8ea426e74758e3eba27f8a79",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-01-24 13:17:59 +0000",
+          "deletions_count": 59,
+          "description": "Always check containers for self",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 53,
+          "message": "fix(docker source): Always check containers for self (#1525)",
+          "pr_number": 1525,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "135d2504ccf3a7efdc6e664cb306ef830c31f7fd",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-24 15:55:58 +0000",
+          "deletions_count": 2,
+          "description": "Fix `release-github` CI job",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 4,
+          "message": "chore(operations): Fix `release-github` CI job (#1600)",
+          "pr_number": 1600,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "f1e1a06ffdcf9bd24df232a928750f23ce16ec39",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-24 18:15:48 +0000",
+          "deletions_count": 56,
+          "description": "Run `make generate`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore: Run `make generate`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "f2a0df640cbbef34c4df17f1fc7bdc04b6d14ce0",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-24 21:32:15 +0000",
+          "deletions_count": 6,
+          "description": "Fix `release-homebrew` CI job",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 5,
+          "message": "chore(operations): Fix `release-homebrew` CI job (#1601)",
+          "pr_number": 1601,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "cc59c392b253daf83cb8d2a231a749fa1df0d2b7",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 13:21:26 +0000",
+          "deletions_count": 1,
+          "description": "Add Netlify _redirects file",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 4,
+          "message": "chore(website): Add Netlify _redirects file",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "7fce71cf21dc5af5fa4db2de480589263468c03f",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 13:35:45 +0000",
+          "deletions_count": 11,
+          "description": "Force netlify redirects",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 14,
+          "message": "chore(website): Force netlify redirects",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "7b4721053c9284c8ef2ebc0335d565620ff0c098",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-25 15:21:53 +0000",
+          "deletions_count": 65,
+          "description": "Fix socket address documentation",
+          "files_count": 31,
+          "group": "docs",
+          "insertions_count": 76,
+          "message": "docs: Fix socket address documentation (#1607)",
+          "pr_number": 1607,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "d06926ce8b74263d92e2f019a652c4e54ca78626",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 15:25:27 +0000",
+          "deletions_count": 27,
+          "description": "Remove unused guides attribute",
+          "files_count": 27,
+          "group": "docs",
+          "insertions_count": 0,
+          "message": "docs: Remove unused guides attribute",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "59cd776e661b72e7728401333ffe611cfcf0b27e",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 15:40:05 +0000",
+          "deletions_count": 200,
+          "description": "Fix service provider filters in components section",
+          "files_count": 41,
+          "group": "chore",
+          "insertions_count": 995,
+          "message": "chore(website): Fix service provider filters in components section",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "7fa4a9ef2c322e0ac0ce6a66ca328c0161241acf",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 15:58:22 +0000",
+          "deletions_count": 350,
+          "description": "Cleanup authentication options",
+          "files_count": 24,
+          "group": "docs",
+          "insertions_count": 315,
+          "message": "docs: Cleanup authentication options",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "0521ac92685ef18b093a076041767493484189c8",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 16:03:45 +0000",
+          "deletions_count": 204,
+          "description": "Make region for AWS services a required option",
+          "files_count": 9,
+          "group": "docs",
+          "insertions_count": 212,
+          "message": "docs: Make region for AWS services a required option",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "8be035e86eaf2e1fc6b40313b94b21e9232ae84a",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 16:19:23 +0000",
+          "deletions_count": 24,
+          "description": "The region option is only requried for AWS exclusive sinks",
+          "files_count": 4,
+          "group": "docs",
+          "insertions_count": 28,
+          "message": "docs: The region option is only requried for AWS exclusive sinks",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "c228164f54fcba7ff211a506776e17b8d7ca19a6",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 16:39:05 +0000",
+          "deletions_count": 236,
+          "description": "Nest source building steps under platform tabs",
+          "files_count": 4,
+          "group": "docs",
+          "insertions_count": 274,
+          "message": "docs: Nest source building steps under platform tabs",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "26ab28bc49cb9e6dbbe1c8f245892f44b5ddb1de",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 16:51:51 +0000",
+          "deletions_count": 0,
+          "description": "Add all vector.dev redirects to netlify.toml",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 46,
+          "message": "docs: Add all vector.dev redirects to netlify.toml",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "d6c85157af4cf189b8d0b29b26cf0468e32ce36c",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 17:21:32 +0000",
+          "deletions_count": 5,
+          "description": "Fix journald supported operating systems",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 4,
+          "message": "docs: Fix journald supported operating systems",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "ccaf8e450fb1d83e2e249ee5ce8870e60816ba57",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 18:01:02 +0000",
+          "deletions_count": 1,
+          "description": "Add \"requirements\" section for relevant components",
+          "files_count": 56,
+          "group": "docs",
+          "insertions_count": 550,
+          "message": "docs: Add \"requirements\" section for relevant components",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "36b68149b36fe9768b5757c6eda43bea588a567e",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-25 18:03:35 +0000",
+          "deletions_count": 5,
+          "description": "Add address example to logplex source",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 7,
+          "message": "docs: Add address example to logplex source",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "c4ef618e6b5c9437f24b48934c7563afe74827f2",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-26 13:27:41 +0000",
+          "deletions_count": 3,
+          "description": "Fix format errors",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 3,
+          "message": "chore: Fix format errors",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "c8999e5465a567ad27d51fd4a78a3ba31e3460a7",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-26 15:40:19 +0000",
+          "deletions_count": 3,
+          "description": "Setup Netlify proxy for test-results subdomain",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 9,
+          "message": "chore(website): Setup Netlify proxy for test-results subdomain",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "623c75377522ae5ad02095d3426fb15f9d4621f6",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-26 15:47:59 +0000",
+          "deletions_count": 0,
+          "description": "Setup Netlify proxy for sh subdomain",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 6,
+          "message": "chore(website): Setup Netlify proxy for sh subdomain",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "ffac8b6cedee84217c779b5947910f0cabae1c8b",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-27 12:42:08 +0000",
+          "deletions_count": 8,
+          "description": "Add checkpointing and communication strategy to journald source docs",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 48,
+          "message": "docs: Add checkpointing and communication strategy to journald source docs (#1611)",
+          "pr_number": 1611,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "61032b6b175e3e19b531c3e014c823f656f24aa0",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-27 21:00:26 +0000",
+          "deletions_count": 7,
+          "description": "Document adding the Vector user to a group which can use `journalctl`",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 33,
+          "message": "docs: Document adding the Vector user to a group which can use `journalctl` (#1584)",
+          "pr_number": 1584,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "3780652b48caf7550252a662956e669d638590d5",
+          "type": "docs"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-01-27 17:41:37 +0000",
+          "deletions_count": 1,
+          "description": "Fix the journalctl start date to work across all timezones",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(journald source): Fix the journalctl start date to work across all timezones (#1627)",
+          "pr_number": 1627,
+          "scope": {
+            "category": "source",
+            "component_name": "journald",
+            "component_type": "source",
+            "name": "journald source"
+          },
+          "sha": "c85c759b2d28315dc05b117f3a610cf8f632b614",
+          "type": "fix"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-01-28 15:30:54 +0000",
+          "deletions_count": 120,
+          "description": "Initial `gcp_stackdriver_logging` sink implementation",
+          "files_count": 23,
+          "group": "feat",
+          "insertions_count": 2095,
+          "message": "feat(new sink): Initial `gcp_stackdriver_logging` sink implementation (#1555)",
+          "pr_number": 1555,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "219b1a8447fe03f56dacc314c7d5366fb87ca3ad",
+          "type": "feat"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-29 11:08:27 +0000",
+          "deletions_count": 39,
+          "description": "Disable kuberenetes tests in CI temporarily",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 35,
+          "message": "chore(testing): Disable kuberenetes tests in CI temporarily (#1629)",
+          "pr_number": 1629,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "eb6b0a137944e356c31c14d8bf2422bc99b09256",
+          "type": "chore"
+        },
+        {
+          "author": "Evan Cameron",
+          "breaking_change": false,
+          "date": "2020-01-29 11:16:50 +0000",
+          "deletions_count": 22,
+          "description": "Event::extend use FromIter",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 18,
+          "message": "chore(event): Event::extend use FromIter (#1631)",
+          "pr_number": 1631,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "event"
+          },
+          "sha": "3149dcc9fef288db77ae765ec4166a959c5d5830",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-29 12:03:49 +0000",
+          "deletions_count": 1,
+          "description": "Introduce `JsonArrayBuffer` buffer",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 89,
+          "message": "chore(buffers): Introduce `JsonArrayBuffer` buffer (#1633)",
+          "pr_number": 1633,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "buffers"
+          },
+          "sha": "bb3aaa5d7d67adbacb4f77a684a9e66088a6d842",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-29 17:31:53 +0000",
+          "deletions_count": 31,
+          "description": "Cleanup generate and check Dockerfiles",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 15,
+          "message": "chore(operations): Cleanup generate and check Dockerfiles (#1623)",
+          "pr_number": 1623,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "5c1e38c61e8b66961d8b38685dc990ef468829d9",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-01-29 19:52:01 +0000",
+          "deletions_count": 25,
+          "description": "Add new `drop_unspecified` option to drop unspecified fields",
+          "files_count": 5,
+          "group": "feat",
+          "insertions_count": 165,
+          "message": "feat(coercer transform): Add new `drop_unspecified` option to drop unspecified fields (#1636)",
+          "pr_number": 1636,
+          "scope": {
+            "category": "transform",
+            "component_name": "coercer",
+            "component_type": "transform",
+            "name": "coercer transform"
+          },
+          "sha": "51b5a2f43942d3a270475c2d24cb52ce4f9db59f",
+          "type": "feat"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-01-29 21:02:44 +0000",
+          "deletions_count": 94,
+          "description": "upgrade http and prost-build deps",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 27,
+          "message": "chore(security): upgrade http and prost-build deps (#1638)",
+          "pr_number": 1638,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "security"
+          },
+          "sha": "b51b1735c4cf348f5e33e2764d1e5b099561ab67",
+          "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-01-30 09:50:21 +0000",
+          "deletions_count": 0,
+          "description": "add cargo-deny check for advisories",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 20,
+          "message": "chore(security): add cargo-deny check for advisories (#1640)",
+          "pr_number": 1640,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "security"
+          },
+          "sha": "cf06460aba1f02cc74d65e12af635515530e3dad",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-30 12:59:24 +0000",
+          "deletions_count": 4,
+          "description": "Upgrade to rustc `1.41.0`",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 4,
+          "message": "chore: Upgrade to rustc `1.41.0` (#1646)",
+          "pr_number": 1646,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "f6626605e8b97af54bebe8bca6a373163a73a631",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-30 13:56:50 +0000",
+          "deletions_count": 25,
+          "description": "Add run.sh to run commands through Docker based on the `USE_DOCKER` env var",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 68,
+          "message": "chore(operations): Add run.sh to run commands through Docker based on the `USE_DOCKER` env var (#1637)",
+          "pr_number": 1637,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "37edb080ec7a5d20e141e5813d0475c59927d366",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-30 16:59:35 +0000",
+          "deletions_count": 3,
+          "description": "Initial `sematext` sink implementation",
+          "files_count": 14,
+          "group": "chore",
+          "insertions_count": 1079,
+          "message": "chore(new sink): Initial `sematext` sink implementation (#1562)",
+          "pr_number": 1562,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "c85022190fe0ca137e958aa58366b56a39d2a359",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-30 17:25:26 +0000",
+          "deletions_count": 655,
+          "description": "Upgrade all dependencies",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 810,
+          "message": "chore: Upgrade all dependencies (#1648)",
+          "pr_number": 1648,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "a9b7950a0f198bc0c87289d048a39b97cc915f4c",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-30 17:43:19 +0000",
+          "deletions_count": 0,
+          "description": "Add Ana 🎉",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 12,
+          "message": "chore(website): Add Ana 🎉 (#1649)",
+          "pr_number": 1649,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "525225524bb1e21121563f386a046bc68da5ac86",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 18:30:48 +0000",
+          "deletions_count": 1,
+          "description": "Fix group creation in the RPM package",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(platforms): Fix group creation in the RPM package (#1654)",
+          "pr_number": 1654,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "platforms"
+          },
+          "sha": "4f429e00b63a5cddfdd725cd3868f04d094f9e2f",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-31 11:29:02 +0000",
+          "deletions_count": 1931,
+          "description": "Update to new lockfile format",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1921,
+          "message": "chore: Update to new lockfile format (#1655)",
+          "pr_number": 1655,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "0a8b0c8043081afb2e01b36f7ebdd3c72c521961",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-31 12:38:14 +0000",
+          "deletions_count": 4,
+          "description": "Fix EU endpoint and docs",
+          "files_count": 4,
+          "group": "fix",
+          "insertions_count": 4,
+          "message": "fix(sematext sink): Fix EU endpoint and docs (#1657)",
+          "pr_number": 1657,
+          "scope": {
+            "category": "sink",
+            "component_name": "sematext",
+            "component_type": "sink",
+            "name": "sematext sink"
+          },
+          "sha": "c1bf8b9a0a0c5f3e3b257e3b8749c114909363f6",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-01-31 12:38:38 +0000",
+          "deletions_count": 132,
+          "description": "Refactor internal http sink to use new helper API",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 327,
+          "message": "chore(http sink): Refactor internal http sink to use new helper API (#1641)",
+          "pr_number": 1641,
+          "scope": {
+            "category": "sink",
+            "component_name": "http",
+            "component_type": "sink",
+            "name": "http sink"
+          },
+          "sha": "47a981f1677a1325c86cf1edbbaf8031126fc833",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 21:27:55 +0000",
+          "deletions_count": 9,
+          "description": "Add ability to verify RPM artifacts locally",
+          "files_count": 7,
+          "group": "chore",
+          "insertions_count": 170,
+          "message": "chore(testing): Add ability to verify RPM artifacts locally (#1647)",
+          "pr_number": 1647,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "b894cf441ceb22ea0f2f8f27b02a05c608b1910c",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-01-31 13:55:36 +0000",
+          "deletions_count": 9,
+          "description": "Update Twitter handle to vectordotdev",
+          "files_count": 6,
+          "group": "chore",
+          "insertions_count": 9,
+          "message": "chore(website): Update Twitter handle to vectordotdev (#1664)",
+          "pr_number": 1664,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "ecf14f9a5b48694f45fad8569a47d34e3c4431b8",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 22:16:51 +0000",
+          "deletions_count": 1,
+          "description": "Fix creation of the tag in `make release`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Fix creation of the tag in `make release`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "e24087a4273e80f4dbbff1e29ee65b0a2b85cdf5",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-01-31 22:24:27 +0000",
+          "deletions_count": 1,
+          "description": "Use all tags in `make release`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Use all tags in `make release`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "1d21d4e27b940a32c505f673ccfefe6434ec3890",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-01-27 13:13:47 +0000",
+          "deletions_count": 73,
+          "description": "Improve 0.7.1 release notes",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 73,
+          "message": "docs: Improve 0.7.1 release notes",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "a1dcc9679eba564f35a92d850080d0970a05fab6",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-01 00:38:11 +0000",
+          "deletions_count": 11,
+          "description": "Update README header links",
+          "files_count": 6,
+          "group": "docs",
+          "insertions_count": 11,
+          "message": "docs: Update README header links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "00653bfc5bdee996811277cc3246665cbccb7710",
+          "type": "docs"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-01 13:36:12 +0000",
+          "deletions_count": 37,
+          "description": "Fix nix verifier step (and nightly builds)",
+          "files_count": 7,
+          "group": "chore",
+          "insertions_count": 16,
+          "message": "chore(operations): Fix nix verifier step (and nightly builds) (#1669)",
+          "pr_number": 1669,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "1cc654284addd2e0774d486e27e6d742158029b6",
+          "type": "chore"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-02-01 17:27:23 +0000",
+          "deletions_count": 89,
+          "description": "flesh out security policy",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 443,
+          "message": "chore(security): flesh out security policy (#1642)",
+          "pr_number": 1642,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "security"
+          },
+          "sha": "ae6f1a975f9e71d6331790f4f78334d37e99f940",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-01 18:28:40 +0000",
+          "deletions_count": 2,
+          "description": "Fox SECURITY.md vulnerability link",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Fox SECURITY.md vulnerability link",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "cb3f8c1d4eddff297747df65d312810bb672cf99",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-01 18:29:30 +0000",
+          "deletions_count": 35,
+          "description": "Fix SECURITY.md TOC links",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 35,
+          "message": "docs: Fix SECURITY.md TOC links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "06670c9c42b79193962dd0995017177d5bac68d5",
+          "type": "docs"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-02 08:28:05 +0000",
+          "deletions_count": 6,
+          "description": "Colourize help",
+          "files_count": 1,
+          "group": "enhancement",
+          "insertions_count": 10,
+          "message": "enhancement(cli): Colourize help (#1660)",
+          "pr_number": 1660,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "ed4b46a58712b589175abceb1b41d80294c431ea",
+          "type": "enhancement"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-02 11:46:54 +0000",
+          "deletions_count": 0,
+          "description": "Add team member social profiles",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 11,
+          "message": "docs: Add team member social profiles",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "df4c4bba3f24815bcf2ca5bf977e8498ddaf1916",
+          "type": "docs"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-02 11:50:01 +0000",
+          "deletions_count": 1,
+          "description": "Fix COPY path for armv7 Docker image",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Fix COPY path for armv7 Docker image (#1671)",
+          "pr_number": 1671,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "49dd7519e68d6034b96ac62dea31e5b3804e2e0a",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-02 13:46:33 +0000",
+          "deletions_count": 12,
+          "description": "Add assume_role docs",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 42,
+          "message": "docs: Add assume_role docs",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "f220a281ae5f451f55c589cd736b3403848d08c2",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-02 14:24:49 +0000",
+          "deletions_count": 148,
+          "description": "Fix broken links",
+          "files_count": 54,
+          "group": "docs",
+          "insertions_count": 144,
+          "message": "docs: Fix broken links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "d3ea7122ea63142e9c21026b59c2f0a4a72c167a",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-02 14:26:49 +0000",
+          "deletions_count": 3,
+          "description": "Clarify SECURITY.md requirements on 2fa and commit signing",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 3,
+          "message": "docs: Clarify SECURITY.md requirements on 2fa and commit signing",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5b97e4c247340cc553b2359f9cdcd63ee02d4f28",
+          "type": "docs"
+        },
+        {
+          "author": "Anton Ryzhov",
+          "breaking_change": false,
+          "date": "2020-02-02 21:48:59 +0000",
+          "deletions_count": 27,
+          "description": "fix typos",
+          "files_count": 15,
+          "group": "docs",
+          "insertions_count": 27,
+          "message": "docs: fix typos (#1577)",
+          "pr_number": 1577,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "eaad0fc503937a37b3ec935e4cb66499b8310c36",
+          "type": "docs"
+        },
+        {
+          "author": "Spencer T Brody",
+          "breaking_change": false,
+          "date": "2020-02-02 16:04:04 +0000",
+          "deletions_count": 50,
+          "description": "Add unix domain socket support to the `socket` sink",
+          "files_count": 9,
+          "group": "feat",
+          "insertions_count": 379,
+          "message": "feat(socket sink): Add unix domain socket support to the `socket` sink (#1561)",
+          "pr_number": 1561,
+          "scope": {
+            "category": "sink",
+            "component_name": "socket",
+            "component_type": "sink",
+            "name": "socket sink"
+          },
+          "sha": "14e2d5aca28ed7e0bdcbc3ccf005a4bd054332d5",
+          "type": "feat"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-02 16:40:59 +0000",
+          "deletions_count": 36,
+          "description": "Add .github/labels.yml for syncing labels",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 547,
+          "message": "chore(operations): Add .github/labels.yml for syncing labels (#1677)",
+          "pr_number": 1677,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "a04a584bbb61c936b10a3224c06b36b8e361448c",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-02 16:44:49 +0000",
+          "deletions_count": 1,
+          "description": "Fix labels.yml path in label-syncer workflow",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operation): Fix labels.yml path in label-syncer workflow",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operation"
+          },
+          "sha": "ac874f883088f2c23642f7563a69be4b0397ff50",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-02 16:47:27 +0000",
+          "deletions_count": 14,
+          "description": "Cleanup unused labels",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 9,
+          "message": "chore(operations): Cleanup unused labels",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "7ddd195b31a331ce17cfb18d287463469b48f56c",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-02 23:13:07 +0000",
+          "deletions_count": 111,
+          "description": "Define a JSON schema for the .meta/**/*.toml files",
+          "files_count": 55,
+          "group": "chore",
+          "insertions_count": 733,
+          "message": "chore(operations): Define a JSON schema for the .meta/**/*.toml files (#1678)",
+          "pr_number": 1678,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "1c912204572e5b5e32096247baf94870f3f25b25",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-03 12:14:14 +0000",
+          "deletions_count": 8,
+          "description": "Upgrade `tracing-subscriber 0.2.0-alpha.5`",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 29,
+          "message": "chore: Upgrade `tracing-subscriber 0.2.0-alpha.5` (#1681)",
+          "pr_number": 1681,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "fcdddbc0dbe062c44643f3be3ce6644e4ff40525",
+          "type": "chore"
+        },
+        {
+          "author": "MOZGIII",
+          "breaking_change": false,
+          "date": "2020-02-03 20:30:15 +0000",
+          "deletions_count": 1,
+          "description": "Fix the SECURITY.md link at CONTRIBUTING.md",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore: Fix the SECURITY.md link at CONTRIBUTING.md (#1682)",
+          "pr_number": 1682,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "74290db698ab6290c3f39437cb34586289d0778f",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-03 21:21:18 +0000",
+          "deletions_count": 3,
+          "description": "Fix `aws_s3` sink examples",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 6,
+          "message": "docs: Fix `aws_s3` sink examples (#1683)",
+          "pr_number": 1683,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "ba7a11caaac2c3c1812e3de6f0cb831a73c573dc",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-03 17:53:56 +0000",
+          "deletions_count": 9,
+          "description": "Remove background checks on security page",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 4,
+          "message": "chore: Remove background checks on security page",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "36fad64b72c177f5d1d4c477e9dc8dda4839917e",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-03 16:46:24 +0000",
+          "deletions_count": 13,
+          "description": "Fixup versions in tracing-metrics",
+          "files_count": 2,
+          "group": "fix",
+          "insertions_count": 4,
+          "message": "fix(dependencies): Fixup versions in tracing-metrics (#1690)",
+          "pr_number": 1690,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "dependencies"
+          },
+          "sha": "465af0b75988ffa0c613be5eeb30b4f549295d6f",
+          "type": "fix"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-04 12:11:08 +0000",
+          "deletions_count": 7,
+          "description": "Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more)",
+          "files_count": 6,
+          "group": "feat",
+          "insertions_count": 638,
+          "message": "feat(aws_s3 sink): Add several S3 object-level options (`grant_full_control`, `server_side_encryption`, and more) (#1689)",
+          "pr_number": 1689,
+          "scope": {
+            "category": "sink",
+            "component_name": "aws_s3",
+            "component_type": "sink",
+            "name": "aws_s3 sink"
+          },
+          "sha": "5a368f34983394c5159b398b7810ac1f62591094",
+          "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-04 23:46:41 +0000",
+          "deletions_count": 20,
+          "description": "Use `rust-toolchain` file when building CI Docker images",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 10,
+          "message": "chore(operations): Use `rust-toolchain` file when building CI Docker images (#1691)",
+          "pr_number": 1691,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "6575e3836672d6111fa8b958e5cb67f46595002e",
+          "type": "chore"
+        },
+        {
+          "author": "MOZGIII",
+          "breaking_change": false,
+          "date": "2020-02-05 08:14:34 +0000",
+          "deletions_count": 38,
+          "description": "New `merge` transform",
+          "files_count": 23,
+          "group": "feat",
+          "insertions_count": 1539,
+          "message": "feat(new transform): New `merge` transform (#1504)",
+          "pr_number": 1504,
+          "scope": {
+            "category": "transform",
+            "component_name": null,
+            "component_type": "transform",
+            "name": "new transform"
+          },
+          "sha": "c285303bc5f403629060d3498b8e2cdf20c6ad9a",
+          "type": "feat"
+        },
+        {
+          "author": "MOZGIII",
+          "breaking_change": false,
+          "date": "2020-02-05 08:14:34 +0000",
+          "deletions_count": 38,
+          "description": "Add `auto_partial_merge` to automatically merge partial events",
+          "files_count": 23,
+          "group": "enhancement",
+          "insertions_count": 1539,
+          "message": "enhancement(docker source): Add `auto_partial_merge` to automatically merge partial events (#1504)",
+          "pr_number": 1504,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "c285303bc5f403629060d3498b8e2cdf20c6ad9a",
+          "type": "enhancement"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-05 00:32:03 +0000",
+          "deletions_count": 5,
+          "description": "Fix auto_partial_merge option name",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 5,
+          "message": "docs(docker source): Fix auto_partial_merge option name",
+          "pr_number": null,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "44099cdf794dc3cac6926002253f2120e3af0c01",
+          "type": "docs"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-05 10:32:25 +0000",
+          "deletions_count": 0,
+          "description": "Warn log for non retryable requests",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 1,
+          "message": "fix(networking): Warn log for non retryable requests (#1706)",
+          "pr_number": 1706,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "networking"
+          },
+          "sha": "0c22ca5c5e00313a12aef3dd1d2abba311ad890c",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-05 10:33:00 +0000",
+          "deletions_count": 52,
+          "description": "Rename cloud and add host",
+          "files_count": 5,
+          "group": "fix",
+          "insertions_count": 126,
+          "message": "fix(sematext sink): Rename cloud and add host (#1704)",
+          "pr_number": 1704,
+          "scope": {
+            "category": "sink",
+            "component_name": "sematext",
+            "component_type": "sink",
+            "name": "sematext sink"
+          },
+          "sha": "99899e35d43fbd8b5301ecdce327a7764f6eeceb",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-05 11:00:20 +0000",
+          "deletions_count": 6,
+          "description": "Upgrade to `tracing-subscriber 0.2.0`",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 6,
+          "message": "chore: Upgrade to `tracing-subscriber 0.2.0` (#1707)",
+          "pr_number": 1707,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "08d629cb79d55fb49c305f1a8866baa4a921c2fa",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-05 11:51:30 +0000",
+          "deletions_count": 12,
+          "description": "Fixup security language",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 9,
+          "message": "docs: Fixup security language (#1711)",
+          "pr_number": 1711,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "ca196b70101bd8d5a0868e27c58ae20b36f67709",
+          "type": "docs"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-05 14:42:12 +0000",
+          "deletions_count": 81,
+          "description": "Allow partials in /.meta/*.toml files",
+          "files_count": 17,
+          "group": "chore",
+          "insertions_count": 105,
+          "message": "chore(website): Allow partials in /.meta/*.toml files (#1715)",
+          "pr_number": 1715,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "aa54e7fff0507560372cf313fb115f957adc0645",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-05 15:05:42 +0000",
+          "deletions_count": 4,
+          "description": "Initial `logdna` sink implementation",
+          "files_count": 16,
+          "group": "feat",
+          "insertions_count": 1389,
+          "message": "feat(sinks): Initial `logdna` sink implementation (#1668)",
+          "pr_number": 1668,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "sinks"
+          },
+          "sha": "0d5db5d71f210fca4667cacc19b3d35276a3897e",
+          "type": "feat"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": true,
+          "date": "2020-02-05 14:06:54 +0000",
+          "deletions_count": 384,
+          "description": "Drop aws endpoint and region options",
+          "files_count": 21,
+          "group": "breaking change",
+          "insertions_count": 137,
+          "message": "chore(elasticsearch sink)!: Drop aws endpoint and region options (#1703)",
+          "pr_number": 1703,
+          "scope": {
+            "category": "sink",
+            "component_name": "elasticsearch",
+            "component_type": "sink",
+            "name": "elasticsearch sink"
+          },
+          "sha": "7e502fb3ca35afa935758985d633de6fc4c7bbfd",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-05 15:21:52 +0000",
+          "deletions_count": 8,
+          "description": "Add ENV_VAR api key examples first",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 10,
+          "message": "docs: Add ENV_VAR api key examples first",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "bcd97a0ae482dadc392afe2ca2a8ab651ee1acac",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-05 15:26:57 +0000",
+          "deletions_count": 2,
+          "description": "Fix LogDNA casing",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Fix LogDNA casing",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "033de8bdbcd8913a410f354310f0f09474285110",
+          "type": "docs"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-05 15:27:58 +0000",
+          "deletions_count": 27,
+          "description": "Add proper non retry messages",
+          "files_count": 3,
+          "group": "feat",
+          "insertions_count": 76,
+          "message": "feat(networking): Add proper non retry messages (#1712)",
+          "pr_number": 1712,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "networking"
+          },
+          "sha": "2414924f69e4845f85e596f5bb9ef3db0b04c13a",
+          "type": "feat"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-05 20:41:25 +0000",
+          "deletions_count": 0,
+          "description": "Add a (super secret) vic page",
+          "files_count": 12,
+          "group": "docs",
+          "insertions_count": 738,
+          "message": "docs: Add a (super secret) vic page (#1710)",
+          "pr_number": 1710,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "fb88fdd211b25fd5c21be881e7a9c920626d614a",
+          "type": "docs"
+        },
+        {
+          "author": "Luke Steensen",
+          "breaking_change": false,
+          "date": "2020-02-05 16:10:37 +0000",
+          "deletions_count": 20,
+          "description": "make host calculation more explicit",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 13,
+          "message": "chore(sematext sink): make host calculation more explicit (#1720)",
+          "pr_number": 1720,
+          "scope": {
+            "category": "sink",
+            "component_name": "sematext",
+            "component_type": "sink",
+            "name": "sematext sink"
+          },
+          "sha": "68dc4b099d7f4f1bac6f43ad27282d31aaaa7fd8",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-05 20:14:01 +0000",
+          "deletions_count": 43,
+          "description": "Add providers to labels and semantic PR scopes",
+          "files_count": 8,
+          "group": "chore",
+          "insertions_count": 153,
+          "message": "chore: Add providers to labels and semantic PR scopes",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "7529fb88ace3d60b697e0c856e85d855b97a7070",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-06 20:32:18 +0000",
+          "deletions_count": 172,
+          "description": "Allow running all tests locally",
+          "files_count": 15,
+          "group": "chore",
+          "insertions_count": 636,
+          "message": "chore(operations): Allow running all tests locally (#1701)",
+          "pr_number": 1701,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "a70758f52937217662f7906e5140f92757623213",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-06 17:37:30 +0000",
+          "deletions_count": 4,
+          "description": "Clarify topology warnings",
+          "files_count": 3,
+          "group": "enhancement",
+          "insertions_count": 4,
+          "message": "enhancement(config): Clarify topology warnings (#1726)",
+          "pr_number": 1726,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "config"
+          },
+          "sha": "8fb49eec4a8096635e83a88f909b1892359b020f",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-06 20:56:43 +0000",
+          "deletions_count": 77,
+          "description": "Restore `rust-toolchain` file in the project root",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 79,
+          "message": "chore(operations): Restore `rust-toolchain` file in the project root (#1729)",
+          "pr_number": 1729,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "d4c28115af4bbea56e5e7dc5ee137c682290ebe1",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-06 20:59:34 +0000",
+          "deletions_count": 1,
+          "description": "Fix `test-stable` CI job",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Fix `test-stable` CI job (#1730)",
+          "pr_number": 1730,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "13c7e9a296769b83ea939e0d248b30df83c12615",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-06 13:42:41 +0000",
+          "deletions_count": 6,
+          "description": "Replace Alexey with Luke",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 6,
+          "message": "chore: Replace Alexey with Luke (#1723)",
+          "pr_number": 1723,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "0d5287bd47524e00725d50b60fc0e7cc1f2c0432",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-06 17:09:54 +0000",
+          "deletions_count": 3,
+          "description": "Set `beta` to true",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 4,
+          "message": "docs(merge transform): Set `beta` to true",
+          "pr_number": null,
+          "scope": {
+            "category": "transform",
+            "component_name": "merge",
+            "component_type": "transform",
+            "name": "merge transform"
+          },
+          "sha": "bfbe58cf1d25c905c27080a447f5e9a4fe356a98",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-06 17:15:21 +0000",
+          "deletions_count": 15,
+          "description": "Require `beta` attribute for all components",
+          "files_count": 34,
+          "group": "docs",
+          "insertions_count": 45,
+          "message": "docs: Require `beta` attribute for all components",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5f8769d9c8ea52e4b39b4cf5f410bfbbf8c3755e",
+          "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-07 10:27:17 +0000",
+          "deletions_count": 40,
+          "description": "Support multiple configuration files.",
+          "files_count": 5,
+          "group": "feat",
+          "insertions_count": 208,
+          "message": "feat(cli): Support multiple configuration files. (#1725)",
+          "pr_number": 1725,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "93b2c1510f2b8151722ab6dc9cc687dc796a4e2a",
+          "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-07 14:01:19 +0000",
+          "deletions_count": 5,
+          "description": "Improve `docker-run.sh` script",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 18,
+          "message": "chore(operations): Improve `docker-run.sh` script (#1733)",
+          "pr_number": 1733,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "9c3b12b700c9f408c03db63d014db6e27e2ff87b",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-07 09:09:22 +0000",
+          "deletions_count": 21,
+          "description": "Add support for running containers under Podman",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 28,
+          "message": "chore(operations): Add support for running containers under Podman (#1736)",
+          "pr_number": 1736,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "52e2c85cd7d5f7c190edaa0c345c7a5208f5cc4c",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-07 16:02:56 +0000",
+          "deletions_count": 77,
+          "description": "Improve cyclic deps error message",
+          "files_count": 4,
+          "group": "enhancement",
+          "insertions_count": 98,
+          "message": "enhancement(cli): Improve cyclic deps error message (#1728)",
+          "pr_number": 1728,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "6f290d3e55d78438100b1bd31747c6c4b1630184",
+          "type": "enhancement"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-07 14:51:44 +0000",
+          "deletions_count": 82,
+          "description": "Add support for `assume_role` to all AWS sinks",
+          "files_count": 13,
+          "group": "feat",
+          "insertions_count": 330,
+          "message": "feat(aws provider): Add support for `assume_role` to all AWS sinks (#1722)",
+          "pr_number": 1722,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "aws provider"
+          },
+          "sha": "ce326530da9235233355a86dcc5c27b626f40a10",
+          "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-08 15:06:56 +0000",
+          "deletions_count": 6,
+          "description": "Disable failing CI check",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 0,
+          "message": "chore(operations): Disable failing CI check",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "a931f0ddca833eee9f1a5113e458f468fecaa221",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-08 10:23:15 +0000",
+          "deletions_count": 1,
+          "description": "Fix loading of private keys in separate files for sinks",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 44,
+          "message": "chore(operations): Fix loading of private keys in separate files for sinks (#1749)",
+          "pr_number": 1749,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "46e0df96231b2b04e3b29263f4e73ae1d79a09ca",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-08 10:24:00 +0000",
+          "deletions_count": 5,
+          "description": "Use the \"minimal\" profile when installing with rustup",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 7,
+          "message": "chore(operations): Use the \"minimal\" profile when installing with rustup (#1747)",
+          "pr_number": 1747,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "d128ab8eb163f1aca92db3093f86fd1a447ab64c",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-09 18:59:07 +0000",
+          "deletions_count": 3018,
+          "description": "Move \"magic\" component fields up to the /.meta directory",
+          "files_count": 181,
+          "group": "docs",
+          "insertions_count": 2766,
+          "message": "docs: Move \"magic\" component fields up to the /.meta directory (#1758)",
+          "pr_number": 1758,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "350f5aa9be81ff271b46e86ced6ec820e4cf4024",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-10 16:13:51 +0000",
+          "deletions_count": 2,
+          "description": "Fix `verify-nixos` CI check",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 8,
+          "message": "chore(operations): Fix `verify-nixos` CI check (#1760)",
+          "pr_number": 1760,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "20fc32b0674bf40897011b3fe7ce3e4335b31358",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-10 14:16:42 +0000",
+          "deletions_count": 21,
+          "description": "Fix nested field documentation",
+          "files_count": 10,
+          "group": "chore",
+          "insertions_count": 193,
+          "message": "chore(website): Fix nested field documentation (#1765)",
+          "pr_number": 1765,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "2ee1b8867e5c79057ed4467d9d4ce3984dd73599",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-10 16:28:09 +0000",
+          "deletions_count": 1,
+          "description": "Initial `humio_logs` sink implementation",
+          "files_count": 12,
+          "group": "feat",
+          "insertions_count": 1022,
+          "message": "feat(new sink): Initial `humio_logs` sink implementation (#1716)",
+          "pr_number": 1716,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "0eb6c9804f4be108960fb48921fdbd87e150d946",
+          "type": "feat"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-10 17:31:15 +0000",
+          "deletions_count": 7,
+          "description": "Fix encoding docs",
+          "files_count": 3,
+          "group": "fix",
+          "insertions_count": 7,
+          "message": "fix(splunk_hec sink): Fix encoding docs (#1768)",
+          "pr_number": 1768,
+          "scope": {
+            "category": "sink",
+            "component_name": "splunk_hec",
+            "component_type": "sink",
+            "name": "splunk_hec sink"
+          },
+          "sha": "7a693547f4b1fcdc58fca3b0679410c53584cda7",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-10 17:36:25 +0000",
+          "deletions_count": 58,
+          "description": "Remove encoding option",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(humio_logs sink): Remove encoding option (#1767)",
+          "pr_number": 1767,
+          "scope": {
+            "category": "sink",
+            "component_name": "humio_logs",
+            "component_type": "sink",
+            "name": "humio_logs sink"
+          },
+          "sha": "fec6798e1a70b6ae8513286b568b6437bf4191d0",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-02-10 23:37:31 +0000",
+          "deletions_count": 1,
+          "description": "Option to reload config on file change",
+          "files_count": 7,
+          "group": "feat",
+          "insertions_count": 260,
+          "message": "feat(config): Option to reload config on file change (#1330)",
+          "pr_number": 1330,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "config"
+          },
+          "sha": "0075ea61060bb57701c821eb835071f303d31d51",
+          "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-11 17:27:10 +0000",
+          "deletions_count": 2,
+          "description": "Fix typo",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Fix typo",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "d986d809c937d800fbca0c55f146284fac8154c4",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-11 18:43:16 +0000",
+          "deletions_count": 5,
+          "description": "Fix example `host` values for `splunk_hec` sink",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 5,
+          "message": "docs: Fix example `host` values for `splunk_hec` sink",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "12ecd000ba7bd8642ae51fa391eb1bde3f9fba87",
+          "type": "docs"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-11 09:48:50 +0000",
+          "deletions_count": 10,
+          "description": "Support conditionally rebuilding the docker images",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 16,
+          "message": "chore(operations): Support conditionally rebuilding the docker images (#1744)",
+          "pr_number": 1744,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "1b24dd1833d41a3fdac741a1190033b6d49cb6f0",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-11 13:02:20 +0000",
+          "deletions_count": 32,
+          "description": "Fix unit tests reference",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 646,
+          "message": "docs: Fix unit tests reference (#1777)",
+          "pr_number": 1777,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5fc373ea5d48eb40a7610673804f30475617e375",
+          "type": "docs"
+        },
+        {
+          "author": "FungusHumungus",
+          "breaking_change": false,
+          "date": "2020-02-11 21:59:52 +0000",
+          "deletions_count": 143,
+          "description": "Improve best effort support for Syslog formats (5424, 3164, nginx style, etc)",
+          "files_count": 8,
+          "group": "enhancement",
+          "insertions_count": 200,
+          "message": "enhancement(syslog source): Improve best effort support for Syslog formats (5424, 3164, nginx style, etc) (#1757)",
+          "pr_number": 1757,
+          "scope": {
+            "category": "source",
+            "component_name": "syslog",
+            "component_type": "source",
+            "name": "syslog source"
+          },
+          "sha": "9a1422efc56fac61e39ff0f33fd73091bc1728de",
+          "type": "enhancement"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-12 10:32:13 +0000",
+          "deletions_count": 23,
+          "description": "Improve `vector generate` syntax and formatting",
+          "files_count": 1,
+          "group": "enhancement",
+          "insertions_count": 195,
+          "message": "enhancement(cli): Improve `vector generate` syntax and formatting (#1773)",
+          "pr_number": 1773,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "2535012cb81d0fa5a4ea0ede00a2f21e1a71d192",
+          "type": "enhancement"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-12 11:05:34 +0000",
+          "deletions_count": 183,
+          "description": "Test sub command improvements",
+          "files_count": 11,
+          "group": "enhancement",
+          "insertions_count": 329,
+          "message": "enhancement(cli): Test sub command improvements (#1739)",
+          "pr_number": 1739,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "8570e00229424e48227be654798ffb06ee6dc184",
+          "type": "enhancement"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-12 12:21:42 +0000",
+          "deletions_count": 5,
+          "description": "Add units to default value examples",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 11,
+          "message": "chore(website): Add units to default value examples",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "955cc18652449cb63e69ceba839511dd4d262427",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-12 13:00:41 +0000",
+          "deletions_count": 27,
+          "description": "Simplify docker example values",
+          "files_count": 6,
+          "group": "docs",
+          "insertions_count": 29,
+          "message": "docs: Simplify docker example values",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "424a6a0f359db1e3cb398be8567f5be757b290bb",
+          "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-12 20:13:45 +0000",
+          "deletions_count": 5,
+          "description": "Clarify generate error messages with type",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 12,
+          "message": "chore: Clarify generate error messages with type (#1780)",
+          "pr_number": 1780,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "93f43cab6331f5f9de41b55c036337beec7a2d9f",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-13 18:51:08 +0000",
+          "deletions_count": 223,
+          "description": "Global default log schemas",
+          "files_count": 49,
+          "group": "feat",
+          "insertions_count": 715,
+          "message": "feat(config): Global default log schemas (#1769)",
+          "pr_number": 1769,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "config"
+          },
+          "sha": "15e69c8c2392f17104037cf94645231a874244d4",
+          "type": "feat"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-14 13:23:37 +0000",
+          "deletions_count": 132,
+          "description": "Add new global `log_schema` throughout the docs",
+          "files_count": 24,
+          "group": "docs",
+          "insertions_count": 445,
+          "message": "docs: Add new global `log_schema` throughout the docs (#1795)",
+          "pr_number": 1795,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "dcc7a593cbaae72212af56b3e562e15d246556fc",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-14 13:43:56 +0000",
+          "deletions_count": 1,
+          "description": "Reduce homepage animation refresh rate",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(website): Reduce homepage animation refresh rate",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "b4b3ebf18cdef172b037a717a1d6b723fcb7ed28",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-14 22:00:31 +0000",
+          "deletions_count": 1,
+          "description": "Add behavior tests for `add_fields` and `remove_fields` transforms",
+          "files_count": 6,
+          "group": "chore",
+          "insertions_count": 144,
+          "message": "chore(testing): Add behavior tests for `add_fields` and `remove_fields` transforms (#1781)",
+          "pr_number": 1781,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "9d2f3c06c1aabad9b726ae26e21c69c531bd4d6e",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-14 14:12:51 +0000",
+          "deletions_count": 7,
+          "description": "Stop homepage animation after a timeout",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 24,
+          "message": "chore(website): Stop homepage animation after a timeout",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "22f2e6d8822537b991e7ca7a6b81b7f0ee3d4571",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-14 19:14:51 +0000",
+          "deletions_count": 3,
+          "description": "Support schema settings in unit tests",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 8,
+          "message": "chore(cli): Support schema settings in unit tests (#1793)",
+          "pr_number": 1793,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "61f9f3356bfdc266d6841d42344dd5dee194b766",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-08 15:06:56 +0000",
+          "deletions_count": 6,
+          "description": "Disable failing CI check",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 0,
+          "message": "chore(operations): Disable failing CI check",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "497e6bddca534e2ef64de676d24b4ba54709f9d6",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-15 14:12:10 +0000",
+          "deletions_count": 22,
+          "description": "Add templating as a domain",
+          "files_count": 4,
+          "group": "chore",
+          "insertions_count": 29,
+          "message": "chore: Add templating as a domain",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "3233202cd457dd256a052ffe8037361dcac6d236",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-15 12:58:34 +0000",
+          "deletions_count": 31,
+          "description": "Correct lints and tests",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 57,
+          "message": "chore(windows platform): Correct lints and tests (#1789)",
+          "pr_number": 1789,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "windows platform"
+          },
+          "sha": "513851364635457395c81bd38eea13297b8f37ec",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-15 16:19:31 +0000",
+          "deletions_count": 333,
+          "description": "Update README and add templating reference",
+          "files_count": 35,
+          "group": "docs",
+          "insertions_count": 601,
+          "message": "docs: Update README and add templating reference (#1805)",
+          "pr_number": 1805,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "dc8009b78de156c9aed07eccf2498749f69ade4e",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-15 16:40:36 +0000",
+          "deletions_count": 24,
+          "description": "Fix generate check",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 24,
+          "message": "chore: Fix generate check",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "612450368e28882ebd31efcd9e2c7e26d3ac69b3",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-15 17:08:35 +0000",
+          "deletions_count": 10,
+          "description": "Update README language",
+          "files_count": 4,
+          "group": "docs",
+          "insertions_count": 8,
+          "message": "docs: Update README language",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "98623e329ae1796259a85db98af96882a1911ce1",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-15 17:09:59 +0000",
+          "deletions_count": 2,
+          "description": "Short README bullet point",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 2,
+          "message": "docs: Short README bullet point",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "c1c529a4397262b60917d825f905fedb97f02434",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-16 19:23:39 +0000",
+          "deletions_count": 4,
+          "description": "Fix typo in `concat` transform example",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 4,
+          "message": "docs: Fix typo in `concat` transform example",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "a366c6fa6d33e50aff378d605a245c72d7bfbcae",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-16 20:26:15 +0000",
+          "deletions_count": 8,
+          "description": "Clarify description of `ansi_stripper` transform",
+          "files_count": 4,
+          "group": "docs",
+          "insertions_count": 8,
+          "message": "docs: Clarify description of `ansi_stripper` transform (#1809)",
+          "pr_number": 1809,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "a96b7288d17d949a983b5756f3b94ea9d4f60918",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-17 13:02:38 +0000",
+          "deletions_count": 0,
+          "description": "Add more behavior tests for transforms",
+          "files_count": 9,
+          "group": "chore",
+          "insertions_count": 320,
+          "message": "chore(testing): Add more behavior tests for transforms (#1811)",
+          "pr_number": 1811,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "8e06920249f8da33cb23fa2ae76088d4a65ef04d",
+          "type": "chore"
+        },
+        {
+          "author": "MOZGIII",
+          "breaking_change": false,
+          "date": "2020-02-17 21:05:22 +0000",
+          "deletions_count": 0,
+          "description": "Add field order test at src/event/discriminant.rs",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 18,
+          "message": "chore: Add field order test at src/event/discriminant.rs (#1822)",
+          "pr_number": 1822,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "93a68f0a7e7a0b3b164a5cb69d2a00ba4e50cf8a",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-17 16:28:39 +0000",
+          "deletions_count": 2779,
+          "description": "Update to docusaurus 2.0.0-alpha.41",
+          "files_count": 13,
+          "group": "chore",
+          "insertions_count": 1599,
+          "message": "chore(website): Update to docusaurus 2.0.0-alpha.41 (#1831)",
+          "pr_number": 1831,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "32105959ee83aa160a830570245614fea864d001",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-18 00:42:28 +0000",
+          "deletions_count": 7,
+          "description": "Support advanced `librdkafka` options",
+          "files_count": 4,
+          "group": "enhancement",
+          "insertions_count": 207,
+          "message": "enhancement(kafka source): Support advanced `librdkafka` options (#1830)",
+          "pr_number": 1830,
+          "scope": {
+            "category": "source",
+            "component_name": "kafka",
+            "component_type": "source",
+            "name": "kafka source"
+          },
+          "sha": "1e85b5bf151ab4ec6f0cab140d79b038aaa02844",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-18 00:45:57 +0000",
+          "deletions_count": 2,
+          "description": "Support advanced `librdkafka` options",
+          "files_count": 4,
+          "group": "enhancement",
+          "insertions_count": 185,
+          "message": "enhancement(kafka sink): Support advanced `librdkafka` options (#1829)",
+          "pr_number": 1829,
+          "scope": {
+            "category": "sink",
+            "component_name": "kafka",
+            "component_type": "sink",
+            "name": "kafka sink"
+          },
+          "sha": "4dfc382fdeb4e81c21e4a526c6917070127eec6f",
+          "type": "enhancement"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-17 14:54:27 +0000",
+          "deletions_count": 9,
+          "description": "Support templating for dynamic values",
+          "files_count": 5,
+          "group": "enhancement",
+          "insertions_count": 147,
+          "message": "enhancement(add_fields transform): Support templating for dynamic values (#1799)",
+          "pr_number": 1799,
+          "scope": {
+            "category": "transform",
+            "component_name": "add_fields",
+            "component_type": "transform",
+            "name": "add_fields transform"
+          },
+          "sha": "88963ef85ffcd431ff3f0b66d213831fa1c8ab2d",
+          "type": "enhancement"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-17 17:55:46 +0000",
+          "deletions_count": 1,
+          "description": "Initial `loki` sink",
+          "files_count": 19,
+          "group": "feat",
+          "insertions_count": 2106,
+          "message": "feat(new sink): Initial `loki` sink (#1783)",
+          "pr_number": 1783,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "19f06ebee8b35058b7248b381924b8b102028ca2",
+          "type": "feat"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-02-18 03:32:37 +0000",
+          "deletions_count": 314,
+          "description": "Add more `include_container_names`, `include_pod_uids`, and `include_namespaces` filters",
+          "files_count": 7,
+          "group": "feat",
+          "insertions_count": 1091,
+          "message": "feat(kubernetes source): Add more `include_container_names`, `include_pod_uids`, and `include_namespaces` filters (#1501)",
+          "pr_number": 1501,
+          "scope": {
+            "category": "source",
+            "component_name": "kubernetes",
+            "component_type": "source",
+            "name": "kubernetes source"
+          },
+          "sha": "5d6dc45f0c3a5c139ba5c2ae345862984e172c7e",
+          "type": "feat"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-18 11:03:17 +0000",
+          "deletions_count": 2,
+          "description": "Ensure zero output event tests fail",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 115,
+          "message": "chore: Ensure zero output event tests fail (#1814)",
+          "pr_number": 1814,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "5d97a1e36fd24d7ccfffc1ef5c225892d81e7118",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-18 11:46:28 +0000",
+          "deletions_count": 108,
+          "description": "Update to docusaurus 2.0.0-alpha.43",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 102,
+          "message": "chore(website): Update to docusaurus 2.0.0-alpha.43",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "website"
+          },
+          "sha": "7c3149fc5d989e689a0b5fb94ec03ff0634e2eba",
+          "type": "chore"
+        },
+        {
+          "author": "Jakub Bednář",
+          "breaking_change": false,
+          "date": "2020-02-19 04:28:36 +0000",
+          "deletions_count": 3,
+          "description": "Initial `influxdb_metrics` sink implementation",
+          "files_count": 16,
+          "group": "feat",
+          "insertions_count": 2554,
+          "message": "feat(new sink): Initial `influxdb_metrics` sink implementation (#1759)",
+          "pr_number": 1759,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "b89aded488ca1a9bfeea06cad92365ee99586c66",
+          "type": "feat"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-02-19 09:08:41 +0000",
+          "deletions_count": 16,
+          "description": "Make token optional",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 54,
+          "message": "chore: Make token optional (#1837)",
+          "pr_number": 1837,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "841a8f8666ead89443dd7c98e8aa4b241537bac6",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-19 15:56:27 +0000",
+          "deletions_count": 378,
+          "description": "Add support for option groups and versions ",
+          "files_count": 82,
+          "group": "docs",
+          "insertions_count": 1155,
+          "message": "docs: Add support for option groups and versions  (#1859)",
+          "pr_number": 1859,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "a7aa9e4cb29402942b0b97dd28fe25d4ff598aa4",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-19 20:05:22 +0000",
+          "deletions_count": 1,
+          "description": "Fix influxdb_metrics common options groups",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 25,
+          "message": "docs: Fix influxdb_metrics common options groups",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "f2b4a30db0dacef5be4fded5c36ad4a56a7088ff",
+          "type": "docs"
+        },
+        {
+          "author": "Samuel Cormier-Iijima",
+          "breaking_change": false,
+          "date": "2020-02-19 23:04:07 +0000",
+          "deletions_count": 8,
+          "description": "only drop source field if JSON parse succeeds",
+          "files_count": 4,
+          "group": "fix",
+          "insertions_count": 33,
+          "message": "fix(json_parser transform): only drop source field if JSON parse succeeds (#1863)",
+          "pr_number": 1863,
+          "scope": {
+            "category": "transform",
+            "component_name": "json_parser",
+            "component_type": "transform",
+            "name": "json_parser transform"
+          },
+          "sha": "9e6cc795f90c39fdb63819cf1bbbe3648eb71dc1",
+          "type": "fix"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-20 01:55:18 +0000",
+          "deletions_count": 111,
+          "description": "Update logging driver support",
+          "files_count": 120,
+          "group": "docs",
+          "insertions_count": 342,
+          "message": "docs(docker source): Update logging driver support (#1741)",
+          "pr_number": 1741,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "799709ac07cc1acb3cd10f142e586cc1af7a241f",
+          "type": "docs"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-02-20 13:24:22 +0000",
+          "deletions_count": 87,
+          "description": "Add transform context",
+          "files_count": 26,
+          "group": "chore",
+          "insertions_count": 120,
+          "message": "chore(transforms): Add transform context (#1855)",
+          "pr_number": 1855,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "transforms"
+          },
+          "sha": "93100d4a6ffd67e1ab8c88ab35d61a791b2693f9",
+          "type": "chore"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-02-20 14:37:00 +0000",
+          "deletions_count": 8,
+          "description": "Inital Kubernetes `WatchClient`",
+          "files_count": 7,
+          "group": "chore",
+          "insertions_count": 490,
+          "message": "chore(transforms): Inital Kubernetes `WatchClient` (#1746)",
+          "pr_number": 1746,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "transforms"
+          },
+          "sha": "2bba79917996a94eab1dee4c742e1ab4c89b1c19",
+          "type": "chore"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": true,
+          "date": "2020-02-20 22:07:29 +0000",
+          "deletions_count": 19,
+          "description": "Support `Array` and `Map` kinds in `Value`",
+          "files_count": 3,
+          "group": "breaking change",
+          "insertions_count": 123,
+          "message": "enhancement(log data model)!: Support `Array` and `Map` kinds in `Value` (#1836)",
+          "pr_number": 1836,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "log data model"
+          },
+          "sha": "657e658117d38f56bdb64b7d9bbbfee554c7d5d5",
+          "type": "enhancement"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-20 14:39:54 +0000",
+          "deletions_count": 171,
+          "description": "Add min_version to relevant components",
+          "files_count": 77,
+          "group": "docs",
+          "insertions_count": 341,
+          "message": "docs: Add min_version to relevant components",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "49afdba04d682b48dd91beae49800e590c2ce0ab",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-20 14:49:46 +0000",
+          "deletions_count": 39,
+          "description": "Run `make generate`",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 39,
+          "message": "chore: Run `make generate`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "ead893c445a121b73aee48987a3cce1ca974a303",
+          "type": "chore"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-20 14:04:26 +0000",
+          "deletions_count": 100,
+          "description": "Initial `gcp_cloud_storage` sink implementation",
+          "files_count": 26,
+          "group": "feat",
+          "insertions_count": 2483,
+          "message": "feat(new sink): Initial `gcp_cloud_storage` sink implementation (#1794)",
+          "pr_number": 1794,
+          "scope": {
+            "category": "sink",
+            "component_name": null,
+            "component_type": "sink",
+            "name": "new sink"
+          },
+          "sha": "269616777cef4466755dfd5a9d80f2ce3a1ac03f",
+          "type": "feat"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-20 15:47:39 +0000",
+          "deletions_count": 217,
+          "description": "Add docker info",
+          "files_count": 177,
+          "group": "docs",
+          "insertions_count": 325,
+          "message": "docs(aws_ec2_metadata transform): Add docker info (#1862)",
+          "pr_number": 1862,
+          "scope": {
+            "category": "transform",
+            "component_name": "aws_ec2_metadata",
+            "component_type": "transform",
+            "name": "aws_ec2_metadata transform"
+          },
+          "sha": "f377e79e472096d6dc2eb91cd7b6e6b2e9e74f03",
+          "type": "docs"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-20 16:04:52 +0000",
+          "deletions_count": 16,
+          "description": "Advance to `prod-ready` status",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 18,
+          "message": "docs(cloudwatch_logs sink): Advance to `prod-ready` status (#1875)",
+          "pr_number": 1875,
+          "scope": {
+            "category": "sink",
+            "component_name": "cloudwatch_logs",
+            "component_type": "sink",
+            "name": "cloudwatch_logs sink"
+          },
+          "sha": "cebd0eb183c75872a5bb6f52905e4fde61773423",
+          "type": "docs"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-20 15:15:38 +0000",
+          "deletions_count": 214,
+          "description": "Re-run `make generate` to fix GCS docs",
+          "files_count": 61,
+          "group": "chore",
+          "insertions_count": 14,
+          "message": "chore(docs): Re-run `make generate` to fix GCS docs (#1877)",
+          "pr_number": 1877,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "docs"
+          },
+          "sha": "8f70eff1f8526be3931c97e662d3da9d26821e03",
+          "type": "chore"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-20 16:23:04 +0000",
+          "deletions_count": 2,
+          "description": "Set `min_version` to `1.1.54378`",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 13,
+          "message": "docs(clickhouse sink): Set `min_version` to `1.1.54378` (#1879)",
+          "pr_number": 1879,
+          "scope": {
+            "category": "sink",
+            "component_name": "clickhouse",
+            "component_type": "sink",
+            "name": "clickhouse sink"
+          },
+          "sha": "4b0492c8a040b4fe7d6ea71bc6d6a0f2d0bb3cd6",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-21 00:36:47 +0000",
+          "deletions_count": 2,
+          "description": "Add feature `disable-resolv-conf` to make Vector tests pass on NixOS",
+          "files_count": 3,
+          "group": "chore",
+          "insertions_count": 9,
+          "message": "chore(testing): Add feature `disable-resolv-conf` to make Vector tests pass on NixOS (#1874)",
+          "pr_number": 1874,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "e9c3466ba6beecd30a3c1ffc304d384c7f665592",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-20 17:01:04 +0000",
+          "deletions_count": 14,
+          "description": "Clarify `split` transform behavior",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 18,
+          "message": "docs: Clarify `split` transform behavior",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "fa3fc07d703aa125075739459d72b7a12ca02027",
+          "type": "docs"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-20 19:19:11 +0000",
+          "deletions_count": 45,
+          "description": "Fix example",
+          "files_count": 3,
+          "group": "docs",
+          "insertions_count": 59,
+          "message": "docs(split transform): Fix example",
+          "pr_number": null,
+          "scope": {
+            "category": "transform",
+            "component_name": "split",
+            "component_type": "transform",
+            "name": "split transform"
+          },
+          "sha": "4f1b5d884acd577ea8060f2d029c4270da82e4f0",
+          "type": "docs"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-20 19:38:50 +0000",
+          "deletions_count": 5,
+          "description": "Refer to docker API",
+          "files_count": 64,
+          "group": "docs",
+          "insertions_count": 77,
+          "message": "docs(docker source): Refer to docker API (#1885)",
+          "pr_number": 1885,
+          "scope": {
+            "category": "source",
+            "component_name": "docker",
+            "component_type": "source",
+            "name": "docker source"
+          },
+          "sha": "415429deae6c3d8d287546ab845af3c29bb559f1",
+          "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-21 11:35:27 +0000",
+          "deletions_count": 135,
+          "description": "Allow multiple unit test inputs",
+          "files_count": 5,
+          "group": "feat",
+          "insertions_count": 376,
+          "message": "feat(cli): Allow multiple unit test inputs (#1824)",
+          "pr_number": 1824,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "f2742dbd5b1d073436fd07af664e38930b36d587",
+          "type": "feat"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-21 13:08:34 +0000",
+          "deletions_count": 0,
+          "description": "Add `no_outputs_from` field to unit tests",
+          "files_count": 4,
+          "group": "feat",
+          "insertions_count": 182,
+          "message": "feat(cli): Add `no_outputs_from` field to unit tests (#1817)",
+          "pr_number": 1817,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "3b090aa80416d55679b543cdec3f361aa9869659",
+          "type": "feat"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-21 16:11:05 +0000",
+          "deletions_count": 121,
+          "description": "Use `BTreeMap` instead of `HashMap` for logs and metrics",
+          "files_count": 23,
+          "group": "enhancement",
+          "insertions_count": 158,
+          "message": "enhancement(log data model): Use `BTreeMap` instead of `HashMap` for logs and metrics (#1838)",
+          "pr_number": 1838,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "log data model"
+          },
+          "sha": "17340e26b0845ed95519027950a0bd9d388df71d",
+          "type": "enhancement"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-21 11:16:29 +0000",
+          "deletions_count": 1,
+          "description": "Add description and bio to press page",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 26,
+          "message": "chore: Add description and bio to press page (#1884)",
+          "pr_number": 1884,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "df8e103b937cc86d9ef12cf6b2638a4003f75b47",
+          "type": "chore"
+        },
+        {
+          "author": "Samuel Cormier-Iijima",
+          "breaking_change": false,
+          "date": "2020-02-21 12:26:59 +0000",
+          "deletions_count": 13,
+          "description": "respect Lua types when converting back to events (#857)",
+          "files_count": 3,
+          "group": "fix",
+          "insertions_count": 78,
+          "message": "fix(lua transform): respect Lua types when converting back to events (#857) (#1886)",
+          "pr_number": 1886,
+          "scope": {
+            "category": "transform",
+            "component_name": "lua",
+            "component_type": "transform",
+            "name": "lua transform"
+          },
+          "sha": "650ce582e2eab05f585505e5b66197eb672c556c",
+          "type": "fix"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-21 14:01:52 +0000",
+          "deletions_count": 11,
+          "description": "Fixup benches",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 6,
+          "message": "docs: Fixup benches (#1883)",
+          "pr_number": 1883,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "e8e0d23db92a6714d45966f0ca5075262e2ca912",
+          "type": "docs"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-21 17:07:37 +0000",
+          "deletions_count": 42,
+          "description": "Rename to `sematext_logs`",
+          "files_count": 10,
+          "group": "chore",
+          "insertions_count": 42,
+          "message": "chore(sematext_logs sink): Rename to `sematext_logs` (#1871)",
+          "pr_number": 1871,
+          "scope": {
+            "category": "sink",
+            "component_name": "sematext_logs",
+            "component_type": "sink",
+            "name": "sematext_logs sink"
+          },
+          "sha": "d4c0d54627d3773a44bb3decb3d385d4ec2606af",
+          "type": "chore"
+        },
+        {
+          "author": "MOZGIII",
+          "breaking_change": false,
+          "date": "2020-02-22 04:10:13 +0000",
+          "deletions_count": 103,
+          "description": "Better multi-line support",
+          "files_count": 6,
+          "group": "enhancement",
+          "insertions_count": 915,
+          "message": "enhancement(file source): Better multi-line support (#1852)",
+          "pr_number": 1852,
+          "scope": {
+            "category": "source",
+            "component_name": "file",
+            "component_type": "source",
+            "name": "file source"
+          },
+          "sha": "89026d0a9a0dc99022ab116f71ef561995b78c69",
+          "type": "enhancement"
+        },
+        {
+          "author": "MOZGIII",
+          "breaking_change": false,
+          "date": "2020-02-22 04:46:43 +0000",
+          "deletions_count": 0,
+          "description": "File doc fix",
+          "files_count": 1,
+          "group": "docs",
+          "insertions_count": 5,
+          "message": "docs: File doc fix (#1896)",
+          "pr_number": 1896,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "7c6995401ca2e7f94a9d82cf0137d9dc45b415ba",
+          "type": "docs"
+        },
+        {
+          "author": "Bruce Guenter",
+          "breaking_change": false,
+          "date": "2020-02-22 20:32:58 +0000",
+          "deletions_count": 122,
+          "description": "Add support for TLS",
+          "files_count": 44,
+          "group": "enhancement",
+          "insertions_count": 341,
+          "message": "enhancement(kafka source): Add support for TLS (#1893)",
+          "pr_number": 1893,
+          "scope": {
+            "category": "source",
+            "component_name": "kafka",
+            "component_type": "source",
+            "name": "kafka source"
+          },
+          "sha": "a00295e59ca789f9c1f100a99f6f06c5c772bb84",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": true,
+          "date": "2020-02-24 12:20:59 +0000",
+          "deletions_count": 2,
+          "description": "Support null values in log events",
+          "files_count": 8,
+          "group": "breaking change",
+          "insertions_count": 45,
+          "message": "enhancement(log data model)!: Support null values in log events (#1898)",
+          "pr_number": 1898,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "log data model"
+          },
+          "sha": "452dcc8d97790a1edccd60fddd1281a801bb48b1",
+          "type": "enhancement"
+        },
+        {
+          "author": "Kruno Tomola Fabro",
+          "breaking_change": false,
+          "date": "2020-02-24 16:06:03 +0000",
+          "deletions_count": 2,
+          "description": "Change `timestamp_key` back to `message_key`",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 2,
+          "message": "chore(kubernetes source): Change `timestamp_key` back to `message_key` (#1887)",
+          "pr_number": 1887,
+          "scope": {
+            "category": "source",
+            "component_name": "kubernetes",
+            "component_type": "source",
+            "name": "kubernetes source"
+          },
+          "sha": "ce1231fda37d50969745ca027b2f17bdd16fe283",
+          "type": "chore"
+        },
+        {
+          "author": "Ana Hobden",
+          "breaking_change": false,
+          "date": "2020-02-24 07:17:16 +0000",
+          "deletions_count": 201,
+          "description": "Initial `rename_fields` transform implementation",
+          "files_count": 13,
+          "group": "feat",
+          "insertions_count": 520,
+          "message": "feat(new transform): Initial `rename_fields` transform implementation (#1800)",
+          "pr_number": 1800,
+          "scope": {
+            "category": "transform",
+            "component_name": null,
+            "component_type": "transform",
+            "name": "new transform"
+          },
+          "sha": "794e473cc6e1834f28ba2681b6de35f5b346672e",
+          "type": "feat"
+        },
+        {
+          "author": "Binary Logic",
+          "breaking_change": false,
+          "date": "2020-02-24 11:17:49 +0000",
+          "deletions_count": 198,
+          "description": "Add multiline examples",
+          "files_count": 20,
+          "group": "docs",
+          "insertions_count": 406,
+          "message": "docs(file source): Add multiline examples (#1899)",
+          "pr_number": 1899,
+          "scope": {
+            "category": "source",
+            "component_name": "file",
+            "component_type": "source",
+            "name": "file source"
+          },
+          "sha": "66d1434e5b46cbc3696fa63b97d3f58f329a9286",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-24 19:31:53 +0000",
+          "deletions_count": 0,
+          "description": "Reduce RAM usage when running `make test`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(testing): Reduce RAM usage when running `make test` (#1901)",
+          "pr_number": 1901,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "2984ae6575e1f5dfb034e68dc49e5e7ef7a08bf4",
+          "type": "chore"
+        },
+        {
+          "author": "binarylogic",
+          "breaking_change": false,
+          "date": "2020-02-24 11:55:17 +0000",
+          "deletions_count": 2,
+          "description": "Make note that prod-ready means a stable API",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 4,
+          "message": "docs: Make note that prod-ready means a stable API",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "9e963e5fea682f5a56dcba936258d6b9c1371a97",
+          "type": "docs"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-24 17:13:10 +0000",
+          "deletions_count": 4,
+          "description": "Add `timestamp_format` field",
+          "files_count": 4,
+          "group": "feat",
+          "insertions_count": 185,
+          "message": "feat(clickhouse sink): Add `timestamp_format` field (#1634)",
+          "pr_number": 1634,
+          "scope": {
+            "category": "sink",
+            "component_name": "clickhouse",
+            "component_type": "sink",
+            "name": "clickhouse sink"
+          },
+          "sha": "992b4930b9d3052714cf90b66bfa6ead1d7855b2",
+          "type": "feat"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-24 18:28:13 +0000",
+          "deletions_count": 1,
+          "description": "Nest request fields",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 59,
+          "message": "fix(clickhouse sink): Nest request fields",
+          "pr_number": null,
+          "scope": {
+            "category": "sink",
+            "component_name": "clickhouse",
+            "component_type": "sink",
+            "name": "clickhouse sink"
+          },
+          "sha": "0aab35eda9ca3f12fd3deaf31890e5c373e58185",
+          "type": "fix"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-24 19:38:46 +0000",
+          "deletions_count": 179,
+          "description": "Add `swimlanes` transform",
+          "files_count": 21,
+          "group": "feat",
+          "insertions_count": 1003,
+          "message": "feat(new transform): Add `swimlanes` transform (#1785)",
+          "pr_number": 1785,
+          "scope": {
+            "category": "transform",
+            "component_name": null,
+            "component_type": "transform",
+            "name": "new transform"
+          },
+          "sha": "d5ef3cdf0c1cdf3bcc660440ac8a52fae0824309",
+          "type": "feat"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-24 20:08:08 +0000",
+          "deletions_count": 90,
+          "description": "Fix swimlanes documentation",
+          "files_count": 5,
+          "group": "chore",
+          "insertions_count": 87,
+          "message": "chore: Fix swimlanes documentation",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "f6408958fa06d199f0f03789e250828e0b23c6f2",
+          "type": "chore"
+        },
+        {
+          "author": "Samuel Cormier-Iijima",
+          "breaking_change": false,
+          "date": "2020-02-24 17:02:16 +0000",
+          "deletions_count": 2,
+          "description": "Use checksum fingerprinting",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 2,
+          "message": "fix(kubernetes source): Use checksum fingerprinting (#1912)",
+          "pr_number": 1912,
+          "scope": {
+            "category": "source",
+            "component_name": "kubernetes",
+            "component_type": "source",
+            "name": "kubernetes source"
+          },
+          "sha": "6a2ab77beab26cf266a9f60a3e48289cefa9f4f3",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-25 11:06:25 +0000",
+          "deletions_count": 4,
+          "description": "Fix `make check-code`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore: Fix `make check-code`",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "84e59e5505ec3756351aa43e334771437555f6fb",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-20 11:22:04 +0000",
+          "deletions_count": 9442,
+          "description": "Prepare v0.8.0 release",
+          "files_count": 16,
+          "group": "chore",
+          "insertions_count": 16467,
+          "message": "chore: Prepare v0.8.0 release",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "11c11c568b1f87f290cab60e70c6d25493eb403d",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-25 14:53:12 +0000",
+          "deletions_count": 19,
+          "description": "Relax the requirements for `no_outputs_from` unit test targets",
+          "files_count": 2,
+          "group": "chore",
+          "insertions_count": 8,
+          "message": "chore: Relax the requirements for `no_outputs_from` unit test targets (#1921)",
+          "pr_number": 1921,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "bdad2880e86ebcda84d3f126bb62bd21a86ead00",
+          "type": "chore"
+        },
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-02-25 15:08:26 +0000",
+          "deletions_count": 22,
+          "description": "Clean up swimlanes examples",
+          "files_count": 2,
+          "group": "docs",
+          "insertions_count": 32,
+          "message": "docs: Clean up swimlanes examples",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "856bd2803d6766d335210cc562587fdae3f9a204",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-25 18:31:10 +0000",
+          "deletions_count": 0,
+          "description": "Enable `rdkafka` by default",
+          "files_count": 1,
+          "group": "enhancement",
+          "insertions_count": 1,
+          "message": "enhancement(observability): Enable `rdkafka` by default (#1918)",
+          "pr_number": 1918,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "observability"
+          },
+          "sha": "b5ffd12d3cfb8921d44b8b7782de02738e32cf51",
+          "type": "enhancement"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-02-25 18:35:47 +0000",
+          "deletions_count": 0,
+          "description": "Fix build with `--no-default-features`",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(operations): Fix build with `--no-default-features` (#1920)",
+          "pr_number": 1920,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "operations"
+          },
+          "sha": "775dc92674bcdb5b1c6773675e6e88e0cba70ad6",
+          "type": "chore"
+        },
+        {
+          "author": "Lucio Franco",
+          "breaking_change": false,
+          "date": "2020-02-25 11:20:16 +0000",
+          "deletions_count": 1,
+          "description": "Allow kubernetes tests to compile",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(testing): Allow kubernetes tests to compile (#1911)",
+          "pr_number": 1911,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "dbb870bd5ceddb64d09f8458e2582cf768a266a3",
+          "type": "chore"
+        }
+      ],
+      "compare_url": "https://github.com/timberio/vector/compare/v0.7.2...v0.8.0",
+      "date": "2020-02-20",
+      "deletions_count": 20399,
+      "description": "The features for this release have been pouring in. Clearly the\nVector team need better hobbies.",
+      "highlights": [
+        {
+          "body": "<p>\nAnyone that was worked with Docker logs knows how frustrating this problem\ncan be. Docker, by default, splits log messages that exceed 16kb. While 16kb\nseems like a lot, it can easily be exceeded if you're logging rich structured\nevents. This can be a very difficult and frustrating problem to solve with\nother tools (we speak from experience). In this release Vector solves this\nautomatically with a new `auto_partial_merge` option in the `docker` source.\n</p>\n<p>\nWe love assimilation and look forward to a future where our individualistic\nhuman personalities can also be merged into a societal hive mind.\n</p>\n",
+          "id": "merge-docker-events",
+          "title": "Automatically Merge Split Docker Events!"
+        },
+        {
+          "body": "<p>\nThe new <a href=\"/docs/reference/transforms/swimlanes/\"><code>swimlanes</code>\ntransform</a> makes it much easier to configure conditional branches of\ntransforms and sinks. For example, you can easily create\n<a href=\"/docs/reference/transforms/swimlanes/#output\">if/else pipelines</a>.\n</p>\n<p>\nRemember to occasionally let your branches mingle so that they don't completely\nlose touch.\n</p>\n",
+          "id": "improved-control-flow",
+          "title": "Improved Control Flow With Swimlanes"
+        },
+        {
+          "body": "<p>\nUnit testing your configuration files has been supported by Vector for a while\nnow. Based on feedback we've received and some healthy dog-fooding we've\nexpanded their functionality and made a lot of improvements to how they work.\n</p>\n<p>\nIf you aren't yet using unit tests in your configs we strongly recommend you try\nit out. You can find out more in <a href=\"/docs/setup/guides/unit-testing/\">this guide</a>.\n</p>\n",
+          "id": "unit-test-improvements",
+          "title": "Config Unit Test Improvements"
+        },
+        {
+          "body": "<p>\nNot everyone enjoys Marmite, we get it, some people have\n<span style=\"text-decoration: line-through;\">wrong</span> different tastes.\nSimilarly, not everyone is going to want to follow our default field schema\n(`host`, `message`, `timestamp`). Rather than making you work around this with\ntransforms we've added some handy global options to set these universally:\n</p>\n<pre>\n# OPTIONAL - Log schema\n[log_schema]\n  host_key = \"host\" # default\n  message_key = \"message\" # default\n  timestamp_key = \"timestamp\" # default\n</pre>\n",
+          "id": "custom-schemas",
+          "title": "Custom Field Schemas"
+        },
+        {
+          "body": "<p>\nVector is now able to execute a topology spread across multiple config files,\nwhich allows you to break large pipelines down into bite size, easier managed,\nchunks. Running them is as simple as:\n</p>\n<pre>\nvector -c ./configs/first.toml -c ./configs/second.toml -c ./more/*.toml\n</pre>\n<p>\nSubscribe to our newsletter and you'll be notified when we learn how to do this\nwith human emotions.\n</p>\n",
+          "id": "multi-config-files",
+          "title": "Support for Multiple Config Files"
+        },
+        {
+          "body": "<p>\nWe all love a good sink. Now you can enjoy our latest offerings:\n<a href=\"/docs/reference/sinks/gcp_stackdriver_logging\"><code>gcp_stackdriver_logging</code></a>,\n<a href=\"/docs/reference/sinks/gcp_cloud_storage\"><code>gcp_cloud_storage</code></a>,\n<a href=\"/docs/reference/sinks/logdna\"><code>logdna</code></a>,\n<a href=\"/docs/reference/sinks/humio_logs\"><code>humio_logs</code></a>,\n<a href=\"/docs/reference/sinks/loki\"><code>loki</code></a> and\n<a href=\"/docs/reference/sinks/influxdb_metrics\"><code>influxdb_metrics</code></a>.\n</p>\n",
+          "id": "lots-of-new-sinks",
+          "title": "Lots of New Sinks"
+        }
+      ],
+      "insertions_count": 53963,
+      "last_version": "0.7.2",
+      "posts": [
+
+      ],
+      "subtitle": "A wholesome platter of features",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
+      "upgrade_guides": [
+
+      ],
+      "version": "0.8.0"
     }
   },
   "sinks": {
