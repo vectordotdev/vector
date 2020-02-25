@@ -268,7 +268,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "transforms-json_parser", feature = "sinks-console"))]
 mod tests {
     use super::*;
 

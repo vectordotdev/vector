@@ -1,3 +1,4 @@
+#![cfg(feature = "rusoto_core")]
 use crate::dns::Resolver;
 use futures::{
     future::{Future, FutureResult},

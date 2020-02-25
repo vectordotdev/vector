@@ -84,6 +84,7 @@ impl TcpSource for VectorSource {
     }
 }
 
+#[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
     use super::VectorConfig;

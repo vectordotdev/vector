@@ -286,7 +286,7 @@ impl Unflatten {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "transforms-json_parser"))]
 mod tests {
     use super::*;
     use crate::{

@@ -234,7 +234,11 @@ by the use of [conventional commit](#what-is-conventional-commits) titles.
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
-[Reviewing guide](/REVIEWING.md#dependencies)
+[Reviewing guide](/REVIEWING.md#dependencies).
+
+If a dependency is required only by one or multiple components, but not by
+Vector's core, make it optional and add it to the list of dependencies of
+the features corresponding to these components in `Cargo.toml`.
 
 ### Guidelines
 

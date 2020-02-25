@@ -72,6 +72,7 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
     )
 }
 
+#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use super::StatsdConfig;
