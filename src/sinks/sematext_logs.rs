@@ -1,6 +1,6 @@
 use crate::{
-    sinks::elasticsearch::ElasticSearchConfig,
-    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
+    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
+    sinks::util::{encoding::EncodingConfig, BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
@@ -13,6 +13,9 @@ pub struct SematextLogsConfig {
     // TODO: replace this with `UriEncode` once that is on master.
     host: Option<String>,
     token: String,
+
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer", default)]
+    pub encoding: EncodingConfig<Encoding>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -35,6 +38,7 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        self.encoding.validate()?;
         let host = match (&self.host, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_string(),
@@ -54,6 +58,7 @@ impl SinkConfig for SematextLogsConfig {
             index: Some(self.token.clone()),
             batch: self.batch.clone(),
             request: self.request.clone(),
+            encoding: self.encoding.clone(),
             ..Default::default()
         }
         .build(cx)?;

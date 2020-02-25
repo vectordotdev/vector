@@ -25,12 +25,19 @@ pub enum NewRelicLogsRegion {
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+#[derivative(Default)]
 pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
 
+    #[serde(
+        deserialize_with = "EncodingConfig::from_deserializer",
+        default = "default_encoding"
+    )]
+    #[derivative(Default(value = "default_encoding()"))]
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
 
@@ -40,6 +47,10 @@ pub struct NewRelicLogsConfig {
 
 inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
+}
+
+fn default_encoding() -> EncodingConfig<Encoding> {
+    EncodingConfig::from(Encoding::Json)
 }
 
 #[typetag::serde(name = "new_relic_logs")]
@@ -61,6 +72,9 @@ impl SinkConfig for NewRelicLogsConfig {
 impl NewRelicLogsConfig {
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
+        if self.encoding.format != Encoding::Json {
+            error!("Using an unsupported encoding for New Relic")
+        }
 
         if let Some(license_key) = &self.license_key {
             headers.insert("X-License-Key".to_owned(), license_key.clone());
@@ -97,7 +111,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
-            encoding: EncodingConfig::from(Encoding::Json),
+            encoding: self.encoding.clone(),
 
             batch,
             request,

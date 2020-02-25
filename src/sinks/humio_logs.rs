@@ -11,6 +11,11 @@ const HOST: &str = "https://cloud.humio.com";
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
+    #[serde(
+        deserialize_with = "EncodingConfig::from_deserializer",
+        default = "default_encoding"
+    )]
+    encoding: EncodingConfig<Encoding>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -23,15 +28,22 @@ inventory::submit! {
     SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
 }
 
+fn default_encoding() -> EncodingConfig<Encoding> {
+    EncodingConfig::from(Encoding::Json)
+}
+
 #[typetag::serde(name = "humio")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        if self.encoding.format != Encoding::Json {
+            error!("Using an unsupported encoding for Humio");
+        }
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
 
         HecSinkConfig {
             token: self.token.clone(),
             host,
-            encoding: EncodingConfig::from(Encoding::Json),
+            encoding: self.encoding.clone(),
             batch: self.batch.clone(),
             request: self.request.clone(),
             ..Default::default()

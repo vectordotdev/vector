@@ -3,6 +3,7 @@ use crate::{
     event::{Event, Unflatten},
     sinks::{
         util::{
+            encoding::EncodingConfig,
             http::{https_client, HttpRetryLogic, HttpService},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
@@ -36,6 +37,9 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    #[serde(default)]
+    pub encoding: EncodingConfig<Encoding>,
 
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -43,6 +47,14 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -85,6 +97,7 @@ lazy_static! {
 #[typetag::serde(name = "gcp_stackdriver_logging")]
 impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        self.encoding.validate()?;
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
         let sink = self.service(&cx, &creds)?;
         let healthcheck = self.healthcheck(&cx, &creds)?;
@@ -109,7 +122,7 @@ impl StackdriverConfig {
     ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
-
+        let encoding = self.encoding.clone();
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let creds = creds.clone();
 
@@ -141,7 +154,7 @@ impl StackdriverConfig {
         let sink = request
             .batch_sink(HttpRetryLogic, http_service, cx.acker())
             .batched_with_min(Buffer::new(false), &batch)
-            .with_flat_map(|event| iter_ok(Some(encode_event(event))));
+            .with_flat_map(move |event| iter_ok(Some(encode_event(event, &encoding))));
 
         Ok(Box::new(sink))
     }
@@ -202,7 +215,8 @@ fn make_request<T>(body: T) -> Request<T> {
     builder.body(body).unwrap()
 }
 
-fn encode_event(event: Event) -> Vec<u8> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Vec<u8> {
+    encoding.apply_rules(&mut event);
     let entry = LogEntry {
         json_payload: event.into_log().unflatten(),
     };
@@ -263,7 +277,7 @@ mod tests {
     #[test]
     fn encode_valid1() {
         let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let body = encode_event(log.into());
+        let body = encode_event(log.into(), &EncodingConfig::from(Encoding::Default));
         let body = String::from_utf8_lossy(&body);
         assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}},");
     }
@@ -272,8 +286,11 @@ mod tests {
     fn encode_valid2() {
         let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
         let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
-        let mut event = encode_event(log1.into());
-        event.extend(encode_event(log2.into()));
+        let mut event = encode_event(log1.into(), &EncodingConfig::from(Encoding::Default));
+        event.extend(encode_event(
+            log2.into(),
+            &EncodingConfig::from(Encoding::Default),
+        ));
         let body = String::from_utf8_lossy(&event);
         assert_eq!(
             body,

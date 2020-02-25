@@ -15,6 +15,7 @@ pub mod uri;
 use crate::buffers::Acker;
 use crate::event::{self, Event};
 use bytes::Bytes;
+use encoding::EncodingConfig;
 use futures::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
@@ -46,10 +47,11 @@ pub enum Encoding {
 * the given encoding.  If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
+pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
 
-    let b = match encoding {
+    let b = match encoding.format {
         Encoding::Json => serde_json::to_vec(&log.unflatten()),
         Encoding::Text => {
             let bytes = log

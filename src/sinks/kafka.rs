@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     kafka::KafkaTlsConfig,
-    sinks::util::MetadataFuture,
+    sinks::util::{encoding::EncodingConfig, MetadataFuture},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{
@@ -31,8 +31,8 @@ pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
     key_field: Option<Atom>,
-
-    encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
@@ -60,7 +60,7 @@ pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
 
     acker: Acker,
@@ -76,6 +76,7 @@ inventory::submit! {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        self.encoding.validate()?;
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -132,7 +133,7 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let (key, body) = encode_event(&item, &self.key_field, &self.encoding);
+        let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
         let record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
@@ -217,17 +218,18 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 }
 
 fn encode_event(
-    event: &Event,
+    mut event: Event,
     key_field: &Option<Atom>,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
+    encoding.apply_rules(&mut event);
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
 
-    let body = match encoding {
+    let body = match encoding.format {
         Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
         Encoding::Text => event
             .as_log()
@@ -249,7 +251,11 @@ mod tests {
     fn kafka_encode_event_text() {
         let key = "";
         let message = "hello world".to_string();
-        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &Encoding::Text);
+        let (key_bytes, bytes) = encode_event(
+            message.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Text),
+        );
 
         assert_eq!(&key_bytes[..], key.as_bytes());
         assert_eq!(&bytes[..], message.as_bytes());
@@ -262,7 +268,11 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         event.as_mut_log().insert("foo", "bar");
 
-        let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
+        let (key, bytes) = encode_event(
+            event,
+            &Some("key".into()),
+            &EncodingConfig::from(Encoding::Json),
+        );
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 

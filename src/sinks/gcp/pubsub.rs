@@ -3,6 +3,7 @@ use crate::{
     event::Event,
     sinks::{
         util::{
+            encoding::EncodingConfig,
             http::{https_client, HttpRetryLogic, HttpService},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
@@ -37,8 +38,19 @@ pub struct PubsubConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    #[serde(default)]
+    pub encoding: EncodingConfig<Encoding>,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 inventory::submit! {
@@ -53,6 +65,7 @@ impl SinkConfig for PubsubConfig {
             None => self.auth.make_credentials(Scope::PubSub)?,
             Some(_) => None,
         };
+        self.encoding.validate()?;
 
         let sink = self.service(&cx, &creds)?;
         let healthcheck = self.healthcheck(&cx, &creds)?;
@@ -77,7 +90,7 @@ impl PubsubConfig {
     ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request = self.request.unwrap_with(&Default::default());
-
+        let encoding = self.encoding.clone();
         let uri = self.uri(":publish")?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let creds = creds.clone();
@@ -101,7 +114,7 @@ impl PubsubConfig {
         let sink = request
             .batch_sink(HttpRetryLogic, http_service, cx.acker())
             .batched_with_min(Buffer::new(false), &batch)
-            .with_flat_map(|event| iter_ok(Some(encode_event(event))));
+            .with_flat_map(move |event| iter_ok(Some(encode_event(event, &encoding))));
 
         Ok(Box::new(sink))
     }
@@ -166,7 +179,8 @@ fn make_body(logs: Vec<u8>) -> Vec<u8> {
     body.into_iter().collect()
 }
 
-fn encode_event(event: Event) -> Vec<u8> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Vec<u8> {
+    encoding.apply_rules(&mut event);
     // Each event needs to be base64 encoded, and put into a JSON object
     // as the `data` item. A trailing comma is added to support multiple
     // events per request, and is stripped in `make_body`.
@@ -183,7 +197,10 @@ mod tests {
     #[test]
     fn encode_valid1() {
         let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let body = make_body(encode_event(log.into()));
+        let body = make_body(encode_event(
+            log.into(),
+            &EncodingConfig::from(Encoding::Default),
+        ));
         let body = String::from_utf8_lossy(&body);
         assert_eq!(
             body,
@@ -195,8 +212,11 @@ mod tests {
     fn encode_valid2() {
         let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
         let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
-        let mut event = encode_event(log1.into());
-        event.extend(encode_event(log2.into()));
+        let mut event = encode_event(log1.into(), &EncodingConfig::from(Encoding::Default));
+        event.extend(encode_event(
+            log2.into(),
+            &EncodingConfig::from(Encoding::Default),
+        ));
         let body = make_body(event);
         let body = String::from_utf8_lossy(&body);
         assert_eq!(

@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{encode_event, Encoding, SinkExt},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
     tls::{TlsConfig, TlsConnectorExt, TlsSettings},
     topology::config::SinkContext,
@@ -42,20 +42,22 @@ enum TcpBuildError {
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     pub tls: Option<TlsConfig>,
 }
 
 impl TcpSinkConfig {
-    pub fn new(address: String) -> Self {
+    pub fn new(address: String, encoding: EncodingConfig<Encoding>) -> Self {
         Self {
             address,
-            encoding: Encoding::Text,
+            encoding,
             tls: None,
         }
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        self.encoding.validate()?;
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
@@ -276,7 +278,7 @@ pub fn raw_tcp(
     host: String,
     port: u16,
     cx: SinkContext,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     tls: Option<TlsSettings>,
 ) -> RouterSink {
     Box::new(

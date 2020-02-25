@@ -3,6 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::{
         util::{
+            encoding::EncodingConfig,
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
@@ -59,7 +60,8 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    encoding: EncodingConfig<Encoding>,
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -151,6 +153,7 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        self.encoding.validate()?;
         let sink = GcsSink::new(self, &cx)?;
         let healthcheck = sink.healthcheck()?;
         let service = sink.service(self, &cx)?;
@@ -360,7 +363,7 @@ impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
         let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
-        let content_type = HeaderValue::from_str(config.encoding.content_type()).unwrap();
+        let content_type = HeaderValue::from_str(config.encoding.format.content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
@@ -405,9 +408,9 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     key_prefix: &Template,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
@@ -419,16 +422,16 @@ fn encode_event(
             );
         })
         .ok()?;
-
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
-    let bytes = match encoding {
+    let bytes = match encoding.format {
         Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        &Encoding::Text => {
+        Encoding::Text => {
             let mut bytes = log
                 .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
@@ -479,8 +482,12 @@ mod tests {
     fn gcs_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes =
-            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
+        let bytes = encode_event(
+            message.clone().into(),
+            &batch_time_format,
+            &EncodingConfig::from(Encoding::Text),
+        )
+        .unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -494,7 +501,12 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
+        let bytes = encode_event(
+            event,
+            &batch_time_format,
+            &EncodingConfig::from(Encoding::Ndjson),
+        )
+        .unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();

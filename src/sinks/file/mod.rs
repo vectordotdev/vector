@@ -3,7 +3,7 @@ mod file;
 use self::file::File;
 use crate::{
     event::Event,
-    sinks::util::SinkExt,
+    sinks::util::{encoding::EncodingConfig, SinkExt},
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
 };
@@ -18,7 +18,8 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -37,6 +38,7 @@ impl Default for Encoding {
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        self.encoding.validate()?;
         let sink = PartitionedFileSink::new(&self).stream_ack(cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
@@ -54,7 +56,7 @@ impl SinkConfig for FileSinkConfig {
 #[derive(Debug, Default)]
 pub struct PartitionedFileSink {
     path: Template,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     idle_timeout_secs: u64,
     partitions: HashMap<Bytes, File>,
     last_accessed: HashMap<Bytes, Instant>,
@@ -200,7 +202,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text,
+            encoding: EncodingConfig::from(Encoding::Text),
         };
 
         let sink = PartitionedFileSink::new(&config);
@@ -226,7 +228,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text,
+            encoding: EncodingConfig::from(Encoding::Text),
         };
 
         let sink = PartitionedFileSink::new(&config);

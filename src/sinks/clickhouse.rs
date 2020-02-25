@@ -2,6 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
+        encoding::EncodingConfig,
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
@@ -24,6 +25,8 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
@@ -42,13 +45,22 @@ inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
+}
+
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healtcheck = healthcheck(cx.resolver(), &self)?;
+        self.encoding.validate()?;
+        let healthcheck = healthcheck(cx.resolver(), &self)?;
         let sink = clickhouse(self.clone(), cx)?;
 
-        Ok((sink, healtcheck))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -109,12 +121,13 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
             cx.acker(),
         )
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |event: Event| iter_ok(encode_event(event)));
+        .with_flat_map(move |event: Event| iter_ok(encode_event(event, &config.encoding)));
 
     Ok(Box::new(sink))
 }
 
-fn encode_event(event: Event) -> Option<Vec<u8>> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Vec<u8>> {
+    encoding.apply_rules(&mut event);
     let mut body =
         serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
     body.push(b'\n');

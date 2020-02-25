@@ -5,6 +5,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     region::RegionOrEndpoint,
     sinks::util::{
+        encoding::EncodingConfig,
         retries::{FixedRetryPolicy, RetryLogic},
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
@@ -54,7 +55,8 @@ pub struct CloudwatchLogsSinkConfig {
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: Encoding,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
@@ -72,7 +74,7 @@ lazy_static! {
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -123,6 +125,7 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        self.encoding.validate()?;
         let batch = self.batch.unwrap_or(1000, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -254,7 +257,7 @@ impl CloudwatchLogsSvc {
                 chrono::Utc::now().timestamp_millis()
             };
 
-        match self.encoding {
+        match self.encoding.format {
             Encoding::Json => {
                 let message = serde_json::to_string(&log.unflatten()).unwrap();
                 InputLogEvent { message, timestamp }
@@ -301,6 +304,10 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
         if self.token_rx.is_none() {
             let events = req
                 .into_iter()
+                .map(|mut e| {
+                    self.encoding.apply_rules(&mut e);
+                    e
+                })
                 .map(|e| e.into_log())
                 .map(|e| self.encode_log(e))
                 .collect::<Vec<_>>();
@@ -701,7 +708,7 @@ mod tests {
     #[test]
     fn cloudwatch_encode_log_as_json() {
         let config = CloudwatchLogsSinkConfig {
-            encoding: Encoding::Json,
+            encoding: EncodingConfig::from(Encoding::Json),
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();
@@ -714,7 +721,7 @@ mod tests {
     #[test]
     fn cloudwatch_encode_log_as_text() {
         let config = CloudwatchLogsSinkConfig {
-            encoding: Encoding::Text,
+            encoding: EncodingConfig::from(Encoding::Text),
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();
