@@ -255,32 +255,37 @@ To follow up with the previous `If/Else` example, let's say we want to split a l
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.error_splitter]
+[transforms.level_splitter]
   type = "swimlanes"
 
-  [transforms.error_splitter.lanes.debug_events]
+  [transforms.level_splitter.lanes.debug_events]
     type = "check_fields"
     "level.eq" = "debug"
 
-  [transforms.error_splitter.lanes.info_events]
+  [transforms.level_splitter.lanes.info_events]
     type = "check_fields"
-    "level.neq" = "info"
+    "level.eq" = "info"
 
-  [transforms.error_splitter.lanes.warn_events]
+  [transforms.level_splitter.lanes.warn_events]
     type = "check_fields"
-    "level.neq" = "warn"
+    "level.eq" = "warn"
 
-  [transforms.error_splitter.lanes.error_events]
+  [transforms.level_splitter.lanes.error_events]
     type = "check_fields"
-    "level.neq" = "error_events"
+    "level.eq" = "error"
+
+[sinks.info_printer]
+  type = "console"
+  inputs = ["level_splitter.info_events"]
+  target = "stdout"
 
 [sinks.error_printer]
   type = "console"
-  inputs = ["error_events"]
+  inputs = ["level_splitter.error_events"]
   target = "stderr"
 
-# Add more sinks or transforms that use the `debug_events`, `info_events`,
-# and `warn_events` streams
+# Add more sinks or transforms that use the `debug_events` and `warn_events`
+# streams
 ```
 
 Notice how we must define mutually exclusive conditions for each `level` value. If a log `level` does not match any of the lanes it will be dropped.
