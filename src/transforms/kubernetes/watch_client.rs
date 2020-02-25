@@ -133,7 +133,7 @@ impl WatchClient {
         &self,
         mut version: Option<Version>,
         error: Option<RuntimeError>,
-    ) -> Result<impl Stream<Item = Pod, Error = RuntimeError>, BuildError> {
+    ) -> Result<impl Stream<Item = (Pod, PodEvent), Error = RuntimeError>, BuildError> {
         match error {
             None => (),
             Some(RuntimeError::WatchEventError { status }) if status.code == Some(410) => {
@@ -156,7 +156,7 @@ impl WatchClient {
     fn build_watch_stream(
         &self,
         request: Request<Body>,
-    ) -> impl Stream<Item = Pod, Error = RuntimeError> {
+    ) -> impl Stream<Item = (Pod, PodEvent), Error = RuntimeError> {
         let mut decoder = Decoder::default();
 
         self.client
@@ -193,8 +193,8 @@ impl WatchClient {
             .and_then(|event| match event {
                 WatchEvent::Added(data)
                 | WatchEvent::Modified(data)
-                | WatchEvent::Bookmark(data)
-                | WatchEvent::Deleted(data) => Ok(data),
+                | WatchEvent::Bookmark(data) => Ok((data, PodEvent::Changed)),
+                WatchEvent::Deleted(data) => Ok((data, PodEvent::Deleted)),
                 WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
                 WatchEvent::ErrorOther(other) => {
                     Err(RuntimeError::UnknownWatchEventError { other })
@@ -250,6 +250,13 @@ impl Decoder {
         // Returns all currently decodable watch responses.
         futures::stream::iter_result(decoded)
     }
+}
+
+/// Event that changed the metadata.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PodEvent {
+    Changed,
+    Deleted,
 }
 
 /// Version of Kubernetes resource
@@ -345,9 +352,9 @@ mod kube_tests {
     use super::ClientConfig;
     use crate::{
         dns::Resolver,
-        sinks::util::tls::{TlsOptions, TlsSettings},
         sources::kubernetes::test::{echo, Kube},
         test_util::{runtime, temp_file},
+        tls::{TlsOptions, TlsSettings},
     };
     use dirs;
     use futures::{future::Future, stream::Stream};

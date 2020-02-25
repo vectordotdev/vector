@@ -1,6 +1,6 @@
 pub mod watch_client;
 
-use self::watch_client::{ClientConfig, RuntimeError, Version, WatchClient};
+use self::watch_client::{ClientConfig, PodEvent, RuntimeError, Version, WatchClient};
 use super::Transform;
 use crate::{
     event::{self, Event, Value},
@@ -11,12 +11,12 @@ use bytes::Bytes;
 use evmap::{ReadHandle, WriteHandle};
 use futures::stream::Stream;
 use futures03::compat::Future01CompatExt;
-
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
@@ -27,6 +27,15 @@ const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
 /// If watcher errors, for how long will we wait before trying again.
 const RETRY_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// For how long will we hold on to pod's metadata after the pod has been deleted.
+///
+/// 10min sounds a lot, but a metadata entry averages around 300B and in an extreme
+/// scenario when a pod is deleted every second, we would have ~200kB of probably
+/// not usefull data. Which is acceptable. The benefit of such a long delay
+/// is that we will certainly* have the metadata while we are processing the
+/// remaining logs from the deleted pod.
+const DELETE_DELAY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -103,6 +112,8 @@ enum BuildError {
 struct MetadataClient {
     fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>>,
     metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
+    /// (key of data to be deleted, can be deleted after this point in time)
+    delete_queue: VecDeque<(Bytes, Instant)>,
     client: WatchClient,
 }
 
@@ -135,6 +146,7 @@ impl MetadataClient {
                 fields,
                 metadata,
                 client,
+                delete_queue: VecDeque::new(),
             })
         } else {
             Err(BuildError::UnknownFields { fields: unknown })
@@ -156,9 +168,13 @@ impl MetadataClient {
             // Watch loop
             let runtime_error = loop {
                 break match watcher.into_future().compat().await {
-                    Ok((Some(pod), tail)) => {
+                    Ok((Some(event), tail)) => {
                         watcher = tail;
-                        version = self.update(&pod).or(version);
+
+                        self.delete_update();
+                        version = self.update(event).or(version);
+
+                        self.metadata.refresh();
                         continue;
                     }
                     Ok((None, _)) => RuntimeError::WatchUnexpectedlyEnded,
@@ -190,24 +206,43 @@ impl MetadataClient {
     // An alternative would be to delay deletions of entrys by 1min. Which is a safe guess.
     //
     /// Extracts metadata from pod and updates metadata map.
-    fn update(&mut self, pod: &Pod) -> Option<Version> {
+    fn update(&mut self, (pod, event): (Pod, PodEvent)) -> Option<Version> {
         if let Some(pod_uid) = pod.metadata.as_ref().and_then(|md| md.uid.as_ref()) {
             let uid: Bytes = pod_uid.as_str().into();
 
             self.metadata.clear(uid.clone());
 
             // Insert field values for this pod.
-            for (field, value) in self.fields.iter().flat_map(|fun| fun(pod)) {
+            for (field, value) in self.fields.iter().flat_map(|fun| fun(&pod)) {
                 self.metadata
                     .insert(uid.clone(), Box::new((field, FieldValue(value))));
             }
 
-            self.metadata.refresh();
-
             trace!(message = "Pod updated.", %pod_uid);
+
+            if PodEvent::Deleted == event {
+                self.delete_queue
+                    .push_back((uid, Instant::now() + DELETE_DELAY));
+            }
         }
 
-        Version::from_pod(pod)
+        Version::from_pod(&pod)
+    }
+
+    /// Checks if there are entries to be deleted.
+    fn delete_update(&mut self) {
+        let now = Instant::now();
+        while let Some((pod_uid, deadline)) = self.delete_queue.get(0) {
+            if *deadline <= now {
+                self.metadata.empty(pod_uid.clone());
+
+                trace!(message = "Pod metadata deleted.", pod_uid=?std::str::from_utf8(pod_uid.as_ref()));
+
+                self.delete_queue.pop_front();
+            } else {
+                break;
+            }
+        }
     }
 }
 
