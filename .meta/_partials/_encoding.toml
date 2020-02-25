@@ -1,6 +1,5 @@
 [<%= namespace %>.encoding.format]
 type = "string"
-category = "requests"
 common = true
 required = true
 description = """\
@@ -11,7 +10,6 @@ The encoding format used to serialize the events before outputting.\
 type = "[string]"
 required = false
 examples = ["timestamp", "message", "host"]
-null = true
 description = """\
 Limit the sink to only encoding the specified labels.\
 """
@@ -20,7 +18,6 @@ Limit the sink to only encoding the specified labels.\
 type = "[string]"
 required = false
 examples = ["timestamp", "message", "host"]
-null = true
 description = """\
 Prevent the sink from encoding the specified labels.\
 """

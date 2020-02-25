@@ -42,9 +42,9 @@ examples = ["my-bucket"]
 required = true
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.aws_s3") %>
+<%= render("_partials/_encoding.toml", namespace: "sinks.aws_s3.options") %>
 
-[sinks.aws_s3.encoding.format.enum]
+[sinks.aws_s3.options.encoding.format.enum]
 ndjson = "Each event is encoded into JSON and the payload is new line delimited."
 text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
 

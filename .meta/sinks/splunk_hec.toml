@@ -30,9 +30,9 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.splunk_hec") %>
+<%= render("_partials/_encoding.toml", namespace: "sinks.splunk_hec.options") %>
 
-[sinks.splunk_hec.encoding.format.enum]
+[sinks.splunk_hec.options.encoding.format.enum]
 json = "Each event is encoded into JSON and the payload is new line delimited."
 text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
 
