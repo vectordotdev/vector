@@ -56,9 +56,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
 
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
-
   # OPTIONAL - General
   healthcheck = true # default
 ```
@@ -82,9 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -421,29 +415,6 @@ The compression mechanism to use.
 ### credentials_path
 
 The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
 
 
 </Field>

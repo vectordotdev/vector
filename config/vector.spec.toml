@@ -2121,18 +2121,6 @@ end
   healthcheck = false
 
   #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
   # Batch
   #
 
@@ -2314,18 +2302,6 @@ end
   # * no default
   # * type: string
   partition_key_field = "user_id"
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   #
   # Batch
@@ -2558,18 +2534,6 @@ end
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
   key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
 
   #
   # Object Attributes
@@ -3101,10 +3065,6 @@ end
 
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -3135,18 +3095,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
 # Batches `metric` events to Datadog's metrics service using HTTP API.
 [sinks.datadog_metrics]
@@ -3575,10 +3523,6 @@ end
 
 # Streams `log` events to a file.
 [sinks.file]
-  #
-  # General
-  #
-
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -3615,18 +3559,6 @@ end
   # * default: "30"
   # * type: int
   idle_timeout_secs = "30"
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
 
 # Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
 [sinks.gcp_cloud_storage]
@@ -3717,18 +3649,6 @@ end
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
   key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
 
   #
   # Object Attributes
@@ -4541,15 +4461,6 @@ end
   # requests
   #
 
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json", "ndjson", and "text"
-  encoding = "json"
-  encoding = "ndjson"
-  encoding = "text"
-
   # The compression strategy used to compress the encoded event data before
   # outputting.
   #
@@ -5218,18 +5129,6 @@ end
   socket_timeout_ms = 90000
 
   #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
   # Advanced
   #
 
@@ -5553,14 +5452,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   # The endpoint used to ship logs to.
   #
@@ -6295,18 +6186,6 @@ end
   healthcheck = false
 
   #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
   # Buffer
   #
 
@@ -6461,18 +6340,6 @@ end
   # * type: [string]
   # * relevant when encoding = "json"
   indexed_fields = ["field1", "field2"]
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   #
   # Batch

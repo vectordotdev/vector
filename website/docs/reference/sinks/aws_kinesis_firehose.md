@@ -43,16 +43,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
+  # OPTIONAL
   healthcheck = true # default
 ```
 
@@ -68,9 +65,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   region = "us-east-1" # example, relevant when host = ""
   stream_name = "my-stream" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
@@ -326,29 +320,6 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
-
 
 </Field>
 

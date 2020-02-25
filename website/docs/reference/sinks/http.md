@@ -48,9 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
   # OPTIONAL - General
   healthcheck = true # default
 
@@ -84,9 +81,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "http" # must be: "http"
   inputs = ["my-source-id"] # example
   uri = "https://10.22.212.22:9000/endpoint" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -459,29 +453,6 @@ The behavior when the buffer becomes full.
 ### compression
 
 The compression strategy used to compress the encoded event data before outputting.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","ndjson","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
 
 
 </Field>

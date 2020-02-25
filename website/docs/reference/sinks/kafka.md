@@ -43,17 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
+  # OPTIONAL
   healthcheck = true # default
 ```
 
@@ -70,9 +67,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -264,29 +258,6 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
-  examples={["json","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
-
 
 </Field>
 

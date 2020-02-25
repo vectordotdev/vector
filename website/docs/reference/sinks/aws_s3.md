@@ -56,9 +56,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
 
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
-
   # OPTIONAL - General
   healthcheck = true # default
 
@@ -87,9 +84,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
@@ -425,29 +419,6 @@ The behavior when the buffer becomes full.
 ### compression
 
 The compression mechanism to use.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
 
 
 </Field>

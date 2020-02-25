@@ -185,6 +185,19 @@
         }
       }
     },
+    "encoding_config": {
+      "type": "object",
+      "properties": {
+        "except_fields": {
+          "type": "object",
+          "description": "Blacklisted fields."
+        },
+        "only_fields": {
+          "type": "object",
+          "description": "Whitelisted fields."
+        }
+      }
+    },
     "requirements": {
       "type": "object",
       "properties": {
@@ -268,6 +281,9 @@
         "healthcheck": {
           "type": "boolean",
           "description": "If the sink implements a healthcheck."
+        },
+        "encoding": {
+          "$ref": "#/definitions/encoding_config"
         },
         "input_types": {
           "type": "array",

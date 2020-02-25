@@ -35,16 +35,9 @@ write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.
   timeout_secs: 30
 ) %>
 
-[sinks.aws_kinesis_streams.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
+<%= render("_partials/_encoding.toml", namespace: "sinks.aws_kinesis_streams") %>
 
-[sinks.aws_kinesis_streams.options.encoding.enum]
+[sinks.aws_kinesis_streams.encoding.format.enum]
 json = "Each event is encoded into JSON and the payload is represented as a JSON array."
 text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
 

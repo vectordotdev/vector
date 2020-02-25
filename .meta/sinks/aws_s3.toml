@@ -42,16 +42,9 @@ examples = ["my-bucket"]
 required = true
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 
-[sinks.aws_s3.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
+<%= render("_partials/_encoding.toml", namespace: "sinks.aws_s3") %>
 
-[sinks.aws_s3.options.encoding.enum]
+[sinks.aws_s3.encoding.format.enum]
 ndjson = "Each event is encoded into JSON and the payload is new line delimited."
 text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
 

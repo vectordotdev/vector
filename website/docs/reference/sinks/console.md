@@ -32,16 +32,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "console" # must be: "console"
   inputs = ["my-source-id"] # example
 
-  # OPTIONAL - General
+  # OPTIONAL
   target = "stdout" # default, enum
   healthcheck = true # default
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 ```
 
 ## Options
@@ -51,29 +48,6 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
-  examples={["json","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
-
-
-</Field>
 
 
 <Field

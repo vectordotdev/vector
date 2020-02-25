@@ -43,16 +43,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
+  # REQUIRED
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"] # example
   host = "http://my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
+  # OPTIONAL
   healthcheck = true # default
   indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 ```
@@ -69,9 +66,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   host = "http://my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -312,29 +306,6 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","text"]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### encoding
-
-The encoding format used to serialize the events before outputting.
-
 
 </Field>
 
