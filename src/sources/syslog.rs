@@ -73,7 +73,7 @@ impl SourceConfig for SyslogConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignals,
+        shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let host_key = self
@@ -88,7 +88,7 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                 };
                 let shutdown_secs = 30;
-                source.run(address, shutdown_secs, out)
+                source.run(address, shutdown_secs, shutdown, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             #[cfg(unix)]

@@ -71,7 +71,7 @@ impl SourceConfig for SocketConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignals,
+        shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         match self.mode.clone() {
@@ -79,14 +79,14 @@ impl SourceConfig for SocketConfig {
                 let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
-                tcp.run(config.address, config.shutdown_timeout_secs, out)
+                tcp.run(config.address, config.shutdown_timeout_secs, shutdown, out)
             }
             Mode::Udp(config) => {
                 let host_key = config
                     .host_key
                     .clone()
                     .unwrap_or(event::log_schema().host_key().clone());
-                Ok(udp::udp(config.address, host_key, out))
+                Ok(udp::udp(config.address, host_key, shutdown, out))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {

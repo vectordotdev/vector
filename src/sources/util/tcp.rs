@@ -1,3 +1,4 @@
+use crate::shutdown::ShutdownSignals;
 use crate::Event;
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -33,6 +34,7 @@ pub trait TcpSource: Clone + Send + 'static {
         self,
         addr: SocketListenAddr,
         shutdown_timeout_secs: u64,
+        shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
@@ -73,6 +75,7 @@ pub trait TcpSource: Clone + Send + 'static {
             );
 
             let (trigger, tripwire) = Tripwire::new();
+            let tripwire = tripwire.select(shutdown.begin_shutdown);
             let tripwire = tripwire
                 .and_then(move |_| {
                     timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
@@ -131,6 +134,7 @@ pub trait TcpSource: Clone + Send + 'static {
                     Ok(())
                 })
                 .inspect(|_| trigger.cancel());
+            // todo signal when shutdown is complete
             future::Either::A(future)
         });
 

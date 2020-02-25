@@ -43,11 +43,11 @@ impl SourceConfig for VectorConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignals,
+        shutdown: ShutdownSignals,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
-        vector.run(self.address, self.shutdown_timeout_secs, out)
+        vector.run(self.address, self.shutdown_timeout_secs, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {

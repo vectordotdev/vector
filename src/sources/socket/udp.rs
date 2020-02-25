@@ -1,10 +1,12 @@
 use crate::event::Event;
+use crate::shutdown::ShutdownSignals;
 use crate::sources::Source;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
+use stream_cancel::StreamExt;
 use string_cache::DefaultAtom as Atom;
 use tokio::net::udp::{UdpFramed, UdpSocket};
 
@@ -25,9 +27,16 @@ impl UdpConfig {
     }
 }
 
-pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> Source {
+pub fn udp(
+    address: SocketAddr,
+    host_key: Atom,
+    shutdown: ShutdownSignals,
+    out: mpsc::Sender<Event>,
+) -> Source {
     let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
+    let begin_shutdown = shutdown.begin_shutdown;
+    let shutdown_complete = shutdown.shutdown_complete;
     Box::new(
         future::lazy(move || {
             let socket = UdpSocket::bind(&address).expect("failed to bind to udp listener socket");
@@ -41,6 +50,7 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> Sou
             // UDP processes messages per packet, where messages are separated by newline.
             // And stretch to end of packet.
             UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
+                .take_until(begin_shutdown)
                 .map(move |(line, addr): (Bytes, _)| {
                     let mut event = Event::from(line);
 
@@ -55,7 +65,12 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> Sou
                 .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
                 .forward(out)
                 // Done with listening and sending
-                .map(|_| ())
+                .map(|_| {
+                    // This source can signal shutdown complete directly because there's only a
+                    // single thread of control.
+                    shutdown_complete.cancel();
+                    ()
+                })
         }),
     )
 }
