@@ -1,4 +1,4 @@
-use crate::{Event, Result};
+use crate::{event::Value, Event, Result};
 use getset::{Getters, Setters};
 use nom::lib::std::collections::VecDeque;
 use serde::de::{MapAccess, Visitor};
@@ -20,6 +20,8 @@ pub struct EncodingConfig<E> {
     only_fields: Option<Vec<Atom>>,
     #[serde(default)]
     except_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    timestamp_format: Option<TimestampFormat>,
 }
 
 impl<E: Default> Default for EncodingConfig<E> {
@@ -28,8 +30,16 @@ impl<E: Default> Default for EncodingConfig<E> {
             format: Default::default(),
             only_fields: Default::default(),
             except_fields: Default::default(),
+            timestamp_format: Default::default(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TimestampFormat {
+    Unix,
+    RFC3339,
 }
 
 impl<E> From<E> for EncodingConfig<E> {
@@ -38,6 +48,7 @@ impl<E> From<E> for EncodingConfig<E> {
             format,
             only_fields: Default::default(),
             except_fields: Default::default(),
+            timestamp_format: Default::default(),
         }
     }
 }
@@ -58,6 +69,7 @@ where
         // Ordering in here should not matter.
         self.except_fields(event);
         self.only_fields(event);
+        self.timestamp_format(event);
     }
     pub(crate) fn only_fields(&self, event: &mut Event) {
         if let Some(only_fields) = &self.only_fields {
@@ -84,6 +96,31 @@ where
                 Event::Log(log_event) => {
                     for field in except_fields {
                         log_event.remove(field);
+                    }
+                }
+                Event::Metric(_) => (), // Metrics don't get affected by this one!
+            }
+        }
+    }
+    pub(crate) fn timestamp_format(&self, event: &mut Event) {
+        if let Some(timestamp_format) = &self.timestamp_format {
+            match event {
+                Event::Log(log_event) => {
+                    match timestamp_format {
+                        TimestampFormat::Unix => {
+                            let mut unix_timestamps = Vec::new();
+                            for (k, v) in log_event.all_fields() {
+                                if let Value::Timestamp(ts) = v {
+                                    unix_timestamps
+                                        .push((k.clone(), Value::Integer(ts.timestamp())));
+                                }
+                            }
+                            for (k, v) in unix_timestamps {
+                                log_event.insert(k, v);
+                            }
+                        }
+                        // RFC3339 is the default serialization of a timestamp.
+                        TimestampFormat::RFC3339 => (),
                     }
                 }
                 Event::Metric(_) => (), // Metrics don't get affected by this one!
@@ -124,6 +161,7 @@ where
                     format: T::deserialize(value.into_deserializer())?,
                     only_fields: Default::default(),
                     except_fields: Default::default(),
+                    timestamp_format: Default::default(),
                 })
             }
 
@@ -146,6 +184,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event;
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
         Snoot,
@@ -229,5 +268,46 @@ mod tests {
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains(&Atom::from("Doop")));
         assert!(!event.as_mut_log().contains(&Atom::from("Beep")));
+    }
+
+    const TOML_TIMESTAMP_FORMAT: &str = "
+        encoding.format = \"Snoot\"
+        encoding.timestamp_format = \"unix\"
+    ";
+    #[test]
+    fn test_timestamp() {
+        let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
+        config.encoding.validate().unwrap();
+        let mut event = Event::from("Demo");
+        let timestamp = event
+            .as_mut_log()
+            .get(&event::log_schema().timestamp_key())
+            .unwrap()
+            .clone();
+        let timestamp = timestamp.as_timestamp().unwrap();
+        event
+            .as_mut_log()
+            .insert("another", Value::Timestamp(timestamp.clone()));
+
+        config.encoding.apply_rules(&mut event);
+
+        match event
+            .as_mut_log()
+            .get(&event::log_schema().timestamp_key())
+            .unwrap()
+        {
+            Value::Integer(_) => {}
+            e => panic!(
+                "Timestamp was not transformed into a Unix timestamp. Was {:?}",
+                e
+            ),
+        }
+        match event.as_mut_log().get(&Atom::from("another")).unwrap() {
+            Value::Integer(_) => {}
+            e => panic!(
+                "Timestamp was not transformed into a Unix timestamp. Was {:?}",
+                e
+            ),
+        }
     }
 }

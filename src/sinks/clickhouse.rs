@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    event::{Event, Value},
+    event::Event,
     sinks::util::{
         encoding::EncodingConfig,
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
@@ -17,19 +17,6 @@ use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum TimestampFormat {
-    Unix,
-    RFC3339,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct EncodingConfig {
-    pub timestamp_format: Option<TimestampFormat>,
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -141,21 +128,6 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
 
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Vec<u8>> {
     encoding.apply_rules(&mut event);
-    match encoding.timestamp_format {
-        Some(TimestampFormat::Unix) => {
-            let mut unix_timestamps = Vec::new();
-            for (k, v) in event.as_log().all_fields() {
-                if let Value::Timestamp(ts) = v {
-                    unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
-                }
-            }
-            for (k, v) in unix_timestamps.pop() {
-                event.as_mut_log().insert(k, v);
-            }
-        }
-        // RFC3339 is the default serialization of a timestamp.
-        Some(TimestampFormat::RFC3339) | None => {}
-    }
     let mut body =
         serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
     body.push(b'\n');
@@ -269,6 +241,7 @@ mod integration_tests {
     use crate::{
         event,
         event::Event,
+        sinks::util::encoding::TimestampFormat,
         test_util::{random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
     };
@@ -332,6 +305,7 @@ mod integration_tests {
             compression: Some(Compression::None),
             encoding: EncodingConfig {
                 timestamp_format: Some(TimestampFormat::Unix),
+                ..Default::default()
             },
             batch: BatchBytesConfig {
                 max_size: Some(1),
