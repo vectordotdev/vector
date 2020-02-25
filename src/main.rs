@@ -179,6 +179,7 @@ fn main() {
             format!("codec={}", level),
             format!("file_source={}", level),
             format!("tower_limit=trace"),
+            format!("rdkafka={}", level),
         ]
         .join(",")
         .to_string()
@@ -442,6 +443,10 @@ fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
         };
     });
 
+    if let Err(mut errs) = config.expand_macros() {
+        errors.append(&mut errs);
+    }
+
     if !errors.is_empty() {
         Err(errors)
     } else {
@@ -487,13 +492,18 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
 
         let config = vector::topology::Config::load(file);
         let config = handle_config_errors(config);
-        let config = config.unwrap_or_else(|| {
+        let mut config = config.unwrap_or_else(|| {
             error!(
                 message = "Failed to parse config file.",
                 path = ?config_path
             );
             std::process::exit(exitcode::CONFIG);
         });
+        if let Err(errs) = config.expand_macros() {
+            for error in errs {
+                error!("Parse error: {}", error);
+            }
+        }
 
         if opts.topology {
             let exit = match topology::builder::check(&config) {

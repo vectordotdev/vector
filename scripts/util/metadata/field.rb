@@ -15,9 +15,9 @@ class Field
     :examples,
     :groups,
     :partition_key,
-    :prioritize,
     :relevant_when,
     :required,
+    :sort,
     :templateable,
     :type,
     :unit
@@ -33,9 +33,9 @@ class Field
     @groups = hash["groups"] || []
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
-    @prioritize = hash["prioritize"] == true
     @relevant_when = hash["relevant_when"]
     @required = hash["required"] == true
+    @sort = hash["sort"]
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
@@ -85,8 +85,10 @@ class Field
   end
 
   def <=>(other)
-    if prioritize? && !other.prioritize?
+    if sort? && !other.sort?
       -1
+    elsif sort? && other.sort?
+      sort <=> other.sort
     elsif !wildcard? && other.wildcard?
       -1
     else
@@ -106,6 +108,10 @@ class Field
     OBJECT_TYPES.any? do |object_type|
       type == "[#{object_type}]"
     end
+  end
+
+  def object_of_object?
+    object? && children_list.length == 1 && children_list[0].object?
   end
 
   def children?
@@ -198,10 +204,6 @@ class Field
     partition_key == true
   end
 
-  def prioritize?
-    prioritize == true
-  end
-
   def relevant_when_kvs
     relevant_when.collect do |k, v|
       if v.is_a?(Array)
@@ -216,6 +218,10 @@ class Field
 
   def required?
     @required == true
+  end
+
+  def sort?
+    @sort != nil
   end
 
   def templateable?

@@ -22,6 +22,7 @@ pub mod remove_tags;
 pub mod rename_fields;
 pub mod sampler;
 pub mod split;
+pub mod swimlanes;
 pub mod tokenizer;
 
 pub trait Transform: Send {

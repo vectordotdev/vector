@@ -273,6 +273,9 @@
 - name: "transform: split"
   description: Anything `split` transform related
   color: 54a0ff
+- name: "transform: swimlanes"
+  description: Anything `swimlanes` transform related
+  color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
   color: 54a0ff
