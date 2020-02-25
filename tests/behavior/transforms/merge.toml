@@ -49,22 +49,22 @@
   inputs = []
   type = "merge"
   merge_fields = ["nested.message"]
-  partial_event_marker_field = ["nested.is_partial"]
+  partial_event_marker_field = "nested.is_partial"
 [[tests]]
-  name = "merge_nested"
+  name = "merge_nested_marker"
   [[tests.inputs]]
-    insert_at = "merge_nested"
+    insert_at = "merge_nested_marker"
     type = "log"
     [tests.inputs.log_fields]
       "nested.message" = "hello "
       "nested.is_partial" = true
   [[tests.inputs]]
-    insert_at = "merge_nested"
+    insert_at = "merge_nested_marker"
     type = "log"
     [tests.inputs.log_fields]
       "nested.message" = "world"
   [[tests.outputs]]
-    extract_from = "merge_nested"
+    extract_from = "merge_nested_marker"
     [[tests.outputs.conditions]]
       type = "check_fields"
       "nested.message.equals" = "hello world"
