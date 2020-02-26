@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::sync::mpsc;
-use futures::{Future, Sink, Stream};
+use futures01::sync::mpsc;
+use futures01::{Future, Sink, Stream};
 use vector::sinks::util::{Batch, BatchSink, Buffer, Partition, PartitionedBatchSink};
 use vector::test_util::random_lines;
 
@@ -19,7 +19,7 @@ fn batching(
                     .take(num_events)
                     .map(|s| s.into_bytes())
                     .collect::<Vec<_>>();
-                futures::stream::iter_ok::<_, ()>(input.into_iter())
+                futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
                 let (tx, _rx) = mpsc::unbounded();
@@ -54,7 +54,7 @@ fn partitioned_batching(
                         key: key.clone(),
                     })
                     .collect::<Vec<_>>();
-                futures::stream::iter_ok::<_, ()>(input.into_iter())
+                futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
                 let (tx, _rx) = mpsc::unbounded();

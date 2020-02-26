@@ -9,7 +9,7 @@ use crate::{
     tls::TlsSettings,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -122,10 +122,10 @@ mod test {
     };
     use crate::tls::{TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures::sync::mpsc;
-    use futures::Stream;
+    use futures01::sync::mpsc;
+    use futures01::Stream;
     #[cfg(unix)]
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     #[cfg(unix)]
     use std::path::PathBuf;
     use std::{
@@ -381,7 +381,7 @@ mod test {
     #[cfg(unix)]
     fn send_lines_unix<'a>(path: PathBuf, lines: Vec<&'a str>) {
         let input_stream =
-            futures::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
+            futures01::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
 
         UnixStream::connect(&path)
             .map_err(|e| panic!("{:}", e))

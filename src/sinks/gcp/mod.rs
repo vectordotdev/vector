@@ -1,5 +1,5 @@
 use crate::sinks::HealthcheckError;
-use futures::{Future, Stream};
+use futures01::{Future, Stream};
 use goauth::scopes::Scope;
 use goauth::{auth::JwtClaims, auth::Token, credentials::Credentials, error::GOErr};
 use hyper::{

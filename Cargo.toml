@@ -42,8 +42,8 @@ tracing-metrics = { path = "lib/tracing-metrics" }
 tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
-futures = "0.1.25"
-futures03 = { package = "futures", version = "0.3", default-features = false, features = ["compat"] }
+futures01 = { package = "futures", version = "0.1.25" }
+futures = { version = "0.3", default-features = false, features = ["compat"] }
 tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"

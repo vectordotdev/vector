@@ -269,7 +269,7 @@ mod tests {
     use crate::buffers::Acker;
     use crate::runtime::Runtime;
     use crate::test_util::wait_for;
-    use futures::{stream, sync::oneshot, Future, Poll, Sink};
+    use futures01::{stream, sync::oneshot, Future, Poll, Sink};
     use std::sync::{atomic::Ordering, Arc, Mutex};
     use tower::Service;
 

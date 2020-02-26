@@ -2,7 +2,7 @@ use crate::event::Event;
 use crate::sources::Source;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;

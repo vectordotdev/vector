@@ -10,7 +10,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 #[cfg(unix)]

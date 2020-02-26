@@ -1,6 +1,6 @@
 use crate::{tls::TlsSettings, Event};
 use bytes::Bytes;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{

@@ -5,7 +5,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 #[cfg(unix)]
 use std::ffi;
 use std::{fmt, io, path};
@@ -213,7 +213,7 @@ mod tests {
             lines_from_file, random_lines_with_stream, random_nested_events_with_stream, temp_file,
         },
     };
-    use futures::Stream;
+    use futures01::Stream;
     use std::path::PathBuf;
 
     #[test]

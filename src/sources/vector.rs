@@ -6,7 +6,7 @@ use crate::{
     Event,
 };
 use bytes::{Bytes, BytesMut};
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio::codec::LengthDelimitedCodec;
@@ -97,7 +97,7 @@ mod test {
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Event,
     };
-    use futures::{stream, sync::mpsc, Future, Sink};
+    use futures01::{stream, sync::mpsc, Future, Sink};
 
     #[test]
     fn tcp_it_works_with_vector_sink() {

@@ -4,8 +4,8 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
-use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
-use futures03::compat::Compat;
+use futures::compat::Compat;
+use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,
@@ -198,7 +198,7 @@ impl Stream for OwnedConsumerStream {
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use futures::sync::mpsc;
+    use futures01::sync::mpsc;
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -241,8 +241,8 @@ mod integration_test {
         event,
         test_util::{collect_n, random_string, runtime},
     };
-    use futures::{sync::mpsc, Future};
-    use futures03::compat::Compat;
+    use futures::compat::Compat;
+    use futures01::{sync::mpsc, Future};
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
