@@ -22,6 +22,7 @@ use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
 
 // *********************** Defined by Vector **************************** //
+
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
@@ -36,6 +37,10 @@ pub struct KubePodMetadata {
     /// For how long will we hold on to pod's metadata after the pod has been deleted.
     #[serde(default = "default_cache_ttl")]
     cache_ttl: u64,
+    /// Node name whose pod's metadata should be watched. Has priority
+    /// over value found in enviorment variable.
+    #[serde(default)]
+    node_name: Option<String>,
 }
 
 fn default_cache_ttl() -> u64 {
@@ -58,9 +63,14 @@ impl TransformConfig for KubePodMetadata {
         // acquire metadata for all pods on this node, and with it maintaine
         // a map of extracted metadata.
 
+        let node = if let Some(node) = self.node_name.clone() {
+            node
+        } else {
+            std::env::var(NODE_NAME_ENV)
+                .map_err(|_| BuildError::MissingNodeName { env: NODE_NAME_ENV })?
+        };
+
         // Construct WatchClient
-        let node = std::env::var(NODE_NAME_ENV)
-            .map_err(|_| BuildError::MissingNodeName { env: NODE_NAME_ENV })?;
         let wc_config = ClientConfig::in_cluster(node, cx.resolver()).context(WatchClientBuild)?;
         let watch_client = wc_config.build().context(WatchClientBuild)?;
 
@@ -396,6 +406,8 @@ mod tests {
     fn unknown_fields() {
         let config = KubePodMetadata {
             fields: vec!["unknown".to_owned()],
+            node_name: Some("name".to_owned()),
+            cache_ttl: 10,
         };
 
         let rt = runtime();
@@ -411,7 +423,7 @@ mod integration_tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
     use crate::sources::kubernetes::test::{echo, logs, user_namespace, Kube, VECTOR_YAML};
-    use crate::test_util::wait_for;
+    use crate::test_util::{random_string, wait_for};
     use kube::api::{Api, RawApi};
     use uuid::Uuid;
 
@@ -505,7 +517,7 @@ data:
     #[test]
     fn kube_metadata() {
         let namespace = format!("kube-metadata-{}", Uuid::new_v4());
-        let message = "20";
+        let message = random_string(300);
         let field = "node_name";
         let user_namespace = user_namespace(namespace.as_str());
         let binding_name = binding_name(namespace.as_str());
@@ -535,7 +547,7 @@ data:
         kube.wait_for_running(vector.clone());
 
         // Start echo
-        let _echo = echo(&user, "echo", message);
+        let _echo = echo(&user, "echo", &message);
 
         // Verify logs
         wait_for(|| {
