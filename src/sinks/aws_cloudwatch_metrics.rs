@@ -10,7 +10,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -432,7 +432,7 @@ mod integration_tests {
     use crate::test_util::{random_string, runtime};
     use crate::topology::config::SinkContext;
     use chrono::offset::TimeZone;
-    use futures::{stream, Sink};
+    use futures01::{stream, Sink};
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {

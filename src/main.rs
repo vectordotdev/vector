@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate tracing;
 
-use futures::{future, Future, Stream};
+use futures01::{future, Future, Stream};
 use std::{
     cmp::{max, min},
     fs::File,
@@ -353,7 +353,7 @@ fn main() {
         };
 
         if signal == SIGINT || signal == SIGTERM {
-            use futures::future::Either;
+            use futures01::future::Either;
 
             info!("Shutting down.");
             let shutdown = topology.stop();
@@ -384,7 +384,7 @@ fn main() {
             .map_err(|_| ())
             .expect("Neither stream errors");
 
-        use futures::future::Either;
+        use futures01::future::Either;
 
         let ctrl_c = match interruption {
             Either::A(((_, ctrl_c_stream), _)) => ctrl_c_stream.into_future(),

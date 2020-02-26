@@ -2,7 +2,7 @@ use super::Encoding;
 use crate::event::{self, Event};
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 #[cfg(unix)]
 use std::ffi;
 use std::{fmt, io, path};
@@ -62,7 +62,7 @@ impl File {
         let log = event.into_log();
 
         match self.encoding {
-            Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+            Encoding::Ndjson => serde_json::to_vec(&log)
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
             Encoding::Text => log
@@ -209,8 +209,8 @@ mod tests {
             lines_from_file, random_lines_with_stream, random_nested_events_with_stream, temp_file,
         },
     };
-    use futures::Stream;
-    use std::{collections::BTreeMap, path::PathBuf};
+    use futures01::Stream;
+    use std::path::PathBuf;
 
     #[test]
     fn encode_text() {
@@ -230,19 +230,8 @@ mod tests {
         let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
 
         for (input, output) in input.into_iter().zip(output) {
-            let output: BTreeMap<String, BTreeMap<String, BTreeMap<String, String>>> =
-                serde_json::from_str(&output[..]).unwrap();
-
-            let deeper = input.into_log().unflatten().match_against(output).unwrap();
-            for (input, output) in deeper {
-                let deeper = input.match_against_map(output).unwrap();
-                for (input, output) in deeper {
-                    let deeper = input.match_against_map(output).unwrap();
-                    for (input, output) in deeper {
-                        assert!(input.equals(output))
-                    }
-                }
-            }
+            let input = serde_json::to_string(input.as_log()).unwrap();
+            assert_eq!(input, output);
         }
     }
 

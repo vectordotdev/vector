@@ -6,7 +6,7 @@ use crate::{
     Event,
 };
 use chrono::Utc;
-use futures::{future, Async, AsyncSink, Future, Sink};
+use futures01::{future, Async, AsyncSink, Future, Sink};
 use hyper::{
     header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
 };

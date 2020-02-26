@@ -9,7 +9,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -187,8 +187,8 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
         .collect::<LogEvent>();
 
     json!({
-        "fields": fields.unflatten(),
-        "event": event.unflatten(),
+        "fields": fields,
+        "event": event,
         "time": timestamp
     })
 }
@@ -286,7 +286,7 @@ mod integration_tests {
         topology::config::SinkContext,
         Event,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use http::StatusCode;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;

@@ -5,7 +5,7 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes::Bytes;
-use futures::{
+use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
@@ -198,7 +198,7 @@ mod tests {
     use super::*;
     use crate::runtime::Runtime;
     use crate::test_util::{random_lines_with_stream, shutdown_on_idle};
-    use futures::{sync::mpsc, Sink, Stream};
+    use futures01::{sync::mpsc, Sink, Stream};
     use stream_cancel::{StreamExt, Tripwire};
     use tokio::codec::{FramedRead, LinesCodec};
     use tokio_uds::UnixListener;

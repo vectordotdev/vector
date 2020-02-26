@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, sink::Sink, Future, Poll};
+use futures01::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -220,7 +220,7 @@ mod test {
         Event,
     };
     use bytes::Bytes;
-    use futures::{stream, stream::Stream, sync::mpsc, Sink};
+    use futures01::{stream, stream::Stream, sync::mpsc, Sink};
     use std::str::from_utf8;
     use tokio::{
         self,

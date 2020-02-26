@@ -1,5 +1,5 @@
 use crate::runtime::TaskExecutor;
-use futures::{future, Future};
+use futures01::{future, Future};
 use hyper::client::connect::dns::{Name, Resolve};
 use snafu::{futures01::FutureExt, ResultExt};
 use std::{

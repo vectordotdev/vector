@@ -11,7 +11,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::Future;
+use futures01::Future;
 use http::Uri;
 use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
@@ -144,7 +144,7 @@ impl HttpSink for PubsubSink {
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        let json = serde_json::to_string(&event.into_log().unflatten()).unwrap();
+        let json = serde_json::to_string(&event.into_log()).unwrap();
         Some(json!({ "data": base64::encode(&json) }))
     }
 
@@ -197,7 +197,7 @@ mod integration_tests {
         runtime::Runtime,
         test_util::{block_on, random_events_with_stream, random_string},
     };
-    use futures::Sink;
+    use futures01::Sink;
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 

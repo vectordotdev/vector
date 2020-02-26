@@ -14,7 +14,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
-use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use futures01::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, Region, RusotoError};
 use rusoto_logs::{
@@ -256,7 +256,7 @@ impl CloudwatchLogsSvc {
 
         match self.encoding {
             Encoding::Json => {
-                let message = serde_json::to_string(&log.unflatten()).unwrap();
+                let message = serde_json::to_string(&log).unwrap();
                 InputLogEvent { message, timestamp }
             }
             Encoding::Text => {
@@ -734,7 +734,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         topology::config::{SinkConfig, SinkContext},
     };
-    use futures::Sink;
+    use futures01::Sink;
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};

@@ -16,7 +16,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -422,7 +422,7 @@ fn encode_event(
 
     let log = event.into_log();
     let bytes = match encoding {
-        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+        Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b

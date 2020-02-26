@@ -5,7 +5,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::{
+use futures01::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
@@ -932,7 +932,7 @@ mod tests {
     use super::*;
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
-    use futures::future;
+    use futures01::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
