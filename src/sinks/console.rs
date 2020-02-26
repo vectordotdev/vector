@@ -73,7 +73,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
     match event {
         Event::Log(log) => match encoding {
             Encoding::Json => {
-                serde_json::to_string(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
+                serde_json::to_string(&log).map_err(|e| panic!("Error encoding: {}", e))
             }
             Encoding::Text => {
                 let s = log

@@ -170,7 +170,7 @@ fn encode_event(event: Event) -> Vec<u8> {
     // Each event needs to be base64 encoded, and put into a JSON object
     // as the `data` item. A trailing comma is added to support multiple
     // events per request, and is stripped in `make_body`.
-    let json = serde_json::to_string(&event.into_log().unflatten()).unwrap();
+    let json = serde_json::to_string(&event.into_log()).unwrap();
     format!("{{\"data\":\"{}\"}},", base64::encode(&json)).into_bytes()
 }
 

@@ -105,9 +105,8 @@ impl HttpSink for LogdnaConfig {
             }
         }
 
-        let unflatten = log.unflatten();
-        if !unflatten.is_empty() {
-            map.insert("meta".to_string(), json!(unflatten));
+        if !log.is_empty() {
+            map.insert("meta".into(), json!(&log));
         }
 
         Some(map.into())

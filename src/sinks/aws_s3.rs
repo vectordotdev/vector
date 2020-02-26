@@ -393,7 +393,7 @@ fn encode_event(
 
     let log = event.into_log();
     let bytes = match encoding {
-        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+        Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b

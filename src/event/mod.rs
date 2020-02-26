@@ -6,19 +6,17 @@ use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::BTreeMap;
-use std::iter::FromIterator;
+use serde_json::Value as JsonValue;
+use std::{collections::BTreeMap, iter::FromIterator};
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
-pub mod flatten;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
-mod unflatten;
+mod util;
 
 pub use metric::Metric;
-pub use unflatten::Unflatten;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -98,45 +96,39 @@ impl Event {
 
 impl LogEvent {
     pub fn get(&self, key: &Atom) -> Option<&Value> {
-        self.fields.get(key)
+        util::log::get(&self.fields, key)
     }
 
     pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
-        self.fields.get_mut(key)
+        util::log::get_mut(&mut self.fields, key)
     }
 
     pub fn contains(&self, key: &Atom) -> bool {
-        self.fields.contains_key(key)
+        util::log::contains(&self.fields, key)
     }
 
     pub fn insert<K, V>(&mut self, key: K, value: V)
     where
-        K: Into<Atom>,
+        K: AsRef<str>,
         V: Into<Value>,
     {
-        self.fields.insert(key.into(), value.into());
+        util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
-        self.fields.remove(key)
+        util::log::remove(&mut self.fields, &key)
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &Atom> {
-        self.fields.keys()
+    pub fn keys<'a>(&'a self) -> impl Iterator<Item = Atom> + 'a {
+        util::log::keys(&self.fields)
     }
 
-    pub fn all_fields(&self) -> FieldsIter {
-        FieldsIter {
-            inner: self.fields.iter(),
-        }
+    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Atom, &'a Value)> + Serialize {
+        util::log::all_fields(&self.fields)
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = (Atom, Value)> {
-        self.fields.into_iter()
-    }
-
-    pub fn unflatten(self) -> unflatten::Unflatten {
-        unflatten::Unflatten::from(self.fields)
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
     }
 }
 
@@ -144,7 +136,7 @@ impl std::ops::Index<&Atom> for LogEvent {
     type Output = Value;
 
     fn index(&self, key: &Atom) -> &Value {
-        &self.fields[key]
+        self.get(key).expect("Key is not found")
     }
 }
 
@@ -309,6 +301,33 @@ impl_valuekind_from_integer!(isize);
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Value::Boolean(value)
+    }
+}
+
+impl From<JsonValue> for Value {
+    fn from(json_value: JsonValue) -> Self {
+        match json_value {
+            JsonValue::Bool(b) => Value::Boolean(b),
+            JsonValue::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Value::Integer(i)
+                } else if let Some(f) = n.as_f64() {
+                    Value::Float(f)
+                } else {
+                    Value::Bytes(n.to_string().into())
+                }
+            }
+            JsonValue::String(s) => Value::Bytes(Bytes::from(s)),
+            JsonValue::Object(obj) => Value::Map(
+                obj.into_iter()
+                    .map(|(key, value)| (key.into(), Value::from(value)))
+                    .collect(),
+            ),
+            JsonValue::Array(arr) => {
+                Value::Array(arr.into_iter().map(|value| Value::from(value)).collect())
+            }
+            JsonValue::Null => Value::Null,
+        }
     }
 }
 
@@ -643,28 +662,6 @@ impl From<Metric> for Event {
     }
 }
 
-#[derive(Clone)]
-pub struct FieldsIter<'a> {
-    inner: std::collections::btree_map::Iter<'a, Atom, Value>,
-}
-
-impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (&'a Atom, &'a Value);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-impl<'a> Serialize for FieldsIter<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_map(self.clone())
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::{Atom, Event, LogSchema, Value};
@@ -728,11 +725,11 @@ mod test {
             all,
             vec![
                 (
-                    &"Ke$ha".into(),
+                    Atom::from("Ke$ha"),
                     "It's going down, I'm yelling timber".to_string()
                 ),
                 (
-                    &"Pitbull".into(),
+                    Atom::from("Pitbull"),
                     "The bigger they are, the harder they fall".to_string()
                 ),
             ]
@@ -753,9 +750,9 @@ mod test {
         assert_eq!(
             collected,
             vec![
-                (&Atom::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-                (&Atom::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-                (&Atom::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+                (Atom::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
+                (Atom::from("lZDfzKIL"), &Value::from("tOVrjveM")),
+                (Atom::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
     }
