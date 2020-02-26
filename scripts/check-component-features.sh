@@ -11,8 +11,11 @@ set -euo pipefail
 
 cd $(dirname $0)/..
 
+echo "Checking that Vector and tests can be built without default features..."
+cargo check --tests --no-default-features
+
 echo "Checking that all components have corresponding features in Cargo.toml..."
-components=$(cargo run --no-default-features --features sinks-console -- list)
+components=$(cargo run --no-default-features -- list)
 if (echo "$components" | egrep -v "^(Sources:|Transforms:|Sinks:|)$" >/dev/null); then
   echo "Some of the components do not have a corresponding feature flag in Cargo.toml:"
   echo "$components" | sed "s/^/    /"
