@@ -9,55 +9,6 @@ it's still a good idea to get yourself ahead of the competition. In this guide
 we're going to cover some tips and tricks that will help you write clear, bug
 free Vector configs that are easy to maintain.
 
-## Building Pipelines
-
-In Vector each component of a pipeline specifies which components it consumes
-events from. This makes it very easy to build multiplexed topologies. However,
-hooking up transforms this way can sometimes be frustrating and brittle as the
-number of transforms increases.
-
-Luckily, the Vector team are desperate for your approval and have worked hard to
-mitigate this with the following tools.
-
-### Generating Chains
-
-In cases where we simply want to chain a few components together we can avoid
-writing most of the boilerplate with the `generate` subcommand. This allows us
-to express a list of components, where it generates a config with all of those
-components connected in a linear chain.
-
-For example, if we wished to create a chain of three transforms; `json_parser`,
-`add_fields`, and `remove_fields`, we can run:
-
-```bash
-vector generate /json_parser,add_fields,remove_fields > example.toml
-# Find out more with `vector generate --help`
-```
-
-And most of the boilerplate will be written for us, with each component printed
-with an `inputs` field that specifies the component before it:
-
-```toml
-[transforms.transform0]
-  inputs = [ "somewhere" ]
-  type = "json_parser"
-  # etc ...
-
-[transforms.transform1]
-  inputs = [ "transform0" ]
-  type = "add_fields"
-  # etc ...
-
-[transforms.transform2]
-  inputs = [ "transform1" ]
-  type = "remove_fields"
-  # etc ...
-```
-
-The names of the generated components are sequential (`transform0`,
-`transform1`, and so on). It's therefore worth doing a search and replace with
-your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
-
 ## Test Driven Configuration
 
 Test driven configuration is a paradigm we just made up, so there's still time
@@ -151,15 +102,49 @@ How many tests you add is at your discretion, but you probably don't need to
 test every single transform. We recommend every four transforms, except during a
 full moon when you should test every two just to be sure.
 
-## Updating Configs
+## Building Pipelines
 
-Sometimes it's useful to update Vector configs on the fly. If you find yourself
-tinkering with a config that Vector is already running you can prompt it to
-reload the changes you've made by sending it a `SIGHUP` signal.
+In Vector each component of a pipeline specifies which components it consumes
+events from. This makes it very easy to build multiplexed topologies. However,
+writing a chain of transforms this way can sometimes be frustrating as the
+number of transforms increases.
 
-If you're running Vector in environments where it's not possible to issue
-`SIGHUP` signals you can instead run it with the `--watch-config` flag and it'll
-automatically gobble up changes whenever the file is written to.
+Luckily, the Vector team are desperate for your approval and have worked hard to
+mitigate this with the `generate` subcommand, which can be used to generate the
+boilerplate for you. The command expects a list of components, where it then
+creates a config with all of those components connected in a linear chain.
+
+For example, if we wished to create a chain of three transforms; `json_parser`,
+`add_fields`, and `remove_fields`, we can run:
+
+```bash
+vector generate /json_parser,add_fields,remove_fields > example.toml
+# Find out more with `vector generate --help`
+```
+
+And most of the boilerplate will be written for us, with each component printed
+with an `inputs` field that specifies the component before it:
+
+```toml
+[transforms.transform0]
+  inputs = [ "somewhere" ]
+  type = "json_parser"
+  # etc ...
+
+[transforms.transform1]
+  inputs = [ "transform0" ]
+  type = "add_fields"
+  # etc ...
+
+[transforms.transform2]
+  inputs = [ "transform1" ]
+  type = "remove_fields"
+  # etc ...
+```
+
+The names of the generated components are sequential (`transform0`,
+`transform1`, and so on). It's therefore worth doing a search and replace with
+your editor to give them better names, e.g. `s/transform2/scrub_emails/g`.
 
 ## Organizing Configs
 
@@ -179,6 +164,16 @@ $ vector -c ./configs/foo.toml ./configs/bar.toml
 
 If you have a large chain of components it's a good idea to break them out into
 individual files, each with its own unit tests.
+
+## Updating Configs
+
+Sometimes it's useful to update Vector configs on the fly. If you find yourself
+tinkering with a config that Vector is already running you can prompt it to
+reload the changes you've made by sending it a `SIGHUP` signal.
+
+If you're running Vector in environments where it's not possible to issue
+`SIGHUP` signals you can instead run it with the `--watch-config` flag and it'll
+automatically gobble up changes whenever the file is written to.
 
 
 [docs.guides.unit-testing]: /docs/setup/guides/unit-testing/
