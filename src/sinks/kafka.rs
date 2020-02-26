@@ -5,7 +5,8 @@ use crate::{
     sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
+use futures::compat::Compat;
+use futures01::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
@@ -60,7 +61,7 @@ pub struct KafkaSink {
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
-    in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
+    in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
     acker: Acker,
     seq_head: usize,
@@ -157,7 +158,8 @@ impl Sink for KafkaSink {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
-        self.in_flight.push(future.join(future::ok(seqno)));
+        self.in_flight
+            .push(Compat::new(future).join(future::ok(seqno)));
         Ok(AsyncSink::Ready)
     }
 
@@ -227,7 +229,7 @@ fn encode_event(
         .unwrap_or_default();
 
     let body = match encoding {
-        Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
+        Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
             .get(&event::log_schema().message_key())
@@ -282,7 +284,7 @@ mod integration_test {
         test_util::{block_on, random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,

@@ -23,7 +23,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
-use futures03::compat::Future01CompatExt;
+use futures::compat::Future01CompatExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -287,7 +287,7 @@ mod integration_tests {
     use crate::topology::config::SinkConfig;
     use crate::Event;
     use bytes::Bytes;
-    use futures::Sink;
+    use futures01::Sink;
 
     #[test]
     fn text() {
@@ -315,7 +315,7 @@ mod integration_tests {
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = rt
-            .block_on(sink.send_all(futures::stream::iter_ok(events)))
+            .block_on(sink.send_all(futures01::stream::iter_ok(events)))
             .unwrap();
 
         let outputs = fetch_stream(stream.to_string());
@@ -352,7 +352,7 @@ mod integration_tests {
             .collect::<Vec<_>>();
 
         let _ = rt
-            .block_on(sink.send_all(futures::stream::iter_ok(events.clone())))
+            .block_on(sink.send_all(futures01::stream::iter_ok(events.clone())))
             .unwrap();
 
         let outputs = fetch_stream(stream.to_string());
@@ -400,7 +400,7 @@ mod integration_tests {
         }
 
         let _ = rt
-            .block_on(sink.send_all(futures::stream::iter_ok(events)))
+            .block_on(sink.send_all(futures01::stream::iter_ok(events)))
             .unwrap();
 
         let outputs1 = fetch_stream(stream1.to_string());

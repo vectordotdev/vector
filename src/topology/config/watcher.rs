@@ -98,8 +98,8 @@ fn create_watcher(
 mod tests {
     use super::*;
     use crate::test_util::{runtime, temp_file};
-    use futures::future;
-    use futures::{Future, Stream};
+    use futures01::future;
+    use futures01::{Future, Stream};
     use std::time::{Duration, Instant};
     use std::{fs::File, io::Write};
     use tokio::timer::Delay;

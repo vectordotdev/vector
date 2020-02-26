@@ -10,7 +10,7 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes::Bytes;
-use futures::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
@@ -306,7 +306,7 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::{Future, Sink, Stream};
+    use futures01::{Future, Sink, Stream};
     use http::Method;
     use hyper::service::service_fn;
     use hyper::{Body, Response, Server, Uri};
@@ -351,7 +351,7 @@ mod test {
 
         let req = service.call(request);
 
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
 
         let new_service = move || {
             let tx = tx.clone();
@@ -366,7 +366,7 @@ mod test {
                     let string = String::from_utf8(v).map_err(|_| "Wasn't UTF-8".to_string());
                     tx.send(string).map_err(|_| "Send error".to_string())
                 }).and_then(|_| {
-                    futures::future::ok(Response::new(Body::from("")))
+                    futures01::future::ok(Response::new(Body::from("")))
                 }))
             })
         };

@@ -10,7 +10,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
@@ -245,10 +245,7 @@ fn encode_event(
 
     let log = event.into_log();
     let data = match encoding {
-        Encoding::Json => {
-            serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
-        }
-
+        Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
             .get(&event::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
@@ -334,7 +331,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         topology::config::SinkContext,
     };
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;

@@ -9,7 +9,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Request};
@@ -260,7 +260,7 @@ mod integration_tests {
         test_util::{random_string, runtime},
         topology::config::{SinkConfig, SinkContext},
     };
-    use futures::Sink;
+    use futures01::Sink;
     use serde_json::Value;
     use std::time::Duration;
     use tokio::util::FutureExt;

@@ -1,4 +1,4 @@
-use futures::{
+use futures01::{
     future,
     sink::Sink,
     sync::mpsc::{Receiver, Sender},
@@ -17,19 +17,19 @@ use vector::topology::config::{
 use vector::transforms::Transform;
 
 pub fn sink() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures01::sync::mpsc::channel(10);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
 
 pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures01::sync::mpsc::channel(10);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
 
 pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(0);
+    let (tx, rx) = futures01::sync::mpsc::channel(0);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }

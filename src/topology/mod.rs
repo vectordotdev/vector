@@ -11,7 +11,7 @@ use crate::topology::builder::Pieces;
 
 use crate::buffers;
 use crate::runtime;
-use futures::{
+use futures01::{
     future,
     sync::{mpsc, oneshot},
     Future, Stream,
@@ -203,7 +203,7 @@ impl RunningTopology {
             .into_iter()
             .map(|name| pieces.healthchecks.remove(&name).unwrap())
             .collect::<Vec<_>>();
-        let healthchecks = futures::future::join_all(healthchecks).map(|_| ());
+        let healthchecks = futures01::future::join_all(healthchecks).map(|_| ());
 
         info!("Running healthchecks.");
         if require_healthy {

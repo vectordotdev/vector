@@ -8,7 +8,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
-use futures::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Instant};
 use tokio::timer::Delay;
@@ -191,7 +191,7 @@ mod tests {
             temp_file,
         },
     };
-    use futures::stream;
+    use futures01::stream;
 
     #[test]
     fn single_partition() {

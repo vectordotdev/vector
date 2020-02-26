@@ -6,7 +6,7 @@ use crate::{
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::{stream::iter_ok, Sink};
+use futures01::{stream::iter_ok, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;

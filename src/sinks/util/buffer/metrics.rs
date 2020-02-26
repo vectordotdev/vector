@@ -271,7 +271,7 @@ mod test {
         event::metric::{Metric, MetricValue},
         Event,
     };
-    use futures::{future::Future, stream, Sink};
+    use futures01::{future::Future, stream, Sink};
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::time::Duration;

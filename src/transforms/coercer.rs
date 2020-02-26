@@ -57,8 +57,8 @@ impl Transform for Coercer {
             // conversion.
             let mut new_event = Event::new_empty_log();
             let new_log = new_event.as_mut_log();
-            for (field, value) in log.into_iter() {
-                if let Some(conv) = self.types.get(&field) {
+            for (field, conv) in &self.types {
+                if let Some(value) = log.remove(field) {
                     match conv.convert(value) {
                         Ok(converted) => new_log.insert(field, converted),
                         Err(error) => {
@@ -97,13 +97,12 @@ impl Transform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::CoercerConfig;
-    use crate::event::{flatten::flatten, LogEvent, Value};
+    use crate::event::{LogEvent, Value};
     use crate::{
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
     use pretty_assertions::assert_eq;
-    use serde_json::Value as JsonValue;
 
     fn parse_it(extra: &str) -> LogEvent {
         let rt = crate::runtime::Runtime::single_threaded().unwrap();
@@ -156,17 +155,9 @@ mod tests {
         let log = parse_it("drop_unspecified = true");
 
         let mut expected = Event::new_empty_log();
-        match serde_json::from_str::<JsonValue>(
-            r#"{
-                 "bool": true,
-                 "number": 1234
-               }"#,
-        )
-        .unwrap()
-        {
-            JsonValue::Object(object) => flatten(expected.as_mut_log(), object),
-            _ => panic!("Invalid result from serde_json::from_str"),
-        }
+        expected.as_mut_log().insert("bool", true);
+        expected.as_mut_log().insert("number", 1234);
+
         assert_eq!(log, expected.into_log());
     }
 }

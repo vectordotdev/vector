@@ -9,7 +9,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -297,7 +297,7 @@ fn encode_event(
     let mut body = serde_json::to_vec(&action).unwrap();
     body.push(b'\n');
 
-    serde_json::to_writer(&mut body, &event.into_log().unflatten()).unwrap();
+    serde_json::to_writer(&mut body, &event.into_log()).unwrap();
     body.push(b'\n');
     Some(body)
 }
@@ -423,7 +423,7 @@ mod integration_tests {
         topology::config::{SinkConfig, SinkContext},
         Event,
     };
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
     use std::fs::File;
@@ -562,7 +562,7 @@ mod integration_tests {
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(rec.into_log().unflatten()).unwrap())
+            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
             let event = hit.into_document().unwrap();
