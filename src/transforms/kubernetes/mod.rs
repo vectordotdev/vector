@@ -28,20 +28,23 @@ const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 /// If watcher errors, for how long will we wait before trying again.
 const RETRY_TIMEOUT: Duration = Duration::from_secs(2);
 
-/// For how long will we hold on to pod's metadata after the pod has been deleted.
-///
-/// 10min sounds a lot, but a metadata entry averages around 300B and in an extreme
-/// scenario when a pod is deleted every second, we would have ~200kB of probably
-/// not usefull data. Which is acceptable. The benefit of such a long delay
-/// is that we will certainly* have the metadata while we are processing the
-/// remaining logs from the deleted pod.
-const DELETE_DELAY: Duration = Duration::from_secs(10 * 60);
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KubePodMetadata {
     #[serde(default = "default_fields")]
     fields: Vec<String>,
+    /// For how long will we hold on to pod's metadata after the pod has been deleted.
+    #[serde(default = "default_cache_ttl")]
+    cache_ttl: u64,
+}
+
+fn default_cache_ttl() -> u64 {
+    // 1h sounds a lot, but a metadata entry averages around 300B and in an extreme
+    // scenario when a pod is deleted every second, we would have ~1MB of probably
+    // not usefull data. Which is acceptable. The benefit of such a long delay
+    // is that we will certainly* have the metadata while we are processing the
+    // remaining logs from the deleted pod.
+    60 * 60
 }
 
 inventory::submit! {
@@ -117,17 +120,18 @@ struct MetadataClient {
     /// (key of data to be deleted, can be deleted after this point in time)
     delete_queue: VecDeque<(Bytes, Instant)>,
     client: WatchClient,
+    cache_ttl: Duration,
 }
 
 impl MetadataClient {
     fn new(
-        trans_config: &KubePodMetadata,
+        config: &KubePodMetadata,
         metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
         client: WatchClient,
     ) -> Result<Self, BuildError> {
         // Select Pod metadata fields that need to be extracted from
         // Pod and then added to Events.
-        let mut add_fields = trans_config.fields.clone();
+        let mut add_fields = config.fields.clone();
         add_fields.sort();
         add_fields.dedup();
 
@@ -149,6 +153,7 @@ impl MetadataClient {
                 metadata,
                 client,
                 delete_queue: VecDeque::new(),
+                cache_ttl: Duration::from_secs(config.cache_ttl),
             })
         } else {
             Err(BuildError::UnknownFields { fields: unknown })
@@ -223,7 +228,7 @@ impl MetadataClient {
 
             if PodEvent::Deleted == event {
                 self.delete_queue
-                    .push_back((uid, Instant::now() + DELETE_DELAY));
+                    .push_back((uid, Instant::now() + self.cache_ttl));
             }
         }
 
