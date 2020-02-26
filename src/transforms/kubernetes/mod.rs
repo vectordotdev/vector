@@ -41,6 +41,9 @@ pub struct KubePodMetadata {
     /// over value found in enviorment variable.
     #[serde(default)]
     node_name: Option<String>,
+    /// Field containg Pod UID to which log belongs.
+    #[serde(default = "default_pod_uid")]
+    pod_uid: String,
 }
 
 fn default_cache_ttl() -> u64 {
@@ -50,6 +53,10 @@ fn default_cache_ttl() -> u64 {
     // is that we will certainly* have the metadata while we are processing the
     // remaining logs from the deleted pod.
     60 * 60
+}
+
+fn default_pod_uid() -> String {
+    POD_UID.as_ref().to_owned()
 }
 
 inventory::submit! {
@@ -87,7 +94,10 @@ impl TransformConfig for KubePodMetadata {
         });
 
         // Construct transform
-        Ok(Box::new(KubernetesPodMetadata { metadata: reader }))
+        Ok(Box::new(KubernetesPodMetadata {
+            metadata: reader,
+            pod_uid: self.pod_uid.clone().into(),
+        }))
     }
 
     fn input_type(&self) -> DataType {
@@ -270,13 +280,14 @@ impl Eq for FieldValue {}
 
 pub struct KubernetesPodMetadata {
     metadata: ReadHandle<Bytes, Box<(Atom, FieldValue)>>,
+    pod_uid: Atom,
 }
 
 impl Transform for KubernetesPodMetadata {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
-        if let Some(Value::Bytes(pod_uid)) = log.get(&POD_UID) {
+        if let Some(Value::Bytes(pod_uid)) = log.get(&self.pod_uid) {
             let pod_uid = pod_uid.clone();
 
             let found = self.metadata.get_and(&pod_uid, |fields| {
@@ -295,7 +306,7 @@ impl Transform for KubernetesPodMetadata {
         } else {
             warn!(
                 message = "Event without field, so it can't be enriched with metadata.",
-                field = POD_UID.as_ref(),
+                field = self.pod_uid.as_ref(),
                 rate_limit_secs = 10
             );
         }
