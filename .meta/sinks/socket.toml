@@ -14,7 +14,7 @@ write_to_description = "a socket, such as a TCP or Unix domain socket"
 
 <%= render("_partials/_buffer_options.toml", namespace: "sinks.socket.options") %>
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.socket.options", encodings: ["json", "text"], required: true) %>
+<%= render("_partials/_encoding.toml", namespace: "sinks.socket.options", encodings: ["json", "text"], default: false) %>
 
 [sinks.socket.options.mode]
 type = "string"

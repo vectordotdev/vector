@@ -2005,18 +2005,6 @@ end
   healthcheck = false
 
   #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  #
   # Batch
   #
 
@@ -2076,6 +2064,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.aws_cloudwatch_logs.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -2341,6 +2365,42 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.aws_kinesis_firehose.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Request
   #
 
@@ -2522,6 +2582,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.aws_kinesis_streams.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -2853,6 +2949,42 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.aws_s3.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "ndjson"
+    format = "ndjson"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Request
   #
 
@@ -3103,9 +3235,29 @@ end
   #
 
   [sinks.clickhouse.encoding]
-    # How to format event timestamps. Formats such as unix can be parsed as a
-    # Clickhouse DateTime, however, this loses precision as DateTimes are defined
-    # in seconds.
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "default"
+    # * type: string
+    # * must be:  (if supplied)
+    format = "default"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
     #
     # * optional
     # * default: "rfc3339"
@@ -3240,6 +3392,10 @@ end
 
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -3270,6 +3426,42 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
+
+  #
+  # Encoding
+  #
+
+  [sinks.console.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
 # Batches `metric` events to Datadog's metrics service using HTTP API.
 [sinks.datadog_metrics]
@@ -3550,6 +3742,42 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.elasticsearch.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "default"
+    # * type: string
+    # * must be:  (if supplied)
+    format = "default"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Headers
   #
 
@@ -3698,6 +3926,10 @@ end
 
 # Streams `log` events to a file.
 [sinks.file]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -3734,6 +3966,42 @@ end
   # * default: "30"
   # * type: int
   idle_timeout_secs = "30"
+
+  #
+  # Encoding
+  #
+
+  [sinks.file.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "ndjson"
+    format = "text"
+    format = "ndjson"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
 # Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
 [sinks.gcp_cloud_storage]
@@ -3922,6 +4190,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.gcp_cloud_storage.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "ndjson"
+    format = "ndjson"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -4166,6 +4470,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.gcp_pubsub.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "default"
+    # * type: string
+    # * must be:  (if supplied)
+    format = "default"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -4437,6 +4777,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.gcp_stackdriver_logging.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "default"
+    # * type: string
+    # * must be:  (if supplied)
+    format = "default"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -4736,6 +5112,43 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.http.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text", "json", and "ndjson"
+    format = "json"
+    format = "ndjson"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Headers
   #
 
@@ -4973,6 +5386,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.humio_logs.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * must be: "json" (if supplied)
+    format = "json"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -5357,6 +5806,42 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.kafka.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Tls
   #
 
@@ -5542,6 +6027,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.logdna.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "default"
+    # * type: string
+    # * must be:  (if supplied)
+    format = "default"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request
@@ -5762,6 +6283,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.loki.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Labels
@@ -6014,6 +6571,42 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.new_relic_logs.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * must be: "json" (if supplied)
+    format = "json"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Request
   #
 
@@ -6246,6 +6839,42 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.sematext_logs.encoding]
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "default"
+    # * type: string
+    # * must be:  (if supplied)
+    format = "default"
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Request
   #
 
@@ -6399,6 +7028,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.socket.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Tls
@@ -6576,6 +7241,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.splunk_hec.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
   #
   # Request

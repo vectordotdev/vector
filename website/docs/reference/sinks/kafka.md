@@ -43,15 +43,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"] # example
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
   key_field = "user_id" # example
   topic = "topic-1234" # example
 
-  # OPTIONAL
+  # OPTIONAL - General
   healthcheck = true # default
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    format = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
@@ -87,6 +97,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    format = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
@@ -252,6 +272,125 @@ The buffer's type and storage mechanism.
 #### when_full
 
 The behavior when the buffer becomes full.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### format
+
+The encoding format used to serialize the events before outputting.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
 
 
 </Field>

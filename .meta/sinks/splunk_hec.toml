@@ -30,7 +30,7 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.splunk_hec.options", encodings: ["json", "text"], required: true) %>
+<%= render("_partials/_encoding.toml", namespace: "sinks.splunk_hec.options", encodings: ["json", "text"], default: false) %>
 
 [sinks.splunk_hec.options.host]
 type = "string"

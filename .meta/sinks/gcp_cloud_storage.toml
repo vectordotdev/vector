@@ -116,7 +116,7 @@ default = "log"
 required = true
 description = "The filename extension to use in the object name."
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.gcp_cloud_storage.options", encodings: ["ndjson", "text"], required: true) %>
+<%= render("_partials/_encoding.toml", namespace: "sinks.gcp_cloud_storage.options", encodings: ["ndjson", "text"], default: false) %>
 
 [sinks.gcp_cloud_storage.options.compression]
 type = "string"

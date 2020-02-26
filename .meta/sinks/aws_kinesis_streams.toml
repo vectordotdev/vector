@@ -35,7 +35,7 @@ write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.
   timeout_secs: 30
 ) %>
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.aws_kinesis_streams.options", encodings: ["json", "text"], required: true) %>
+<%= render("_partials/_encoding.toml", namespace: "sinks.aws_kinesis_streams.options", encodings: ["json", "text"], default: false) %>
 
 [sinks.aws_kinesis_streams.options.partition_key_field]
 type = "string"
