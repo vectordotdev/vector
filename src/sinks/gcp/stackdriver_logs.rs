@@ -106,7 +106,7 @@ lazy_static! {
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
+        let creds = Some(self.auth.make_required_credentials(Scope::LoggingWrite)?);
 
         let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -189,7 +189,7 @@ impl StackdriverConfig {
             .call(request)
             .map_err(Into::into)
             .and_then(healthcheck_response(
-                sink.creds.clone(),
+                sink.creds,
                 HealthcheckError::NotFound.into(),
             ));
 

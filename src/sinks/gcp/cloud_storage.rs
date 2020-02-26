@@ -39,7 +39,7 @@ const BASE_URL: &str = "https://storage.googleapis.com/";
 struct GcsSink {
     bucket: String,
     client: HttpClient,
-    creds: Option<GcpCredentials>,
+    creds: GcpCredentials,
     base_url: String,
     settings: RequestSettings,
 }
@@ -199,7 +199,9 @@ enum HealthcheckError {
 
 impl GcsSink {
     fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
-        let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
+        let creds = config
+            .auth
+            .make_required_credentials(Scope::DevStorageReadWrite)?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
@@ -250,16 +252,14 @@ impl GcsSink {
         builder.uri(self.base_url.parse::<Uri>()?);
 
         let mut request = builder.body(Body::empty()).unwrap();
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.creds.apply(&mut request);
 
         let healthcheck =
             self.client
                 .call(request)
                 .map_err(Into::into)
                 .and_then(healthcheck_response(
-                    self.creds.clone(),
+                    Some(self.creds.clone()),
                     GcsError::BucketNotFound {
                         bucket: self.bucket.clone(),
                     }
@@ -304,9 +304,7 @@ impl Service<RequestWrapper> for GcsSink {
         }
 
         let mut request = builder.body(Body::from(request.body)).unwrap();
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.creds.apply(&mut request);
 
         self.client.call(request)
     }

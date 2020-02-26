@@ -21,6 +21,8 @@ pub mod stackdriver_logs;
 enum GcpError {
     #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
     MissingAuth,
+    #[snafu(display("This requires credentials_path to be defined"))]
+    MissingCreds,
     #[snafu(display("Invalid GCP credentials"))]
     InvalidCredentials0,
     #[snafu(display("Invalid GCP credentials"))]
@@ -38,7 +40,7 @@ pub struct GcpAuthConfig {
 }
 
 impl GcpAuthConfig {
-    pub fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
+    pub(super) fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
         if self.api_key.is_none() && creds_path.is_none() {
@@ -49,6 +51,11 @@ impl GcpAuthConfig {
                 None => None,
             })
         }
+    }
+
+    pub(super) fn make_required_credentials(&self, scope: Scope) -> crate::Result<GcpCredentials> {
+        self.make_credentials(scope)?
+            .ok_or(GcpError::MissingCreds.into())
     }
 }
 
@@ -142,8 +149,14 @@ mod tests {
     fn fails_missing_creds() {
         let config: GcpAuthConfig = toml::from_str("").unwrap();
         match config.make_credentials(Scope::Compute) {
-            Ok(_) => panic!("make_credentials failed to error"),
+            Ok(_) => panic!("make_credentials failed to error with neither"),
             Err(err) => assert_downcast_matches!(err, GcpError, GcpError::MissingAuth),
+        }
+
+        let config: GcpAuthConfig = toml::from_str("api_key=\"broken\"").unwrap();
+        match config.make_required_credentials(Scope::Compute) {
+            Ok(_) => panic!("make_required_credentials failed to error with api_key"),
+            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::MissingCreds),
         }
     }
 }
