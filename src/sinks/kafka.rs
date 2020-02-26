@@ -10,6 +10,7 @@ use futures::{
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
+use futures03::compat::Compat;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
@@ -60,7 +61,7 @@ pub struct KafkaSink {
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
-    in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
+    in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
     acker: Acker,
     seq_head: usize,
@@ -157,7 +158,8 @@ impl Sink for KafkaSink {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
-        self.in_flight.push(future.join(future::ok(seqno)));
+        self.in_flight
+            .push(Compat::new(future).join(future::ok(seqno)));
         Ok(AsyncSink::Ready)
     }
 
