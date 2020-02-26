@@ -225,8 +225,8 @@ tests only for `console` sink using
 cargo test --lib --no-default-features --features sinks-console sinks::console
 ```
 
-In case if only the component file changed, it is around 4 times faster than building
-tests with all features.
+In case if the tests are already built and only the component file changed, it is
+around 4 times faster than rebuilding tests with all features.
 
 #### Documentation
 
