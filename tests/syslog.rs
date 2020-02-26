@@ -32,6 +32,7 @@ fn test_tcp_syslog() {
         "in",
         SyslogConfig::new(Mode::Tcp {
             address: in_addr.into(),
+            tls: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));

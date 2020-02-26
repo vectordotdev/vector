@@ -78,7 +78,6 @@ where
                     let to_remove = log_event
                         .keys()
                         .filter(|f| !only_fields.contains(f))
-                        .cloned()
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
                         log_event.remove(&removal);

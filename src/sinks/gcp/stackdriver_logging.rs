@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::{Event, Unflatten},
+    event::{Event, LogEvent},
     sinks::{
         util::{
             encoding::EncodingConfig,
@@ -218,7 +218,7 @@ fn make_request<T>(body: T) -> Request<T> {
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Vec<u8> {
     encoding.apply_rules(&mut event);
     let entry = LogEntry {
-        json_payload: event.into_log().unflatten(),
+        json_payload: event.into_log(),
     };
     let mut json = serde_json::to_vec(&entry).unwrap();
     json.push(b',');
@@ -241,7 +241,7 @@ struct WriteRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LogEntry {
-    json_payload: Unflatten,
+    json_payload: LogEvent,
 }
 
 #[derive(Serialize)]

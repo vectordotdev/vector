@@ -29,3 +29,5 @@ unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\
 """
+
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.vector.options", relevant: "") %>

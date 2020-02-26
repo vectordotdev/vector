@@ -637,6 +637,50 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
+  #
+  # Tls
+  #
+
+  [sources.socket.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    # * relevant when mode = "tcp"
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
   # The component type. This is a required field that tells Vector which
@@ -776,8 +820,52 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
+  #
+  # Tls
+  #
+
+  [sources.syslog.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -803,6 +891,46 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   # * unit: seconds
   shutdown_timeout_secs = 30
+
+  #
+  # Tls
+  #
+
+  [sources.vector.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
 
 
 # ------------------------------------------------------------------------------

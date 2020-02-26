@@ -52,7 +52,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
     let log = event.into_log();
 
     let b = match encoding.format {
-        Encoding::Json => serde_json::to_vec(&log.unflatten()),
+        Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
                 .get(&event::log_schema().message_key())

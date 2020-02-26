@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::{tls::TlsSettings, Event};
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
@@ -11,11 +11,13 @@ use std::{
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     codec::{Decoder, FramedRead},
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
+    prelude::AsyncRead,
     reactor::Handle,
     timer,
 };
-use tracing::field;
+use tokio_tls::TlsAcceptor;
+use tracing::{field, Span};
 use tracing_futures::Instrument;
 
 pub trait TcpSource: Clone + Send + 'static {
@@ -33,6 +35,7 @@ pub trait TcpSource: Clone + Send + 'static {
         self,
         addr: SocketListenAddr,
         shutdown_timeout_secs: u64,
+        tls: Option<TlsSettings>,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
@@ -111,23 +114,16 @@ pub trait TcpSource: Clone + Send + 'static {
 
                     let source = self.clone();
                     span.in_scope(|| {
-                        debug!("accepted a new socket.");
-
-                        let out = out.clone();
-
-                        let events_in = FramedRead::new(socket, source.decoder())
-                            .take_until(tripwire)
-                            .filter_map(move |frame| {
-                                let host = host.clone();
-                                source.build_event(frame, host)
-                            })
-                            .map_err(|error| warn!(message = "connection error.", %error));
-
-                        let handler = events_in.forward(out).map(|_| debug!("connection closed."));
-
-                        tokio::spawn(handler.instrument(span.clone()));
+                        accept_socket(
+                            span.clone(),
+                            socket,
+                            source,
+                            tripwire,
+                            host,
+                            out.clone(),
+                            tls.clone(),
+                        )
                     });
-
                     Ok(())
                 })
                 .inspect(|_| trigger.cancel());
@@ -136,6 +132,54 @@ pub trait TcpSource: Clone + Send + 'static {
 
         Ok(Box::new(source))
     }
+}
+
+fn accept_socket(
+    span: Span,
+    socket: TcpStream,
+    source: impl TcpSource,
+    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
+    host: Option<Bytes>,
+    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
+    tls: Option<TlsSettings>,
+) {
+    debug!("accepted a new socket.");
+
+    match tls {
+        Some(tls) => match tls.acceptor() {
+            Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
+            Ok(acceptor) => {
+                let inner_span = span.clone();
+                let handler = TlsAcceptor::from(acceptor)
+                    .accept(socket)
+                    .map_err(|error| warn!(message = "TLS connection accept error.", %error))
+                    .map(|socket| handle_stream(inner_span, socket, source, tripwire, host, out));
+
+                tokio::spawn(handler.instrument(span.clone()));
+            }
+        },
+        None => handle_stream(span, socket, source, tripwire, host, out),
+    }
+}
+
+fn handle_stream(
+    span: Span,
+    socket: impl AsyncRead + Send + 'static,
+    source: impl TcpSource,
+    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
+    host: Option<Bytes>,
+    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
+) {
+    let handler = FramedRead::new(socket, source.decoder())
+        .take_until(tripwire)
+        .filter_map(move |frame| {
+            let host = host.clone();
+            source.build_event(frame, host)
+        })
+        .map_err(|error| warn!(message = "connection error.", %error))
+        .forward(out)
+        .map(|_| debug!("connection closed."));
+    tokio::spawn(handler.instrument(span));
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]

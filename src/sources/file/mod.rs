@@ -296,7 +296,10 @@ pub fn file_source(
         let span = info_span!("file_server");
         thread::spawn(move || {
             let _enter = span.enter();
-            file_server.run(tx.sink_map_err(drop), shutdown_rx);
+            file_server.run(
+                futures03::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
+                shutdown_rx,
+            );
         });
 
         // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,
@@ -808,7 +811,7 @@ mod tests {
 
             let received = wait_with_timeout(rx.into_future()).0.unwrap();
             assert_eq!(
-                received.as_log().keys().cloned().collect::<HashSet<_>>(),
+                received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     event::log_schema().host_key().clone(),
                     event::log_schema().message_key().clone(),

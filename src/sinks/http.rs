@@ -155,7 +155,7 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Ndjson => {
-                let mut b = serde_json::to_vec(&event.unflatten())
+                let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                     .ok()?;
                 b.push(b'\n');
@@ -163,7 +163,7 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Json => {
-                let mut b = serde_json::to_vec(&event.unflatten())
+                let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                     .ok()?;
                 b.push(b',');
