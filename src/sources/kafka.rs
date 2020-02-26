@@ -5,11 +5,12 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
+use futures03::compat::Compat;
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
-    error::KafkaResult,
+    error::KafkaError,
     message::{BorrowedMessage, Message},
 };
 use serde::{Deserialize, Serialize};
@@ -102,7 +103,7 @@ fn kafka_source(
         let stream = OwnedConsumerStream {
             upstream: OwningHandle::new_with_fn(consumer, |c| {
                 let cf = unsafe { &*c };
-                Box::new(cf.start())
+                Box::new(Compat::new(cf.start()))
             }),
         };
 
@@ -110,8 +111,7 @@ fn kafka_source(
             .then(move |message| {
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
-                    Ok(Err(e)) => Err(error!(message = "Kafka returned error", error = ?e)),
-                    Ok(Ok(msg)) => {
+                    Ok(msg) => {
                         let payload = match msg.payload_view::<[u8]>() {
                             None => return Err(()), // skip messages with empty payload
                             Some(Err(e)) => {
@@ -180,13 +180,15 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
 }
 
 struct OwnedConsumerStream {
-    upstream:
-        OwningHandle<Arc<StreamConsumer>, Box<MessageStream<'static, DefaultConsumerContext>>>,
+    upstream: OwningHandle<
+        Arc<StreamConsumer>,
+        Box<Compat<MessageStream<'static, DefaultConsumerContext>>>,
+    >,
 }
 
 impl Stream for OwnedConsumerStream {
-    type Item = KafkaResult<BorrowedMessage<'static>>;
-    type Error = ();
+    type Item = BorrowedMessage<'static>;
+    type Error = KafkaError;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.upstream.poll()
