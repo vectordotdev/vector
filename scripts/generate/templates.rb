@@ -449,6 +449,10 @@ class Templates
     end
   end
 
+  def vector_summary
+    render("#{partials_path}/_vector_summary.md", binding).strip
+  end
+
   def write_verb_link(sink)
     if sink.batching?
       "[#{sink.plural_write_verb.humanize}](#buffers--batches)"
