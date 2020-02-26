@@ -14,9 +14,7 @@ use futures03::compat::Future01CompatExt;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
@@ -382,7 +380,7 @@ fn with_prefix(name: &str) -> String {
 }
 
 #[cfg(test)]
-mod regular_tests {
+mod tests {
     use super::{KubePodMetadata, TransformConfig, TransformContext};
     use crate::test_util::runtime;
 
@@ -401,7 +399,7 @@ mod regular_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod integration_tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
     use crate::sources::kubernetes::test::{echo, logs, user_namespace, Kube, VECTOR_YAML};
