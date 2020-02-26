@@ -242,6 +242,7 @@ mod integration_test {
         test_util::{collect_n, random_string, runtime},
     };
     use futures::{sync::mpsc, Future};
+    use futures03::compat::Compat;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
@@ -260,8 +261,7 @@ mod integration_test {
 
         let record = FutureRecord::to(topic).payload(text).key(key);
 
-        producer
-            .send(record, 0)
+        Compat::new(producer.send(record, 0))
             .map(|_| ())
             .map_err(|e| panic!("Cannot send event to Kafka: {:?}", e))
     }
