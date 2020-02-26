@@ -26875,6 +26875,28 @@ module.exports = {
 
       ]
     },
+    "tag_cardinality_limit": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts metric events and allows you to limit the cardinality of tags.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "filter",
+      "id": "tag_cardinality_limit_transform",
+      "name": "tag_cardinality_limit",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "tokenizer": {
       "beta": false,
       "delivery_guarantee": null,

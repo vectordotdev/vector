@@ -1,0 +1,67 @@
+<%- component = metadata.transforms.tag_cardinality_limit -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+
+## Options
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list) %>
+
+<%- end -%>
+## Output
+
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Memory Utilization
+
+This transform stores in memory a copy of the key for every tag on every metric
+event seen by this transform.  In mode `hash_set`, a copy of every distinct
+value *for each key* is also kept in memory, until `value_limit` distinct values
+have been seen for a given key, at which point new values for that key will be
+rejected.  So to estimate the memory usage of this transform in mode `hash_set`
+you can use the following formula:
+(number of distinct field names in the tags for your metrics * average length of
+the field names for the tags) + (number of distinct field names in the tags of
+your metrics * `value_limit` * average length of the values of tags for your
+metrics)
+
+In mode `bloom_filter`, rather than storing all values seen for each key, each
+distinct key has a bloom filter which can probabilistically determine whether
+a given value has been seen for that key.  The formula for estimating memory
+usage in mode `bloom_filter` is:
+(number of distinct field names in the tags for your metrics * average length of
+the field names for the tags) + (number of distinct field names in the tags of
+your metrics * size of each bloom filter)
+
+The size of each bloom filter will be based on the configured `value_limit`
+and `false_positive_rate`. Higher values for `value_limit` and lower values for
+`false_positive_rate` result in larger bloom filters.  The exact formula for
+calculating the size of the bloom filter is complex, but there are many
+free bloom filter size calculators available online. The formula is generally
+presented in terms of 'n', 'p', 'k', and 'm' where 'n' is the number of items
+in the filter (`value_limit` in our case), 'p' is the probability of false
+positives (`false_positive_rate` in our case), 'k' is the number of hash
+functions used internally, and 'm' is the number of bits in the bloom filter.
+You should be able to provide values for just 'n' and 'p' and get back the
+value for 'm' with an optional 'k' selected for you.  The value of 'm' that
+the calculator gives you will tell you the memory usage required by each
+bloom filter in this transform.  Generally speaking this mode should require
+much less memory than mode `hash_set`.

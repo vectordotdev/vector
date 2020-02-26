@@ -191,6 +191,8 @@ module.exports = {
             
               "reference/transforms/swimlanes",
             
+              "reference/transforms/tag_cardinality_limit",
+            
               "reference/transforms/tokenizer",
             
           ]

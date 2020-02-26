@@ -1,0 +1,66 @@
+[transforms.tag_cardinality_limit]
+title = "Tag Cardinality Limit"
+allow_you_to_description = "limit the cardinality of tags"
+beta = false
+common = false
+function_category = "filter"
+input_types = ["metric"]
+output_types = ["metric"]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "tag_cardinality_limit") %>
+
+[transforms.tag_cardinality_limit.options.value_limit]
+type = "int"
+common = true
+default = 500
+examples = [500]
+description = "How many distinct values to accept for any given key."
+
+[transforms.tag_cardinality_limit.options.limit_exceeded_action]
+type = "string"
+common = true
+default = "drop_tag"
+description = """\
+Controls what should happen when a metric comes in with a tag that would \
+exceed the configured limit on cardinality.\
+"""
+
+[transforms.tag_cardinality_limit.options.limit_exceeded_action.enum]
+drop_tag = "Remove tags that would exceed the configured limit from the incoming metric"
+drop_event = "Drop any metric events that contain tags that would exceed the configured limit"
+
+[transforms.tag_cardinality_limit.options.mode]
+type = "string"
+common = true
+required = true
+description = """\
+Controls what approach is used internally to keep track of previously seen \
+tags and deterime when a tag on an incoming metric exceeds the limit.\
+"""
+
+[transforms.tag_cardinality_limit.options.mode.enum]
+hash_set = """\
+Uses a HashSet internally to keep track of previously seen tag values. Has \
+higher memory requirements than `bloom_filter`, but never falsely outputs \
+metrics with new tags after the limit has been hit.\
+"""
+bloom_filter= """\
+Uses a BloomFilter internally to keep track of previously seen tag values. \
+Has lower memory requirements than `hash_set`, but may occassionally allow \
+metric events to pass through the transform even when they contain new tags \
+that exceed the configured limit.  The rate at which this happens can be \
+controlled by changing the value of `false_positive_rate`.\
+"""
+
+[transforms.tag_cardinality_limit.options.false_positive_rate]
+type = "float"
+common = true
+default = 0.00001
+examples = [0.00001]
+relevant_when = {mode = "bloom_filter"}
+description = """\
+Controls how likely it is that a metric with a new tag after the limit has \
+been reached isn't caught by the transform. Lower values make this less likely \
+at the cost of higher memory usage.\
+"""
