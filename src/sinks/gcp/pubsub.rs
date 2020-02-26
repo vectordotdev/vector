@@ -3,19 +3,19 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            http::{https_client, HttpRetryLogic, HttpService},
-            BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+            http::{https_client, BatchedHttpSink, HttpSink},
+            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink, UriParseError,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes::{BufMut, BytesMut};
-use futures01::{stream::iter_ok, Future, Sink};
-use http::{Method, Uri};
-use hyper::{Body, Request};
+use futures01::Future;
+use http::Uri;
+use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
@@ -48,16 +48,23 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        // We only need to load the credentials if we are not targetting an emulator.
-        let creds = match self.emulator_host {
-            None => self.auth.make_credentials(Scope::PubSub)?,
-            Some(_) => None,
-        };
+        let sink = PubsubSink::from_config(self)?;
+        let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let request_settings = self.request.unwrap_with(&Default::default());
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
 
-        let sink = self.service(&cx, &creds)?;
-        let healthcheck = self.healthcheck(&cx, &creds)?;
+        let healthcheck = sink.healthcheck(&cx, &tls_settings)?;
 
-        Ok((sink, healthcheck))
+        let sink = BatchedHttpSink::new(
+            sink,
+            JsonArrayBuffer::default(),
+            request_settings,
+            batch_settings,
+            Some(tls_settings),
+            &cx,
+        );
+
+        Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -69,57 +76,45 @@ impl SinkConfig for PubsubConfig {
     }
 }
 
-impl PubsubConfig {
-    fn service(
-        &self,
-        cx: &SinkContext,
-        creds: &Option<GcpCredentials>,
-    ) -> crate::Result<RouterSink> {
-        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
-        let request = self.request.unwrap_with(&Default::default());
+struct PubsubSink {
+    api_key: Option<String>,
+    creds: Option<GcpCredentials>,
+    uri_base: String,
+}
 
-        let uri = self.uri(":publish")?;
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let creds = creds.clone();
+impl PubsubSink {
+    fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
+        // We only need to load the credentials if we are not targetting an emulator.
+        let creds = match config.emulator_host {
+            None => config.auth.make_credentials(Scope::PubSub)?,
+            Some(_) => None,
+        };
 
-        let http_service = HttpService::builder(cx.resolver())
-            .tls_settings(tls_settings)
-            .build(move |logs: Vec<u8>| {
-                let mut builder = hyper::Request::builder();
-                builder.method(Method::POST);
-                builder.uri(uri.clone());
-                builder.header("Content-Type", "application/json");
+        let uri_base = match config.emulator_host.as_ref() {
+            Some(host) => format!("http://{}", host),
+            None => "https://pubsub.googleapis.com".into(),
+        };
+        let uri_base = format!(
+            "{}/v1/projects/{}/topics/{}",
+            uri_base, config.project, config.topic,
+        );
 
-                let mut request = builder.body(make_body(logs)).unwrap();
-                if let Some(creds) = creds.as_ref() {
-                    creds.apply(&mut request);
-                }
-
-                request
-            });
-
-        let sink = request
-            .batch_sink(HttpRetryLogic, http_service, cx.acker())
-            .batched_with_min(Buffer::new(false), &batch)
-            .with_flat_map(|event| iter_ok(Some(encode_event(event))));
-
-        Ok(Box::new(sink))
+        Ok(Self {
+            api_key: config.auth.api_key.clone(),
+            creds,
+            uri_base,
+        })
     }
 
-    fn healthcheck(
-        &self,
-        cx: &SinkContext,
-        creds: &Option<GcpCredentials>,
-    ) -> crate::Result<Healthcheck> {
+    fn healthcheck(&self, cx: &SinkContext, tls: &TlsSettings) -> crate::Result<Healthcheck> {
         let uri = self.uri("")?;
         let mut request = Request::get(uri).body(Body::empty()).unwrap();
-        if let Some(creds) = creds.as_ref() {
+        if let Some(creds) = self.creds.as_ref() {
             creds.apply(&mut request);
         }
 
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = https_client(cx.resolver(), tls)?;
-        let creds = creds.clone();
+        let client = https_client(cx.resolver(), tls.clone())?;
+        let creds = self.creds.clone();
         let healthcheck =
             client
                 .request(request)
@@ -132,78 +127,49 @@ impl PubsubConfig {
     }
 
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
-        let base = match self.emulator_host.as_ref() {
-            Some(host) => format!("http://{}", host),
-            None => "https://pubsub.googleapis.com".into(),
-        };
-        let uri = format!(
-            "{}/v1/projects/{}/topics/{}{}",
-            base, self.project, self.topic, suffix
-        );
-        let uri = match &self.auth.api_key {
-            Some(key) => format!("{}?key={}", uri, key),
-            None => uri,
-        };
+        let mut uri = format!("{}{}", self.uri_base, suffix);
+        if let Some(key) = &self.api_key {
+            uri = format!("{}?key={}", uri, key);
+        }
         uri.parse::<Uri>()
             .context(UriParseError)
             .map_err(Into::into)
     }
 }
 
-const BODY_PREFIX: &str = "{\"messages\":[";
-const BODY_SUFFIX: &str = "]}";
+impl HttpSink for PubsubSink {
+    type Input = Value;
+    type Output = Vec<BoxedRawValue>;
 
-fn make_body(logs: Vec<u8>) -> Vec<u8> {
-    // It would be cleaner to use serde_json, but doing it manually is
-    // more efficient and not much more complicated.
-    let mut body = BytesMut::with_capacity(logs.len() + BODY_PREFIX.len() + BODY_SUFFIX.len());
-    body.put(BODY_PREFIX);
-    if logs.len() > 0 {
-        body.put(&logs[..logs.len() - 1]);
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+        // Each event needs to be base64 encoded, and put into a JSON object
+        // as the `data` item.
+        let json = serde_json::to_string(&event.into_log()).unwrap();
+        Some(json!({ "data": base64::encode(&json) }))
     }
-    body.put(BODY_SUFFIX);
 
-    body.into_iter().collect()
-}
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let body = json!({ "messages": events });
+        let body = serde_json::to_vec(&body).unwrap();
 
-fn encode_event(event: Event) -> Vec<u8> {
-    // Each event needs to be base64 encoded, and put into a JSON object
-    // as the `data` item. A trailing comma is added to support multiple
-    // events per request, and is stripped in `make_body`.
-    let json = serde_json::to_string(&event.into_log()).unwrap();
-    format!("{{\"data\":\"{}\"}},", base64::encode(&json)).into_bytes()
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(self.uri(":publish").unwrap());
+        builder.header("Content-Type", "application/json");
+
+        let mut request = builder.body(body).unwrap();
+        if let Some(creds) = &self.creds {
+            creds.apply(&mut request);
+        }
+
+        request
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LogEvent, test_util::runtime};
-    use std::iter::FromIterator;
-
-    #[test]
-    fn encode_valid1() {
-        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let body = make_body(encode_event(log.into()));
-        let body = String::from_utf8_lossy(&body);
-        assert_eq!(
-            body,
-            "{\"messages\":[{\"data\":\"eyJtZXNzYWdlIjoiaGVsbG8gd29ybGQifQ==\"}]}"
-        );
-    }
-
-    #[test]
-    fn encode_valid2() {
-        let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
-        let mut event = encode_event(log1.into());
-        event.extend(encode_event(log2.into()));
-        let body = make_body(event);
-        let body = String::from_utf8_lossy(&body);
-        assert_eq!(
-            body,
-            "{\"messages\":[{\"data\":\"eyJtZXNzYWdlIjoiaGVsbG8gd29ybGQifQ==\"},{\"data\":\"eyJtZXNzYWdlIjoia2lsbHJveSB3YXMgaGVyZSJ9\"}]}"
-        );
-    }
+    use crate::test_util::runtime;
 
     #[test]
     fn fails_missing_creds() {
@@ -231,6 +197,7 @@ mod integration_tests {
         runtime::Runtime,
         test_util::{block_on, random_events_with_stream, random_string},
     };
+    use futures01::Sink;
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
