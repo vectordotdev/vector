@@ -1,9 +1,8 @@
 use super::Transform;
 use crate::{
     event::{Event, Value},
-    runtime::TaskExecutor,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -45,7 +44,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 
@@ -186,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn add_fields_preseves_types() {
+    fn add_fields_preserves_types() {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();

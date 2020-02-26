@@ -1,5 +1,7 @@
+<%- groups ||= [] -%>
 [<%= namespace %>.buffer]
 type = "table"
+groups = <%= groups.to_json %>
 description = "Configures the sink specific buffer behavior."
 
 [<%= namespace %>.buffer.children.max_events]
@@ -23,8 +25,8 @@ description = "The maximum size of the buffer on the disk."
 [<%= namespace %>.buffer.children.type]
 type = "string"
 default = "memory"
-prioritize = true
 required = true
+sort = 1
 description = "The buffer's type and storage mechanism."
 
 [<%= namespace %>.buffer.children.type.enum]

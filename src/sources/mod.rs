@@ -1,4 +1,4 @@
-use futures::Future;
+use futures01::Future;
 use snafu::Snafu;
 
 pub mod docker;

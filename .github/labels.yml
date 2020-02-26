@@ -163,6 +163,9 @@
 - name: "provider: google"
   description: Anything Google related
   color: ff9f43
+- name: "provider: influxdata"
+  description: Anything InfluxData related
+  color: ff9f43
 - name: "provider: confluent"
   description: Anything Confluent related
   color: ff9f43
@@ -261,11 +264,17 @@
 - name: "transform: remove_tags"
   description: Anything `remove_tags` transform related
   color: 54a0ff
+- name: "transform: rename_fields"
+  description: Anything `rename_fields` transform related
+  color: 54a0ff
 - name: "transform: sampler"
   description: Anything `sampler` transform related
   color: 54a0ff
 - name: "transform: split"
   description: Anything `split` transform related
+  color: 54a0ff
+- name: "transform: swimlanes"
+  description: Anything `swimlanes` transform related
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
@@ -304,6 +313,9 @@
 - name: "sink: file"
   description: Anything `file` sink related
   color: 4ddbfb
+- name: "sink: gcp_cloud_storage"
+  description: Anything `gcp_cloud_storage` sink related
+  color: 4ddbfb
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
@@ -318,6 +330,9 @@
   color: 4ddbfb
 - name: "sink: humio_logs"
   description: Anything `humio_logs` sink related
+  color: 4ddbfb
+- name: "sink: influxdb_metrics"
+  description: Anything `influxdb_metrics` sink related
   color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related
@@ -334,8 +349,8 @@
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb
-- name: "sink: sematext"
-  description: Anything `sematext` sink related
+- name: "sink: sematext_logs"
+  description: Anything `sematext_logs` sink related
   color: 4ddbfb
 - name: "sink: socket"
   description: Anything `socket` sink related

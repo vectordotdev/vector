@@ -4,7 +4,7 @@ use crate::{
 };
 use bytes::Buf;
 use chrono::{DateTime, Utc};
-use futures::{sync::mpsc, Future, Sink};
+use futures01::{sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::{
@@ -51,7 +51,7 @@ impl SourceConfig for LogplexConfig {
 
                 let out = out.clone();
                 let trigger = trigger.clone();
-                out.send_all(futures::stream::iter_ok(events))
+                out.send_all(futures01::stream::iter_ok(events))
                     .map_err(move |_: mpsc::SendError<Event>| {
                         error!("Failed to forward events, downstream is closed");
                         // shut down the http server if someone hasn't already
@@ -134,7 +134,7 @@ mod tests {
         topology::config::{GlobalOptions, SourceConfig},
     };
     use chrono::{DateTime, Utc};
-    use futures::sync::mpsc;
+    use futures01::sync::mpsc;
     use http::Method;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;

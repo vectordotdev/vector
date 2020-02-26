@@ -442,6 +442,8 @@ services:
         - ec2_metadata
         - gcloud-pubsub
         - loki
+        - influxdb_v1
+        - influxdb_v2
 
     localstack:
       image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
@@ -528,7 +530,6 @@ services:
         - 8681-8682:8681-8682
       environment:
         - PUBSUB_PROJECT1=testproject,topic1:subscription1
-
     loki:
       image: grafana/loki
       ports:
@@ -536,3 +537,14 @@ services:
       command: -config.file=/etc/loki/loki-config.yaml
       volumes:
           - ./tests/data:/etc/loki
+    influxdb_v1:
+      image: influxdb:1.7
+      ports:
+        - "8086:8086"
+      environment:
+        - INFLUXDB_REPORTING_DISABLED=true
+    influxdb_v2:
+      image: quay.io/influxdb/influxdb:2.0.0-beta
+      ports:
+        - "9999:9999"
+      command: influxd --reporting-disabled

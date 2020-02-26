@@ -1,5 +1,5 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::Future;
+use futures01::Future;
 use hyper::service::service_fn_ok;
 use hyper::{Body, Response, Server};
 use std::net::SocketAddr;

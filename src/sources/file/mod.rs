@@ -3,17 +3,19 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
-use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::{HashMap, VecDeque};
+use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
-use tokio::timer::DelayQueue;
+
+mod line_agg;
+use line_agg::LineAgg;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -42,6 +44,24 @@ enum BuildError {
         indicator: String,
         source: regex::Error,
     },
+    #[snafu(display(
+        "unable to parse multiline start pattern from {:?}: {}",
+        start_pattern,
+        source
+    ))]
+    InvalidMultilineStartPattern {
+        start_pattern: String,
+        source: regex::Error,
+    },
+    #[snafu(display(
+        "unable to parse multiline condition pattern from {:?}: {}",
+        condition_pattern,
+        source
+    ))]
+    InvalidMultilineConditionPattern {
+        condition_pattern: String,
+        source: regex::Error,
+    },
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -60,8 +80,45 @@ pub struct FileConfig {
     pub fingerprinting: FingerprintingConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
+    pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,
     pub oldest_first: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MultilineConfig {
+    pub start_pattern: String,
+    pub condition_pattern: String,
+    pub mode: line_agg::Mode,
+    pub timeout_ms: u64,
+}
+
+impl TryFrom<&MultilineConfig> for line_agg::Config {
+    type Error = crate::Error;
+
+    fn try_from(config: &MultilineConfig) -> crate::Result<Self> {
+        let MultilineConfig {
+            start_pattern,
+            condition_pattern,
+            mode,
+            timeout_ms,
+        } = config;
+
+        let start_pattern = Regex::new(start_pattern)
+            .with_context(|| InvalidMultilineStartPattern { start_pattern })?;
+        let condition_pattern = Regex::new(condition_pattern)
+            .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
+        let mode = mode.clone();
+        let timeout = Duration::from_millis(*timeout_ms);
+
+        Ok(Self {
+            start_pattern,
+            condition_pattern,
+            mode,
+            timeout,
+        })
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -112,6 +169,7 @@ impl Default for FileConfig {
             glob_minimum_cooldown: 1000, // millis
             message_start_indicator: None,
             multi_line_timeout: 1000, // millis
+            multiline: None,
             max_read_bytes: 2048,
             oldest_first: false,
         }
@@ -135,6 +193,10 @@ impl SourceConfig for FileConfig {
         // without the file servers' checkpointers interfering with each
         // other
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
+
+        if let Some(ref config) = self.multiline {
+            let _: line_agg::Config = config.try_into()?;
+        }
 
         if let Some(ref indicator) = self.message_start_indicator {
             Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
@@ -186,20 +248,28 @@ pub fn file_source(
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
+    let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
         // sizing here is just a guess
-        let (tx, rx) = futures::sync::mpsc::channel(100);
+        let (tx, rx) = futures01::sync::mpsc::channel(100);
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
-            if let Some(msi) = message_start_indicator {
+            if let Some(ref multiline_config) = multiline_config {
                 Box::new(LineAgg::new(
                     rx,
-                    Regex::new(&msi).unwrap(), // validated in build
-                    multi_line_timeout,
+                    multiline_config.try_into().unwrap(), // validated in build
+                ))
+            } else if let Some(msi) = message_start_indicator {
+                Box::new(LineAgg::new(
+                    rx,
+                    line_agg::Config::for_legacy(
+                        Regex::new(&msi).unwrap(), // validated in build
+                        multi_line_timeout,
+                    ),
                 ))
             } else {
                 Box::new(rx)
@@ -226,103 +296,16 @@ pub fn file_source(
         let span = info_span!("file_server");
         thread::spawn(move || {
             let _enter = span.enter();
-            file_server.run(tx.sink_map_err(drop), shutdown_rx);
+            file_server.run(
+                futures::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
+                shutdown_rx,
+            );
         });
 
         // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,
         // so it needs to be held onto until the future we return is dropped.
         future::empty().inspect(|_| drop(shutdown_tx))
     }))
-}
-
-struct LineAgg<T> {
-    inner: T,
-    marker: Regex,
-    timeout: u64,
-    buffers: HashMap<String, BytesMut>,
-    draining: Option<Vec<(Bytes, String)>>,
-    timeouts: DelayQueue<String>,
-    expired: VecDeque<String>,
-}
-
-impl<T> LineAgg<T> {
-    fn new(inner: T, marker: Regex, timeout: u64) -> Self {
-        Self {
-            inner,
-            marker,
-            timeout,
-            draining: None,
-            buffers: HashMap::new(),
-            timeouts: DelayQueue::new(),
-            expired: VecDeque::new(),
-        }
-    }
-}
-
-impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
-    type Item = (Bytes, String);
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            if let Some(to_drain) = &mut self.draining {
-                if let Some((data, key)) = to_drain.pop() {
-                    return Ok(Async::Ready(Some((data, key))));
-                } else {
-                    return Ok(Async::Ready(None));
-                }
-            }
-
-            // check for keys that have hit their timeout
-            while let Ok(Async::Ready(Some(expired_key))) = self.timeouts.poll() {
-                self.expired.push_back(expired_key.into_inner());
-            }
-
-            match self.inner.poll() {
-                Ok(Async::Ready(Some((line, src)))) => {
-                    // look for buffered content from same source
-                    if self.buffers.contains_key(&src) {
-                        if self.marker.is_match(line.as_ref()) {
-                            // buffer the incoming line and flush the existing data
-                            let buffered = self
-                                .buffers
-                                .insert(src.clone(), line.into())
-                                .expect("already asserted key is present");
-                            return Ok(Async::Ready(Some((buffered.freeze(), src))));
-                        } else {
-                            // append new line to the buffered data
-                            let buffered = self
-                                .buffers
-                                .get_mut(&src)
-                                .expect("already asserted key is present");
-                            buffered.extend_from_slice(b"\n");
-                            buffered.extend_from_slice(&line);
-                        }
-                    } else {
-                        // no existing data for this source so buffer it with timeout
-                        self.timeouts
-                            .insert(src.clone(), Duration::from_millis(self.timeout));
-                        self.buffers.insert(src, line.into());
-                    }
-                }
-                Ok(Async::Ready(None)) => {
-                    // start flushing all existing data, stop polling inner
-                    self.draining =
-                        Some(self.buffers.drain().map(|(k, v)| (v.into(), k)).collect());
-                }
-                Ok(Async::NotReady) => {
-                    if let Some(key) = self.expired.pop_front() {
-                        if let Some(buffered) = self.buffers.remove(&key) {
-                            return Ok(Async::Ready(Some((buffered.freeze(), key))));
-                        }
-                    }
-
-                    return Ok(Async::NotReady);
-                }
-                Err(()) => return Err(()),
-            };
-        }
-    }
 }
 
 fn create_event(
@@ -354,7 +337,7 @@ mod tests {
         test_util::{block_on, shutdown_on_idle},
         topology::Config,
     };
-    use futures::{Future, Stream};
+    use futures01::{Future, Stream};
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
@@ -480,7 +463,7 @@ mod tests {
     #[test]
     fn file_happy_path() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -542,7 +525,7 @@ mod tests {
     #[test]
     fn file_truncate() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -611,7 +594,7 @@ mod tests {
     #[test]
     fn file_rotate() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -681,7 +664,7 @@ mod tests {
     #[test]
     fn file_multiple_paths() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(4 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(4 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -746,7 +729,7 @@ mod tests {
 
         // Default
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -775,7 +758,7 @@ mod tests {
 
         // Custom
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -805,7 +788,7 @@ mod tests {
 
         // Hidden
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -828,7 +811,7 @@ mod tests {
 
             let received = wait_with_timeout(rx.into_future()).0.unwrap();
             assert_eq!(
-                received.as_log().keys().cloned().collect::<HashSet<_>>(),
+                received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     event::log_schema().host_key().clone(),
                     event::log_schema().message_key().clone(),
@@ -858,7 +841,7 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -880,7 +863,7 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -907,7 +890,7 @@ mod tests {
                 start_at_beginning: true,
                 ..test_default_file_config(&dir)
             };
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -943,7 +926,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -969,7 +952,7 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -999,7 +982,7 @@ mod tests {
         use std::time::{Duration, SystemTime};
 
         let mut rt = runtime::Runtime::new().unwrap();
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1084,7 +1067,7 @@ mod tests {
 
     #[test]
     fn file_max_line_bytes() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1143,8 +1126,8 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_line_aggregation() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+    fn test_multi_line_aggregation_legacy() {
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1216,8 +1199,85 @@ mod tests {
     }
 
     #[test]
+    fn test_multi_line_aggregation() {
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            multiline: Some(MultilineConfig {
+                start_pattern: "INFO".to_owned(),
+                condition_pattern: "INFO".to_owned(),
+                mode: line_agg::Mode::HaltBefore,
+                timeout_ms: 25, // less than 50 in sleep()
+            }),
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+
+        let mut rt = runtime::Runtime::new().unwrap();
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep(); // The files must be observed at their original lengths before writing to them
+
+        writeln!(&mut file, "leftover foo").unwrap();
+        writeln!(&mut file, "INFO hello").unwrap();
+        writeln!(&mut file, "INFO goodbye").unwrap();
+        writeln!(&mut file, "part of goodbye").unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "INFO hi again").unwrap();
+        writeln!(&mut file, "and some more").unwrap();
+        writeln!(&mut file, "INFO hello").unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "too slow").unwrap();
+        writeln!(&mut file, "INFO doesn't have").unwrap();
+        writeln!(&mut file, "to be INFO in").unwrap();
+        writeln!(&mut file, "the middle").unwrap();
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&event::log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "leftover foo".into(),
+                "INFO hello".into(),
+                "INFO goodbye\npart of goodbye".into(),
+                "INFO hi again\nand some more".into(),
+                "INFO hello".into(),
+                "too slow".into(),
+                "INFO doesn't have".into(),
+                "to be INFO in\nthe middle".into(),
+            ]
+        );
+    }
+
+    #[test]
     fn test_fair_reads() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1282,7 +1342,7 @@ mod tests {
 
     #[test]
     fn test_oldest_first() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1347,7 +1407,7 @@ mod tests {
 
     #[test]
     fn test_gzipped_file() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();

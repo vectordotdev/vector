@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
+min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Kafka"
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
 status: "prod-ready"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -61,7 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -105,8 +104,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Kafka version >= 0.8 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -122,6 +131,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["10.14.22.123:9092,10.14.23.332:9092"]}
+  groups={[]}
   name={"bootstrap_servers"}
   path={null}
   relevantWhen={null}
@@ -144,6 +154,7 @@ A comma delimited list of host and port pairs that the Kafka client should conta
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -165,6 +176,7 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
@@ -187,6 +199,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -209,6 +222,7 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
@@ -231,6 +245,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -258,6 +273,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -280,6 +296,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -302,6 +319,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}
+  groups={[]}
   name={"key_field"}
   path={null}
   relevantWhen={null}
@@ -324,6 +342,7 @@ The log field name to use for the topic key. If unspecified, the key will be ran
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"librdkafka_options"}
   path={null}
   relevantWhen={null}
@@ -346,6 +365,7 @@ Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   defaultValue={null}
   enumValues={null}
   examples={[{"client.id":"${ENV_VAR}"},{"socket.send.buffer.bytes":"100"}]}
+  groups={[]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}
   relevantWhen={null}
@@ -374,6 +394,7 @@ The options and their values. Accepts `string` values.
   defaultValue={300000}
   enumValues={null}
   examples={[150000,450000]}
+  groups={[]}
   name={"message_timeout_ms"}
   path={null}
   relevantWhen={null}
@@ -396,6 +417,7 @@ Local message timeout.
   defaultValue={60000}
   enumValues={null}
   examples={[30000,90000]}
+  groups={[]}
   name={"socket_timeout_ms"}
   path={null}
   relevantWhen={null}
@@ -418,6 +440,7 @@ Default timeout for network requests.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -439,6 +462,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"enabled"}
   path={"tls"}
   relevantWhen={null}
@@ -461,6 +485,7 @@ Enable TLS during connections to the remote.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -483,6 +508,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -505,6 +531,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -516,7 +543,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
@@ -527,6 +554,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -554,6 +582,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={null}
   enumValues={null}
   examples={["topic-1234"]}
+  groups={[]}
   name={"topic"}
   path={null}
   relevantWhen={null}
@@ -639,6 +668,13 @@ If you'd like to disable health checks for this sink you can set the
 The `kafka` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
+### librdkafka
+
+The `kafka` sink uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
+is a battle tested, performant, and reliabile library that facilitates
+communication with Kafka. And because Vector produces static MUSL builds,
+this dependency is packaged with Vector, meaning you do not need to install it.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
@@ -650,4 +686,5 @@ event-by-event basis. It does not batch data.
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
+[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

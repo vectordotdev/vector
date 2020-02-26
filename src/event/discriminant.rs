@@ -1,5 +1,8 @@
 use super::{LogEvent, Value};
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::BTreeMap,
+    hash::{Hash, Hasher},
+};
 use string_cache::DefaultAtom as Atom;
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
@@ -100,12 +103,32 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         Value::Timestamp(val) => val.hash(hasher),
         // Non-trivial.
         Value::Float(val) => hash_f64(hasher, val),
+        Value::Array(val) => hash_array(hasher, val),
+        Value::Map(val) => hash_map(hasher, val),
+        Value::Null => hash_null(hasher),
     }
 }
 
 // Does f64 hashing that is suitable for discriminant purposes.
 fn hash_f64<H: Hasher>(hasher: &mut H, value: &f64) {
     hasher.write(&value.to_ne_bytes());
+}
+
+fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
+    for val in array.iter() {
+        hash_value(hasher, val);
+    }
+}
+
+fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<Atom, Value>) {
+    for (key, val) in map.iter() {
+        hasher.write(key.as_bytes());
+        hash_value(hasher, val);
+    }
+}
+
+fn hash_null<H: Hasher>(hasher: &mut H) {
+    hasher.write_u8(0);
 }
 
 #[cfg(test)]

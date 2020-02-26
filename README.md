@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.7.2<a/>
+    <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.0<a/>
   </strong>
 </p>
 
@@ -49,8 +49,8 @@ companies and engineering teams trying to tame observability pipelines.
 #### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [6 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [14 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_pubsub][docs.sinks.gcp_pubsub], [gcp_stackdriver_logging][docs.sinks.gcp_stackdriver_logging], and [20 more...][docs.sinks]
+* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [16 more...][docs.transforms]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [22 more...][docs.sinks]
 
 #### Administration
 
@@ -62,7 +62,7 @@ companies and engineering teams trying to tame observability pipelines.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.7.2 (latest)][urls.v0.7.2]
+* [**Releases**][urls.vector_releases] - [v0.8.0 (latest)][urls.v0.8.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -177,8 +177,8 @@ Or use your own [preferred method][docs.installation].
 [docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3/
 [docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse/
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch/
+[docs.sinks.gcp_cloud_storage]: https://vector.dev/docs/reference/sinks/gcp_cloud_storage/
 [docs.sinks.gcp_pubsub]: https://vector.dev/docs/reference/sinks/gcp_pubsub/
-[docs.sinks.gcp_stackdriver_logging]: https://vector.dev/docs/reference/sinks/gcp_stackdriver_logging/
 [docs.sinks]: https://vector.dev/docs/reference/sinks/
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker/
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file/
@@ -205,7 +205,7 @@ Or use your own [preferred method][docs.installation].
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
-[urls.v0.7.2]: https://vector.dev/releases/0.7.2/download
+[urls.v0.8.0]: https://vector.dev/releases/0.8.0/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

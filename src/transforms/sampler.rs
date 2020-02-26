@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
@@ -23,7 +22,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
             .context(super::InvalidRegex)?)

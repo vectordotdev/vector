@@ -271,12 +271,12 @@ mod test {
         event::metric::{Metric, MetricValue},
         Event,
     };
-    use futures::{future::Future, stream, Sink};
+    use futures01::{future::Future, stream, Sink};
     use pretty_assertions::assert_eq;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::time::Duration;
 
-    fn tag(name: &str) -> HashMap<String, String> {
+    fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
             .into_iter()
             .collect()

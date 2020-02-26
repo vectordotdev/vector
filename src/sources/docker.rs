@@ -5,17 +5,18 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::{
+use futures01::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
+use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
     rep::ContainerDetails,
     tty::{Chunk, StreamType},
-    Docker,
+    Docker, Error,
 };
 use std::borrow::Borrow;
 use std::sync::Arc;
@@ -582,9 +583,19 @@ impl EventStreamBuilder {
                         Ok(Async::Ready(None)) => break,
                         Ok(Async::NotReady) => Ok(Async::NotReady),
                         Err(error) => {
-                            error!(message = "docker API container logging error",%error);
-                            // On any error, restart connection
-                            break;
+                            match error {
+                                Error::Fault { code, .. } if code == StatusCode::NOT_IMPLEMENTED => {
+                                    error!(r#"docker engine is not using either `jsonfile` or `journald`
+                                            logging driver. Please enable one of these logging drivers
+                                            to get logs from the docker daemon."#);
+                                    break;
+                                }
+                                error => {
+                                    error!(message = "docker API container logging error",%error);
+                                    // On any error, restart connection
+                                    break;
+                                }
+                            }
                         }
                     };
                 }
@@ -921,7 +932,7 @@ mod tests {
     use super::*;
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
-    use futures::future;
+    use futures01::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
