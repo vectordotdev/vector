@@ -2,14 +2,14 @@ use crate::{
     sinks::util::{
         self,
         tcp::{tcp_healthcheck, TcpSink},
-        tls::{TlsOptions, TlsSettings},
         uri::UriSerde,
         Encoding,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Sink};
+use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
