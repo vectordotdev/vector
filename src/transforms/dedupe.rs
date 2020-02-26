@@ -20,13 +20,13 @@ pub enum FieldMatchConfig {
     IgnoreFields(Vec<Atom>),
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
     pub num_entries: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
     #[serde(default = "default_field_match_config")]
@@ -55,10 +55,7 @@ inventory::submit! {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Dedupe::new(
-            self.cache.num_entries,
-            self.fields.clone(),
-        )))
+        Ok(Box::new(Dedupe::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -117,12 +114,10 @@ fn type_id_for_value(val: &Value) -> TypeId {
 }
 
 impl Dedupe {
-    pub fn new(num_entries: usize, field_match_config: FieldMatchConfig) -> Self {
+    pub fn new(config: DedupeConfig) -> Self {
+        let num_entries = config.cache.num_entries;
         Self {
-            config: DedupeConfig {
-                fields: field_match_config,
-                cache: CacheConfig { num_entries },
-            },
+            config,
             cache: LruCache::new(num_entries),
         }
     }
@@ -176,32 +171,38 @@ impl Transform for Dedupe {
 #[cfg(test)]
 mod tests {
     use super::Dedupe;
-    use crate::transforms::dedupe::FieldMatchConfig;
+    use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value, transforms::Transform};
     use std::collections::BTreeMap;
     use string_cache::DefaultAtom as Atom;
 
-    fn make_match_config(fields: Vec<Atom>) -> FieldMatchConfig {
-        FieldMatchConfig::MatchFields(fields)
+    fn make_match_transform(num_entries: usize, fields: Vec<Atom>) -> Dedupe {
+        Dedupe::new(DedupeConfig {
+            cache: CacheConfig { num_entries },
+            fields: { FieldMatchConfig::MatchFields(fields) },
+        })
     }
 
-    fn make_ignore_config(given_fields: Vec<Atom>) -> FieldMatchConfig {
+    fn make_ignore_transform(num_entries: usize, given_fields: Vec<Atom>) -> Dedupe {
         // "message" and "timestamp" are added automatically to all Events
         let mut fields = vec!["message".into(), "timestamp".into()];
         fields.extend(given_fields);
 
-        FieldMatchConfig::IgnoreFields(fields)
+        Dedupe::new(DedupeConfig {
+            cache: CacheConfig { num_entries },
+            fields: { FieldMatchConfig::IgnoreFields(fields) },
+        })
     }
 
     #[test]
     fn dedupe_match_basic() {
-        let transform = Dedupe::new(5, make_match_config(vec!["matched".into()]));
+        let transform = make_match_transform(5, vec!["matched".into()]);
         basic(transform);
     }
 
     #[test]
     fn dedupe_ignore_basic() {
-        let transform = Dedupe::new(5, make_ignore_config(vec!["unmatched".into()]));
+        let transform = make_ignore_transform(5, vec!["unmatched".into()]);
         basic(transform);
     }
 
@@ -235,16 +236,13 @@ mod tests {
 
     #[test]
     fn dedupe_match_field_name_matters() {
-        let transform = Dedupe::new(
-            5,
-            make_match_config(vec!["matched1".into(), "matched2".into()]),
-        );
+        let transform = make_match_transform(5, vec!["matched1".into(), "matched2".into()]);
         field_name_matters(transform);
     }
 
     #[test]
     fn dedupe_ignore_field_name_matters() {
-        let transform = Dedupe::new(5, make_ignore_config(vec![]));
+        let transform = make_ignore_transform(5, vec![]);
         field_name_matters(transform);
     }
 
@@ -267,16 +265,13 @@ mod tests {
 
     #[test]
     fn dedupe_match_field_order_irrelevant() {
-        let transform = Dedupe::new(
-            5,
-            make_match_config(vec!["matched1".into(), "matched2".into()]),
-        );
+        let transform = make_match_transform(5, vec!["matched1".into(), "matched2".into()]);
         field_order_irrelevant(transform);
     }
 
     #[test]
     fn dedupe_ignore_field_order_irrelevant() {
-        let transform = Dedupe::new(5, make_ignore_config(vec!["randomData".into()]));
+        let transform = make_ignore_transform(5, vec!["randomData".into()]);
         field_order_irrelevant(transform);
     }
 
@@ -304,14 +299,14 @@ mod tests {
     #[test]
     fn dedupe_match_age_out() {
         // Construct transform with a cache size of only 1 entry.
-        let transform = Dedupe::new(1, FieldMatchConfig::MatchFields(vec!["matched".into()]));
+        let transform = make_match_transform(1, vec!["matched".into()]);
         age_out(transform);
     }
 
     #[test]
     fn dedupe_ignore_age_out() {
         // Construct transform with a cache size of only 1 entry.
-        let transform = Dedupe::new(1, make_ignore_config(vec![]));
+        let transform = make_ignore_transform(1, vec![]);
         age_out(transform);
     }
 
@@ -343,13 +338,13 @@ mod tests {
 
     #[test]
     fn dedupe_match_type_matching() {
-        let transform = Dedupe::new(5, make_match_config(vec!["matched".into()]));
+        let transform = make_match_transform(5, vec!["matched".into()]);
         type_matching(transform);
     }
 
     #[test]
     fn dedupe_ignore_type_matching() {
-        let transform = Dedupe::new(5, make_ignore_config(vec![]));
+        let transform = make_ignore_transform(5, vec![]);
         type_matching(transform);
     }
 
@@ -374,13 +369,13 @@ mod tests {
 
     #[test]
     fn dedupe_match_type_matching_nested_objects() {
-        let transform = Dedupe::new(5, make_match_config(vec!["matched".into()]));
+        let transform = make_match_transform(5, vec!["matched".into()]);
         type_matching_nested_objects(transform);
     }
 
     #[test]
     fn dedupe_ignore_type_matching_nested_objects() {
-        let transform = Dedupe::new(5, make_ignore_config(vec![]));
+        let transform = make_ignore_transform(5, vec![]);
         type_matching_nested_objects(transform);
     }
 
