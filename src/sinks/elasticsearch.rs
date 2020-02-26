@@ -297,7 +297,7 @@ fn encode_event(
     let mut body = serde_json::to_vec(&action).unwrap();
     body.push(b'\n');
 
-    serde_json::to_writer(&mut body, &event.into_log().unflatten()).unwrap();
+    serde_json::to_writer(&mut body, &event.into_log()).unwrap();
     body.push(b'\n');
     Some(body)
 }
@@ -562,7 +562,7 @@ mod integration_tests {
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(rec.into_log().unflatten()).unwrap())
+            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
             let event = hit.into_document().unwrap();

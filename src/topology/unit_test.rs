@@ -34,9 +34,7 @@ pub struct UnitTest {
 
 fn event_to_string(event: &Event) -> String {
     match event {
-        Event::Log(log) => {
-            serde_json::to_string(&log.clone().unflatten()).unwrap_or_else(|_| "{}".into())
-        }
+        Event::Log(log) => serde_json::to_string(&log).unwrap_or_else(|_| "{}".into()),
         Event::Metric(metric) => serde_json::to_string(&metric).unwrap_or_else(|_| "{}".into()),
     }
 }

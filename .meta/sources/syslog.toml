@@ -59,6 +59,8 @@ description = """\
 The unix socket path. *This should be absolute path.*
 """
 
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.syslog.options", relevant: "") %>
+
 [sources.syslog.output.log.fields.appname]
 type = "string"
 examples = ["app-name"]

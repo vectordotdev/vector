@@ -808,7 +808,7 @@ mod tests {
 
             let received = wait_with_timeout(rx.into_future()).0.unwrap();
             assert_eq!(
-                received.as_log().keys().cloned().collect::<HashSet<_>>(),
+                received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     event::log_schema().host_key().clone(),
                     event::log_schema().message_key().clone(),
