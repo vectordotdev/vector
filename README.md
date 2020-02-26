@@ -29,7 +29,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 * **Reliability First.** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
 * **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
-* **Single Responsibility.** - Vector does _routing_ very well, it has no plans to become a distributed, coordinated anything.
+* **Single Responsibility.** - Vector _routes_ data very well, it does not plan to become a distributed anything.
 
 #### Who should use Vector?
 
@@ -117,10 +117,10 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Data Model**
   * **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon).
-  * **Customizable log schema** - Vector does not impose a strict schema, [change Vector's log schema][docs.global-options#log_schema] to anything you like.
+  * **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
   * **Rich type system** - Support for [JSON primitive types][docs.data-model.log#types] and [timestamps][docs.data-model.log#timestamps].
-  * **Metrics interoperability* - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperality between systems.
-  * **Metrics aggregation** - [Aggregted histgorams][docs.data-model.metric#aggregated_histogram] and [aggregated summaries][docs.data-model.metric#aggregated_summary] allows for efficient processing without loss of precision.
+  * **Metrics interoperability** - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperality between systems.
+  * **Metrics aggregation** - Aggregated [histgorams][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] allow for aggreation without loss of precision.
 * **Data Flow**
   * **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
   * **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
@@ -128,26 +128,26 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Data Processing**
   * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
   * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
-  * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] make Vector programmable.
+  * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
   * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
   * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
 * **Operations**
   * **Configurable concurrency** - All CPU cores ([service][docs.roles.service]) or just one ([agent][docs.roles.agent]) via the [`--threads` flag][docs.process-management#starting].
-  * **CI friendlty** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][docs.guides.unit-testing] make Vector CI friendly.
+  * **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][docs.guides.unit-testing] make Vector CI friendly.
   * **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
   * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
   * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
   * **Zero delay start** - Starts and restarts without a delay.
-  * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation] make Vector compatible with most environmnets.
+  * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
   * **TLS support** - All relevant Vector components offer TLS options for secure communication.
 * **Reliability**
   * **Decoupled buffer design** - Buffers are coupled with sinks; a bad sink won't bring the entire pipeline to a halt.
   * **Fibnacci backoffs with jitter** - Vector's backoff algorithm makes Vector a good citizen during outages.
   * **Back pressure & load shedding** - Buffers can be configured to provide back pressure or shed load.
-  * **Memory safety** - Vector is built in Rust and memory safe, avoiding a large class of errors common in other languages.
+  * **Memory safety** - Vector is built in Rust and is memory safe, avoiding a large class of memory related errors.
   * **Rate-limited internal logging** - Vector's internal logging is rate-limited avoiding IO saturation when errors occur.
   * **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.
-  * **Durable disk buffering** - Vector uses `leveldb` which transfers data to operating system memory to improve durability.
+  * **Durable disk buffering** - Vector uses `leveldb` which transfers data to OSm memory for improved durability.
 * **UX**
   * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
   * **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
