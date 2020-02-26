@@ -305,7 +305,9 @@ mod integration_tests {
             compression: Some(Compression::None),
             encoding: EncodingConfig {
                 timestamp_format: Some(TimestampFormat::Unix),
-                ..Default::default()
+                format: Encoding::Default,
+                except_fields: None,
+                only_fields: None,
             },
             batch: BatchBytesConfig {
                 max_size: Some(1),

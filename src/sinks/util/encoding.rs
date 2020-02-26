@@ -17,11 +17,11 @@ use string_cache::DefaultAtom as Atom;
 pub struct EncodingConfig<E> {
     pub(crate) format: E,
     #[serde(default)]
-    only_fields: Option<Vec<Atom>>,
+    pub(crate) only_fields: Option<Vec<Atom>>,
     #[serde(default)]
-    except_fields: Option<Vec<Atom>>,
+    pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
-    timestamp_format: Option<TimestampFormat>,
+    pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
 impl<E: Default> Default for EncodingConfig<E> {
@@ -65,6 +65,10 @@ where
         }
         Ok(())
     }
+
+    /// Apply the EncodingConfig rules to the provided event.
+    ///
+    /// This mutates the event in place!
     pub(crate) fn apply_rules(&self, event: &mut Event) {
         // Ordering in here should not matter.
         self.except_fields(event);

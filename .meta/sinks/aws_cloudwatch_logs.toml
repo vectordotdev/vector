@@ -35,12 +35,7 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
   timeout_secs: 30
 ) %>
 
-
-<%= render("_partials/_encoding.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
-
-[sinks.aws_cloudwatch_logs.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml", namespace: "sinks.aws_cloudwatch_logs.options", encodings: ["json", "text"], required: true) %>
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"

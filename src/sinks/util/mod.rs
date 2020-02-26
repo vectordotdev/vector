@@ -16,7 +16,7 @@ use crate::buffers::Acker;
 use crate::event::{self, Event};
 use bytes::Bytes;
 use encoding::EncodingConfig;
-use futures::{
+use futures01::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use serde::{Deserialize, Serialize};

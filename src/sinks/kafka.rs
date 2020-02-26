@@ -330,7 +330,7 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
             topic: topic.clone(),
-            encoding: Encoding::Text,
+            encoding: EncodingConfig::from(Encoding::Text),
             key_field: None,
             tls,
             socket_timeout_ms: 60000,

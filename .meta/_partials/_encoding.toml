@@ -1,23 +1,38 @@
 [<%= namespace %>.encoding.format]
 type = "string"
 common = true
-required = true
+required = <%- if required -%>true<%- else -%>false<%- end -%>
 description = """\
 The encoding format used to serialize the events before outputting.\
 """
 
-[<%= namespace %>.encoding.only_fields]
+[<%= namespace %>.encoding.format.enum]
+<%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
+<%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
+<%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>
+
+[<%= namespace %>.encoding.children.only_fields]
 type = "[string]"
 required = false
-examples = ["timestamp", "message", "host"]
+examples = [["timestamp", "message", "host"]]
 description = """\
 Limit the sink to only encoding the specified labels.\
 """
 
-[<%= namespace %>.encoding.except_fields]
+[<%= namespace %>.encoding.children.except_fields]
 type = "[string]"
 required = false
-examples = ["timestamp", "message", "host"]
+examples = [["timestamp", "message", "host"]]
 description = """\
 Prevent the sink from encoding the specified labels.\
 """
+
+[<%= namespace %>.encoding.children.timestamp_format]
+type = "string"
+required = false
+default = "rfc3339"
+description = "How to format event timestamps."
+
+[<%= namespace %>.encoding.children.timestamp_format.enum]
+rfc3339 = "Format as an RFC3339 string"
+unix = "Format as a unix timestamp, can be parsed as a Clickhouse DateTime"
