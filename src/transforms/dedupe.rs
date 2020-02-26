@@ -74,25 +74,25 @@ impl TransformConfig for DedupeConfig {
     }
 }
 
-/**
-* A CacheEntry comes in two forms, depending on the FieldMatchConfig in use.
-*
-* When matching fields, a CacheEntry contains a vector of optional 2-tuples.  Each element in the
-* vector represents one field in the corresponding LogEvent.  Elements in the vector will correspond
-* 1:1 (and in order) to the fields specified in "fields.match".  The tuples each store the
-* TypeId for this field and the data as Bytes for the field.  There is no need to store the field
-* name because the elements of the vector correspond 1:1 to "fields.match", so there is never any
-* ambiguity about what field is being referred to.  If a field from "fields.match" does not show
-* up in an incoming Event, the CacheEntry will have None in the correspond location in the vector.
-*
-* When ignoring fields, a CacheEntry contains a vector of 3-tuples.  Each element in the vector
-* represents one field in the corresponding LogEvent.  The tuples will each contain the field name,
-* TypeId, and data as Bytes for the corresponding field (in that order).  Since the set of fields
-* that might go into CacheEntries is not known at startup, we must store the field names as part of
-* CacheEntries.  Since Event objects store their field in alphabetic order (as they are backed by a
-* BTreeMap), and we build CacheEntries by iterating over the fields of the incoming Events, we know
-* that the CacheEntries for 2 equivalent events will always contain the fields in the same order.
-**/
+/// A CacheEntry comes in two forms, depending on the FieldMatchConfig in use.
+///
+/// When matching fields, a CacheEntry contains a vector of optional 2-tuples.  Each element in the
+/// vector represents one field in the corresponding LogEvent.  Elements in the vector will
+/// correspond 1:1 (and in order) to the fields specified in "fields.match".  The tuples each store
+/// the TypeId for this field and the data as Bytes for the field.  There is no need to store the
+/// field name because the elements of the vector correspond 1:1 to "fields.match", so there is
+/// never any ambiguity about what field is being referred to.  If a field from "fields.match" does
+/// not show up in an incoming Event, the CacheEntry will have None in the correspond location in
+/// the vector.
+///
+/// When ignoring fields, a CacheEntry contains a vector of 3-tuples.  Each element in the vector
+/// represents one field in the corresponding LogEvent.  The tuples will each contain the field
+/// name, TypeId, and data as Bytes for the corresponding field (in that order).  Since the set of
+/// fields that might go into CacheEntries is not known at startup, we must store the field names
+/// as part of CacheEntries.  Since Event objects store their field in alphabetic order (as they
+/// are backed by a BTreeMap), and we build CacheEntries by iterating over the fields of the
+/// incoming Events, we know that the CacheEntries for 2 equivalent events will always contain the
+/// fields in the same order.
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
@@ -128,9 +128,9 @@ impl Dedupe {
     }
 }
 
-// Takes in an Event and returns a CacheEntry to place into the LRU cache containing
-// all relevant information for the fields that need matching against according to the
-// specified FieldMatchConfig.
+/// Takes in an Event and returns a CacheEntry to place into the LRU cache containing
+/// all relevant information for the fields that need matching against according to the
+/// specified FieldMatchConfig.
 fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     match &fields {
         FieldMatchConfig::MatchFields(fields) => {
@@ -280,8 +280,8 @@ mod tests {
         field_order_irrelevant(transform);
     }
 
-    // Test that two Events that are considered duplicates get handled that way, even
-    // if the order of the matched fields is different between the two.
+    /// Test that two Events that are considered duplicates get handled that way, even
+    /// if the order of the matched fields is different between the two.
     fn field_order_irrelevant(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
         event1.as_mut_log().insert("matched1", "value1");
@@ -315,6 +315,7 @@ mod tests {
         age_out(transform);
     }
 
+    /// Test the eviction behavior of the underlying LruCache
     fn age_out(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
         event1.as_mut_log().insert("matched", "some value");
@@ -352,8 +353,8 @@ mod tests {
         type_matching(transform);
     }
 
-    // Test that two events with values for the matched fields that have different
-    // types but the same string representation aren't considered duplicates.
+    /// Test that two events with values for the matched fields that have different
+    /// types but the same string representation aren't considered duplicates.
     fn type_matching(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
         event1.as_mut_log().insert("matched", "123");
@@ -383,8 +384,8 @@ mod tests {
         type_matching_nested_objects(transform);
     }
 
-    // Test that two events where the matched field is a sub object and that object contains values
-    // that have different types but the same string representation aren't considered duplicates.
+    /// Test that two events where the matched field is a sub object and that object contains values
+    /// that have different types but the same string representation aren't considered duplicates.
     fn type_matching_nested_objects(mut transform: Dedupe) {
         let mut map1: BTreeMap<Atom, Value> = BTreeMap::new();
         map1.insert("key".into(), "123".into());
