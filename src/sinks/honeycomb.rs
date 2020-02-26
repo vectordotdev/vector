@@ -2,12 +2,12 @@ use crate::{
     dns::Resolver,
     event::{log_schema, Event, Value},
     sinks::util::http::{https_client, BatchedHttpSink, HttpSink},
-    sinks::util::tls::TlsSettings,
     sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
+    tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::Stream;
-use futures03::{compat::Future01CompatExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, TryFutureExt};
+use futures01::Stream;
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
