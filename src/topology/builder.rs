@@ -4,7 +4,7 @@ use super::{
     task::Task,
 };
 use crate::{buffers, dns::Resolver, runtime};
-use futures::{
+use futures01::{
     future::{lazy, Either},
     sync::mpsc,
     Future, Stream,
@@ -160,7 +160,7 @@ pub fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
+        let (input_tx, input_rx) = futures01::sync::mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
@@ -169,7 +169,7 @@ pub fn build_pieces(
             .map(move |event| {
                 let mut output = Vec::with_capacity(1);
                 transform.transform_into(&mut output, event);
-                futures::stream::iter_ok(output.into_iter())
+                futures01::stream::iter_ok(output.into_iter())
             })
             .flatten()
             .forward(output)

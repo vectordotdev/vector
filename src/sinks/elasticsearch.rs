@@ -9,7 +9,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -423,7 +423,7 @@ mod integration_tests {
         topology::config::{SinkConfig, SinkContext},
         Event,
     };
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
     use std::fs::File;

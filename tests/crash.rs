@@ -1,6 +1,6 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
-use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
+use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
     test_util::{

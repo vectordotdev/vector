@@ -6,7 +6,7 @@ use crate::{
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures03::{compat::Future01CompatExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, TryFutureExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -201,7 +201,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use crate::topology::config::SinkConfig;
-    use futures::{Sink, Stream};
+    use futures01::{Sink, Stream};
     use serde_json::json;
 
     #[test]
@@ -278,7 +278,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures::stream::iter_ok(events));
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();

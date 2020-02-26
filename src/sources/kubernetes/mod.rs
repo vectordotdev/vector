@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, Utc};
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures01::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 

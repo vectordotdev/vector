@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, Sink};
+use futures01::{future, Sink};
 use serde::{Deserialize, Serialize};
 use tokio::{
     codec::{FramedWrite, LinesCodec},

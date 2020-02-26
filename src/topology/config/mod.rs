@@ -7,7 +7,7 @@ use crate::{
     sinks, sources, transforms,
 };
 use component::ComponentDescription;
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
