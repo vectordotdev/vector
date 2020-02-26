@@ -211,6 +211,23 @@ rustup component add rustfmt
 make fmt
 ```
 
+#### Feature flags
+
+When a new component (a source, transform, or sink) is added, it has to be put behind
+a feature flag with the corresponding name. This ensures that it is possible to
+customize Vector builds. See the `features` section in `Cargo.toml` for examples.
+
+In addition, during development of a particular component it is useful to disable all
+other components to speed up compilation. For example, it is possible to build and run
+tests only for `console` sink using
+
+```bash
+cargo test --lib --no-default-features --features sinks-console sinks::console
+```
+
+In case if only the component file changed, it is around 4 times faster than building
+tests with all features.
+
 #### Documentation
 
 Documentation is extremely important to the Vector project. Ideally, all
