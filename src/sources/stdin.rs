@@ -3,7 +3,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, thread, time::Duration};
 
@@ -68,7 +68,7 @@ where
             .clone()
             .unwrap_or(event::log_schema().host_key().to_string());
         let hostname = hostname::get_hostname();
-        let (mut tx, rx) = futures::sync::mpsc::channel(1024);
+        let (mut tx, rx) = futures01::sync::mpsc::channel(1024);
 
         thread::spawn(move || {
             for line in stdin.lines() {
@@ -115,8 +115,8 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 mod tests {
     use super::*;
     use crate::event;
-    use futures::sync::mpsc;
-    use futures::Async::*;
+    use futures01::sync::mpsc;
+    use futures01::Async::*;
     use std::io::Cursor;
     use tokio::runtime::current_thread::Runtime;
 

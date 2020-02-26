@@ -1,7 +1,7 @@
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
 use vector::{
-    topology::config::TransformConfig,
+    topology::config::{TransformConfig, TransformContext},
     transforms::{self, Transform},
     Event,
 };
@@ -67,7 +67,7 @@ fn field_filter(c: &mut Criterion) {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
-                    .build(rt.executor())
+                    .build(TransformContext::new_test(rt.executor()))
                     .unwrap()
                 },
                 |mut transform| {

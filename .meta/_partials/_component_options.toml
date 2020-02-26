@@ -1,6 +1,8 @@
+<%- groups ||= [] -%>
 [<%= type.pluralize %>.<%= name %>.options.type]
 type = "string"
 common = true
+groups = <%= groups.to_json %>
 required = true
 description = """\
 The component type. This is a required field that tells Vector which component \
@@ -15,6 +17,7 @@ to use. The value _must_ be `#{name}`.\
 type = "[string]"
 common = true
 examples = [["my-source-id"]]
+groups = <%= groups.to_json %>
 required = true
 description = """\
 A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. \
@@ -27,6 +30,7 @@ See [configuration][docs.configuration] for more info.\
 type = "bool"
 common = true
 default = true
+groups = <%= groups.to_json %>
 required = false
 description = "Enables/disables the sink healthcheck upon start."
 <%- end -%>

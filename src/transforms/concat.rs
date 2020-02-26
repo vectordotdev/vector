@@ -1,8 +1,7 @@
 use super::{BuildError, Transform};
-use crate::runtime::TaskExecutor;
 use crate::{
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -24,7 +23,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var.into(),

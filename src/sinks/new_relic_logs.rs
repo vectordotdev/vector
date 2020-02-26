@@ -119,7 +119,7 @@ mod tests {
         topology::config::SinkConfig,
     };
     use bytes::Buf;
-    use futures::{stream, sync::mpsc, Future, Sink, Stream};
+    use futures01::{stream, sync::mpsc, Future, Sink, Stream};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
     use serde_json::Value;

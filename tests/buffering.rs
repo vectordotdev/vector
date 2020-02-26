@@ -1,6 +1,6 @@
 #![cfg(feature = "leveldb")]
 
-use futures::Future;
+use futures01::Future;
 use prost::Message;
 use tempfile::tempdir;
 use vector::event::{self, Event};

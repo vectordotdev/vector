@@ -7,7 +7,6 @@ pub mod service;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
-pub mod tls;
 #[cfg(unix)]
 pub mod unix;
 pub mod uri;
@@ -15,7 +14,7 @@ pub mod uri;
 use crate::buffers::Acker;
 use crate::event::{self, Event};
 use bytes::Bytes;
-use futures::{
+use futures01::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use serde::{Deserialize, Serialize};
@@ -50,7 +49,7 @@ pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
     let log = event.into_log();
 
     let b = match encoding {
-        Encoding::Json => serde_json::to_vec(&log.unflatten()),
+        Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
                 .get(&event::log_schema().message_key())
@@ -267,7 +266,7 @@ mod tests {
     use crate::buffers::Acker;
     use crate::runtime::Runtime;
     use crate::test_util::wait_for;
-    use futures::{stream, sync::oneshot, Future, Poll, Sink};
+    use futures01::{stream, sync::oneshot, Future, Poll, Sink};
     use std::sync::{atomic::Ordering, Arc, Mutex};
     use tower::Service;
 

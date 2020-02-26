@@ -1,0 +1,73 @@
+[<%= namespace %>.tls]
+type = "table"
+common = false
+description = "Configures the TLS options for connections from this source."
+
+[<%= namespace %>.tls.children.enabled]
+type = "bool"
+common = true
+default = false
+required = false
+<%= relevant %>
+description = """\
+Require TLS for incoming connections. \
+If this is set, an identity certificate is also required.\
+"""
+
+# This is not yet supported
+#[<%= namespace %>.tls.children.ca_path]
+#type = "string"
+#examples = ["/path/to/certificate_authority.crt"]
+#description = """\
+#Absolute path to an additional CA certificate file, in DER or PEM format \
+#(X.509).\
+#"""
+
+[<%= namespace %>.tls.children.crt_path]
+type = "string"
+common = true
+examples = ["/path/to/host_certificate.crt"]
+<%= relevant %>
+description = """\
+Absolute path to a certificate file used to identify this server, in DER \
+or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
+`key_path` must also be set. \
+This is required if `enabled` is set to `true`.\
+"""
+
+[<%= namespace %>.tls.children.key_path]
+type = "string"
+common = true
+examples = ["/path/to/host_certificate.key"]
+<%= relevant %>
+description = """\
+Absolute path to a certificate key file used to identify this server, in \
+DER or PEM format (PKCS#8).\
+"""
+
+[<%= namespace %>.tls.children.key_pass]
+type = "string"
+common = true
+examples = ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+<%= relevant %>
+description = """\
+Pass phrase used to unlock the encrypted key file. This has no effect unless \
+`key_path` is set.\
+"""
+
+# These are not yet supported
+#[<%= namespace %>.tls.children.verify_certificate]
+#type = "bool"
+#default = true
+#description = """\
+#If `true` (the default), Vector will validate the TLS certificate of the \
+#connecting host.\
+#"""
+
+#[<%= namespace %>.tls.children.verify_hostname]
+#type = "bool"
+#default = true
+#description = """\
+#If `true` (the default), Vector will validate the configured connecting host
+#name against the remote host's TLS certificate.\
+#"""

@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Console"
 sidebar_label: "console|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
 status: "prod-ready"
@@ -55,6 +58,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -77,6 +81,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -99,6 +104,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
+  groups={[]}
   name={"target"}
   path={null}
   relevantWhen={null}

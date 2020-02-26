@@ -2,14 +2,13 @@ use super::Transform;
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     event::{self, Value},
-    runtime::TaskExecutor,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,7 +74,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
@@ -118,11 +117,11 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
 fn render_tags(
     tags: &Option<IndexMap<Atom, String>>,
     event: &Event,
-) -> Option<HashMap<String, String>> {
+) -> Option<BTreeMap<String, String>> {
     match tags {
         None => None,
         Some(tags) => {
-            let mut map = HashMap::new();
+            let mut map = BTreeMap::new();
             for (name, value) in tags {
                 if let Ok(tag) = render_template(value, event) {
                     map.insert(name.to_string(), tag);

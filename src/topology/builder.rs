@@ -1,10 +1,10 @@
 use super::{
-    config::SinkContext,
+    config::{SinkContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
 };
 use crate::{buffers, dns::Resolver, runtime};
-use futures::{
+use futures01::{
     future::{lazy, Either},
     sync::mpsc,
     Future, Stream,
@@ -147,7 +147,12 @@ pub fn build_pieces(
 
         let typetag = &transform.inner.transform_type();
 
-        let mut transform = match transform.inner.build(exec.clone()) {
+        let cx = TransformContext {
+            resolver: resolver.clone(),
+            exec: exec.clone(),
+        };
+
+        let transform = match transform.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -155,18 +160,13 @@ pub fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
+        let (input_tx, input_rx) = futures01::sync::mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
 
-        let transform = input_rx
-            .map(move |event| {
-                let mut output = Vec::with_capacity(1);
-                transform.transform_into(&mut output, event);
-                futures::stream::iter_ok(output.into_iter())
-            })
-            .flatten()
+        let transform = transform
+            .transform_stream(input_rx)
             .forward(output)
             .map(|_| ());
         let task = Task::new(&name, &typetag, transform);

@@ -5,6 +5,7 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
+requirements = {}
 through_description = "a socket, such as a TCP, UDP, or Unix socket"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "socket") %>
@@ -69,6 +70,8 @@ relevant_when = {mode = "tcp"}
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\
 """
+
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.socket.options", relevant: "relevant_when = {mode = \"tcp\"}") %>
 
 [[sources.socket.output.log.examples]]
 label = "Generic"

@@ -15,14 +15,18 @@ pub mod config_paths;
 pub mod dns;
 pub mod event;
 pub mod generate;
+#[cfg(feature = "rdkafka")]
+pub mod kafka;
 pub mod list;
 pub mod metrics;
 pub mod region;
 pub mod runtime;
+pub mod serde;
 pub mod sinks;
 pub mod sources;
 pub mod template;
 pub mod test_util;
+mod tls;
 pub mod topology;
 pub mod trace;
 pub mod transforms;

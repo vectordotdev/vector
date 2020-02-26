@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Value},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +19,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()

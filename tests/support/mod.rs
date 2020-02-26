@@ -1,4 +1,4 @@
-use futures::{
+use futures01::{
     future,
     sink::Sink,
     sync::mpsc::{Receiver, Sender},
@@ -8,28 +8,28 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::event::{self, metric::MetricValue, Event, Value};
-use vector::runtime::TaskExecutor;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
+    TransformContext,
 };
 use vector::transforms::Transform;
 
 pub fn sink() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures01::sync::mpsc::channel(10);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
 
 pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (tx, rx) = futures01::sync::mpsc::channel(10);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
 
 pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(0);
+    let (tx, rx) = futures01::sync::mpsc::channel(0);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
@@ -151,7 +151,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self, _exec: TaskExecutor) -> Result<Box<dyn Transform>, vector::Error> {
+    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

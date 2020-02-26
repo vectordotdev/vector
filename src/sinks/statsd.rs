@@ -5,10 +5,10 @@ use crate::{
     sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, sink::Sink, Future, Poll};
+use futures01::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use tower::{Service, ServiceBuilder};
 
@@ -104,7 +104,7 @@ impl StatsdSvc {
     }
 }
 
-fn encode_tags(tags: &HashMap<String, String>) -> String {
+fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     let mut parts: Vec<_> = tags
         .iter()
         .map(|(name, value)| {
@@ -220,7 +220,7 @@ mod test {
         Event,
     };
     use bytes::Bytes;
-    use futures::{stream, stream::Stream, sync::mpsc, Sink};
+    use futures01::{stream, stream::Stream, sync::mpsc, Sink};
     use std::str::from_utf8;
     use tokio::{
         self,
@@ -228,7 +228,7 @@ mod test {
         net::{UdpFramed, UdpSocket},
     };
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),

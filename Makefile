@@ -72,6 +72,7 @@ sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
 test: ## Spins up Docker resources and runs _every_ test
+	@cargo test --all --features docker --no-run
 	@docker-compose up -d test-runtime-deps
 	@cargo test --all --features docker -- --test-threads 4
 

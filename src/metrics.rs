@@ -1,4 +1,4 @@
-use futures::Future;
+use futures01::Future;
 use hotmic::{
     snapshot::{Snapshot, TypedMeasurement},
     Controller, Receiver,

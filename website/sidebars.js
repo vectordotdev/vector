@@ -180,9 +180,13 @@ module.exports = {
             
               "reference/transforms/remove_tags",
             
+              "reference/transforms/rename_fields",
+            
               "reference/transforms/sampler",
             
               "reference/transforms/split",
+            
+              "reference/transforms/swimlanes",
             
               "reference/transforms/tokenizer",
             
@@ -218,6 +222,8 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_cloud_storage",
+            
               "reference/sinks/gcp_pubsub",
             
               "reference/sinks/gcp_stackdriver_logging",
@@ -226,15 +232,19 @@ module.exports = {
             
               "reference/sinks/humio_logs",
             
+              "reference/sinks/influxdb_metrics",
+            
               "reference/sinks/kafka",
             
               "reference/sinks/logdna",
+            
+              "reference/sinks/loki",
             
               "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
             
-              "reference/sinks/sematext",
+              "reference/sinks/sematext_logs",
             
               "reference/sinks/socket",
             

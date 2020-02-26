@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Datadog Logs"
 description: "The Vector `datadog_logs` sink streams `log` events to Datadog's logs."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_logs%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Datadog Logs"
 sidebar_label: "datadog_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_logs.rs
 status: "beta"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -60,7 +59,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -98,7 +97,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -115,6 +113,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
   name={"api_key"}
   path={null}
   relevantWhen={null}
@@ -137,6 +136,7 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -158,6 +158,7 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
@@ -180,6 +181,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -202,6 +204,7 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
@@ -224,6 +227,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -251,6 +255,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -273,6 +278,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={"intake.logs.datadoghq.com:10516"}
   enumValues={null}
   examples={["127.0.0.1:8080","example.com:12345"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={null}
@@ -295,6 +301,7 @@ The endpoint to stream logs to.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -317,6 +324,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -338,6 +346,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={[]}
   name={"enabled"}
   path={"tls"}
   relevantWhen={null}
@@ -360,6 +369,7 @@ Enable TLS during connections to the remote.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -382,6 +392,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -404,6 +415,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -415,7 +427,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
@@ -426,6 +438,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -448,6 +461,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -470,6 +484,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_hostname"}
   path={"tls"}
   relevantWhen={null}

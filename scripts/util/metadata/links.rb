@@ -66,6 +66,11 @@ class Links
 
   def fetch(id)
     id_parts = id.split(".", 2)
+
+    if id_parts.length != 2
+      raise ArgumentError.new("Link id is invalid! #{id}")
+    end
+
     category = id_parts[0]
     suffix = id_parts[1]
     hash_parts = suffix.split("#", 2)

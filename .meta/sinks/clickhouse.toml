@@ -7,6 +7,8 @@ function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
+min_version = "1.1.54378"
+requirements = {}
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
 
 <%= render("_partials/_component_options.toml", type: "sink", name: "clickhouse") %>
@@ -35,8 +37,8 @@ description = "Options for the authentication strategy."
 
 [sinks.clickhouse.options.auth.children.strategy]
 type = "string"
-prioritize = true
 required = true
+sort = 1
 description = "The authentication strategy to use."
 
 [sinks.clickhouse.options.auth.children.strategy.enum]
@@ -84,10 +86,27 @@ examples = ["mytable"]
 required = true
 description = "The table that data will be inserted into."
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify: true) %>
 
 [sinks.clickhouse.options.database]
 type = "string"
 common = true
 examples = ["mydatabase"]
 description = "The database that contains the stable that data will be inserted into."
+
+[sinks.clickhouse.options.encoding]
+type = "table"
+common = true
+required = false
+description = "Customize how events are encoded."
+
+[sinks.clickhouse.options.encoding.children.timestamp_format]
+type = "string"
+common = true
+required = false
+default = "rfc3339"
+description = "How to format event timestamps. Formats such as unix can be parsed as a Clickhouse DateTime, however, this loses precision as DateTimes are defined in seconds."
+
+[sinks.clickhouse.options.encoding.children.timestamp_format.enum]
+rfc3339 = "Format as an RFC3339 string"
+unix = "Format as a unix timestamp, can be parsed as a Clickhouse DateTime"

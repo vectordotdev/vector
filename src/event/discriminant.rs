@@ -1,5 +1,8 @@
 use super::{LogEvent, Value};
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::BTreeMap,
+    hash::{Hash, Hasher},
+};
 use string_cache::DefaultAtom as Atom;
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
@@ -100,12 +103,32 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         Value::Timestamp(val) => val.hash(hasher),
         // Non-trivial.
         Value::Float(val) => hash_f64(hasher, val),
+        Value::Array(val) => hash_array(hasher, val),
+        Value::Map(val) => hash_map(hasher, val),
+        Value::Null => hash_null(hasher),
     }
 }
 
 // Does f64 hashing that is suitable for discriminant purposes.
 fn hash_f64<H: Hasher>(hasher: &mut H, value: &f64) {
     hasher.write(&value.to_ne_bytes());
+}
+
+fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
+    for val in array.iter() {
+        hash_value(hasher, val);
+    }
+}
+
+fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<Atom, Value>) {
+    for (key, val) in map.iter() {
+        hasher.write(key.as_bytes());
+        hash_value(hasher, val);
+    }
+}
+
+fn hash_null<H: Hasher>(hasher: &mut H) {
+    hasher.write_u8(0);
 }
 
 #[cfg(test)]
@@ -156,6 +179,24 @@ mod tests {
 
         assert_ne!(discriminant_1, discriminant_2);
         assert_ne!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn field_order() {
+        let mut event_1 = new_log_event();
+        event_1.insert("a", "a");
+        event_1.insert("b", "b");
+        let mut event_2 = new_log_event();
+        event_2.insert("b", "b");
+        event_2.insert("a", "a");
+
+        let discriminant_fields = vec![Atom::from("a"), Atom::from("b")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_eq!(discriminant_1, discriminant_2);
+        assert_eq!(hash(discriminant_1), hash(discriminant_2));
     }
 
     #[test]

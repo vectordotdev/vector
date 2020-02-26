@@ -1,6 +1,8 @@
+<%- groups ||= [] -%>
 [<%= namespace %>.batch]
 type = "table"
 common = <%= common %>
+groups = <%= groups.to_json %>
 description = "Configures the sink batching behavior."
 
 <%- if max_events -%>
