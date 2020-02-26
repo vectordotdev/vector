@@ -5,12 +5,22 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Ensures that each component feature in `Cargo.toml` declares all dependencies
+#   Ensures that all components have corresponding features in `Cargo.toml` and
+#   that each of these features declares declares all dependencies
 #   necessary to build it without having other features enabled.
 
 cd $(dirname $0)/..
 
+echo "Checking that all components have corresponding features in Cargo.toml..."
+components=$(cargo run --no-default-features --features sinks-console -- list)
+if (echo "$components" | egrep -v "^(Sources:|Transforms:|Sinks:|)$" >/dev/null); then
+  echo "Some of the components do not have a corresponding feature flag in Cargo.toml:"
+  echo "$components" | sed "s/^/    /"
+  exit 1
+fi
+
+echo "Checking that each component feature can be built without other features..."
 cat Cargo.toml |
   remarshal --if toml --of json |
-  jq -r '.features.sources,.features.transforms,.features.sinks|.[]' |
-  xargs -I{} sh -cx 'cargo check --tests --no-default-features --features {} || exit 255'
+  jq -r ".features.sources,.features.transforms,.features.sinks|.[]" |
+  xargs -I{} sh -cx "cargo check --tests --no-default-features --features {} || exit 255"
