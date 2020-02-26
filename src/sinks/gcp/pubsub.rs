@@ -12,7 +12,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::{BufMut, BytesMut};
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};

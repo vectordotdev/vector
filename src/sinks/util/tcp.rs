@@ -6,7 +6,7 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes::Bytes;
-use futures::{
+use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
@@ -321,14 +321,14 @@ where
     type SinkItem = I;
     type SinkError = E;
 
-    fn start_send(&mut self, item: I) -> futures::StartSend<I, E> {
+    fn start_send(&mut self, item: I) -> futures01::StartSend<I, E> {
         match self {
             MaybeTlsStream::Raw(r) => r.start_send(item),
             MaybeTlsStream::Tls(t) => t.start_send(item),
         }
     }
 
-    fn poll_complete(&mut self) -> futures::Poll<(), E> {
+    fn poll_complete(&mut self) -> futures01::Poll<(), E> {
         match self {
             MaybeTlsStream::Raw(r) => r.poll_complete(),
             MaybeTlsStream::Tls(t) => t.poll_complete(),

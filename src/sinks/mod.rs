@@ -1,4 +1,4 @@
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use snafu::Snafu;
 
 pub mod aws_cloudwatch_logs;

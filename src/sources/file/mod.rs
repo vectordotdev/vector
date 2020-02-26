@@ -5,7 +5,7 @@ use crate::{
 };
 use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -255,7 +255,7 @@ pub fn file_source(
         info!(message = "Starting file server.", ?include, ?exclude);
 
         // sizing here is just a guess
-        let (tx, rx) = futures::sync::mpsc::channel(100);
+        let (tx, rx) = futures01::sync::mpsc::channel(100);
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(ref multiline_config) = multiline_config {
@@ -297,7 +297,7 @@ pub fn file_source(
         thread::spawn(move || {
             let _enter = span.enter();
             file_server.run(
-                futures03::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
+                futures::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
                 shutdown_rx,
             );
         });
@@ -337,7 +337,7 @@ mod tests {
         test_util::{block_on, shutdown_on_idle},
         topology::Config,
     };
-    use futures::{Future, Stream};
+    use futures01::{Future, Stream};
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn file_happy_path() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -525,7 +525,7 @@ mod tests {
     #[test]
     fn file_truncate() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -594,7 +594,7 @@ mod tests {
     #[test]
     fn file_rotate() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -664,7 +664,7 @@ mod tests {
     #[test]
     fn file_multiple_paths() {
         let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(4 * n);
+        let (tx, rx) = futures01::sync::mpsc::channel(4 * n);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -729,7 +729,7 @@ mod tests {
 
         // Default
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -758,7 +758,7 @@ mod tests {
 
         // Custom
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -788,7 +788,7 @@ mod tests {
 
         // Hidden
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -841,7 +841,7 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -863,7 +863,7 @@ mod tests {
         }
         // Restart server, read file from checkpoint.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -890,7 +890,7 @@ mod tests {
                 start_at_beginning: true,
                 ..test_default_file_config(&dir)
             };
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -926,7 +926,7 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -952,7 +952,7 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let (tx, rx) = futures01::sync::mpsc::channel(10);
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
@@ -982,7 +982,7 @@ mod tests {
         use std::time::{Duration, SystemTime};
 
         let mut rt = runtime::Runtime::new().unwrap();
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1067,7 +1067,7 @@ mod tests {
 
     #[test]
     fn file_max_line_bytes() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1127,7 +1127,7 @@ mod tests {
 
     #[test]
     fn test_multi_line_aggregation_legacy() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1200,7 +1200,7 @@ mod tests {
 
     #[test]
     fn test_multi_line_aggregation() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1277,7 +1277,7 @@ mod tests {
 
     #[test]
     fn test_fair_reads() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1342,7 +1342,7 @@ mod tests {
 
     #[test]
     fn test_oldest_first() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();
@@ -1407,7 +1407,7 @@ mod tests {
 
     #[test]
     fn test_gzipped_file() {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let dir = tempdir().unwrap();

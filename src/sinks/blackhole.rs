@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 
 pub struct BlackholeSink {

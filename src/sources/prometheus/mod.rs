@@ -1,5 +1,5 @@
 use crate::{topology::config::GlobalOptions, Event};
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures01::{sync::mpsc, Future, Sink, Stream};
 use http::Uri;
 use hyper;
 use hyper_tls::HttpsConnector;
@@ -51,7 +51,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
 
     let task = Interval::new(Instant::now(), Duration::from_secs(interval))
         .map_err(|e| error!("timer error: {:?}", e))
-        .map(move |_| futures::stream::iter_ok(urls.clone()))
+        .map(move |_| futures01::stream::iter_ok(urls.clone()))
         .flatten()
         .map(move |url| {
             let https = HttpsConnector::new(4).expect("TLS initialization failed");
@@ -71,7 +71,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
                         .unwrap_or_default()
                         .into_iter()
                         .map(Event::Metric);
-                    futures::stream::iter_ok(metrics)
+                    futures01::stream::iter_ok(metrics)
                 })
                 .flatten_stream()
                 .map_err(|e| error!("http request processing error: {:?}", e))

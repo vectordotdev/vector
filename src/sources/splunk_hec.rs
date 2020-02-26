@@ -5,7 +5,7 @@ use crate::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{sync::mpsc, Async, Future, Sink, Stream};
+use futures01::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
@@ -183,7 +183,7 @@ impl SplunkSource {
             .and_then(
                 move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
                     // Construct event parser
-                    futures::stream::once(raw_event(body, gzip, channel, host))
+                    futures01::stream::once(raw_event(body, gzip, channel, host))
                         .forward(source.sink_with_shutdown())
                         .map(|_| ())
                 },
@@ -685,7 +685,7 @@ mod tests {
         event::{self, Event},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
-    use futures::{stream, sync::mpsc, Sink};
+    use futures01::{stream, sync::mpsc, Sink};
     use http::Method;
     use std::net::SocketAddr;
 

@@ -16,7 +16,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
