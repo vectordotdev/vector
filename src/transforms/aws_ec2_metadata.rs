@@ -4,8 +4,8 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
-use futures::Stream;
-use futures03::compat::Future01CompatExt;
+use futures::compat::Future01CompatExt;
+use futures01::Stream;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{client::connect::HttpConnector, Body, Client};
 use serde::{Deserialize, Serialize};

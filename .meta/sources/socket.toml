@@ -71,6 +71,8 @@ description = """\
 The timeout before a connection is forcefully closed during shutdown.\
 """
 
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.socket.options", relevant: "relevant_when = {mode = \"tcp\"}") %>
+
 [[sources.socket.output.log.examples]]
 label = "Generic"
 body = """\

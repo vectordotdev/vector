@@ -19,9 +19,13 @@ pub mod merge;
 pub mod regex_parser;
 pub mod remove_fields;
 pub mod remove_tags;
+pub mod rename_fields;
 pub mod sampler;
 pub mod split;
+pub mod swimlanes;
 pub mod tokenizer;
+
+use futures01::{sync::mpsc::Receiver, Stream};
 
 pub trait Transform: Send {
     fn transform(&mut self, event: Event) -> Option<Event>;
@@ -30,6 +34,25 @@ pub trait Transform: Send {
         if let Some(transformed) = self.transform(event) {
             output.push(transformed);
         }
+    }
+
+    fn transform_stream(
+        self: Box<Self>,
+        input_rx: Receiver<Event>,
+    ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut me = self;
+        Box::new(
+            input_rx
+                .map(move |event| {
+                    let mut output = Vec::with_capacity(1);
+                    me.transform_into(&mut output, event);
+                    futures01::stream::iter_ok(output.into_iter())
+                })
+                .flatten(),
+        )
     }
 }
 

@@ -3,7 +3,7 @@ use crate::{
     sinks::util::http::https_client,
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{future::Future, stream::Stream};
+use futures01::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body, Chunk};
 use hyper_tls::HttpsConnector;
@@ -248,7 +248,7 @@ impl Decoder {
         }
 
         // Returns all currently decodable watch responses.
-        futures::stream::iter_result(decoded)
+        futures01::stream::iter_result(decoded)
     }
 }
 
@@ -357,7 +357,7 @@ mod kube_tests {
         tls::{TlsOptions, TlsSettings},
     };
     use dirs;
-    use futures::{future::Future, stream::Stream};
+    use futures01::{future::Future, stream::Stream};
     use http::Uri;
     use kube::config::Config;
     use serde_yaml;

@@ -1,11 +1,11 @@
 use crate::{
-    event::{self, flatten::flatten, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{sync::mpsc, Async, Future, Sink, Stream};
+use futures01::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
@@ -183,7 +183,7 @@ impl SplunkSource {
             .and_then(
                 move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
                     // Construct event parser
-                    futures::stream::once(raw_event(body, gzip, channel, host))
+                    futures01::stream::once(raw_event(body, gzip, channel, host))
                         .forward(source.sink_with_shutdown())
                         .map(|_| ())
                 },
@@ -390,20 +390,14 @@ impl<R: Read> Stream for EventStream<R> {
                     if let Some(line) = object.remove("line") {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
-                            JsonValue::Array(_) | JsonValue::Object(_) => {
-                                event::flatten::insert(log, "line", line)
-                            }
-                            _ => {
-                                event::flatten::insert(
-                                    log,
-                                    event::log_schema().message_key().clone(),
-                                    line,
-                                );
-                            }
+                            JsonValue::Array(_) | JsonValue::Object(_) => log.insert("line", line),
+                            _ => log.insert(event::log_schema().message_key(), line),
                         }
                     }
 
-                    flatten(log, object);
+                    for (key, value) in object {
+                        log.insert(key, value);
+                    }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
             },
@@ -419,7 +413,9 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
-            flatten(log, object);
+            for (key, value) in object {
+                log.insert(key, value);
+            }
         }
 
         // Process time field
@@ -689,7 +685,7 @@ mod tests {
         event::{self, Event},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
-    use futures::{stream, sync::mpsc, Sink};
+    use futures01::{stream, sync::mpsc, Sink};
     use http::Method;
     use std::net::SocketAddr;
 

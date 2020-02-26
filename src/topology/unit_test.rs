@@ -24,7 +24,7 @@ pub struct UnitTestTransform {
 
 pub struct UnitTest {
     pub name: String,
-    inputs: Vec<(String, Event)>,
+    inputs: Vec<(Vec<String>, Event)>,
     transforms: IndexMap<String, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
     no_outputs_from: Vec<String>,
@@ -34,9 +34,7 @@ pub struct UnitTest {
 
 fn event_to_string(event: &Event) -> String {
     match event {
-        Event::Log(log) => {
-            serde_json::to_string(&log.clone().unflatten()).unwrap_or_else(|_| "{}".into())
-        }
+        Event::Log(log) => serde_json::to_string(&log).unwrap_or_else(|_| "{}".into()),
         Event::Metric(metric) => serde_json::to_string(&metric).unwrap_or_else(|_| "{}".into()),
     }
 }
@@ -95,12 +93,14 @@ impl UnitTest {
         let mut results = HashMap::new();
 
         for input in &self.inputs {
-            walk(
-                &input.0,
-                vec![input.1.clone()],
-                &mut self.transforms,
-                &mut results,
-            );
+            for target in &input.0 {
+                walk(
+                    target,
+                    vec![input.1.clone()],
+                    &mut self.transforms,
+                    &mut results,
+                );
+            }
         }
 
         for check in &self.checks {
@@ -188,8 +188,8 @@ fn links_to_a_leaf(
     link_checked: &mut IndexMap<String, bool>,
     transform_outputs: &IndexMap<String, IndexMap<String, ()>>,
 ) -> bool {
-    if let Some(check) = link_checked.get(target) {
-        return *check;
+    if *link_checked.get(target).unwrap_or(&false) {
+        return true;
     }
     let has_linked_children = if let Some(outputs) = transform_outputs.get(target) {
         outputs
@@ -216,7 +216,10 @@ fn reduce_transforms(
 
     if roots
         .iter()
-        .all(|r| !links_to_a_leaf(r, leaves, &mut link_checked, transform_outputs))
+        .map(|r| links_to_a_leaf(r, leaves, &mut link_checked, transform_outputs))
+        .collect::<Vec<_>>() // Ensure we map each element.
+        .iter()
+        .all(|b| !b)
     {
         transform_outputs.clear();
     }
@@ -233,8 +236,15 @@ fn reduce_transforms(
     });
 }
 
-fn build_input(input: &TestInput) -> Result<(String, Event), String> {
-    let target = input.insert_at.clone();
+fn build_input(
+    input: &TestInput,
+    expansions: &IndexMap<String, Vec<String>>,
+) -> Result<(Vec<String>, Event), String> {
+    let target = if let Some(children) = expansions.get(&input.insert_at) {
+        children.clone()
+    } else {
+        vec![input.insert_at.clone()]
+    };
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
             Some(v) => Ok((target, Event::from(v.clone()))),
@@ -271,12 +281,15 @@ fn build_input(input: &TestInput) -> Result<(String, Event), String> {
     }
 }
 
-fn build_inputs(definition: &TestDefinition) -> Result<Vec<(String, Event)>, Vec<String>> {
+fn build_inputs(
+    definition: &TestDefinition,
+    expansions: &IndexMap<String, Vec<String>>,
+) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
     if let Some(input_def) = &definition.input {
-        match build_input(input_def) {
+        match build_input(input_def, &expansions) {
             Ok(input_event) => inputs.push(input_event),
             Err(err) => errors.push(err),
         }
@@ -284,7 +297,7 @@ fn build_inputs(definition: &TestDefinition) -> Result<Vec<(String, Event)>, Vec
         errors.push("must specify at least one input.".to_owned());
     }
     for input_def in &definition.inputs {
-        match build_input(input_def) {
+        match build_input(input_def, &expansions) {
             Ok(input_event) => inputs.push(input_event),
             Err(err) => errors.push(err),
         }
@@ -299,12 +312,13 @@ fn build_inputs(definition: &TestDefinition) -> Result<Vec<(String, Event)>, Vec
 
 fn build_unit_test(
     definition: &TestDefinition,
+    expansions: &IndexMap<String, Vec<String>>,
     config: &super::Config,
 ) -> Result<UnitTest, Vec<String>> {
     let rt = Runtime::single_threaded().unwrap();
     let mut errors = vec![];
 
-    let inputs = match build_inputs(&definition) {
+    let inputs = match build_inputs(&definition, &expansions) {
         Ok(inputs) => inputs,
         Err(mut errs) => {
             errors.append(&mut errs);
@@ -329,11 +343,13 @@ fn build_unit_test(
     });
 
     for (i, (input_target, _)) in inputs.iter().enumerate() {
-        if !transform_outputs.contains_key(input_target) {
-            errors.push(format!(
-                "inputs[{}]: unable to locate target transform '{}'",
-                i, input_target
-            ));
+        for target in input_target {
+            if !transform_outputs.contains_key(target) {
+                errors.push(format!(
+                    "inputs[{}]: unable to locate target transform '{}'",
+                    i, target
+                ));
+            }
         }
     }
     if !errors.is_empty() {
@@ -353,7 +369,9 @@ fn build_unit_test(
     reduce_transforms(
         &inputs
             .iter()
-            .map(|(name, _)| name.clone())
+            .map(|(names, _)| names)
+            .flatten()
+            .cloned()
             .collect::<Vec<_>>(),
         &leaves,
         &mut transform_outputs,
@@ -389,30 +407,16 @@ fn build_unit_test(
 
     definition.outputs.iter().for_each(|o| {
         if !transforms.contains_key(&o.extract_from) {
-            if inputs.len() == 1 {
+            let targets = inputs.iter().map(|(i, _)| i).flatten().collect::<Vec<_>>();
+            if targets.len() == 1 {
                 errors.push(format!(
                     "unable to complete topology between target transform '{}' and output target '{}'",
-                    inputs.first().map(|(i, _)| i).unwrap(), o.extract_from
+                    targets.first().unwrap(), o.extract_from
                 ));
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
-                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o.extract_from
-                ));
-            }
-        }
-    });
-    definition.no_outputs_from.iter().for_each(|o| {
-        if !transforms.contains_key(o) {
-            if inputs.len() == 1 {
-                errors.push(format!(
-                    "unable to complete topology between target transform '{}' and no_outputs_from target '{}'",
-                    inputs.first().map(|(i, _)| i).unwrap(), o,
-                ));
-            } else {
-                errors.push(format!(
-                    "unable to complete topology between target transforms {:?} and no_outputs_from target '{}'",
-                    inputs.iter().map(|(i, _)| i).collect::<Vec<_>>(), o,
+                    targets, o.extract_from
                 ));
             }
         }
@@ -477,14 +481,15 @@ fn build_unit_test(
     }
 }
 
-pub fn build_unit_tests(config: &super::Config) -> Result<Vec<UnitTest>, Vec<String>> {
+pub fn build_unit_tests(config: &mut super::Config) -> Result<Vec<UnitTest>, Vec<String>> {
     let mut tests = vec![];
     let mut errors = vec![];
 
+    let expansions = config.expand_macros()?;
     config
         .tests
         .iter()
-        .for_each(|test| match build_unit_test(test, config) {
+        .for_each(|test| match build_unit_test(test, &expansions, config) {
             Ok(t) => tests.push(t),
             Err(errs) => {
                 let mut test_err = errs.join("\n");
@@ -509,7 +514,7 @@ mod tests {
 
     #[test]
     fn parse_no_input() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -532,7 +537,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -540,7 +545,7 @@ mod tests {
                 .to_owned(),]
         );
 
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -567,7 +572,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -578,7 +583,7 @@ mod tests {
 
     #[test]
     fn parse_no_test_input() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -597,7 +602,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -608,7 +613,7 @@ mod tests {
 
     #[test]
     fn parse_no_outputs() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -626,7 +631,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -637,7 +642,7 @@ mod tests {
 
     #[test]
     fn parse_broken_topology() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["something"]
@@ -721,7 +726,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![
@@ -742,7 +747,7 @@ mod tests {
 
     #[test]
     fn parse_bad_input_event() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -766,7 +771,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(&config).err().unwrap();
+        let errs = build_unit_tests(&mut config).err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -777,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_success_multi_inputs() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -859,13 +864,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_success() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -919,13 +924,73 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_swimlanes() {
+        let mut config: Config = toml::from_str(
+            r#"
+[transforms.foo]
+  inputs = ["ignored"]
+  type = "swimlanes"
+  [transforms.foo.lanes.first]
+    type = "check_fields"
+    "message.eq" = "test swimlane 1"
+  [transforms.foo.lanes.second]
+    type = "check_fields"
+    "message.eq" = "test swimlane 2"
+
+[transforms.bar]
+  inputs = ["foo.first"]
+  type = "add_fields"
+  [transforms.bar.fields]
+    new_field = "new field added"
+
+[[tests]]
+  name = "successful swimlanes test 1"
+
+  [tests.input]
+    insert_at = "foo"
+    value = "test swimlane 1"
+
+  [[tests.outputs]]
+    extract_from = "foo.first"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.equals" = "test swimlane 1"
+
+  [[tests.outputs]]
+    extract_from = "bar"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.equals" = "test swimlane 1"
+      "new_field.equals" = "new field added"
+
+[[tests]]
+  name = "successful swimlanes test 2"
+
+  [tests.input]
+    insert_at = "foo"
+    value = "test swimlane 2"
+
+  [[tests.outputs]]
+    extract_from = "foo.second"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.equals" = "test swimlane 2"
+      "#,
+        )
+        .unwrap();
+
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_fail_no_outputs() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = [ "TODO" ]
@@ -949,13 +1014,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_ne!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_fail_two_output_events() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = [ "TODO" ]
@@ -1019,14 +1084,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_no_outputs_from() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = [ "ignored" ]
@@ -1055,14 +1120,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_no_outputs_from_chained() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = [ "ignored" ]
@@ -1097,14 +1162,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_log_input() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1135,13 +1200,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_metric_input() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1174,13 +1239,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_success_over_gap() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1219,13 +1284,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_success_tree() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.ignored]
   inputs = ["also_ignored"]
@@ -1277,13 +1342,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
     #[test]
     fn test_fails() {
-        let config: Config = toml::from_str(
+        let mut config: Config = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1348,7 +1413,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(&config).unwrap();
+        let mut tests = build_unit_tests(&mut config).unwrap();
         assert_ne!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
         // TODO: The json representations are randomly ordered so these checks

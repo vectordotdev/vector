@@ -52,6 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
+  no_outputs_from = ["foo"] # example
 
   # REQUIRED - Inputs
   [[tests.inputs]]
@@ -113,6 +114,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [[tests]]
   # REQUIRED - General
   name = "foo test" # example
+  no_outputs_from = ["foo"] # example
 
   # REQUIRED - Inputs
   [[tests.inputs]]
@@ -159,9 +161,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
       "message.eq" = "this is the content to match against"
       "host.exists" = true
       "method.neq" = "POST"
-
-  # OPTIONAL - General
-  no_outputs_from = ["foo"] # example, no default
 ```
 
 </TabItem>
@@ -564,7 +563,7 @@ A unique identifier for this test.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[["foo"]]}
@@ -572,7 +571,7 @@ A unique identifier for this test.
   name={"no_outputs_from"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"[string]"}
   unit={null}

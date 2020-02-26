@@ -8,6 +8,7 @@ module PostProcessors
   # post processor ensures imports are always present.
   class ComponentImporter
     IMPORTS = {
+      'Accordion' => "import Accordion from '@site/src/components/Accordion';",
       'Alert' => "import Alert from '@site/src/components/Alert';",
       'CodeHeader' => "import CodeHeader from '@site/src/components/CodeHeader';",
       'Diagram' => "import Diagram from '@site/src/components/Diagram';",

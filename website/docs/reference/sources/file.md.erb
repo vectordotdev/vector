@@ -51,6 +51,21 @@ the data directory which is specified via the
 [global `data_dir` option][docs.global-options#data_dir] but can be
 overridden via the `data_dir` option in the `file` source directly.
 
+### Compressed Files
+
+Vector will transparently detect files which have been compressed using `gzip`
+and decompress them for reading. This detection process looks for the unique
+sequence of bytes in the `gzip` header and does not rely on the compressed files
+adhering to any kind of naming convention.
+
+One caveat with reading compressed files is that Vector is not able to
+efficiently seek into them. Rather than implement a potentially-expensive full
+scan as a seek mechanism, Vector currently will not attempt to make further
+reads from a file for which it has already stored a checkpoint in a previous
+run. For this reason, users should take care to allow Vector to fully process
+any compressed files before shutting the process down or moving the files to
+another location on disk.
+
 ### File Rotation
 
 Vector supports tailing across a number of file rotation strategies. The default
@@ -69,7 +84,14 @@ allows Vector to find the file after rotation, read it uncompressed to identify
 it, and then ensure it has all of the data, including any written in a gap
 between Vector's last read and the actual rotation event.
 
-### File Identification
+### File Deletion
+
+When a watched file is deleted, Vector will maintain its open file handle and
+continue reading until it reaches `EOF`. When a file is no longer findable in
+the `includes` glob and the reader has reached EOF, that file's reader is
+discarded.
+
+### Fingerprinting
 
 By default, Vector identifies files by creating a [cyclic redundancy check
 (CRC)][urls.crc] on the first 256 bytes of the file. This serves as a
@@ -80,12 +102,6 @@ This strategy avoids the common pitfalls of using device and inode names since
 inode names can be reused across files. This enables Vector to [properly tail
 files across various rotation strategies][pages.index#correctness].
 
-### File Deletion
-
-When a watched file is deleted, Vector will maintain its open file handle and
-continue reading until it reaches EOF. When a file is no longer findable in the
-`includes` glob and the reader has reached EOF, that file's reader is discarded.
-
 ### Globbing
 
 [Globbing][urls.globbing] is supported in all provided file paths, files will
@@ -95,6 +111,108 @@ be [autodiscovered](#auto-discovery) continually at a rate defined by the
 ### Line Delimiters
 
 Each line is read until a new line delimiter (the `0xA` byte) or `EOF` is found.
+
+###  Multi-Line Messages
+
+Sometimes a single log event will appear as multiple log lines. To handle this,
+Vector provides a set of `multiline` options. These options were carefully
+thought through and will allow you to solve the simplest and most complex
+cases. Let's look at a few examples:
+
+#### Example 1: Ruby Exceptions
+
+Ruby exceptions, when logged, consist of multiple lines:
+
+```
+foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
+	from foobar.rb:6:in `bar'
+  from foobar.rb:2:in `foo'
+  from foobar.rb:9:in `<main>'
+```
+
+To consume these lines as a single event, use the following Vector configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^[^\\s]"
+    mode = "continue_through"
+    condition_pattern = "^[\\s]+from"
+    timeout_ms = 1000
+```
+
+* `start_pattern`, set to `^[^\\s]`, tells Vector that new multi-line events
+  should _not_ start  with white-space.
+* `mode`, set to `continue_through`, tells Vector continue aggregating lines
+  until the `condition_pattern` is no longer valid (excluding the invalid line).
+* `condition_pattern`, set to `^[\\s]+from`, tells Vector to continue
+  aggregating lines if they start with white-space followed by `from`.
+
+#### Example 2: Line Continuations
+
+Some programming languages use the backslash (`\`) character to signal that a
+line will continue on the next line:
+
+```
+First line\
+second line\
+third line
+```
+
+To consume these lines as a single event, use the following Vector configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "\\$"
+    mode = "continue_past"
+    condition_pattern = "\\$"
+    timeout_ms = 1000
+```
+
+* `start_pattern`, set to `\\$`, tells Vector that new multi-line events
+  start with lines that end in `\`.
+* `mode`, set to `continue_past`, tells Vector continue aggregating lines, plus
+  one additional line, until `condition_pattern` is false.
+* `condition_pattern`, set to `\\$`, tells Vector to continue aggregating lines
+  if they _end_ with a `\` character.
+
+#### Example 3: Timestamps
+
+Activity logs from services such as Elasticsearch typically begin with a
+timestamp, followed by information on the specific activity, as in this example:
+
+```
+[2015-08-24 11:49:14,389][ INFO ][env                      ] [Letha] using [1] data paths, mounts [[/
+(/dev/disk1)]], net usable_space [34.5gb], net total_space [118.9gb], types [hfs]
+```
+
+To consume these lines as a single event, use the following Vector configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    mode = "halt_before"
+    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    timeout_ms = 1000
+```
+
+* `start_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector that
+  new multi-line events start with a timestamp sequence.
+* `mode`, set to `halt_before`, tells Vector to continue aggregating lines as
+  long as the `condition_pattern` does not match.
+* `condition_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector to
+  continue aggregating up until a line starts with a timestamp sequence.
 
 ### Read Position
 
@@ -135,18 +253,3 @@ logs from multiple services), you are likely better off with the default
 behavior. If you're dealing with a single logical log stream or if you value
 per-stream ordering over fairness across streams, consider setting
 `oldest_first` to `true`.
-
-### Compressed Files
-
-Vector will transparently detect files which have been compressed using `gzip`
-and decompress them for reading. This detection process looks for the unique
-sequence of bytes in the `gzip` header and does not rely on the compressed files
-adhering to any kind of naming convention.
-
-One caveat with reading compressed files is that Vector is not able to
-efficiently seek into them. Rather than implement a potentially-expensive full
-scan as a seek mechanism, Vector currently will not attempt to make further
-reads from a file for which it has already stored a checkpoint in a previous
-run. For this reason, users should take care to allow Vector to fully process
-any compressed files before shutting the process down or moving the files to
-another location on disk.

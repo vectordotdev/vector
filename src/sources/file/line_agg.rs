@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use futures::{Async, Poll, Stream};
+use futures01::{Async, Poll, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap, VecDeque};
@@ -468,7 +468,7 @@ mod tests {
     fn stream_from_lines<'a>(
         lines: &'a [&'static str],
     ) -> impl Stream<Item = (Bytes, Filename), Error = ()> + 'a {
-        futures::stream::iter_ok::<_, ()>(
+        futures01::stream::iter_ok::<_, ()>(
             lines
                 .iter()
                 .map(|line| (Bytes::from_static(line.as_bytes()), "test.log".to_owned())),
@@ -480,7 +480,7 @@ mod tests {
         T: Stream<Item = (Bytes, K), Error = ()>,
         K: Hash + Eq + Clone,
     {
-        futures::future::Future::wait(futures::stream::Stream::collect(line_agg))
+        futures01::future::Future::wait(futures01::stream::Stream::collect(line_agg))
             .expect("Failed to collect test results")
     }
 

@@ -1,0 +1,49 @@
+[transforms.rename_fields]
+title = "Rename Fields"
+allow_you_to_description = "rename one or more log fields"
+beta = false
+common = false
+function_category = "shape"
+input_types = ["log"]
+output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "rename_fields") %>
+
+[transforms.rename_fields.options.fields]
+type = "table"
+common = true
+required = true
+description = """\
+A table of old-key/new-key pairs representing the keys to be moved in the \
+event.\
+"""
+
+[transforms.rename_fields.options.fields.children."`[field-name]`"]
+type = "*"
+required = true
+examples = [
+  {"old field name" = "new field name"},
+]
+description = """\
+The name of the field to move. Use `.` for adding nested fields.\
+"""
+
+
+[[transforms.rename_fields.output.log.examples]]
+label = "Generic"
+body = """\
+Given the following configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_transform]
+  type = "rename_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    old_field = "new_field"
+    old_nested.nested = "new_nested.nested",
+```
+"""

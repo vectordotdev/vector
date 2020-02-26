@@ -3,7 +3,7 @@ use super::{
     Batch, BatchServiceSink,
 };
 use crate::buffers::Acker;
-use futures::Poll;
+use futures01::Poll;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -212,7 +212,7 @@ where
 {
     type Response = S::Response;
     type Error = crate::Error;
-    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
+    type Future = futures01::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         self.inner.poll_ready().map_err(Into::into)
@@ -220,7 +220,7 @@ where
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        use futures::Future;
+        use futures01::Future;
         self.inner.call(req).map_err(|e| e.into())
     }
 }
@@ -237,7 +237,7 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::Future;
+    use futures01::Future;
     use std::sync::Arc;
     use tokio01_test::{assert_ready, task::MockTask};
     use tower::layer::Layer;

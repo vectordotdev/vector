@@ -1,7 +1,7 @@
 use crate::runtime::Runtime;
 use crate::Event;
 
-use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use futures01::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -17,6 +17,7 @@ use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::util::FutureExt;
+use tokio_tls::TlsConnector;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -51,7 +52,7 @@ pub fn send_lines(
     addr: SocketAddr,
     lines: impl Iterator<Item = String>,
 ) -> impl Future<Item = (), Error = ()> {
-    let lines = futures::stream::iter_ok::<_, ()>(lines);
+    let lines = futures01::stream::iter_ok::<_, ()>(lines);
 
     TcpStream::connect(&addr)
         .map_err(|e| panic!("{:}", e))
@@ -66,6 +67,48 @@ pub fn send_lines(
                     tokio::io::shutdown(socket).map_err(|e| panic!("{:}", e))
                 })
                 .map(|_| ())
+        })
+}
+
+pub fn send_lines_tls(
+    addr: SocketAddr,
+    host: String,
+    lines: impl Iterator<Item = String>,
+) -> impl Future<Item = (), Error = ()> {
+    let lines = futures01::stream::iter_ok::<_, ()>(lines);
+
+    let connector: TlsConnector = native_tls::TlsConnector::builder()
+        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_hostnames(true)
+        .build()
+        .expect("Failed to build TLS connector")
+        .into();
+
+    TcpStream::connect(&addr)
+        .map_err(|e| panic!("{:}", e))
+        .and_then(move |socket| {
+            connector
+                .connect(&host, socket)
+                .map_err(|e| panic!("{:}", e))
+                .and_then(|stream| {
+                    let out = FramedWrite::new(stream, LinesCodec::new())
+                        .sink_map_err(|e| panic!("{:?}", e));
+
+                    lines
+                        .forward(out)
+                        .and_then(|(_source, sink)| {
+                            let mut stream = sink.into_inner().into_inner();
+                            // We should catch TLS shutdown errors here,
+                            // but doing so results in a repeatable
+                            // "Resource temporarily available" error,
+                            // and tests will be checking that contents
+                            // are received anyways.
+                            stream.get_mut().shutdown().ok();
+                            //tokio::io::shutdown(stream).map_err(|e| panic!("{:}", e))
+                            Ok(())
+                        })
+                        .map(|_| ())
+                })
         })
 }
 
@@ -244,7 +287,7 @@ where
 }
 
 pub struct Receiver {
-    handle: futures::sync::oneshot::SpawnHandle<Vec<String>, ()>,
+    handle: futures01::sync::oneshot::SpawnHandle<Vec<String>, ()>,
     count: Arc<AtomicUsize>,
     trigger: Trigger,
     _runtime: Runtime,
@@ -282,7 +325,7 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
         .map_err(|e| panic!("{:?}", e))
         .collect();
 
-    let handle = futures::sync::oneshot::spawn(lines, &runtime.executor());
+    let handle = futures01::sync::oneshot::spawn(lines, &runtime.executor());
     Receiver {
         handle,
         count,
@@ -292,7 +335,7 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
 }
 
 pub struct CountReceiver {
-    handle: futures::sync::oneshot::SpawnHandle<usize, ()>,
+    handle: futures01::sync::oneshot::SpawnHandle<usize, ()>,
     trigger: Trigger,
     _runtime: Runtime,
 }
@@ -319,7 +362,7 @@ pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
         .map_err(|e| panic!("{:?}", e))
         .fold(0, |n, _| future::ok(n + 1));
 
-    let handle = futures::sync::oneshot::spawn(count, &runtime.executor());
+    let handle = futures01::sync::oneshot::spawn(count, &runtime.executor());
     CountReceiver {
         handle,
         trigger,
