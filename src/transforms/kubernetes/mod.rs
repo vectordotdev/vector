@@ -1,6 +1,8 @@
 pub mod watch_client;
 
-use self::watch_client::{ClientConfig, PodEvent, RuntimeError, Version, WatchClient};
+use self::watch_client::{
+    ClientConfig, PodEvent, RuntimeError, Version, WatchClient, WatchStreamBuild,
+};
 use super::Transform;
 use crate::{
     event::{self, Event, Value},
@@ -65,8 +67,10 @@ impl TransformConfig for KubePodMetadata {
 
         // Run background task
         cx.executor().spawn_std(async move {
-            let error = metadata_client.run().await;
-            error!(message = "Stopped updating Pod metadata.", reason = %error);
+            match metadata_client.run().await {
+                Ok(()) => unreachable!(),
+                Err(error) => error!(message = "Stopped updating Pod metadata.", reason = %error),
+            }
         });
 
         // Construct transform
@@ -152,15 +156,15 @@ impl MetadataClient {
     }
 
     /// Listens for pod metadata changes and updates metadata map.
-    async fn run(mut self) -> BuildError {
+    async fn run(mut self) -> Result<(), BuildError> {
         let mut version = None;
         let mut error = None;
         loop {
             // Build watcher stream
-            let mut watcher = match self.client.watch_metadata(version.clone(), error.take()) {
-                Ok(watcher) => watcher,
-                Err(error) => return BuildError::WatchStreamBuild { source: error },
-            };
+            let mut watcher = self
+                .client
+                .watch_metadata(version.clone(), error.take())
+                .context(WatchStreamBuild)?;
             info!("Watching Pod metadata.");
 
             // Watch loop
