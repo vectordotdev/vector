@@ -152,7 +152,7 @@ pub fn build_pieces(
             exec: exec.clone(),
         };
 
-        let mut transform = match transform.inner.build(cx) {
+        let transform = match transform.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -165,13 +165,8 @@ pub fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        let transform = input_rx
-            .map(move |event| {
-                let mut output = Vec::with_capacity(1);
-                transform.transform_into(&mut output, event);
-                futures01::stream::iter_ok(output.into_iter())
-            })
-            .flatten()
+        let transform = transform
+            .transform_stream(input_rx)
             .forward(output)
             .map(|_| ());
         let task = Task::new(&name, &typetag, transform);
