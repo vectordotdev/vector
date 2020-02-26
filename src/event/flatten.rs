@@ -29,7 +29,7 @@ pub fn insert<K: Into<Atom> + AsRef<str>>(event: &mut LogEvent, name: K, value: 
             event.insert(name, b);
         }
         JsonValue::Null => {
-            event.insert(name, "");
+            event.insert(name, Value::Null);
         }
         JsonValue::Array(array) => {
             for (i, element) in array.into_iter().enumerate() {

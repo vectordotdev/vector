@@ -15,6 +15,7 @@ pub mod config_paths;
 pub mod dns;
 pub mod event;
 pub mod generate;
+#[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod list;
 pub mod metrics;

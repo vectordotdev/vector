@@ -93,7 +93,7 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, path: nil, titles: true)
+  def config_example(options, array: false, skip_path: false, common: false, path: nil, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end

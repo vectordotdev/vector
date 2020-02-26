@@ -203,6 +203,13 @@ pub trait TransformConfig: core::fmt::Debug {
     fn output_type(&self) -> DataType;
 
     fn transform_type(&self) -> &'static str;
+
+    /// Allows a transform configuration to expand itself into multiple "child"
+    /// transformations to replace it. This allows a transform to act as a macro
+    /// for various patterns.
+    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+        Ok(None)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -328,6 +335,48 @@ impl Config {
         };
 
         self.transforms.insert(name.to_string(), transform);
+    }
+
+    /// Some component configs can act like macros and expand themselves into
+    /// multiple replacement configs. Returns a map of components to their
+    /// expanded child names.
+    pub fn expand_macros(&mut self) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
+        let mut expanded_transforms = IndexMap::new();
+        let mut expansions = IndexMap::new();
+        let mut errors = Vec::new();
+
+        while let Some((k, mut t)) = self.transforms.pop() {
+            if let Some(expanded) = match t.inner.expand() {
+                Ok(e) => e,
+                Err(err) => {
+                    errors.push(format!("failed to expand transform '{}': {}", k, err));
+                    continue;
+                }
+            } {
+                let mut children = Vec::new();
+                for (name, child) in expanded {
+                    let full_name = format!("{}.{}", k, name);
+                    expanded_transforms.insert(
+                        full_name.clone(),
+                        TransformOuter {
+                            inputs: t.inputs.clone(),
+                            inner: child,
+                        },
+                    );
+                    children.push(full_name);
+                }
+                expansions.insert(k.clone(), children);
+            } else {
+                expanded_transforms.insert(k, t);
+            }
+        }
+        self.transforms = expanded_transforms;
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(expansions)
+        }
     }
 
     pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {

@@ -258,6 +258,10 @@ Booleans represent binary true/false values.
 Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
 stored as UTC.
 
+#### Null Values
+
+ For compatibility with JSON log events, Vector also supports `null` values.
+
 
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
