@@ -1,4 +1,4 @@
-use super::{Atom, PathIter, PathNode, Value};
+use super::{Atom, PathComponent, PathIter, Value};
 use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 
 /// Removes field value specified by the given path and return its value.
@@ -9,7 +9,7 @@ pub fn remove(fields: &mut BTreeMap<Atom, Value>, path: &str) -> Option<Value> {
     let mut path_iter = PathIter::new(path).peekable();
 
     let key = match path_iter.next() {
-        Some(PathNode::Key(key)) => key,
+        Some(PathComponent::Key(key)) => key,
         _ => return None,
     };
 
@@ -24,18 +24,18 @@ pub fn remove(fields: &mut BTreeMap<Atom, Value>, path: &str) -> Option<Value> {
 
 fn value_remove<I>(mut value: &mut Value, mut path_iter: Peekable<I>) -> Option<Value>
 where
-    I: Iterator<Item = PathNode>,
+    I: Iterator<Item = PathComponent>,
 {
     loop {
         value = match (path_iter.next(), value) {
-            (Some(PathNode::Key(ref key)), Value::Map(map)) => match path_iter.peek() {
+            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match path_iter.peek() {
                 None => return map.remove(key),
                 Some(_) => match map.get_mut(key) {
                     None => return None,
                     Some(value) => value,
                 },
             },
-            (Some(PathNode::Index(index)), Value::Array(array)) => match path_iter.peek() {
+            (Some(PathComponent::Index(index)), Value::Array(array)) => match path_iter.peek() {
                 None => return array_remove(array, index),
                 Some(_) => match array.get_mut(index) {
                     None => return None,

@@ -1,4 +1,4 @@
-use super::{Atom, PathIter, PathNode, Value};
+use super::{Atom, PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
 
 /// Returns a mutable reference to field value specified by the given path.
@@ -6,7 +6,7 @@ pub fn get_mut<'a>(fields: &'a mut BTreeMap<Atom, Value>, path: &str) -> Option<
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {
-        Some(PathNode::Key(key)) => match fields.get_mut(&key) {
+        Some(PathComponent::Key(key)) => match fields.get_mut(&key) {
             None => None,
             Some(value) => get_mut_value(value, path_iter),
         },
@@ -16,23 +16,25 @@ pub fn get_mut<'a>(fields: &'a mut BTreeMap<Atom, Value>, path: &str) -> Option<
 
 fn get_mut_value<'a, I>(mut value: &'a mut Value, mut path_iter: I) -> Option<&'a mut Value>
 where
-    I: Iterator<Item = PathNode>,
+    I: Iterator<Item = PathComponent>,
 {
     loop {
         match (path_iter.next(), value) {
             (None, value) => return Some(value),
-            (Some(PathNode::Key(ref key)), Value::Map(map)) => match map.get_mut(key) {
+            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match map.get_mut(key) {
                 None => return None,
                 Some(nested_value) => {
                     value = nested_value;
                 }
             },
-            (Some(PathNode::Index(index)), Value::Array(array)) => match array.get_mut(index) {
-                None => return None,
-                Some(nested_value) => {
-                    value = nested_value;
+            (Some(PathComponent::Index(index)), Value::Array(array)) => {
+                match array.get_mut(index) {
+                    None => return None,
+                    Some(nested_value) => {
+                        value = nested_value;
+                    }
                 }
-            },
+            }
             _ => return None,
         }
     }

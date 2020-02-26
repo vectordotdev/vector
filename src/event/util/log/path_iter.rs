@@ -2,7 +2,7 @@ use super::Atom;
 use std::{mem, str::Chars};
 
 #[derive(Debug, PartialEq)]
-pub enum PathNode {
+pub enum PathComponent {
     /// For example, in "a.b[0].c[2]" the keys are "a", "b", and "c".
     Key(Atom),
     /// For example, in "a.b[0].c[2]" the indexes are 0 and 2.
@@ -11,7 +11,7 @@ pub enum PathNode {
     Invalid,
 }
 
-/// Iterator over nodes of paths specified in form "a.b[0].c[2]".
+/// Iterator over components of paths specified in form "a.b[0].c[2]".
 pub struct PathIter<'a> {
     chars: Chars<'a>,
     state: PathIterState,
@@ -47,7 +47,7 @@ impl Default for PathIterState {
 }
 
 impl<'a> Iterator for PathIter<'a> {
-    type Item = PathNode;
+    type Item = PathComponent;
     fn next(&mut self) -> Option<Self::Item> {
         let mut res = None;
         loop {
@@ -64,16 +64,16 @@ impl<'a> Iterator for PathIter<'a> {
                 },
                 Key(mut s) => match c {
                     Some('.') => {
-                        res = Some(Some(PathNode::Key(s.into())));
+                        res = Some(Some(PathComponent::Key(s.into())));
                         Dot
                     }
                     Some('[') => {
-                        res = Some(Some(PathNode::Key(s.into())));
+                        res = Some(Some(PathComponent::Key(s.into())));
                         OpeningBracket
                     }
                     Some(']') => Invalid,
                     None => {
-                        res = Some(Some(PathNode::Key(s.into())));
+                        res = Some(Some(PathComponent::Key(s.into())));
                         End
                     }
                     Some(c) => {
@@ -84,7 +84,7 @@ impl<'a> Iterator for PathIter<'a> {
                 Index(i) => match c {
                     Some(c) if c >= '0' && c <= '9' => Index(10 * i + (c as usize - '0' as usize)),
                     Some(']') => {
-                        res = Some(Some(PathNode::Index(i)));
+                        res = Some(Some(PathComponent::Index(i)));
                         ClosingBracket
                     }
                     _ => Invalid,
@@ -108,7 +108,7 @@ impl<'a> Iterator for PathIter<'a> {
                     End
                 }
                 Invalid => {
-                    res = Some(Some(PathNode::Invalid));
+                    res = Some(Some(PathComponent::Invalid));
                     End
                 }
             }
@@ -123,13 +123,13 @@ mod test {
     #[test]
     fn path_iter_elementary() {
         let actual: Vec<_> = PathIter::new(&"squirrel".to_string()).collect();
-        let expected = vec![PathNode::Key("squirrel".into())];
+        let expected = vec![PathComponent::Key("squirrel".into())];
         assert_eq!(actual, expected);
     }
 
     #[test]
     fn path_iter_complex() {
-        use PathNode::*;
+        use PathComponent::*;
 
         let inputs = vec![
             "flying.squirrels.are.everywhere",
@@ -177,7 +177,7 @@ mod test {
         ];
 
         for i in inputs.into_iter() {
-            assert_eq!(PathIter::new(i).last(), Some(PathNode::Invalid));
+            assert_eq!(PathIter::new(i).last(), Some(PathComponent::Invalid));
         }
     }
 }

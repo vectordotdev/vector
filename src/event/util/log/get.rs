@@ -1,4 +1,4 @@
-use super::{Atom, PathIter, PathNode, Value};
+use super::{Atom, PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
 
 /// Returns a reference to a field value specified by the given path.
@@ -6,7 +6,7 @@ pub fn get<'a>(fields: &'a BTreeMap<Atom, Value>, path: &str) -> Option<&'a Valu
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {
-        Some(PathNode::Key(key)) => match fields.get(&key) {
+        Some(PathComponent::Key(key)) => match fields.get(&key) {
             None => None,
             Some(value) => get_value(value, path_iter),
         },
@@ -16,18 +16,18 @@ pub fn get<'a>(fields: &'a BTreeMap<Atom, Value>, path: &str) -> Option<&'a Valu
 
 fn get_value<'a, I>(mut value: &'a Value, mut path_iter: I) -> Option<&'a Value>
 where
-    I: Iterator<Item = PathNode>,
+    I: Iterator<Item = PathComponent>,
 {
     loop {
         match (path_iter.next(), value) {
             (None, _) => return Some(value),
-            (Some(PathNode::Key(ref key)), Value::Map(map)) => match map.get(key) {
+            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match map.get(key) {
                 None => return None,
                 Some(nested_value) => {
                     value = nested_value;
                 }
             },
-            (Some(PathNode::Index(index)), Value::Array(array)) => match array.get(index) {
+            (Some(PathComponent::Index(index)), Value::Array(array)) => match array.get(index) {
                 None => return None,
                 Some(nested_value) => {
                     value = nested_value;

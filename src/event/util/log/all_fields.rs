@@ -20,35 +20,38 @@ enum LeafIter<'a> {
 }
 
 #[derive(Clone)]
-enum Node<'a> {
+enum PathComponent<'a> {
     Key(&'a Atom),
     Index(usize),
 }
 
+/// Performs depth-first traversal of the nested structure.
 #[derive(Clone)]
 struct FieldsIter<'a> {
+    /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,
-    nodes: Vec<Node<'a>>,
+    /// Path components from the root up to the top of the stack.
+    path: Vec<PathComponent<'a>>,
 }
 
 impl<'a> FieldsIter<'a> {
     fn new(fields: &'a BTreeMap<Atom, Value>) -> FieldsIter<'a> {
         FieldsIter {
             stack: vec![LeafIter::Map(fields.iter())],
-            nodes: vec![],
+            path: vec![],
         }
     }
 
-    fn push(&mut self, value: &'a Value, node: Node<'a>) -> Option<&'a Value> {
+    fn push(&mut self, value: &'a Value, component: PathComponent<'a>) -> Option<&'a Value> {
         match value {
             Value::Map(map) => {
                 self.stack.push(LeafIter::Map(map.iter()));
-                self.nodes.push(node);
+                self.path.push(component);
                 None
             }
             Value::Array(array) => {
                 self.stack.push(LeafIter::Array(array.iter().enumerate()));
-                self.nodes.push(node);
+                self.path.push(component);
                 None
             }
             _ => Some(value),
@@ -57,19 +60,19 @@ impl<'a> FieldsIter<'a> {
 
     fn pop(&mut self) {
         self.stack.pop();
-        self.nodes.pop();
+        self.path.pop();
     }
 
-    fn make_path(&mut self, node: Node<'a>) -> Atom {
+    fn make_path(&mut self, component: PathComponent<'a>) -> Atom {
         let mut res = String::new();
-        let mut nodes_iter = self.nodes.iter().chain(iter::once(&node)).peekable();
+        let mut path_iter = self.path.iter().chain(iter::once(&component)).peekable();
         loop {
-            match nodes_iter.next() {
+            match path_iter.next() {
                 None => return Atom::from(res),
-                Some(Node::Key(key)) => res.push_str(&key),
-                Some(Node::Index(index)) => res.push_str(&format!("[{}]", index)),
+                Some(PathComponent::Key(key)) => res.push_str(&key),
+                Some(PathComponent::Index(index)) => res.push_str(&format!("[{}]", index)),
             }
-            if let Some(Node::Key(_)) = nodes_iter.peek() {
+            if let Some(PathComponent::Key(_)) = path_iter.peek() {
                 res.push('.');
             }
         }
@@ -86,16 +89,19 @@ impl<'a> Iterator for FieldsIter<'a> {
                 Some(LeafIter::Map(map_iter)) => match map_iter.next() {
                     None => self.pop(),
                     Some((key, value)) => {
-                        if let Some(scalar_value) = self.push(value, Node::Key(key)) {
-                            return Some((self.make_path(Node::Key(key)), scalar_value));
+                        if let Some(scalar_value) = self.push(value, PathComponent::Key(key)) {
+                            return Some((self.make_path(PathComponent::Key(key)), scalar_value));
                         }
                     }
                 },
                 Some(LeafIter::Array(array_iter)) => match array_iter.next() {
                     None => self.pop(),
                     Some((index, value)) => {
-                        if let Some(scalar_value) = self.push(value, Node::Index(index)) {
-                            return Some((self.make_path(Node::Index(index)), scalar_value));
+                        if let Some(scalar_value) = self.push(value, PathComponent::Index(index)) {
+                            return Some((
+                                self.make_path(PathComponent::Index(index)),
+                                scalar_value,
+                            ));
                         }
                     }
                 },

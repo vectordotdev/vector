@@ -8,7 +8,7 @@ mod path_iter;
 mod remove;
 
 pub(self) use super::{Atom, Value};
-pub(self) use path_iter::{PathIter, PathNode};
+pub(self) use path_iter::{PathComponent, PathIter};
 
 pub use all_fields::all_fields;
 pub use contains::contains;

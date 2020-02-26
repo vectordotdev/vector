@@ -1,4 +1,4 @@
-use super::{Atom, PathIter, PathNode, Value};
+use super::{Atom, PathComponent, PathIter, Value};
 use std::{collections::BTreeMap, iter::Peekable};
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
@@ -8,13 +8,13 @@ pub fn insert(fields: &mut BTreeMap<Atom, Value>, path: &str, value: Value) {
 
 fn map_insert<I>(fields: &mut BTreeMap<Atom, Value>, mut path_iter: Peekable<I>, value: Value)
 where
-    I: Iterator<Item = PathNode>,
+    I: Iterator<Item = PathComponent>,
 {
     match (path_iter.next(), path_iter.peek()) {
-        (Some(PathNode::Key(current)), None) => {
+        (Some(PathComponent::Key(current)), None) => {
             fields.insert(current, value);
         }
-        (Some(PathNode::Key(current)), Some(PathNode::Key(_))) => {
+        (Some(PathComponent::Key(current)), Some(PathComponent::Key(_))) => {
             if let Some(Value::Map(map)) = fields.get_mut(&current) {
                 map_insert(map, path_iter, value);
             } else {
@@ -23,7 +23,7 @@ where
                 fields.insert(current, Value::Map(map));
             }
         }
-        (Some(PathNode::Key(current)), Some(&PathNode::Index(next))) => {
+        (Some(PathComponent::Key(current)), Some(&PathComponent::Index(next))) => {
             if let Some(Value::Array(array)) = fields.get_mut(&current) {
                 array_insert(array, path_iter, value);
             } else {
@@ -38,16 +38,16 @@ where
 
 fn array_insert<I>(values: &mut Vec<Value>, mut path_iter: Peekable<I>, value: Value)
 where
-    I: Iterator<Item = PathNode>,
+    I: Iterator<Item = PathComponent>,
 {
     match (path_iter.next(), path_iter.peek()) {
-        (Some(PathNode::Index(current)), None) => {
+        (Some(PathComponent::Index(current)), None) => {
             while values.len() < current {
                 values.push(Value::Null);
             }
             values.insert(current, value);
         }
-        (Some(PathNode::Index(current)), Some(PathNode::Key(_))) => {
+        (Some(PathComponent::Index(current)), Some(PathComponent::Key(_))) => {
             if let Some(Value::Map(map)) = values.get_mut(current) {
                 map_insert(map, path_iter, value);
             } else {
@@ -59,7 +59,7 @@ where
                 values.insert(current, Value::Map(map));
             }
         }
-        (Some(PathNode::Index(current)), Some(PathNode::Index(next))) => {
+        (Some(PathComponent::Index(current)), Some(PathComponent::Index(next))) => {
             if let Some(Value::Array(array)) = values.get_mut(current) {
                 array_insert(array, path_iter, value);
             } else {
