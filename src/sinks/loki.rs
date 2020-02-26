@@ -23,7 +23,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
-use futures03::compat::Future01CompatExt;
+use futures::compat::Future01CompatExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;

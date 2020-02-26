@@ -6,7 +6,7 @@ use crate::{
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures03::{compat::Future01CompatExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, TryFutureExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;

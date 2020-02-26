@@ -4,8 +4,8 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
+use futures::compat::Compat;
 use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
-use futures03::compat::Compat;
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,

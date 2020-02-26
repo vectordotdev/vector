@@ -297,7 +297,7 @@ pub fn file_source(
         thread::spawn(move || {
             let _enter = span.enter();
             file_server.run(
-                futures03::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
+                futures::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
                 shutdown_rx,
             );
         });

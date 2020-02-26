@@ -5,12 +5,12 @@ use crate::{
     sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use futures::compat::Compat;
 use futures01::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
-use futures03::compat::Compat;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
