@@ -61,16 +61,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
 
-        let tls = match self.tls {
-            Some(ref tls) => {
-                if tls.enabled.unwrap_or(false) {
-                    Some(TlsSettings::from_options(&Some(tls.options.clone()))?)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        };
+        let tls = TlsSettings::from_config(&self.tls, false)?;
 
         let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(host, port, cx.resolver());
