@@ -296,7 +296,10 @@ pub fn file_source(
         let span = info_span!("file_server");
         thread::spawn(move || {
             let _enter = span.enter();
-            file_server.run(tx.sink_map_err(drop), shutdown_rx);
+            file_server.run(
+                futures03::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
+                shutdown_rx,
+            );
         });
 
         // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,
