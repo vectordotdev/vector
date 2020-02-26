@@ -1,8 +1,6 @@
 pub mod watch_client;
 
-use self::watch_client::{
-    ClientConfig, PodEvent, RuntimeError, Version, WatchClient, WatchStreamBuild,
-};
+use self::watch_client::{ClientConfig, PodEvent, RuntimeError, Version, WatchClient};
 use super::Transform;
 use crate::{
     event::{self, Event, Value},
@@ -11,8 +9,10 @@ use crate::{
 };
 use bytes::Bytes;
 use evmap::{ReadHandle, WriteHandle};
-use futures::stream::Stream;
-use futures03::compat::Future01CompatExt;
+use futures::{
+    compat::{Future01CompatExt, Stream01CompatExt},
+    stream::StreamExt,
+};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -164,32 +164,31 @@ impl MetadataClient {
             let mut watcher = self
                 .client
                 .watch_metadata(version.clone(), error.take())
-                .context(WatchStreamBuild)?;
+                .context(WatchStreamBuild)?
+                .compat();
             info!("Watching Pod metadata.");
 
             // Watch loop
-            let runtime_error = loop {
-                break match watcher.into_future().compat().await {
-                    Ok((Some(event), tail)) => {
-                        watcher = tail;
-
+            error = Some(RuntimeError::WatchUnexpectedlyEnded);
+            while let Some(next) = watcher.next().await {
+                match next {
+                    Ok(event) => {
                         self.delete_update();
                         version = self.update(event).or(version);
 
                         self.metadata.refresh();
-                        continue;
                     }
-                    Ok((None, _)) => RuntimeError::WatchUnexpectedlyEnded,
-                    Err((err, _)) => err,
-                };
-            };
+                    Err(err) => {
+                        error = Some(err);
+                        break;
+                    }
+                }
+            }
 
             warn!(
                 message = "Temporary stoped watching Pod metadata.",
-                reason = %runtime_error
+                reason = ?error
             );
-
-            error = Some(runtime_error);
 
             // Wait for bit before trying to watch again.
             let _ = Delay::new(Instant::now() + RETRY_TIMEOUT)
