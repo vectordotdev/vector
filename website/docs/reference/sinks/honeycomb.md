@@ -592,6 +592,13 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
+### Obtaining a Honeycomb api key
+
+1. Register for a free account at [honeycomb.io](https://ui.honeycomb.io/signup)
+
+2. Once registered, create a new dataset and when presented with log shippers select the
+curl option and use the key provided with the curl example.
+
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the

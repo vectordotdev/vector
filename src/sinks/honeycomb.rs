@@ -122,8 +122,7 @@ async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> Result<(), 
 
         let message = if let Some(s) = json
             .as_object()
-            .unwrap()
-            .get("error")
+            .and_then(|o| o.get("error"))
             .and_then(|s| s.as_str())
         {
             s.to_string()
