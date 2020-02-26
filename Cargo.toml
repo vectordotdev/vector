@@ -49,6 +49,8 @@ tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.16"
 tokio-tls = "0.2.1"
+tokio02 = { package = "tokio", version = "0.2", features = ["sync", "fs"] }
+async-trait = "0.1"
 
 # Tracing
 tracing = "0.1.9"

@@ -12,6 +12,7 @@ pub mod console;
 pub mod datadog_metrics;
 pub mod elasticsearch;
 pub mod file;
+pub mod file2;
 pub mod gcp;
 pub mod http;
 pub mod humio_logs;
