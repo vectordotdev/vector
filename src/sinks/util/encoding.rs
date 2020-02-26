@@ -14,6 +14,7 @@ use string_cache::DefaultAtom as Atom;
 ///
 /// Currently, we don't have a defined ordering, since all options are mutually exclusive.
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Getters, Setters)]
+#[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
     pub(crate) format: E,
     #[serde(default)]
