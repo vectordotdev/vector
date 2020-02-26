@@ -46,6 +46,22 @@ end
 
   # OPTIONAL
   search_dirs = ["/etc/vector/lua"] # example, no default
+
+# Optional unit tests
+[[tests]]
+  name = "test_lua"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "raw"
+    value = "I desperately want a host please"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.eq" = "I desperately want a host please"
+      "host.eq" = "myhost"
 ```
 
 ## Options

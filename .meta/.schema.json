@@ -185,6 +185,25 @@
         }
       }
     },
+    "test_examples": {
+      "type": "array",
+      "description": "An array of example unit tests used to demonstrate appropriate tests for a component.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["body", "label"],
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The example test body. This should be in TOML format."
+          },
+          "label": {
+            "type": "string",
+            "description": "The test label. This will be used in the tab name if multiple test examples are provided."
+          }
+        }
+      }
+    },
     "requirements": {
       "type": "object",
       "properties": {
@@ -489,6 +508,10 @@
               "$ref": "#/definitions/output"
             }
           }
+        },
+        "test_examples": {
+          "$ref": "#/definitions/test_examples",
+          "description": "Example tests for this transform."
         },
         "output_types": {
           "$ref": "#/definitions/event_types",

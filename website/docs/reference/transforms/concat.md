@@ -32,11 +32,29 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "concat" # must be: "concat"
   inputs = ["my-source-id"] # example
-  items = ["first[..3]", "second[-5..]", "third[3..6]"] # example
+  items = ["first[..5]", "second[3..5]", "third[-5..]"] # example
   target = "dest_field_name" # example
 
   # OPTIONAL
   joiner = " " # default
+
+# Optional unit tests
+[[tests]]
+  name = "test_concat"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "log"
+    [tests.inputs.log_fields]
+      first = "checking for errors"
+      second = "in my config"
+      third = "suits my style"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "dest_field_name.eq" = "check my style"
 ```
 
 ## Options
@@ -52,7 +70,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["first[..3]","second[-5..]","third[3..6]"]]}
+  examples={[["first[..5]","second[3..5]","third[-5..]"]]}
   groups={[]}
   name={"items"}
   path={null}

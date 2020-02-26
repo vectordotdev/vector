@@ -24,6 +24,7 @@ class Component
     :service_name,
     :service_providers,
     :title,
+    :test_examples,
     :type,
     :unsupported_operating_systems
 
@@ -39,6 +40,7 @@ class Component
     @service_name = hash["service_name"] || hash.fetch("title")
     @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
+    @test_examples = hash["test_examples"] || []
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = (hash["options"] || {}).to_struct_with_name(Field)

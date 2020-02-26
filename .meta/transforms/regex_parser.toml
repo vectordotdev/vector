@@ -40,3 +40,23 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.\
 """
 
 <%= render("_partials/_types.toml", namespace: "transforms.regex_parser", common: true) %>
+
+[[transforms.regex_parser.test_examples]]
+label = "Basic"
+body = """\
+[[tests]]
+  name = "test_regex_parser"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "raw"
+    value = "2020-02-26T12:58:27+00:00 DEBUG hello world this is a test message"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "timestamp.eq" = "2020-02-26T12:58:27+00:00"
+      "level.eq" = "DEBUG"
+      "message.eq" = "hello world this is a test message"\
+"""

@@ -37,3 +37,22 @@ description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
 """
+
+[[transforms.lua.test_examples]]
+label = "Basic"
+body = """\
+[[tests]]
+  name = "test_lua"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "raw"
+    value = "I desperately want a host please"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "message.eq" = "I desperately want a host please"
+      "host.eq" = "myhost"\
+"""

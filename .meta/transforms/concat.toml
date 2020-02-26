@@ -29,12 +29,33 @@ The string that is used to join all items.\
 
 [transforms.concat.options.items]
 type = "[string]"
-examples = [["first[..3]", "second[-5..]", "third[3..6]"]]
+examples = [["first[..5]", "second[3..5]", "third[-5..]"]]
 required = true
 description = """\
 A list of substring definitons in the format of source_field[start..end]. \
 For both start and end negative values are counted from the end of the \
 string.\
+"""
+
+[[transforms.concat.test_examples]]
+label = "Basic"
+body = """\
+[[tests]]
+  name = "test_concat"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "log"
+    [tests.inputs.log_fields]
+      first = "checking for errors"
+      second = "in my config"
+      third = "suits my style"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "dest_field_name.eq" = "check my style"\
 """
 
 [[transforms.concat.output.log.examples]]

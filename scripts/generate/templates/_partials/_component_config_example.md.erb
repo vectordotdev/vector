@@ -15,6 +15,13 @@
 
 ```toml
 <%= config_example(component.option_example_groups.fetch(key), path: "#{component.type.pluralize}.my_#{component.type}_id") %>
+<%- if component.test_examples.size > 0 -%>
+
+# Optional unit tests
+<%- component.test_examples.each do |example| -%>
+<%= example["body"] %>
+<%- end -%>
+<%- end -%>
 ```
 <%- if keys.length > 1 -%>
 

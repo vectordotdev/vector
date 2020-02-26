@@ -45,6 +45,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
     success = "bool" # example
     timestamp = "timestamp|%F" # example
     timestamp = "timestamp|%a %b %e %T %Y" # example
+
+# Optional unit tests
+[[tests]]
+  name = "test_regex_parser"
+
+  [[tests.inputs]]
+    insert_at = "my_transform_id"
+    type = "raw"
+    value = "2020-02-26T12:58:27+00:00 DEBUG hello world this is a test message"
+
+  [[tests.outputs]]
+    extract_from = "my_transform_id"
+    [[tests.outputs.conditions]]
+      type = "check_fields"
+      "timestamp.eq" = "2020-02-26T12:58:27+00:00"
+      "level.eq" = "DEBUG"
+      "message.eq" = "hello world this is a test message"
 ```
 
 ## Options
