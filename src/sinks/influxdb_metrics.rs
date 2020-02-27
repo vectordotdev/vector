@@ -7,7 +7,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use http::{Method, StatusCode, Uri};
 use hyper;
 use hyper_tls::HttpsConnector;
@@ -1161,7 +1161,7 @@ mod integration_tests {
     use crate::topology::SinkContext;
     use crate::Event;
     use chrono::Utc;
-    use futures::{stream, Sink};
+    use futures01::{stream, Sink};
 
     const ORG: &str = "my-org";
     const BUCKET: &str = "my-bucket";

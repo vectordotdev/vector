@@ -1,10 +1,6 @@
 use super::Transform;
 use crate::{
-    event::{
-        self,
-        flatten::{flatten, insert},
-        Event,
-    },
+    event::{self, Event},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -51,7 +47,7 @@ pub struct JsonParser {
     field: Atom,
     drop_invalid: bool,
     drop_field: bool,
-    target_field: Option<String>,
+    target_field: Option<Atom>,
     overwrite_target: bool,
 }
 
@@ -67,7 +63,7 @@ impl From<JsonParserConfig> for JsonParser {
             field: field.clone(),
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
-            target_field: config.target_field.clone(),
+            target_field: config.target_field.map(Atom::from),
             overwrite_target: config.overwrite_target.unwrap_or(false),
         }
     }
@@ -75,7 +71,8 @@ impl From<JsonParserConfig> for JsonParser {
 
 impl Transform for JsonParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        let to_parse = event.as_log().get(&self.field).map(|s| s.as_bytes());
+        let log = event.as_mut_log();
+        let to_parse = log.get(&self.field).map(|s| s.as_bytes());
 
         let parsed = to_parse
             .and_then(|to_parse| {
@@ -101,33 +98,26 @@ impl Transform for JsonParser {
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
-                    let target_atom: Atom = target_field.as_str().into();
-                    let contains_target = event.as_log().contains(&target_atom);
-                    if self.overwrite_target && contains_target {
-                        event.as_mut_log().remove(&target_atom);
-                    }
-                    if !self.overwrite_target && contains_target {
+                    let contains_target = log.contains(&target_field);
+
+                    if contains_target && !self.overwrite_target {
                         error!(message = "target field already exists", %target_field);
                     } else {
                         if self.drop_field {
-                            event.as_mut_log().remove(&self.field);
+                            log.remove(&self.field);
                         }
 
-                        for (name, value) in object {
-                            insert(
-                                event.as_mut_log(),
-                                format!("{}.{}", target_field, name),
-                                value,
-                            );
-                        }
+                        log.insert(&target_field, Value::Object(object));
                     }
                 }
                 None => {
                     if self.drop_field {
-                        event.as_mut_log().remove(&self.field);
+                        log.remove(&self.field);
                     }
 
-                    flatten(event.as_mut_log(), object);
+                    for (key, value) in object {
+                        log.insert(key, value);
+                    }
                 }
             }
         } else if self.drop_invalid {
@@ -486,7 +476,10 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event.get(&"message".into()), None);
+        match event.get(&"message".into()) {
+            Some(crate::event::Value::Map(_)) => (),
+            _ => panic!("\"message\" is not a map"),
+        }
         assert_eq!(event[&Atom::from("message.greeting")], "hello".into());
         assert_eq!(event[&Atom::from("message.name")], "bob".into());
     }

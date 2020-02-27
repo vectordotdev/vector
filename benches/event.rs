@@ -9,21 +9,16 @@ use vector::{
 };
 
 fn benchmark_event(c: &mut Criterion) {
-    c.bench_function("unflatten baseline", |b| {
-        b.iter_with_setup(
-            || {
-                let mut e = Event::new_empty_log().into_log();
-                e.insert("key1", "value1");
-                e.insert("key2", "value2");
-                e.insert("key3", "value3");
-
-                e
-            },
-            |e| e.unflatten(),
-        )
+    c.bench_function("create and insert single-level", |b| {
+        b.iter(|| {
+            let mut log = Event::new_empty_log().into_log();
+            log.insert("key1", "value1");
+            log.insert("key2", "value2");
+            log.insert("key3", "value3");
+        })
     });
 
-    c.bench_function("unflatten single-level", |b| {
+    c.bench_function("iterate all fields single-level", |b| {
         b.iter_with_setup(
             || {
                 create_event(json!({
@@ -32,11 +27,20 @@ fn benchmark_event(c: &mut Criterion) {
                     "key3": "value3"
                 }))
             },
-            |e| e.unflatten(),
+            |e| e.all_fields().count(),
         )
     });
 
-    c.bench_function("unflatten nested-keys", |b| {
+    c.bench_function("create and insert nested-keys", |b| {
+        b.iter(|| {
+            let mut log = Event::new_empty_log().into_log();
+            log.insert("key1.nested1.nested2", "value1");
+            log.insert("key1.nested1.nested3", "value4");
+            log.insert("key3", "value3");
+        })
+    });
+
+    c.bench_function("iterate all fields nested-keys", |b| {
         b.iter_with_setup(
             || {
                 create_event(json!({
@@ -49,11 +53,19 @@ fn benchmark_event(c: &mut Criterion) {
                     "key3": "value3"
                 }))
             },
-            |e| e.unflatten(),
+            |e| e.all_fields().count(),
         )
     });
 
-    c.bench_function("unflatten array", |b| {
+    c.bench_function("create and insert array", |b| {
+        b.iter(|| {
+            let mut log = Event::new_empty_log().into_log();
+            log.insert("key1.nested1[0]", "value1");
+            log.insert("key1.nested1[1]", "value2");
+        })
+    });
+
+    c.bench_function("iterate all fields array", |b| {
         b.iter_with_setup(
             || {
                 create_event(json!({
@@ -65,7 +77,7 @@ fn benchmark_event(c: &mut Criterion) {
                     },
                 }))
             },
-            |e| e.unflatten(),
+            |e| e.all_fields().count(),
         )
     });
 }

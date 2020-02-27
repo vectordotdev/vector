@@ -7,7 +7,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use http::{uri::InvalidUri, Method, StatusCode, Uri};
 use hyper;
 use hyper_tls::HttpsConnector;

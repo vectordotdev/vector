@@ -3,13 +3,14 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
+    tls::{TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 #[cfg(unix)]
@@ -38,6 +39,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     Tcp {
         address: SocketListenAddr,
+        tls: Option<TlsConfig>,
     },
     Udp {
         address: SocketAddr,
@@ -80,13 +82,14 @@ impl SourceConfig for SyslogConfig {
             .unwrap_or(event::log_schema().host_key().to_string());
 
         match self.mode.clone() {
-            Mode::Tcp { address } => {
+            Mode::Tcp { address, tls } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
                     host_key,
                 };
                 let shutdown_secs = 30;
-                source.run(address, shutdown_secs, out)
+                let tls = TlsSettings::from_config(&tls, true)?;
+                source.run(address, shutdown_secs, tls, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             #[cfg(unix)]

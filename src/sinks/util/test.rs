@@ -2,7 +2,7 @@ use crate::{
     runtime::Runtime,
     topology::config::{SinkConfig, SinkContext},
 };
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures01::{sync::mpsc, Future, Sink, Stream};
 use hyper::{service::service_fn_ok, Body, Request, Response, Server};
 use serde::Deserialize;
 

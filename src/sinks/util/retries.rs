@@ -1,5 +1,5 @@
 use crate::Error;
-use futures::{try_ready, Async, Future, Poll};
+use futures01::{try_ready, Async, Future, Poll};
 use std::{
     cmp,
     time::{Duration, Instant},
@@ -186,7 +186,7 @@ impl RetryAction {
 mod tests {
     use super::*;
     use crate::test_util::trace_init;
-    use futures::Future;
+    use futures01::Future;
     use std::{fmt, time::Duration};
     use tokio01_test::{assert_err, assert_not_ready, assert_ready, clock};
     use tower::{retry::Retry, Service};

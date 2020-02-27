@@ -1,7 +1,7 @@
 use crate::event::Event;
 use crate::sources::Source;
 use bytes::Bytes;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::path::PathBuf;
 use tokio::{
     self,

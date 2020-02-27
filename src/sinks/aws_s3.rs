@@ -11,7 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
@@ -393,7 +393,7 @@ fn encode_event(
 
     let log = event.into_log();
     let bytes = match encoding {
-        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+        Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b
@@ -512,7 +512,7 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use flate2::read::GzDecoder;
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
@@ -578,7 +578,7 @@ mod integration_tests {
             e
         });
 
-        let pump = sink.send_all(futures::stream::iter_ok(events));
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
@@ -613,7 +613,7 @@ mod integration_tests {
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
-        let (tx, rx) = futures::sync::mpsc::channel(1);
+        let (tx, rx) = futures01::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
         let mut rt = Runtime::new().unwrap();
