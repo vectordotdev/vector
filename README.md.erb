@@ -103,13 +103,13 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
 * **Rich type system** - Support for [JSON primitive types][docs.data-model.log#types] and [timestamps][docs.data-model.log#timestamps].
 * **Metrics interoperability** - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperability between systems.
-* **Metrics aggregation** - Aggregated [histgorams][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] aggregate to reduce volume without loss of precision.
+* **Metrics aggregation** - Aggregated [histgorams][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
 
-#### Data Flow
+#### Control Flow
 
 * **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
 * **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
-* **Dynamic partitioning** - Create dynamic partitions on the fly ([ex][docs.sinks.aws_s3#partitioning]) with Vector's [templating syntax][docs.reference.templating].
+* **Dynamic partitioning** - Create [dynamic partitions on the fly][docs.sinks.aws_s3#partitioning] with Vector's [templating syntax][docs.reference.templating].
 
 #### Data Processing
 
@@ -122,7 +122,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 #### Operations
 
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
-* **Zero delay start** - Starts and restarts without a delay.
+* **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
 * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
 * **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][docs.guides.unit-testing] make Vector CI friendly.
 * **Configurable concurrency** - All CPU cores ([service][docs.roles.service]) or just one ([agent][docs.roles.agent]) via the [`--threads` flag][docs.process-management#starting].
@@ -132,11 +132,11 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 #### Reliability
 
-* **Decoupled buffer design** - Buffers are coupled with sinks; a bad sink won't bring the entire pipeline to a halt.
+* **Memory safety** - Vector is built in Rust and is [memory safe][urls.rust_memory_safety], avoiding a large class of memory related errors.
+* **Decoupled buffer design** - Buffers are per-[sink][docs.sinks]; a bad sink won't bring the entire pipeline to a halt.
 * **Intelligent retries** - A fibonacci backoff algorithsm with jitter makes Vector a good citizen during outages.
-* **Backpressure & load shedding** - Buffers can be configured to provide backoffpressure or shed load.
-* **Memory safety** - Vector is built in Rust and is memory safe, avoiding a large class of memory related errors.
-* **Rate-limited internal logging** - Vector's internal logging is rate-limited avoiding IO saturation when errors occur.
+* **Backpressure & load shedding** - Buffers can be configured to provide backpressure or shed load.
+* **Rate-limited internal logging** - Vector's internal logging is rate-limited avoiding IO saturation if errors occur.
 * **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.
 * **Robust disk buffering** - Vector uses `leveldb` for robust data durability across restarts.
 
