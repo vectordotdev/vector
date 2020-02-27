@@ -205,6 +205,7 @@ also uses a single byte per field to store the type information of that field.
 When using `fields.ignore` each cache entry additionally stores a copy of each
 field name being considered for matching.  When using `fields.match` storing
 the field names is not necessary.
+
 ### Memory Utilization Estimation
 
 If you want to estimate the memory requirements of this transform
