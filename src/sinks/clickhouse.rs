@@ -373,6 +373,7 @@ compression = "none"
 [batch]
   max_size = 1
 [encoding]
+  format = "default"
   timestamp_format = "unix""#,
             host, table
         ))
