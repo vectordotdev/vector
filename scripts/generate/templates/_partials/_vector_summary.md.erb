@@ -8,12 +8,12 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 * **Reliability First.** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
 * **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
-* **Single Responsibility.** - Vector _routes_ data very well, it does not plan to become a distributed anything.
+* **Single Responsibility.** - Vector is a _data router_, it does not plan to become a distributed processing framework.
 
 #### Who should use Vector?
 
-* You _SHOULD_ use Vector to replace Logstash, Fluentd, Fluentbit, or similar tools.
-* You _SHOULD_ use Vector as an [application sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector to replace Logstash, Fluentd, Fluent Bit, Beats, or similar tools.
+* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
 * You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
 * You _SHOULD_ use Vector in resource constrained environments (such as devices).
 * You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
