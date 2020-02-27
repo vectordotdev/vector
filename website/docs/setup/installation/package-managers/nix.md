@@ -28,7 +28,7 @@ delayed. Generally new Vector releases are made available within a few days.
 ## Install
 
 1.  Install Vector
-    
+
     ```bash
     nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
     ```
@@ -36,7 +36,7 @@ delayed. Generally new Vector releases are made available within a few days.
     <Alert icon={false} type="info">
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.7.2).
+      of Vector (0.8.0).
     * The `--attr` improves installation speed.
 
     </Alert>
