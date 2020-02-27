@@ -550,7 +550,7 @@ mod integration_tests {
     }
 
     fn config(
-        encoding: impl Into<EncodingConfig<Encoding>>,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         indexed_fields: Vec<Atom>,
     ) -> super::HecSinkConfig {
         super::HecSinkConfig {
