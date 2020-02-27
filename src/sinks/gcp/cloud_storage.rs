@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
@@ -62,6 +62,7 @@ pub struct GcsSinkConfig {
     filename_extension: Option<String>,
     #[serde(
         deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
         default
     )]
     encoding: EncodingConfigWithDefault<Encoding>,

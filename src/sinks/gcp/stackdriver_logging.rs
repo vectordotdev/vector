@@ -3,7 +3,7 @@ use crate::{
     event::{Event, LogEvent},
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
             http::{https_client, HttpRetryLogic, HttpService},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
@@ -39,6 +39,7 @@ pub struct StackdriverConfig {
     pub auth: GcpAuthConfig,
     #[serde(
         deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,

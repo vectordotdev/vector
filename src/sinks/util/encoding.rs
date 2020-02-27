@@ -79,10 +79,10 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
 /// This structure **does** assume that there is a default format. Consider
 /// `EncodingConfig<E>` instead if `E: !Default`.
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Default)]
-pub struct EncodingConfigWithDefault<E: Default> {
+pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) format: E,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(default)]
@@ -95,7 +95,13 @@ pub struct EncodingConfigWithDefault<E: Default> {
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E: Default> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
+/// For encodings, answers "Is it possible to skip serializing this value, because it's the
+/// default?"
+pub(crate) fn skip_serializing_if_default<E: Default + PartialEq>(e: &E) -> bool {
+    e == &E::default()
+}
+
+impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
     fn format(&self) -> &E {
         &self.format
     }
@@ -110,7 +116,7 @@ impl<E: Default> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
     }
 }
 
-impl<E: Default> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E> {
+impl<E: Default + PartialEq> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E> {
     fn into(self) -> EncodingConfig<E> {
         EncodingConfig {
             format: self.format,
@@ -121,7 +127,7 @@ impl<E: Default> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E> {
     }
 }
 
-impl<E: Default> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E> {
+impl<E: Default + PartialEq> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E> {
     fn into(self) -> EncodingConfigWithDefault<E> {
         EncodingConfigWithDefault {
             format: self.format,
@@ -242,7 +248,7 @@ impl<E> From<E> for EncodingConfig<E> {
     }
 }
 
-impl<E: Default> From<E> for EncodingConfigWithDefault<E> {
+impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(format: E) -> Self {
         Self {
             format,

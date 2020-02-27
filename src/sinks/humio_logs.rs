@@ -1,20 +1,22 @@
 use crate::{
     sinks::splunk_hec::{Encoding, HecSinkConfig},
-    sinks::util::{encoding::EncodingConfigWithDefault, BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{encoding::{EncodingConfigWithDefault, skip_serializing_if_default}, BatchBytesConfig, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
     #[serde(
         deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
         default = "default_encoding"
     )]
+    #[derivative(Default(value = "default_encoding()"))]
     encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]

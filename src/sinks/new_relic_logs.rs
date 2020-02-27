@@ -1,6 +1,6 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{encoding::EncodingConfig, BatchBytesConfig, Compression, TowerRequestConfig},
+    sinks::util::{encoding::{EncodingConfigWithDefault, skip_serializing_if_default}, BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
@@ -33,11 +33,12 @@ pub struct NewRelicLogsConfig {
     pub region: Option<NewRelicLogsRegion>,
 
     #[serde(
-        deserialize_with = "EncodingConfig::from_deserializer",
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
         default = "default_encoding"
     )]
     #[derivative(Default(value = "default_encoding()"))]
-    pub encoding: EncodingConfig<Encoding>,
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
 
@@ -49,8 +50,8 @@ inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
 }
 
-fn default_encoding() -> EncodingConfig<Encoding> {
-    EncodingConfig::from(Encoding::Json)
+fn default_encoding() -> EncodingConfigWithDefault<Encoding> {
+    EncodingConfigWithDefault::from(Encoding::Json)
 }
 
 #[typetag::serde(name = "new_relic_logs")]

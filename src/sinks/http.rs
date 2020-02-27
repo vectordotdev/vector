@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -43,7 +43,11 @@ pub struct HttpSinkConfig {
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
-    #[serde(deserialize_with = "EncodingConfigWithDefault::from_deserializer")]
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,

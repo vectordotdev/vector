@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
@@ -27,6 +27,7 @@ pub struct ClickhouseConfig {
     pub compression: Option<Compression>,
     #[serde(
         deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,

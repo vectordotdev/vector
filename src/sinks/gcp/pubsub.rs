@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
             http::{https_client, BatchedHttpSink, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -40,6 +40,7 @@ pub struct PubsubConfig {
     pub request: TowerRequestConfig,
     #[serde(
         deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        skip_serializing_if = "skip_serializing_if_default",
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
