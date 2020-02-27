@@ -205,7 +205,7 @@ pub trait EncodingConfiguration<E>: Into<EncodingConfig<E>> + From<E> {
     /// For example, this checks if `except_fields` and `only_fields` items are mutually exclusive.
     fn validate(&self) -> Result<()> {
         if let (Some(only_fields), Some(except_fields)) =
-        (&self.only_fields(), &self.except_fields())
+            (&self.only_fields(), &self.except_fields())
         {
             if only_fields.iter().any(|f| except_fields.contains(f)) {
                 Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
