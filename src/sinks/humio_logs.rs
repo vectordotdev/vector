@@ -1,6 +1,6 @@
 use crate::{
     sinks::splunk_hec::{Encoding, HecSinkConfig},
-    sinks::util::{encoding::EncodingConfig, BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{encoding::EncodingConfigWithDefault, BatchBytesConfig, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,10 @@ pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
     #[serde(
-        deserialize_with = "EncodingConfig::from_deserializer",
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
         default = "default_encoding"
     )]
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -28,8 +28,8 @@ inventory::submit! {
     SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
 }
 
-fn default_encoding() -> EncodingConfig<Encoding> {
-    EncodingConfig::from(Encoding::Json)
+fn default_encoding() -> EncodingConfigWithDefault<Encoding> {
+    EncodingConfigWithDefault::from(Encoding::Json)
 }
 
 #[typetag::serde(name = "humio")]

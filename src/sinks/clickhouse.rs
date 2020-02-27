@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
@@ -25,8 +25,11 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     pub auth: Option<Auth>,
@@ -126,7 +129,10 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
     Ok(Box::new(sink))
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Vec<u8>> {
+fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfigWithDefault<Encoding>,
+) -> Option<Vec<u8>> {
     encoding.apply_rules(&mut event);
     let mut body =
         serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
@@ -303,7 +309,7 @@ mod integration_tests {
             host: host.clone(),
             table: table.clone(),
             compression: Some(Compression::None),
-            encoding: EncodingConfig {
+            encoding: EncodingConfigWithDefault {
                 timestamp_format: Some(TimestampFormat::Unix),
                 format: Encoding::Default,
                 except_fields: None,
@@ -373,7 +379,6 @@ compression = "none"
 [batch]
   max_size = 1
 [encoding]
-  format = "default"
   timestamp_format = "unix""#,
             host, table
         ))

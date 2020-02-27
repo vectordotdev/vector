@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::{
         util::{
-            encoding::EncodingConfig,
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
@@ -60,8 +60,11 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    encoding: EncodingConfigWithDefault<Encoding>,
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -410,7 +413,7 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 fn encode_event(
     mut event: Event,
     key_prefix: &Template,
-    encoding: &EncodingConfig<Encoding>,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     encoding.apply_rules(&mut event);
     let key = key_prefix
@@ -485,7 +488,7 @@ mod tests {
         let bytes = encode_event(
             message.clone().into(),
             &batch_time_format,
-            &EncodingConfig::from(Encoding::Text),
+            &Encoding::Text.into(),
         )
         .unwrap();
 
@@ -501,12 +504,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(
-            event,
-            &batch_time_format,
-            &EncodingConfig::from(Encoding::Ndjson),
-        )
-        .unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();

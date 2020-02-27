@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, HttpRetryLogic, HttpService},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -34,8 +34,8 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(deserialize_with = "EncodingConfigWithDefault::from_deserializer")]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -200,7 +200,7 @@ fn encode_event(
     host_field: &Atom,
     mut event: Event,
     indexed_fields: &[Atom],
-    encoding: &EncodingConfig<Encoding>,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<Vec<u8>> {
     encoding.apply_rules(&mut event);
     let mut event = event.into_log();

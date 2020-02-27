@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
     sinks::util::{
-        encoding::EncodingConfig, BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
+        encoding::EncodingConfigWithDefault, BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
         TowerRequestConfig, UriSerde,
     },
     tls::TlsSettings,
@@ -31,8 +31,11 @@ pub struct LogdnaConfig {
     ip: Option<String>,
     tags: Option<Vec<String>>,
 
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer", default)]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     default_app: Option<String>,
 

@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -43,8 +43,8 @@ pub struct HttpSinkConfig {
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(deserialize_with = "EncodingConfigWithDefault::from_deserializer")]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let encoding = EncodingConfig::from(Encoding::Text);
+        let encoding = EncodingConfigWithDefault::from(Encoding::Text);
         let event = Event::from("hello world");
 
         let mut config = HttpSinkConfig::default();
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_json() {
-        let encoding = EncodingConfig::from(Encoding::Ndjson);
+        let encoding = EncodingConfigWithDefault::from(Encoding::Ndjson);
         let event = Event::from("hello world");
 
         let mut config = HttpSinkConfig::default();

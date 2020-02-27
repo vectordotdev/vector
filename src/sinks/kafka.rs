@@ -2,7 +2,10 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     kafka::KafkaTlsConfig,
-    sinks::util::{encoding::EncodingConfig, MetadataFuture},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        MetadataFuture,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;

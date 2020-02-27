@@ -17,7 +17,10 @@ use crate::{
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::{encoding::EncodingConfig, BatchBytesConfig, TowerRequestConfig, UriSerde},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        BatchBytesConfig, TowerRequestConfig, UriSerde,
+    },
     template::Template,
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

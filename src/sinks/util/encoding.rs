@@ -1,5 +1,39 @@
+//! This module holds encoding related code.
+//!
+//!
+//! You'll find two stuctures for configuration:
+//!   * `EncodingConfig<E>`: For sinks without a default `Encoding`.
+//!   * `EncodingConfigWithDefault<E: Default>`: For sinks that have a default `Encoding`.
+//!
+//! Your sink should define some `Encoding` enum that is used as the `E` parameter.
+//!
+//! You can use either of these for a sink! They both implement `EncodingConfiguration`, which you
+//! will need to import as well.
+//!
+//! # Using a configuration
+//!
+//! To use an `EncodingConfig` involves three steps:
+//!
+//!  1. Use `#[serde(deserialize_with = "EncodingConfig::from_deserializer")]` or
+//!     `#[serde(deserialize_with = "EncodingConfigWithDefault::from_deserializer", default)]`
+//!     to deserialize the configuration in your sink configuration.
+//!  2. Call `validate()` on this config in the `build()` step of your sink.
+//!  3. Call `apply_rules(&mut event)` on this config **on each event** just before it gets sent.
+//!
+//! # Implementation notes
+//!
+//! You may wonder why we have both of these types! **Great question.** `serde` works with the
+//! static `*SinkConfig` types when it deserializes our configuration. This means `serde` needs to
+//! statically be aware if there is a default for some given `E` of the config. Since
+//! We don't require `E: Default` we can't always assume that, so we need to create statically
+//! distinct types! Having `EncodingConfigWithDefault` is a relatively straightforward way to
+//! accomplish this without a bunch of magic.
+//!
+// TODO: To avoid users forgetting to apply the rules, the `E` param should require a trait
+//       `Encoder` that defines some `encode` function which this config then calls internally as
+//       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
+
 use crate::{event::Value, Event, Result};
-use getset::{Getters, Setters};
 use nom::lib::std::collections::VecDeque;
 use serde::de::{MapAccess, Visitor};
 use serde::{
@@ -12,8 +46,9 @@ use string_cache::DefaultAtom as Atom;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
-/// Currently, we don't have a defined ordering, since all options are mutually exclusive.
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Getters, Setters)]
+/// This structure **does not** assume that there is a default format. Consider
+/// `EncodingConfigWithDefault<E>` instead if `E: Default`.
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
     pub(crate) format: E,
@@ -25,59 +60,90 @@ pub struct EncodingConfig<E> {
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E: Default> Default for EncodingConfig<E> {
-    fn default() -> Self {
-        Self {
-            format: Default::default(),
-            only_fields: Default::default(),
-            except_fields: Default::default(),
-            timestamp_format: Default::default(),
-        }
+impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
+    fn format(&self) -> &E {
+        &self.format
+    }
+    fn only_fields(&self) -> &Option<Vec<Atom>> {
+        &self.only_fields
+    }
+    fn except_fields(&self) -> &Option<Vec<Atom>> {
+        &self.except_fields
+    }
+    fn timestamp_format(&self) -> &Option<TimestampFormat> {
+        &self.timestamp_format
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum TimestampFormat {
-    Unix,
-    RFC3339,
+/// A structure to wrap sink encodings and enforce field privacy.
+///
+/// This structure **does** assume that there is a default format. Consider
+/// `EncodingConfig<E>` instead if `E: !Default`.
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Default)]
+pub struct EncodingConfigWithDefault<E: Default> {
+    /// The format of the encoding.
+    // TODO: This is currently sink specific.
+    #[serde(default)]
+    pub(crate) format: E,
+    /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
+    #[serde(default)]
+    pub(crate) only_fields: Option<Vec<Atom>>,
+    /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
+    #[serde(default)]
+    pub(crate) except_fields: Option<Vec<Atom>>,
+    /// Format for outgoing timestamps.
+    #[serde(default)]
+    pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E> From<E> for EncodingConfig<E> {
-    fn from(format: E) -> Self {
+impl<E: Default> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
+    fn format(&self) -> &E {
+        &self.format
+    }
+    fn only_fields(&self) -> &Option<Vec<Atom>> {
+        &self.only_fields
+    }
+    fn except_fields(&self) -> &Option<Vec<Atom>> {
+        &self.except_fields
+    }
+    fn timestamp_format(&self) -> &Option<TimestampFormat> {
+        &self.timestamp_format
+    }
+}
+
+impl<E: Default> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E> {
+    fn into(self) -> EncodingConfig<E> {
         EncodingConfig {
-            format,
-            only_fields: Default::default(),
-            except_fields: Default::default(),
-            timestamp_format: Default::default(),
+            format: self.format,
+            only_fields: self.only_fields,
+            except_fields: self.except_fields,
+            timestamp_format: self.timestamp_format,
         }
     }
 }
 
-impl<E> EncodingConfig<E>
-where
-    E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
-{
-    pub(crate) fn validate(&self) -> Result<()> {
-        if let (Some(only_fields), Some(except_fields)) = (&self.only_fields, &self.except_fields) {
-            if only_fields.iter().any(|f| except_fields.contains(f)) {
-                Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
-            }
+impl<E: Default> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E> {
+    fn into(self) -> EncodingConfigWithDefault<E> {
+        EncodingConfigWithDefault {
+            format: self.format,
+            only_fields: self.only_fields,
+            except_fields: self.except_fields,
+            timestamp_format: self.timestamp_format,
         }
-        Ok(())
     }
+}
 
-    /// Apply the EncodingConfig rules to the provided event.
-    ///
-    /// This mutates the event in place!
-    pub(crate) fn apply_rules(&self, event: &mut Event) {
-        // Ordering in here should not matter.
-        self.except_fields(event);
-        self.only_fields(event);
-        self.timestamp_format(event);
-    }
-    pub(crate) fn only_fields(&self, event: &mut Event) {
-        if let Some(only_fields) = &self.only_fields {
+/// The behavior of a encoding configuration.
+pub trait EncodingConfiguration<E>: Into<EncodingConfig<E>> + From<E> {
+    // Required Accessors
+
+    fn format(&self) -> &E;
+    fn only_fields(&self) -> &Option<Vec<Atom>>;
+    fn except_fields(&self) -> &Option<Vec<Atom>>;
+    fn timestamp_format(&self) -> &Option<TimestampFormat>;
+
+    fn apply_only_fields(&self, event: &mut Event) {
+        if let Some(only_fields) = &self.only_fields() {
             match event {
                 Event::Log(log_event) => {
                     let to_remove = log_event
@@ -94,8 +160,8 @@ where
             }
         }
     }
-    pub(crate) fn except_fields(&self, event: &mut Event) {
-        if let Some(except_fields) = &self.except_fields {
+    fn apply_except_fields(&self, event: &mut Event) {
+        if let Some(except_fields) = &self.except_fields() {
             match event {
                 Event::Log(log_event) => {
                     for field in except_fields {
@@ -106,8 +172,8 @@ where
             }
         }
     }
-    pub(crate) fn timestamp_format(&self, event: &mut Event) {
-        if let Some(timestamp_format) = &self.timestamp_format {
+    fn apply_timestamp_format(&self, event: &mut Event) {
+        if let Some(timestamp_format) = &self.timestamp_format() {
             match event {
                 Event::Log(log_event) => {
                     match timestamp_format {
@@ -132,10 +198,69 @@ where
         }
     }
 
+    /// Check that the configuration is valid.
+    ///
+    /// If an error is returned, the entire encoding configuration should be considered inoperable.
+    ///
+    /// For example, this checks if `except_fields` and `only_fields` items are mutually exclusive.
+    fn validate(&self) -> Result<()> {
+        if let (Some(only_fields), Some(except_fields)) =
+        (&self.only_fields(), &self.except_fields())
+        {
+            if only_fields.iter().any(|f| except_fields.contains(f)) {
+                Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Apply the EncodingConfig rules to the provided event.
+    ///
+    /// Currently, this is idempotent.
+    fn apply_rules(&self, event: &mut Event) {
+        // Ordering in here should not matter.
+        self.apply_except_fields(event);
+        self.apply_only_fields(event);
+        self.apply_timestamp_format(event);
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TimestampFormat {
+    Unix,
+    RFC3339,
+}
+
+impl<E> From<E> for EncodingConfig<E> {
+    fn from(format: E) -> Self {
+        Self {
+            format,
+            only_fields: Default::default(),
+            except_fields: Default::default(),
+            timestamp_format: Default::default(),
+        }
+    }
+}
+
+impl<E: Default> From<E> for EncodingConfigWithDefault<E> {
+    fn from(format: E) -> Self {
+        Self {
+            format,
+            only_fields: Default::default(),
+            except_fields: Default::default(),
+            timestamp_format: Default::default(),
+        }
+    }
+}
+
+impl<E> EncodingConfig<E>
+where
+    E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
+{
     // Derived from https://serde.rs/string-or-struct.html
     pub(crate) fn from_deserializer<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
-        E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
         D: Deserializer<'de>,
     {
         // This is a Visitor that forwards string types to T's `FromStr` impl and
@@ -152,6 +277,62 @@ where
             T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone,
         {
             type Value = EncodingConfig<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("string or map")
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Self::Value {
+                    format: T::deserialize(value.into_deserializer())?,
+                    only_fields: Default::default(),
+                    except_fields: Default::default(),
+                    timestamp_format: Default::default(),
+                })
+            }
+
+            fn visit_map<M>(self, map: M) -> std::result::Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                // `MapAccessDeserializer` is a wrapper that turns a `MapAccess`
+                // into a `Deserializer`, allowing it to be used as the input to T's
+                // `Deserialize` implementation. T then deserializes itself using
+                // the entries from the map visitor.
+                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+            }
+        }
+
+        deserializer.deserialize_any(StringOrStruct(PhantomData))
+    }
+}
+
+impl<E> EncodingConfigWithDefault<E>
+where
+    E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq + Default,
+{
+    // Derived from https://serde.rs/string-or-struct.html
+    pub(crate) fn from_deserializer<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // This is a Visitor that forwards string types to T's `FromStr` impl and
+        // forwards map types to T's `Deserialize` impl. The `PhantomData` is to
+        // keep the compiler from complaining about T being an unused generic type
+        // parameter. We need T in order to know the Value type for the Visitor
+        // impl.
+        struct StringOrStruct<T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone + Default>(
+            PhantomData<fn() -> T>,
+        );
+
+        impl<'de, T> Visitor<'de> for StringOrStruct<T>
+        where
+            T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone + Default,
+        {
+            type Value = EncodingConfigWithDefault<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("string or map")

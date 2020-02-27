@@ -1,6 +1,10 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
+    sinks::util::{
+        encode_event,
+        encoding::{EncodingConfig, EncodingConfiguration},
+        Encoding, SinkExt,
+    },
     sinks::{Healthcheck, RouterSink},
     tls::{TlsConfig, TlsConnectorExt, TlsSettings},
     topology::config::SinkContext,

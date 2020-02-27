@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, SinkExt, TowerRequestConfig,
@@ -39,8 +39,11 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
     #[serde(default)]
@@ -223,7 +226,7 @@ fn create_client(
 fn encode_event(
     mut event: Event,
     partition_key_field: &Option<Atom>,
-    encoding: &EncodingConfig<Encoding>,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
     encoding.apply_rules(&mut event);
     let partition_key = if let Some(partition_key_field) = partition_key_field {

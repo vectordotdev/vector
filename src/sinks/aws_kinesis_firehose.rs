@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, SinkExt, TowerRequestConfig,
@@ -36,8 +36,11 @@ pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
     #[serde(default)]
@@ -208,7 +211,10 @@ fn create_client(
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
+fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfigWithDefault<Encoding>,
+) -> Option<Record> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let data = match encoding.format {

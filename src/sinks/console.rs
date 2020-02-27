@@ -1,4 +1,4 @@
-use super::util::encoding::EncodingConfig;
+use super::util::encoding::{EncodingConfig, EncodingConfiguration};
 use super::util::SinkExt;
 use crate::{
     event::{self, Event},

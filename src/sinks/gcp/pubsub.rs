@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            encoding::EncodingConfig,
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{https_client, BatchedHttpSink, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -38,9 +38,11 @@ pub struct PubsubConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    #[serde(default)]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
 }
@@ -93,7 +95,7 @@ struct PubsubSink {
     api_key: Option<String>,
     creds: Option<GcpCredentials>,
     uri_base: String,
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfigWithDefault<Encoding>,
 }
 
 impl PubsubSink {

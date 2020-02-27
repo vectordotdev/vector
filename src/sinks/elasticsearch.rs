@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, HttpRetryLogic, HttpService},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -33,8 +33,11 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer", default)]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -282,7 +285,7 @@ fn encode_event(
     index: &Template,
     doc_type: &str,
     id_key: &Option<String>,
-    encoding: &EncodingConfig<Encoding>,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<Vec<u8>> {
     encoding.apply_rules(&mut event);
     let index = index

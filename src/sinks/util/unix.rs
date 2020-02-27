@@ -1,6 +1,10 @@
 use crate::sinks::util::SinkExt;
 use crate::{
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding},
+    sinks::util::{
+        encode_event,
+        encoding::{EncodingConfig, EncodingConfiguration},
+        Encoding,
+    },
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };

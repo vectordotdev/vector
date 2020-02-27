@@ -683,7 +683,7 @@ mod tests {
         event::{self, Event},
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
-            util::{encoding::EncodingConfig, Compression},
+            util::{encoding::EncodingConfigWithDefault, Compression},
             Healthcheck, RouterSink,
         },
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
@@ -715,7 +715,7 @@ mod tests {
 
     fn sink(
         address: SocketAddr,
-        encoding: impl Into<EncodingConfig<Encoding>>,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
         exec: TaskExecutor,
     ) -> (RouterSink, Healthcheck) {
@@ -731,7 +731,7 @@ mod tests {
     }
 
     fn start(
-        encoding: impl Into<EncodingConfig<Encoding>>,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
         let mut rt = test_util::runtime();

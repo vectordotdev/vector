@@ -5,7 +5,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     region::RegionOrEndpoint,
     sinks::util::{
-        encoding::EncodingConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
@@ -55,8 +55,11 @@ pub struct CloudwatchLogsSinkConfig {
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
@@ -74,7 +77,7 @@ lazy_static! {
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfigWithDefault<Encoding>,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -708,7 +711,7 @@ mod tests {
     #[test]
     fn cloudwatch_encode_log_as_json() {
         let config = CloudwatchLogsSinkConfig {
-            encoding: EncodingConfig::from(Encoding::Json),
+            encoding: Encoding::Json.into(),
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();
@@ -721,7 +724,7 @@ mod tests {
     #[test]
     fn cloudwatch_encode_log_as_text() {
         let config = CloudwatchLogsSinkConfig {
-            encoding: EncodingConfig::from(Encoding::Text),
+            encoding: Encoding::Text.into(),
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();

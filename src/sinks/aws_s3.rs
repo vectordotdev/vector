@@ -3,8 +3,10 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        encoding::EncodingConfig, retries::RetryLogic, rusoto, BatchBytesConfig, Buffer,
-        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        retries::RetryLogic,
+        rusoto, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
+        SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -43,8 +45,11 @@ pub struct S3SinkConfig {
     options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -380,7 +385,7 @@ impl RetryLogic for S3RetryLogic {
 fn encode_event(
     mut event: Event,
     key_prefix: &Template,
-    encoding: &EncodingConfig<Encoding>,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     encoding.apply_rules(&mut event);
     let key = key_prefix

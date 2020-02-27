@@ -111,7 +111,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
-            encoding: self.encoding.clone(),
+            encoding: self.encoding.clone().into(),
 
             batch,
             request,
