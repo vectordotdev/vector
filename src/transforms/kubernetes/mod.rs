@@ -14,6 +14,7 @@ use futures::{
     stream::StreamExt,
 };
 use k8s_openapi::api::core::v1::Pod;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, VecDeque};
@@ -26,15 +27,13 @@ use tokio::timer::Delay;
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
-/// If watcher errors, for how long will we wait before trying again.
-const RETRY_TIMEOUT: Duration = Duration::from_secs(2);
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KubePodMetadata {
     #[serde(default = "default_fields")]
     fields: Vec<Field>,
     /// For how long will we hold on to pod's metadata after the pod has been deleted.
+    /// seconds
     #[serde(default = "default_cache_ttl")]
     cache_ttl: u64,
     /// Node name whose pod's metadata should be watched. Has priority
@@ -44,6 +43,11 @@ pub struct KubePodMetadata {
     /// Field containg Pod UID to which log belongs.
     #[serde(default = "default_pod_uid")]
     pod_uid: String,
+    /// If watcher errors, for how maximaly will we wait before trying again.
+    /// Must be larger than 0.
+    /// seconds
+    #[serde(default = "default_max_retry_timeout")]
+    max_retry_timeout: u64,
 }
 
 fn default_cache_ttl() -> u64 {
@@ -64,6 +68,10 @@ fn default_fields() -> Vec<Field> {
     use Field::*;
 
     vec![Name, Namespace, Labels, Annotations, NodeName]
+}
+
+fn default_max_retry_timeout() -> u64 {
+    1
 }
 
 inventory::submit! {
@@ -90,7 +98,7 @@ impl TransformConfig for KubePodMetadata {
 
         // Construct MetadataClient
         let (reader, writer) = evmap::new();
-        let metadata_client = MetadataClient::new(self, writer, watch_client);
+        let metadata_client = MetadataClient::new(self, writer, watch_client)?;
 
         // Run background task
         cx.executor().spawn_std(async move {
@@ -135,6 +143,8 @@ enum BuildError {
         env
     ))]
     MissingNodeName { env: &'static str },
+    #[snafu(display("max_retry_timeout must be larger than 0."))]
+    TooSmallMaxRetryTimeout,
 }
 
 /// Vlient which watches for Pod metadata changes, extracts fields,
@@ -146,6 +156,7 @@ struct MetadataClient {
     delete_queue: VecDeque<(Bytes, Instant)>,
     client: WatchClient,
     cache_ttl: Duration,
+    max_retry_timeout: Duration,
 }
 
 impl MetadataClient {
@@ -153,13 +164,18 @@ impl MetadataClient {
         config: &KubePodMetadata,
         metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
         client: WatchClient,
-    ) -> Self {
-        Self {
-            fields: config.fields.clone(),
-            metadata,
-            client,
-            delete_queue: VecDeque::new(),
-            cache_ttl: Duration::from_secs(config.cache_ttl),
+    ) -> Result<Self, BuildError> {
+        if config.max_retry_timeout > 0 {
+            Ok(Self {
+                fields: config.fields.clone(),
+                metadata,
+                client,
+                delete_queue: VecDeque::new(),
+                cache_ttl: Duration::from_secs(config.cache_ttl),
+                max_retry_timeout: Duration::from_secs(config.max_retry_timeout),
+            })
+        } else {
+            Err(BuildError::TooSmallMaxRetryTimeout)
         }
     }
 
@@ -167,7 +183,19 @@ impl MetadataClient {
     async fn run(mut self) -> Result<(), BuildError> {
         let mut version = None;
         let mut error = None;
+        // Since this transform will in most cases be deployed on all Nodes
+        // and fairly simulationisly, we can immediately start with user
+        // defined max_retry_timeout.
+        let mut retry_timeout = self.max_retry_timeout;
         loop {
+            // Wait for bit before trying to watch again.
+            // We are sampling from a uniform distribution here.
+            let timeout = rand::thread_rng().gen_range(Duration::default(), retry_timeout);
+            let _ = Delay::new(Instant::now() + timeout)
+                .compat()
+                .await
+                .expect("Timer not set.");
+
             // Build watcher stream
             let mut watcher = self
                 .client
@@ -178,6 +206,8 @@ impl MetadataClient {
 
             // Watch loop
             error = Some(RuntimeError::WatchUnexpectedlyEnded);
+            retry_timeout = self.max_retry_timeout.min(retry_timeout * 2);
+
             while let Some(next) = watcher.next().await {
                 match next {
                     Ok(event) => {
@@ -187,6 +217,16 @@ impl MetadataClient {
                         self.metadata.refresh();
                     }
                     Err(err) => {
+                        match err {
+                            // Keep the retry_timeout for errors that could
+                            // be caused by the api server being overloaded.
+                            RuntimeError::FailedConnecting { .. }
+                            | RuntimeError::ConnectionStatusNotOK { .. }
+                            | RuntimeError::WatchConnectionErrored { .. }
+                            | RuntimeError::WatchUnexpectedlyEnded => (),
+                            // Optimistically try the shortest timeout.
+                            _ => retry_timeout = Duration::from_secs(1),
+                        }
                         error = Some(err);
                         break;
                     }
@@ -194,15 +234,9 @@ impl MetadataClient {
             }
 
             warn!(
-                message = "Temporary stoped watching Pod metadata.",
+                message = "Temporarily stoped watching Pod metadata.",
                 reason = ?error
             );
-
-            // Wait for bit before trying to watch again.
-            let _ = Delay::new(Instant::now() + RETRY_TIMEOUT)
-                .compat()
-                .await
-                .expect("Timer not set.");
         }
     }
 
