@@ -33,8 +33,8 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 #### Who should use Vector?
 
-* You _SHOULD_ use Vector to replace Logstash, Fluentd, Fluentbit, or similar tools.
-* You _SHOULD_ use Vector as an [application sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector to replace Logstash, Fluentd, Fluent Bit, Beats, or similar tools.
+* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
 * You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
 * You _SHOULD_ use Vector in resource constrained environments (such as devices).
 * You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
