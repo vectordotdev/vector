@@ -4,11 +4,8 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use std::any::TypeId;
-use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -71,6 +68,8 @@ impl TransformConfig for DedupeConfig {
     }
 }
 
+type TypeId = u8;
+
 /// A CacheEntry comes in two forms, depending on the FieldMatchConfig in use.
 ///
 /// When matching fields, a CacheEntry contains a vector of optional 2-tuples.  Each element in the
@@ -96,20 +95,17 @@ enum CacheEntry {
     Ignore(Vec<(Atom, TypeId, Bytes)>),
 }
 
-struct Null;
-
+/// Assigns a unique number to each of the types supported by Event::Value.
 fn type_id_for_value(val: &Value) -> TypeId {
     match val {
-        Value::Bytes(_) => TypeId::of::<Bytes>(),
-        Value::Timestamp(_) => TypeId::of::<DateTime<Utc>>(),
-        Value::Integer(_) => TypeId::of::<i64>(),
-        Value::Float(_) => TypeId::of::<f64>(),
-        Value::Boolean(_) => TypeId::of::<bool>(),
-        Value::Map(_) => TypeId::of::<BTreeMap<Atom, Value>>(),
-        Value::Array(_) => TypeId::of::<Vec<Value>>(),
-        // There's no real type in Rust for Null, so we make a new type just for getting a unique
-        // TypeId. All that matters is that all possible Value types have a distinct TypeId.
-        Value::Null => TypeId::of::<Null>(),
+        Value::Bytes(_) => 0,
+        Value::Timestamp(_) => 1,
+        Value::Integer(_) => 2,
+        Value::Float(_) => 3,
+        Value::Boolean(_) => 4,
+        Value::Map(_) => 5,
+        Value::Array(_) => 6,
+        Value::Null => 7,
     }
 }
 
