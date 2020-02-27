@@ -25,7 +25,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * You _SHOULD_ use Vector in resource constrained environments (such as devices).
 * You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
 * You _SHOULD NOT_ use Vector to replace Kafka. Vector is designed to work with Kafka!
-* You _SHOULD NOT_ use Vector for non-observability data such as analytics data. 
+* You _SHOULD NOT_ use Vector for non-observability data such as analytics data.
 
 #### Community
 
