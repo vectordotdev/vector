@@ -23,7 +23,7 @@ used on MacOS systems.
 
    That's it! Proceed to [configure](#configuring) Vector for your use case.
 
-## Previous Versions
+### Previous Versions
 
 Historical Vector versions can be found in the [releases][urls.vector_releases].
 Once you've found the version you'd like to install you can specify it with:
