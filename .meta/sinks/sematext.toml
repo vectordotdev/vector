@@ -47,4 +47,8 @@ required = true
 examples = ["${SEMATEXT_TOKEN_ENV_VAR}", "some-sematext-token"]
 description = "The token that will be used to write to Sematext."
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.sematext_logs.options", encodings: ["default"], default: "default") %>
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.sematext_logs.options",
+  encodings: ["default"],
+  default: "default"
+) %>

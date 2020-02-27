@@ -38,7 +38,11 @@ required = true
 examples = ["http://localhost:3100", "http://127.0.0.1:8080"]
 description = "The endpoint used to ship logs to."
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.loki.options", encodings: ["json", "text"], default: false) %>
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.loki.options",
+  encodings: ["json", "text"],
+  default: "json"
+) %>
 
 [sinks.loki.options.tenant_id]
 type = "string"

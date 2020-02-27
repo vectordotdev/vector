@@ -54,11 +54,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
-    # REQUIRED
-    format = "json" # example, enum
-
-    # OPTIONAL
     except_fields = ["timestamp", "message", "host"] # example, no default
+    format = "text" # default, enum
     only_fields = ["timestamp", "message", "host"] # example, no default
     timestamp_format = "rfc3339" # default, enum
 ```
@@ -98,11 +95,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
-    # REQUIRED
-    format = "json" # example, enum
-
-    # OPTIONAL
     except_fields = ["timestamp", "message", "host"] # example, no default
+    format = "text" # default, enum
     only_fields = ["timestamp", "message", "host"] # example, no default
     timestamp_format = "rfc3339" # default, enum
 
@@ -391,14 +385,14 @@ Prevent the sink from encoding the specified labels.
 
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"text"}
   enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
   examples={["json","text"]}
   groups={[]}
   name={"format"}
   path={"encoding"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

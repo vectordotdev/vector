@@ -35,7 +35,11 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
   timeout_secs: 30
 ) %>
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.aws_kinesis_firehose.options", encodings: ["json", "text"], default: false) %>
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.aws_kinesis_firehose.options",
+  encodings: ["json", "text"],
+  default: "text"
+) %>
 
 [sinks.aws_kinesis_firehose.options.stream_name]
 type = "string"

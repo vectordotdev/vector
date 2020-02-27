@@ -24,6 +24,7 @@ The encoding format used to serialize the events before outputting.\
 <%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
 <%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
 <%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>
+<%- if encodings.include?("default") -%>default = "Each event is encoded according to the default for this sink."<%- end -%>
 
 [<%= namespace %>.encoding.children.only_fields]
 type = "[string]"
