@@ -1,17 +1,15 @@
-use crate::metrics;
 use tracing::{
     dispatcher::{set_global_default, Dispatch},
     span::Span,
 };
 use tracing_limit::Limit;
 use tracing_log::LogTracer;
-use tracing_metrics::MetricsSubscriber;
 use tracing_subscriber::{layer::SubscriberExt, FmtSubscriber};
 
 pub use tracing_futures::Instrument;
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
-pub fn init(color: bool, json: bool, levels: &str, metrics: Option<metrics::Sink>) {
+pub fn init(color: bool, json: bool, levels: &str) {
     let dispatch = if json {
         let subscriber = FmtSubscriber::builder()
             .with_env_filter(levels)
@@ -20,11 +18,7 @@ pub fn init(color: bool, json: bool, levels: &str, metrics: Option<metrics::Sink
             .finish()
             .with(Limit::default());
 
-        if let Some(sink) = metrics {
-            Dispatch::new(MetricsSubscriber::new(subscriber, sink))
-        } else {
             Dispatch::new(subscriber)
-        }
     } else {
         let subscriber = FmtSubscriber::builder()
             .with_ansi(color)
@@ -32,11 +26,7 @@ pub fn init(color: bool, json: bool, levels: &str, metrics: Option<metrics::Sink
             .finish()
             .with(Limit::default());
 
-        if let Some(sink) = metrics {
-            Dispatch::new(MetricsSubscriber::new(subscriber, sink))
-        } else {
             Dispatch::new(subscriber)
-        }
     };
 
     let _ = LogTracer::init();
