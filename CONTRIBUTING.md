@@ -33,6 +33,7 @@ expanding into more specifics.
       - [Sink Healthchecks](#sink-healthchecks)
    - [Testing](#testing)
       - [Sample Logs](#sample-logs)
+      - [Tips and Tricks](#tips-and-tricks)
    - [Benchmarking](#benchmarking)
 - [Security](#security)
 - [Legal](#legal)
@@ -330,6 +331,33 @@ flog --bytes $((100 * 1024 * 1024)) > sample.log
 ```
 
 This will create a `100MiB` sample log file in the `sample.log` file.
+
+#### Tips and Tricks
+
+If you are developing a particular component and want to quickly iterate on unit
+tests related only to this component, the following approach can reduce waiting times:
+
+1. Install [cargo-watch](https://github.com/passcod/cargo-watch).
+2. (Only for GNU/Linux) Install LLVM 9 (for example, package `llvm-9` on Debian)
+   and set `RUSTFLAGS` environment variable to use `lld` as the linker:
+
+   ```sh
+   export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
+   ```
+3. Run in the root directory of Vector's source
+
+   ```sh
+   cargo watch -s clear -s \
+     'cargo test --lib --no-default-features --features=<component type>-<component name> <component type>::<component name>'
+   ```
+
+   For example, if the component is `add_fields` transform, the command above turns
+   into
+
+   ```sh
+   cargo watch -s clear -s \
+     'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
+   ```
 
 ### Benchmarking
 
