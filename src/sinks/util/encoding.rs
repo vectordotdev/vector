@@ -1,6 +1,5 @@
 //! This module holds encoding related code.
 //!
-//!
 //! You'll find two stuctures for configuration:
 //!   * `EncodingConfig<E>`: For sinks without a default `Encoding`.
 //!   * `EncodingConfigWithDefault<E: Default>`: For sinks that have a default `Encoding`.
