@@ -1166,7 +1166,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "dest_field_name"
 
-# Accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted.
+# Accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache.
 [transforms.dedupe]
   #
   # General
@@ -1193,7 +1193,7 @@ dns_servers = ["0.0.0.0:53"]
   [transforms.dedupe.cache]
     # The number of recent Events to cache and compare new incoming Events against.
     #
-    # * required
+    # * optional
     # * default: 5000
     # * type: int
     num_entries = 5000
@@ -1204,6 +1204,7 @@ dns_servers = ["0.0.0.0:53"]
 
   [transforms.dedupe.fields]
     # The field names to ignore when deciding if an Event is a duplicate.
+    # Incompatible with the "fields.match" option.
     #
     # * optional
     # * no default
@@ -1211,6 +1212,7 @@ dns_servers = ["0.0.0.0:53"]
     ignore = ["field1", "field2"]
 
     # The field names considered when deciding if an Event is a duplicate.
+    # Incompatible with the "fields.ignore" option.
     #
     # * optional
     # * default: ["timestamp"]

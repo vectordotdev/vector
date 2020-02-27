@@ -26534,7 +26534,7 @@ module.exports = {
     "dedupe": {
       "beta": false,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to prevent duplicate Events from being outputted.",
+      "description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
       "event_types": [
         "log"
       ],
