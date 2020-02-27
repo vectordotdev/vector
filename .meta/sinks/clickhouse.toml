@@ -94,4 +94,8 @@ common = true
 examples = ["mydatabase"]
 description = "The database that contains the stable that data will be inserted into."
 
-<%= render("_partials/_encoding.toml", namespace: "sinks.clickhouse.options", encodings: ["default"], default: "default") %>
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.clickhouse.options",
+  encodings: ["default"],
+  default: "default"
+) %>

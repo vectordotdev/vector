@@ -412,6 +412,7 @@ fn encode_event(
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -422,7 +423,6 @@ fn encode_event(
             );
         })
         .ok()?;
-    encoding.apply_rules(&mut event);
     let log = event.into_log();
     let bytes = match encoding.format {
         Encoding::Ndjson => serde_json::to_vec(&log)
