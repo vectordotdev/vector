@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="/docs/setup/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.0<a/>
+    <a href="https://vector.dev/docs/setup/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.0<a/>
   </strong>
 </p>
 
@@ -53,7 +53,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 #### About
 
 * [**Concepts**][docs.concepts]
-* [**Data model (Event)**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
+* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
