@@ -1,5 +1,5 @@
 use crate::{
-    conditions::Condition,
+    conditions::{Condition, ConditionConfig},
     event::{Event, Value},
     runtime::Runtime,
     topology::config::{
@@ -437,6 +437,17 @@ fn build_unit_test(
             {
                 match cond_conf {
                     TestCondition::Embedded(b) => match b.build() {
+                        Ok(c) => {
+                            conditions.push(c);
+                        }
+                        Err(e) => {
+                            errors.push(format!(
+                                "failed to create test condition '{}': {}",
+                                index, e,
+                            ));
+                        }
+                    },
+                    TestCondition::NoTypeEmbedded(n) => match n.build() {
                         Ok(c) => {
                             conditions.push(c);
                         }

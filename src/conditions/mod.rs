@@ -4,6 +4,8 @@ use inventory;
 
 pub mod check_fields;
 
+pub use check_fields::CheckFieldsConfig;
+
 pub trait Condition: Send + Sync {
     fn check(&self, e: &Event) -> bool;
 
