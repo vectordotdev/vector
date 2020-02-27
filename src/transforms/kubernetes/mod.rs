@@ -16,7 +16,7 @@ use futures::{
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
@@ -33,7 +33,7 @@ const RETRY_TIMEOUT: Duration = Duration::from_secs(2);
 #[serde(deny_unknown_fields)]
 pub struct KubePodMetadata {
     #[serde(default = "default_fields")]
-    fields: Vec<String>,
+    fields: Vec<Field>,
     /// For how long will we hold on to pod's metadata after the pod has been deleted.
     #[serde(default = "default_cache_ttl")]
     cache_ttl: u64,
@@ -57,6 +57,13 @@ fn default_cache_ttl() -> u64 {
 
 fn default_pod_uid() -> String {
     POD_UID.as_ref().to_owned()
+}
+
+/// Default included fields
+fn default_fields() -> Vec<Field> {
+    use Field::*;
+
+    vec![Name, Namespace, Labels, Annotations, NodeName]
 }
 
 inventory::submit! {
@@ -83,7 +90,7 @@ impl TransformConfig for KubePodMetadata {
 
         // Construct MetadataClient
         let (reader, writer) = evmap::new();
-        let metadata_client = MetadataClient::new(self, writer, watch_client)?;
+        let metadata_client = MetadataClient::new(self, writer, watch_client);
 
         // Run background task
         cx.executor().spawn_std(async move {
@@ -128,14 +135,12 @@ enum BuildError {
         env
     ))]
     MissingNodeName { env: &'static str },
-    #[snafu(display("Unknown metadata fields: {:?}", fields))]
-    UnknownFields { fields: Vec<String> },
 }
 
 /// Vlient which watches for Pod metadata changes, extracts fields,
 /// and writes them to the metadata map.
 struct MetadataClient {
-    fields: Vec<Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>>,
+    fields: Vec<Field>,
     metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
     /// (key of data to be deleted, can be deleted after this point in time)
     delete_queue: VecDeque<(Bytes, Instant)>,
@@ -148,35 +153,13 @@ impl MetadataClient {
         config: &KubePodMetadata,
         metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
         client: WatchClient,
-    ) -> Result<Self, BuildError> {
-        // Select Pod metadata fields that need to be extracted from
-        // Pod and then added to Events.
-        let mut add_fields = config.fields.clone();
-        add_fields.sort();
-        add_fields.dedup();
-
-        let mut fields = Vec::new();
-        let mut unknown = Vec::new();
-        let mut all_fields = all_fields();
-
-        for field in add_fields {
-            if let Some(fun) = all_fields.remove(field.as_str()) {
-                fields.push(fun);
-            } else {
-                unknown.push(field.to_owned());
-            }
-        }
-
-        if unknown.is_empty() {
-            Ok(Self {
-                fields,
-                metadata,
-                client,
-                delete_queue: VecDeque::new(),
-                cache_ttl: Duration::from_secs(config.cache_ttl),
-            })
-        } else {
-            Err(BuildError::UnknownFields { fields: unknown })
+    ) -> Self {
+        Self {
+            fields: config.fields.clone(),
+            metadata,
+            client,
+            delete_queue: VecDeque::new(),
+            cache_ttl: Duration::from_secs(config.cache_ttl),
         }
     }
 
@@ -223,14 +206,6 @@ impl MetadataClient {
         }
     }
 
-    // In the case of Deleted, we don't delete it's data, as there could still exist unprocessed logs from that pod.
-    // Not deleting it will cause "memory leakage" in a sense that the data won't be used ever
-    // again after some point, but the catch is that we don't know when that point is.
-    // Also considering that, on average, an entry occupies ~232B, so to 'leak' 1MB of memory, ~4500 pods would need to be
-    // created and destroyed on the same node, which is highly unlikely.
-    //
-    // An alternative would be to delay deletions of entrys by 1min. Which is a safe guess.
-    //
     /// Extracts metadata from pod and updates metadata map.
     fn update(&mut self, (pod, event): (Pod, PodEvent)) -> Option<Version> {
         if let Some(pod_uid) = pod.metadata.as_ref().and_then(|md| md.uid.as_ref()) {
@@ -239,7 +214,11 @@ impl MetadataClient {
             self.metadata.clear(uid.clone());
 
             // Insert field values for this pod.
-            for (field, value) in self.fields.iter().flat_map(|fun| fun(&pod)) {
+            for (field, value) in self
+                .fields
+                .iter()
+                .flat_map(|field| field.extract(&pod).unwrap_or_default())
+            {
                 self.metadata
                     .insert(uid.clone(), Box::new((field, FieldValue(value))));
             }
@@ -315,117 +294,80 @@ impl Transform for KubernetesPodMetadata {
     }
 }
 
-/// Default included fields
-fn default_fields() -> Vec<String> {
-    vec!["name", "namespace", "labels", "annotations", "node_name"]
-        .into_iter()
-        .map(Into::into)
-        .collect()
+/// Extractable fields
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+enum Field {
+    Name,
+    Namespace,
+    CreationTimestamp,
+    DeletionTimestamp,
+    Labels,
+    Annotations,
+    NodeName,
+    Hostname,
+    Priority,
+    PriorityClassName,
+    ServiceAccountName,
+    Subdomain,
+    HostIp,
+    Ip,
 }
 
-/// Returns list of all supported fields and their extraction function.
-fn all_fields(
-) -> HashMap<&'static str, Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>> {
-    // Support for new fields can be added by adding them in the bellow vector.
-    vec![
-        // ------------------------ ObjectMeta ------------------------ //
-        field("name", |pod| pod.metadata.as_ref()?.name.clone()),
-        field("namespace", |pod| pod.metadata.as_ref()?.namespace.clone()),
-        field("creation_timestamp", |pod| {
-            pod.metadata
-                .as_ref()?
-                .creation_timestamp
-                .clone()
-                .map(|time| time.0)
-        }),
-        field("deletion_timestamp", |pod| {
-            pod.metadata
-                .as_ref()?
-                .deletion_timestamp
-                .clone()
-                .map(|time| time.0)
-        }),
-        collection_field("labels", |pod| pod.metadata.as_ref()?.labels.as_ref()),
-        collection_field("annotations", |pod| {
-            pod.metadata.as_ref()?.annotations.as_ref()
-        }),
-        // ------------------------ PodSpec ------------------------ //
-        field("node_name", |pod| pod.spec.as_ref()?.node_name.clone()),
-        field("hostname", |pod| pod.spec.as_ref()?.hostname.clone()),
-        field("priority", |pod| pod.spec.as_ref()?.priority),
-        field("priority_class_name", |pod| {
-            pod.spec.as_ref()?.priority_class_name.clone()
-        }),
-        field("service_account_name", |pod| {
-            pod.spec.as_ref()?.service_account_name.clone()
-        }),
-        field("subdomain", |pod| pod.spec.as_ref()?.subdomain.clone()),
-        // ------------------------ PodStatus ------------------------ //
-        field("host_ip", |pod| pod.status.as_ref()?.host_ip.clone()),
-        field("ip", |pod| pod.status.as_ref()?.pod_ip.clone()),
-    ]
-    .into_iter()
-    .collect()
-}
+impl Field {
+    fn name(self) -> String {
+        toml::to_string(&self).unwrap().replace('\"', "")
+    }
 
-fn field<T: Into<Value>>(
-    name: &'static str,
-    fun: impl Fn(&Pod) -> Option<T> + Send + Sync + 'static,
-) -> (
-    &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
-) {
-    let key: Atom = with_prefix(name).into();
-    let fun = move |pod: &Pod| {
-        fun(pod)
-            .map(|data| vec![(key.clone(), data.into())])
-            .unwrap_or_default()
-    };
-    (name, Box::new(fun) as Box<_>)
-}
+    /// Extracts this field from Pod
+    fn extract(self, pod: &Pod) -> Option<Vec<(Atom, Value)>> {
+        use Field::*;
 
-fn collection_field(
-    name: &'static str,
-    fun: impl Fn(&Pod) -> Option<&BTreeMap<String, String>> + Send + Sync + 'static,
-) -> (
-    &'static str,
-    Box<dyn Fn(&Pod) -> Vec<(Atom, Value)> + Send + Sync + 'static>,
-) {
-    let prefix_key = with_prefix(name) + ".";
-    let fun = move |pod: &Pod| {
-        fun(pod)
-            .map(|map| {
-                map.iter()
-                    .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
-    (name, Box::new(fun) as Box<_>)
-}
+        Some(match self {
+            // ------------------------ ObjectMeta ------------------------ //
+            Name => self.field(pod.metadata.as_ref()?.name.clone()?),
+            Namespace => self.field(pod.metadata.as_ref()?.namespace.clone()?),
+            CreationTimestamp => self.field(pod.metadata.as_ref()?.creation_timestamp.clone()?.0),
+            DeletionTimestamp => self.field(pod.metadata.as_ref()?.deletion_timestamp.clone()?.0),
+            Labels => self.collection(pod.metadata.as_ref()?.labels.as_ref()?),
+            Annotations => self.collection(pod.metadata.as_ref()?.annotations.as_ref()?),
+            // ------------------------ PodSpec ------------------------ //
+            NodeName => self.field(pod.spec.as_ref()?.node_name.clone()?),
+            Hostname => self.field(pod.spec.as_ref()?.hostname.clone()?),
+            Priority => self.field(pod.spec.as_ref()?.priority.clone()?),
+            PriorityClassName => self.field(pod.spec.as_ref()?.priority_class_name.clone()?),
+            ServiceAccountName => self.field(pod.spec.as_ref()?.service_account_name.clone()?),
+            Subdomain => self.field(pod.spec.as_ref()?.subdomain.clone()?),
+            // ------------------------ PodStatus ------------------------ //
+            HostIp => self.field(pod.status.as_ref()?.host_ip.clone()?),
+            Ip => self.field(pod.status.as_ref()?.pod_ip.clone()?),
+        })
+    }
 
-fn with_prefix(name: &str) -> String {
-    event::log_schema().kubernetes_key().as_ref().to_owned() + "." + name
+    fn field(self, data: impl Into<Value>) -> Vec<(Atom, Value)> {
+        vec![(Self::with_prefix(self.name()).into(), data.into())]
+    }
+
+    fn collection(self, map: &BTreeMap<String, String>) -> Vec<(Atom, Value)> {
+        let prefix_key = Self::with_prefix(self.name()) + ".";
+
+        map.iter()
+            .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
+            .collect()
+    }
+
+    fn with_prefix(name: String) -> String {
+        event::log_schema().kubernetes_key().as_ref().to_owned() + "." + &name
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{KubePodMetadata, TransformConfig, TransformContext};
-    use crate::test_util::runtime;
+    use super::Field;
 
     #[test]
-    fn unknown_fields() {
-        let config = KubePodMetadata {
-            fields: vec!["unknown".to_owned()],
-            node_name: Some("name".to_owned()),
-            cache_ttl: 10,
-        };
-
-        let rt = runtime();
-
-        assert!(config
-            .build(TransformContext::new_test(rt.executor()))
-            .is_err());
+    fn field_name() {
+        assert_eq!("priority_class_name", &Field::PriorityClassName.name());
     }
 }
 
