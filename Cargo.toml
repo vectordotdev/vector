@@ -50,7 +50,7 @@ tokio-codec = "0.1.0"
 tokio-openssl = "0.3.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
-tokio-compat = { version = "0.1", features = ["rt-full"] }
+tokio-compat = { version = "0.1", features = ["rt-full"], git = "https://github.com/tokio-rs/tokio-compat.git" }
 
 # Tracing
 tracing = "0.1.9"

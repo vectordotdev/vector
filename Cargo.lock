@@ -3912,8 +3912,7 @@ dependencies = [
 [[package]]
 name = "tokio-compat"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d4000e3c984d0e58ace4926f1eae4d830a90a76c386dccf5b82aeca4cbee6df"
+source = "git+https://github.com/tokio-rs/tokio-compat.git#f2dad5709e2134419617b2dbba4355de0e8045d6"
 dependencies = [
  "futures 0.1.29",
  "futures-core",
