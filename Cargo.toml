@@ -237,6 +237,7 @@ transforms = [
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
   "transforms-concat",
+  "transforms-dedupe",
   "transforms-field_filter",
   "transforms-geoip",
   "transforms-grok_parser",
