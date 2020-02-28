@@ -84,6 +84,21 @@ services:
       working_dir: $PWD
       command: cargo check --all --all-targets
 
+    check-component-features:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
+      environment:
+        RUSTFLAGS: "-D warnings"
+        CARGO_TERM_COLOR: always
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/root/.cargo/registry
+        - ./target/cargo/git:/root/.cargo/git
+        - ./target/rustup/tmp:/root/.rustup/tmp
+      working_dir: $PWD
+      command: ./scripts/check-component-features.sh
+
     check-fmt:
       build:
         context: .

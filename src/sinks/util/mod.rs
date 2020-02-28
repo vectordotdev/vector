@@ -2,12 +2,13 @@ pub mod batch;
 pub mod buffer;
 pub mod http;
 pub mod retries;
+#[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
-#[cfg(unix)]
+#[cfg(all(feature = "sinks-socket", unix))]
 pub mod unix;
 pub mod uri;
 

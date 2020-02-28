@@ -500,7 +500,7 @@ fn healthcheck_default() -> bool {
     true
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod test {
     use super::Config;
     use std::path::PathBuf;

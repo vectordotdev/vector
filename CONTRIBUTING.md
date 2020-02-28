@@ -33,6 +33,7 @@ expanding into more specifics.
       - [Sink Healthchecks](#sink-healthchecks)
    - [Testing](#testing)
       - [Sample Logs](#sample-logs)
+      - [Tips and Tricks](#tips-and-tricks)
    - [Benchmarking](#benchmarking)
 - [Security](#security)
 - [Legal](#legal)
@@ -211,6 +212,23 @@ rustup component add rustfmt
 make fmt
 ```
 
+#### Feature flags
+
+When a new component (a source, transform, or sink) is added, it has to be put behind
+a feature flag with the corresponding name. This ensures that it is possible to
+customize Vector builds. See the `features` section in `Cargo.toml` for examples.
+
+In addition, during development of a particular component it is useful to disable all
+other components to speed up compilation. For example, it is possible to build and run
+tests only for `console` sink using
+
+```bash
+cargo test --lib --no-default-features --features sinks-console sinks::console
+```
+
+In case if the tests are already built and only the component file changed, it is
+around 4 times faster than rebuilding tests with all features.
+
 #### Documentation
 
 Documentation is extremely important to the Vector project. Ideally, all
@@ -234,7 +252,11 @@ by the use of [conventional commit](#what-is-conventional-commits) titles.
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
-[Reviewing guide](/REVIEWING.md#dependencies)
+[Reviewing guide](/REVIEWING.md#dependencies).
+
+If a dependency is required only by one or multiple components, but not by
+Vector's core, make it optional and add it to the list of dependencies of
+the features corresponding to these components in `Cargo.toml`.
 
 ### Guidelines
 
@@ -309,6 +331,33 @@ flog --bytes $((100 * 1024 * 1024)) > sample.log
 ```
 
 This will create a `100MiB` sample log file in the `sample.log` file.
+
+#### Tips and Tricks
+
+If you are developing a particular component and want to quickly iterate on unit
+tests related only to this component, the following approach can reduce waiting times:
+
+1. Install [cargo-watch](https://github.com/passcod/cargo-watch).
+2. (Only for GNU/Linux) Install LLVM 9 (for example, package `llvm-9` on Debian)
+   and set `RUSTFLAGS` environment variable to use `lld` as the linker:
+
+   ```sh
+   export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
+   ```
+3. Run in the root directory of Vector's source
+
+   ```sh
+   cargo watch -s clear -s \
+     'cargo test --lib --no-default-features --features=<component type>-<component name> <component type>::<component name>'
+   ```
+
+   For example, if the component is `add_fields` transform, the command above turns
+   into
+
+   ```sh
+   cargo watch -s clear -s \
+     'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
+   ```
 
 ### Benchmarking
 
