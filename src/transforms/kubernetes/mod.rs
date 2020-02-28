@@ -106,7 +106,7 @@ impl TransformConfig for KubePodMetadata {
         // Run background task
         cx.executor().spawn_std(async move {
             match metadata_client.run().await {
-                Ok(()) => unreachable!(),
+                Ok(()) => (),
                 Err(error) => error!(message = "Stopped updating Pod metadata.", reason = %error),
             }
         });
@@ -244,7 +244,7 @@ impl MetadataClient {
 
             warn!(
                 message = "Temporarily stoped watching Pod metadata.",
-                reason = ?error
+                reason = %error
             );
         }
     }
@@ -388,19 +388,19 @@ impl Field {
     }
 
     fn field(self, data: impl Into<Value>) -> Vec<(Atom, Value)> {
-        vec![(Self::with_prefix(self.name()).into(), data.into())]
+        vec![(Self::with_prefix(&self.name()).into(), data.into())]
     }
 
     fn collection(self, map: &BTreeMap<String, String>) -> Vec<(Atom, Value)> {
-        let prefix_key = Self::with_prefix(self.name()) + ".";
+        let prefix_key = Self::with_prefix(&self.name()) + ".";
 
         map.iter()
             .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
             .collect()
     }
 
-    fn with_prefix(name: String) -> String {
-        event::log_schema().kubernetes_key().as_ref().to_owned() + "." + &name
+    fn with_prefix(name: &str) -> String {
+        event::log_schema().kubernetes_key().as_ref().to_owned() + "." + name
     }
 }
 
