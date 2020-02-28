@@ -214,7 +214,7 @@ impl MetadataClient {
             info!("Watching Pod metadata.");
 
             // Watch loop
-            error = Some(RuntimeError::WatchUnexpectedlyEnded);
+            let mut runtime_error = RuntimeError::WatchUnexpectedlyEnded;
             retry_timeout = self.max_retry_timeout.min(retry_timeout * 2);
 
             while let Some(next) = watcher.next().await {
@@ -236,7 +236,7 @@ impl MetadataClient {
                             // Optimistically try the shortest timeout.
                             _ => retry_timeout = Duration::from_secs(1),
                         }
-                        error = Some(err);
+                        runtime_error = err;
                         break;
                     }
                 }
@@ -244,8 +244,10 @@ impl MetadataClient {
 
             warn!(
                 message = "Temporarily stoped watching Pod metadata.",
-                reason = %error
+                reason = %runtime_error
             );
+
+            error = Some(runtime_error);
         }
     }
 
