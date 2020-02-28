@@ -16,6 +16,7 @@ pub fn init(color: bool, json: bool, levels: &str, metrics: Option<metrics::Sink
         let subscriber = FmtSubscriber::builder()
             .with_env_filter(levels)
             .json()
+            .flatten_event(true)
             .finish()
             .with(Limit::default());
 
