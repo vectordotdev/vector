@@ -28,7 +28,7 @@ build: ## Build the project
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors (only default features)
-	@scripts/run.sh checker cargo check --all --all-targets
+	@scripts/run.sh checker cargo check --all --all-targets --features docker,kubernetes
 
 check-fmt: ## Checks code formatting correctness
 	@scripts/run.sh checker scripts/check-style.sh

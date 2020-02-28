@@ -432,7 +432,7 @@ services:
         - test-runtime-deps
       network_mode: host
       working_dir: $PWD
-      command: cargo test --all --no-default-features --features docker,default-musl --target x86_64-unknown-linux-musl -- --test-threads 4
+      command: cargo test --all --no-default-features --features default-musl,docker,kubernetes --target x86_64-unknown-linux-musl -- --test-threads 4
 
     test-behavior:
       image: ubuntu:18.04
