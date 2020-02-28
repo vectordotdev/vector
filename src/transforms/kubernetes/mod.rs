@@ -27,51 +27,41 @@ use tokio::timer::Delay;
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
 
+/// 1h sounds a lot, but a metadata entry averages around 300B and in an extreme
+/// scenario when a pod is deleted every second, we would have ~1MB of probably
+/// not usefull data. Which is acceptable. The benefit of such a long delay
+/// is that we will certainly* have the metadata while we are processing the
+/// remaining logs from the deleted pod.
+const DEFAULT_CACHE_TTL: Duration = Duration::from_secs(60 * 60);
+
+/// Must be larger than 0.
+const DEFAULT_MAX_RETRY_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// Default fields added to events
+const DEFAULT_FIELDS: [Field; 5] = [
+    Field::Name,
+    Field::Namespace,
+    Field::Labels,
+    Field::Annotations,
+    Field::NodeName,
+];
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct KubePodMetadata {
-    #[serde(default = "default_fields")]
-    fields: Vec<Field>,
+    fields: Option<Vec<Field>>,
     /// For how long will we hold on to pod's metadata after the pod has been deleted.
     /// seconds
-    #[serde(default = "default_cache_ttl")]
-    cache_ttl: u64,
+    cache_ttl: Option<u64>,
     /// Node name whose pod's metadata should be watched. Has priority
-    /// over value found in enviorment variable.
-    #[serde(default)]
+    /// over value found in enviroment variable.
     node_name: Option<String>,
     /// Field containg Pod UID to which log belongs.
-    #[serde(default = "default_pod_uid")]
-    pod_uid: String,
+    pod_uid: Option<String>,
     /// If watcher errors, for how maximaly will we wait before trying again.
     /// Must be larger than 0.
     /// seconds
-    #[serde(default = "default_max_retry_timeout")]
-    max_retry_timeout: u64,
-}
-
-fn default_cache_ttl() -> u64 {
-    // 1h sounds a lot, but a metadata entry averages around 300B and in an extreme
-    // scenario when a pod is deleted every second, we would have ~1MB of probably
-    // not usefull data. Which is acceptable. The benefit of such a long delay
-    // is that we will certainly* have the metadata while we are processing the
-    // remaining logs from the deleted pod.
-    60 * 60
-}
-
-fn default_pod_uid() -> String {
-    POD_UID.as_ref().to_owned()
-}
-
-/// Default included fields
-fn default_fields() -> Vec<Field> {
-    use Field::*;
-
-    vec![Name, Namespace, Labels, Annotations, NodeName]
-}
-
-fn default_max_retry_timeout() -> u64 {
-    1
+    max_retry_timeout: Option<u64>,
 }
 
 inventory::submit! {
@@ -85,6 +75,7 @@ impl TransformConfig for KubePodMetadata {
         // acquire metadata for all pods on this node, and with it maintaine
         // a map of extracted metadata.
 
+        // Detemine Node's name of whose Pod's metadata we will watch for.
         let node = if let Some(node) = self.node_name.clone() {
             node
         } else {
@@ -98,7 +89,19 @@ impl TransformConfig for KubePodMetadata {
 
         // Construct MetadataClient
         let (reader, writer) = evmap::new();
-        let metadata_client = MetadataClient::new(self, writer, watch_client)?;
+        let metadata_client = MetadataClient::new(
+            self.fields
+                .clone()
+                .unwrap_or(DEFAULT_FIELDS.iter().map(Clone::clone).collect()),
+            self.cache_ttl
+                .map(Duration::from_secs)
+                .unwrap_or(DEFAULT_CACHE_TTL),
+            self.max_retry_timeout
+                .map(Duration::from_secs)
+                .unwrap_or(DEFAULT_MAX_RETRY_TIMEOUT),
+            writer,
+            watch_client,
+        )?;
 
         // Run background task
         cx.executor().spawn_std(async move {
@@ -111,7 +114,11 @@ impl TransformConfig for KubePodMetadata {
         // Construct transform
         Ok(Box::new(KubernetesPodMetadata {
             metadata: reader,
-            pod_uid: self.pod_uid.clone().into(),
+            pod_uid: self
+                .pod_uid
+                .clone()
+                .map(Into::into)
+                .unwrap_or(POD_UID.clone()),
         }))
     }
 
@@ -161,18 +168,20 @@ struct MetadataClient {
 
 impl MetadataClient {
     fn new(
-        config: &KubePodMetadata,
+        fields: Vec<Field>,
+        cache_ttl: Duration,
+        max_retry_timeout: Duration,
         metadata: WriteHandle<Bytes, Box<(Atom, FieldValue)>>,
         client: WatchClient,
     ) -> Result<Self, BuildError> {
-        if config.max_retry_timeout > 0 {
+        if max_retry_timeout > Duration::default() {
             Ok(Self {
-                fields: config.fields.clone(),
+                fields,
                 metadata,
                 client,
                 delete_queue: VecDeque::new(),
-                cache_ttl: Duration::from_secs(config.cache_ttl),
-                max_retry_timeout: Duration::from_secs(config.max_retry_timeout),
+                cache_ttl,
+                max_retry_timeout,
             })
         } else {
             Err(BuildError::TooSmallMaxRetryTimeout)
