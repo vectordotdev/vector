@@ -4,7 +4,9 @@ extern crate tracing;
 pub mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform};
-use futures::{future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::oneshot};
+use futures01::{
+    future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::oneshot,
+};
 use std::iter;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},

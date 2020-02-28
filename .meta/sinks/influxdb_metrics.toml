@@ -7,6 +7,8 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
+min_version = "0"
+requirements = {}
 service_providers = ["InfluxData"]
 write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API"
 
@@ -46,8 +48,8 @@ type = "string"
 common = true
 examples = ["https://us-west-2-1.aws.cloud2.influxdata.com", "http://localhost:8086/"]
 groups = ["v1", "v2"]
-prioritize = true
 required = true
+sort = 1
 description = "InfluxDB endpoint to send metrics to."
 
 [sinks.influxdb_metrics.options.org]
@@ -125,6 +127,6 @@ type = "string"
 common = true
 examples = ["service"]
 groups = ["v1", "v2"]
-prioritize = true
 required = true
+sort = 1
 description = "A prefix that will be added to all metric names."

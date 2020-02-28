@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_pubsub%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "GCP PubSub"
 sidebar_label: "gcp_pubsub|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/pubsub.rs
 status: "beta"
@@ -48,6 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   topic = "this-is-a-topic" # example
 
   # OPTIONAL
+  credentials_path = "/path/to/credentials.json" # example, no default
   healthcheck = true # default
 ```
 
@@ -133,7 +136,7 @@ import Field from '@site/src/components/Field';
 
 ### api_key
 
-A Google Cloud API key used to authenticate access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be set. See [GCP Authentication](#gcp-authentication) for more info.
+A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be set. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -332,7 +335,7 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -348,7 +351,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. Either this or [`api_key`](#api_key) must be set. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -673,7 +676,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
@@ -784,7 +787,7 @@ The topic within the project to which to publish logs.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
@@ -800,7 +803,7 @@ The topic within the project to which to publish logs.
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>

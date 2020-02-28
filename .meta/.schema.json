@@ -110,10 +110,6 @@
           "type": "boolean",
           "description": "If this option can be used to partition data. For example, the `path` option in the `aws_s3` sink."
         },
-        "prioritize": {
-          "type": "boolean",
-          "description": "Should this option be prioritized and moved to the top when displayed?"
-        },
         "relevant_when": {
           "type": "object",
           "description": "An object representing the conditions when an option is relevant. This is commonly used in conjuntion with `type` or `strategy` options."
@@ -121,6 +117,10 @@
         "required": {
           "type": "boolean",
           "description": "If this option is required."
+        },
+        "sort": {
+          "type": "int",
+          "description": "Manual sorting option."
         },
         "templateable": {
           "type": "boolean",
@@ -185,6 +185,19 @@
         }
       }
     },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "additional": {
+          "type": "string",
+          "description": "Additional free-form requirements. Markdown is supported and they should be in list format."
+        },
+        "network": {
+          "type": "boolean",
+          "description": "Is the network required for this component?"
+        }
+      }
+    },
     "sink": {
       "type": "object",
       "description": "A component that outputs/sends data from Vector.",
@@ -195,6 +208,7 @@
         "delivery_guarantee",
         "egress_method",
         "function_category",
+        "requirements",
         "title",
         "write_to_description"
       ],
@@ -275,10 +289,18 @@
           "$ref": "#/definitions/output",
           "description": "Output examples of this sink."
         },
+        "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
+        },
         "service_limits_short_link": {
           "type": "string",
           "description": "A link to the target service's limits, if applicable.",
           "minLength": 1
+        },
+        "service_name": {
+          "type": "string",
+          "description": "The name of the underlying service that this component integrates with."
         },
         "service_providers": {
           "type": "array",
@@ -319,6 +341,7 @@
         "common",
         "delivery_guarantee",
         "function_category",
+        "requirements",
         "through_description",
         "title"
       ],
@@ -383,8 +406,12 @@
           "description": "The types of events this source outputs."
         },
         "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
+        },
+        "service_name": {
           "type": "string",
-          "description": "A description of requirements needed for this source to operate correctly. Markdown syntax is supported."
+          "description": "The name of the underlying service that this component integrates with."
         },
         "through_description": {
           "type": "string",
@@ -407,6 +434,7 @@
         "beta",
         "common",
         "function_category",
+        "requirements",
         "title"
       ],
       "properties": {
@@ -465,6 +493,10 @@
         "output_types": {
           "$ref": "#/definitions/event_types",
           "description": "The types of events this transform outputs."
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
         },
         "title": {
           "type": "string",

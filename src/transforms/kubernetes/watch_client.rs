@@ -1,8 +1,5 @@
-use crate::{
-    dns::Resolver,
-    sinks::util::{http::https_client, tls::TlsSettings},
-};
-use futures::{future::Future, stream::Stream};
+use crate::{dns::Resolver, sinks::util::http::https_client, tls::TlsSettings};
+use futures01::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body, Chunk};
 use hyper_tls::HttpsConnector;
@@ -206,7 +203,7 @@ impl Decoder {
         }
 
         // Returns all currently decodable watch responses.
-        futures::stream::iter_result(decoded)
+        futures01::stream::iter_result(decoded)
     }
 }
 
@@ -260,7 +257,7 @@ pub enum RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::ClientConfig;
-    use crate::{dns::Resolver, sinks::util::tls::TlsSettings};
+    use crate::{dns::Resolver, tls::TlsSettings};
     use http::Uri;
 
     #[test]
@@ -287,12 +284,12 @@ mod kube_tests {
     use super::ClientConfig;
     use crate::{
         dns::Resolver,
-        sinks::util::tls::{TlsOptions, TlsSettings},
         sources::kubernetes::test::{echo, Kube},
         test_util::{runtime, temp_file},
+        tls::{TlsOptions, TlsSettings},
     };
     use dirs;
-    use futures::{future::Future, stream::Stream};
+    use futures01::{future::Future, stream::Stream};
     use http::Uri;
     use kube::config::Config;
     use serde_yaml;

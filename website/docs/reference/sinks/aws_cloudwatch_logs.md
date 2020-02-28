@@ -1,13 +1,15 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS Cloudwatch Logs"
 sidebar_label: "aws_cloudwatch_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/
-status: "beta"
+status: "prod-ready"
 title: "AWS Cloudwatch Logs Sink"
 unsupported_operating_systems: []
 ---

@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
-min_version: null
+min_version: "1.1.54378"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Clickhouse"
 sidebar_label: "clickhouse|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
 status: "beta"
@@ -53,6 +55,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - requests
   compression = "none" # default, enum
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
@@ -96,6 +102,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
 
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    timestamp_format = "rfc3339" # default, enum
+
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
     in_flight_limit = 5 # default, requests
@@ -118,6 +128,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Clickhouse version >= 1.1.54378 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -464,6 +485,56 @@ The database that contains the stable that data will be inserted into.
 
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Customize how events are encoded.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps. Formats such as unix can be parsed as a Clickhouse DateTime, however, this loses precision as DateTimes are defined in seconds.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -804,7 +875,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>

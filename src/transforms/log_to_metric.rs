@@ -8,7 +8,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -117,11 +117,11 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
 fn render_tags(
     tags: &Option<IndexMap<Atom, String>>,
     event: &Event,
-) -> Option<HashMap<String, String>> {
+) -> Option<BTreeMap<String, String>> {
     match tags {
         None => None,
         Some(tags) => {
-            let mut map = HashMap::new();
+            let mut map = BTreeMap::new();
             for (name, value) in tags {
                 if let Ok(tag) = render_template(value, event) {
                     map.insert(name.to_string(), tag);

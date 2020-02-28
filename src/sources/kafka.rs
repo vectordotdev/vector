@@ -1,14 +1,16 @@
 use crate::{
     event::Event,
+    kafka::KafkaTlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
-use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
+use futures::compat::Compat;
+use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
-    error::KafkaResult,
+    error::KafkaError,
     message::{BorrowedMessage, Message},
 };
 use serde::{Deserialize, Serialize};
@@ -42,6 +44,7 @@ pub struct KafkaSourceConfig {
     host_key: Option<String>,
     key_field: Option<String>,
     librdkafka_options: Option<HashMap<String, String>>,
+    tls: Option<KafkaTlsConfig>,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -100,7 +103,7 @@ fn kafka_source(
         let stream = OwnedConsumerStream {
             upstream: OwningHandle::new_with_fn(consumer, |c| {
                 let cf = unsafe { &*c };
-                Box::new(cf.start())
+                Box::new(Compat::new(cf.start()))
             }),
         };
 
@@ -108,8 +111,7 @@ fn kafka_source(
             .then(move |message| {
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
-                    Ok(Err(e)) => Err(error!(message = "Kafka returned error", error = ?e)),
-                    Ok(Ok(msg)) => {
+                    Ok(msg) => {
                         let payload = match msg.payload_view::<[u8]>() {
                             None => return Err(()), // skip messages with empty payload
                             Some(Err(e)) => {
@@ -160,6 +162,10 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
         .set("enable.auto.offset.store", "false")
         .set("client.id", "vector");
 
+    if let Some(tls) = &config.tls {
+        tls.apply(&mut client_config)?;
+    }
+
     if let Some(librdkafka_options) = config.librdkafka_options {
         for (key, value) in librdkafka_options.into_iter() {
             client_config.set(key.as_str(), value.as_str());
@@ -174,13 +180,15 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
 }
 
 struct OwnedConsumerStream {
-    upstream:
-        OwningHandle<Arc<StreamConsumer>, Box<MessageStream<'static, DefaultConsumerContext>>>,
+    upstream: OwningHandle<
+        Arc<StreamConsumer>,
+        Box<Compat<MessageStream<'static, DefaultConsumerContext>>>,
+    >,
 }
 
 impl Stream for OwnedConsumerStream {
-    type Item = KafkaResult<BorrowedMessage<'static>>;
-    type Error = ();
+    type Item = BorrowedMessage<'static>;
+    type Error = KafkaError;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.upstream.poll()
@@ -190,7 +198,7 @@ impl Stream for OwnedConsumerStream {
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use futures::sync::mpsc;
+    use futures01::sync::mpsc;
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -205,6 +213,7 @@ mod test {
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             librdkafka_options: None,
+            tls: None,
         }
     }
 
@@ -232,7 +241,8 @@ mod integration_test {
         event,
         test_util::{collect_n, random_string, runtime},
     };
-    use futures::{sync::mpsc, Future};
+    use futures::compat::Compat;
+    use futures01::{sync::mpsc, Future};
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
@@ -251,8 +261,7 @@ mod integration_test {
 
         let record = FutureRecord::to(topic).payload(text).key(key);
 
-        producer
-            .send(record, 0)
+        Compat::new(producer.send(record, 0))
             .map(|_| ())
             .map_err(|e| panic!("Cannot send event to Kafka: {:?}", e))
     }
@@ -276,6 +285,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             librdkafka_options: None,
+            tls: None,
         };
 
         let mut rt = runtime();

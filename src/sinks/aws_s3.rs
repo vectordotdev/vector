@@ -11,7 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
@@ -19,7 +19,7 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
@@ -62,7 +62,7 @@ struct S3Options {
     server_side_encryption: Option<S3ServerSideEncryption>,
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
-    tags: Option<HashMap<String, String>>,
+    tags: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -301,7 +301,8 @@ impl Service<Request> for S3Sink {
 }
 
 fn to_string(value: impl Serialize) -> String {
-    serde_json::to_value(&value).unwrap().to_string()
+    let value = serde_json::to_value(&value).unwrap();
+    value.as_str().unwrap().into()
 }
 
 fn build_request(
@@ -392,7 +393,7 @@ fn encode_event(
 
     let log = event.into_log();
     let bytes = match encoding {
-        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+        Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b
@@ -416,7 +417,7 @@ mod tests {
     use super::*;
     use crate::event::{self, Event};
 
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn s3_encode_event_text() {
@@ -440,7 +441,7 @@ mod tests {
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
 
         let (bytes, _) = bytes.into_parts();
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -511,7 +512,7 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use flate2::read::GzDecoder;
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
@@ -577,7 +578,7 @@ mod integration_tests {
             e
         });
 
-        let pump = sink.send_all(futures::stream::iter_ok(events));
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
@@ -612,7 +613,7 @@ mod integration_tests {
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
-        let (tx, rx) = futures::sync::mpsc::channel(1);
+        let (tx, rx) = futures01::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
         let mut rt = Runtime::new().unwrap();

@@ -7,6 +7,8 @@ egress_method = "streaming"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+min_version = "0.8"
+requirements = {}
 service_providers = ["AWS", "Confluent"]
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
 
@@ -49,7 +51,7 @@ randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify: false) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify: false) %>
 
 [sinks.kafka.options.topic]
 type = "string"

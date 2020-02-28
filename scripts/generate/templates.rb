@@ -67,10 +67,6 @@ class Templates
     send("#{component.type}_description", component)
   end
 
-  def component_guides(component)
-
-  end
-
   def component_header(component)
     render("#{partials_path}/_component_header.md", binding).strip
   end
@@ -79,6 +75,10 @@ class Templates
     examples = output.examples
     fields = output.fields ? output.fields.to_h.values.sort : []
     render("#{partials_path}/_component_output.md", binding).strip
+  end
+
+  def component_requirements(component)
+    render("#{partials_path}/_component_requirements.md", binding).strip
   end
 
   def component_sections(component)
@@ -93,7 +93,7 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, path: nil, titles: true)
+  def config_example(options, array: false, skip_path: false, common: false, path: nil, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
@@ -149,6 +149,12 @@ class Templates
       "The encoding type will be dynamically chosen based on the explicit structuring of the event. If the event has been explicitly structured (parsed, keys added, etc), then it will be encoded in the `json` format. If not, it will be encoded as `text`."
     else
       raise("Unhandled compression: #{encoding.inspect}")
+    end
+  end
+
+  def event_types(types)
+    types.collect do |type|
+      "`#{type}`"
     end
   end
 
@@ -296,6 +302,14 @@ class Templates
     options.collect { |option| "`#{option.name}`" }
   end
 
+  def outputs_link(component)
+    if component.output.to_h.any?
+      "[outputs #{event_types(component.output_types).to_sentence} events](#output)"
+    else
+      "outputs #{event_type_links(component.output_types).to_sentence} events"
+    end
+  end
+
   def partial?(template_path)
     basename = File.basename(template_path)
     basename.start_with?("_")
@@ -387,7 +401,7 @@ class Templates
 
   def source_description(source)
     strip <<~EOF
-    Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.
+    Ingests data through #{source.through_description} and #{outputs_link(source)}.
     EOF
   end
 
@@ -424,9 +438,19 @@ class Templates
   end
 
   def transform_description(transform)
-    strip <<~EOF
-    Accepts #{event_type_links(transform.input_types).to_sentence} events and allows you to #{transform.allow_you_to_description}.
-    EOF
+    if transform.input_types == transform.output_types
+      strip <<~EOF
+      Accepts and #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      EOF
+    else
+      strip <<~EOF
+      Accepts #{event_type_links(transform.input_types).to_sentence} events but #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      EOF
+    end
+  end
+
+  def vector_summary
+    render("#{partials_path}/_vector_summary.md", binding).strip
   end
 
   def write_verb_link(sink)

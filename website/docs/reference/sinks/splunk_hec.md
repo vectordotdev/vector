@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
@@ -679,7 +681,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>

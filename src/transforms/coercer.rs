@@ -55,11 +55,12 @@ impl Transform for Coercer {
             // below, as it will be fewer steps to fully recreate the
             // event than to scan the event for extraneous fields after
             // conversion.
-            let drain = log.drain().collect::<Vec<_>>();
-            for (field, value) in drain {
-                if let Some(conv) = self.types.get(&field) {
+            let mut new_event = Event::new_empty_log();
+            let new_log = new_event.as_mut_log();
+            for (field, conv) in &self.types {
+                if let Some(value) = log.remove(field) {
                     match conv.convert(value) {
-                        Ok(converted) => log.insert(field, converted),
+                        Ok(converted) => new_log.insert(field, converted),
                         Err(error) => {
                             warn!(
                                 message = "Could not convert types.",
@@ -71,6 +72,7 @@ impl Transform for Coercer {
                     }
                 }
             }
+            return Some(new_event);
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
@@ -95,13 +97,12 @@ impl Transform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::CoercerConfig;
-    use crate::event::{flatten::flatten, LogEvent, Value};
+    use crate::event::{LogEvent, Value};
     use crate::{
         topology::config::{TransformConfig, TransformContext},
         Event,
     };
     use pretty_assertions::assert_eq;
-    use serde_json::Value as JsonValue;
 
     fn parse_it(extra: &str) -> LogEvent {
         let rt = crate::runtime::Runtime::single_threaded().unwrap();
@@ -154,17 +155,9 @@ mod tests {
         let log = parse_it("drop_unspecified = true");
 
         let mut expected = Event::new_empty_log();
-        match serde_json::from_str::<JsonValue>(
-            r#"{
-                 "bool": true,
-                 "number": 1234
-               }"#,
-        )
-        .unwrap()
-        {
-            JsonValue::Object(object) => flatten(expected.as_mut_log(), object),
-            _ => panic!("Invalid result from serde_json::from_str"),
-        }
+        expected.as_mut_log().insert("bool", true);
+        expected.as_mut_log().insert("number", 1234);
+
         assert_eq!(log, expected.into_log());
     }
 }

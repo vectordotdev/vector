@@ -1,10 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
-min_version: null
+min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Kafka"
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
 status: "prod-ready"
@@ -103,6 +105,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Kafka version >= 0.8 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -530,7 +543,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
@@ -655,6 +668,13 @@ If you'd like to disable health checks for this sink you can set the
 The `kafka` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
+### librdkafka
+
+The `kafka` sink uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
+is a battle tested, performant, and reliabile library that facilitates
+communication with Kafka. And because Vector produces static MUSL builds,
+this dependency is packaged with Vector, meaning you do not need to install it.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
@@ -666,4 +686,5 @@ event-by-event basis. It does not batch data.
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
+[urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md

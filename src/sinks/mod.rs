@@ -1,4 +1,4 @@
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use snafu::Snafu;
 
 pub mod aws_cloudwatch_logs;
@@ -22,7 +22,7 @@ pub mod logdna;
 pub mod loki;
 pub mod new_relic_logs;
 pub mod prometheus;
-pub mod sematext;
+pub mod sematext_logs;
 pub mod socket;
 pub mod splunk_hec;
 pub mod statsd;

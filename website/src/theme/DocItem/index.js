@@ -42,7 +42,7 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({deliveryGuarantee, minVersion, operatingSystems, status, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, minVersion, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
@@ -66,30 +66,30 @@ function Statuses({deliveryGuarantee, minVersion, operatingSystems, status, unsu
       {status == "beta" &&
         <div>
           <Link to="/docs/about/guarantees/#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
-            <i className="feather icon-alert-triangle"></i> beta
+            <i className="feather icon-alert-triangle"></i> Beta
           </Link>
         </div>}
       {status == "prod-ready" &&
         <div>
           <Link to="/docs/about/guarantees/#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
-            <i className="feather icon-award"></i> prod-ready
+            <i className="feather icon-award"></i> Prod-ready
           </Link>
         </div>}
       {deliveryGuarantee == "best_effort" &&
         <div>
           <Link to="/docs/about/guarantees/#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
-            <i className="feather icon-shield-off"></i> best-effort
+            <i className="feather icon-shield-off"></i> Best-effort
           </Link>
         </div>}
       {deliveryGuarantee == "at_least_once" &&
         <div>
           <Link to="/docs/about/guarantees/#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
-            <i className="feather icon-shield"></i> at-least-once
+            <i className="feather icon-shield"></i> At-least-once
           </Link>
         </div>}
       {minVersion &&
-        <div>
-          <i className="feather icon-key"></i> >= {minVersion}
+        <div className="text--primary">
+          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {serviceName} versions</> : <>{serviceName} >= {minVersion}</>}
         </div>}
       {operatingSystemsEls.length > 0 &&
         <div>
@@ -120,6 +120,7 @@ function DocItem(props) {
   } = metadata;
   const {
     frontMatter: {
+      component_title: componentTitle,
       delivery_guarantee: deliveryGuarantee,
       event_types: eventTypes,
       hide_title: hideTitle,
@@ -128,6 +129,7 @@ function DocItem(props) {
       min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
+      service_name: serviceName,
       source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
@@ -196,6 +198,7 @@ function DocItem(props) {
                     deliveryGuarantee={deliveryGuarantee}
                     minVersion={minVersion}
                     operatingSystems={operatingSystems}
+                    serviceName={serviceName}
                     status={status}
                     unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&

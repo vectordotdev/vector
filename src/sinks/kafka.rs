@@ -1,11 +1,12 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    sinks::util::tls::TlsOptions,
+    kafka::KafkaTlsConfig,
     sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
+use futures::compat::Compat;
+use futures01::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
@@ -17,7 +18,6 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 
@@ -25,8 +25,6 @@ use string_cache::DefaultAtom as Atom;
 enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
-    #[snafu(display("invalid path: {:?}", path))]
-    InvalidPath { path: PathBuf },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -35,7 +33,7 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
-    tls: Option<KafkaSinkTlsConfig>,
+    tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
@@ -58,19 +56,12 @@ pub enum Encoding {
     Json,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaSinkTlsConfig {
-    enabled: Option<bool>,
-    #[serde(flatten)]
-    options: TlsOptions,
-}
-
 pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
-    in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
+    in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
     acker: Acker,
     seq_head: usize,
@@ -103,24 +94,8 @@ impl KafkaSinkConfig {
     fn to_rdkafka(&self) -> crate::Result<rdkafka::ClientConfig> {
         let mut client_config = rdkafka::ClientConfig::new();
         client_config.set("bootstrap.servers", &self.bootstrap_servers);
-        if let Some(ref tls) = self.tls {
-            let enabled = tls.enabled.unwrap_or(false);
-            client_config.set(
-                "security.protocol",
-                if enabled { "ssl" } else { "plaintext" },
-            );
-            if let Some(ref path) = tls.options.ca_path {
-                client_config.set("ssl.ca.location", pathbuf_to_string(&path)?);
-            }
-            if let Some(ref path) = tls.options.crt_path {
-                client_config.set("ssl.certificate.location", pathbuf_to_string(&path)?);
-            }
-            if let Some(ref path) = tls.options.key_path {
-                client_config.set("ssl.keystore.location", pathbuf_to_string(&path)?);
-            }
-            if let Some(ref pass) = tls.options.key_pass {
-                client_config.set("ssl.keystore.password", pass);
-            }
+        if let Some(tls) = &self.tls {
+            tls.apply(&mut client_config)?;
         }
         client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
         client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
@@ -131,11 +106,6 @@ impl KafkaSinkConfig {
         }
         Ok(client_config)
     }
-}
-
-fn pathbuf_to_string(path: &PathBuf) -> crate::Result<&str> {
-    path.to_str()
-        .ok_or_else(|| BuildError::InvalidPath { path: path.into() }.into())
 }
 
 impl KafkaSink {
@@ -188,7 +158,8 @@ impl Sink for KafkaSink {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
-        self.in_flight.push(future.join(future::ok(seqno)));
+        self.in_flight
+            .push(Compat::new(future).join(future::ok(seqno)));
         Ok(AsyncSink::Ready)
     }
 
@@ -258,7 +229,7 @@ fn encode_event(
         .unwrap_or_default();
 
     let body = match encoding {
-        Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
+        Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
             .get(&event::log_schema().message_key())
@@ -273,7 +244,7 @@ fn encode_event(
 mod tests {
     use super::*;
     use crate::event::{self, Event};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn kafka_encode_event_text() {
@@ -294,7 +265,7 @@ mod tests {
 
         let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
 
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], "value".as_bytes());
         assert_eq!(map[&event::log_schema().message_key().to_string()], message);
@@ -307,10 +278,13 @@ mod tests {
 #[cfg(test)]
 mod integration_test {
     use super::*;
-    use crate::buffers::Acker;
-    use crate::sinks::util::tls::TlsOptions;
-    use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
-    use futures::Sink;
+    use crate::{
+        buffers::Acker,
+        kafka::KafkaTlsConfig,
+        test_util::{block_on, random_lines_with_stream, random_string, wait_for},
+        tls::TlsOptions,
+    };
+    use futures01::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -328,7 +302,7 @@ mod integration_test {
     fn kafka_happy_path_tls() {
         kafka_happy_path(
             "localhost:9091",
-            Some(KafkaSinkTlsConfig {
+            Some(KafkaTlsConfig {
                 enabled: Some(true),
                 options: TlsOptions {
                     ca_path: Some(TEST_CA.into()),
@@ -338,13 +312,10 @@ mod integration_test {
         );
     }
 
-    fn kafka_happy_path(server: &str, tls: Option<KafkaSinkTlsConfig>) {
+    fn kafka_happy_path(server: &str, tls: Option<KafkaTlsConfig>) {
         let topic = format!("test-{}", random_string(10));
 
-        let tls_enabled = tls
-            .as_ref()
-            .map(|tls| tls.enabled.unwrap_or(false))
-            .unwrap_or(false);
+        let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
             topic: topic.clone(),

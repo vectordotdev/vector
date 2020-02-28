@@ -1,5 +1,5 @@
 use crate::runtime::TaskExecutor;
-use futures::{future, Future};
+use futures01::{future, Future};
 use hyper::client::connect::dns::{Name, Resolve};
 use snafu::{futures01::FutureExt, ResultExt};
 use std::{
@@ -66,7 +66,11 @@ impl Resolver {
 
             (config, opts)
         } else {
-            system_conf::read_system_conf().context(ReadSystemConf)?
+            #[cfg(feature = "disable-resolv-conf")]
+            let res = (Default::default(), Default::default());
+            #[cfg(not(feature = "disable-resolv-conf"))]
+            let res = system_conf::read_system_conf().context(ReadSystemConf)?;
+            res
         };
 
         let (inner, bg_task) = AsyncResolver::new(config, opt);

@@ -7,16 +7,32 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
 
-Vector is a _highly reliable_ observability data router built for demanding
-production environments. Vector is designed on the following principles:
+Vector is a lightweight and ultra-fast tool for building observability
+pipelines. Compared to Logstash and friends, Vector [improves throughput by
+~10X while significanly reducing CPU and memory usage](#performance).
 
-* **High reliability** - Built in [Rust][urls.rust], Vector is [memory safe][urls.rust_memory_safety], [correct][pages.index#correctness], and [performant][pages.index#performance].
-* **Operator safety** - Vector is pragmatic and hard to break. It avoids the common pitfalls in similar tools.
-* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). A [sophisticated data model][docs.data-model] enables _correct_ interoperability.
-* **One tool** - Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service]. One tool gets your data from A to B.
+#### Principles
 
-Vector is **deployed over 100,000 times per day**, and is trusted by Fortune 500
-companies and engineering teams trying to tame observability pipelines.
+* **Reliability First.** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
+* **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
+* **Single Responsibility.** - Vector is a _data router_, it does not plan to become a distributed processing framework.
+
+#### Who should use Vector?
+
+* You _SHOULD_ use Vector to replace Logstash, Fluent*, Telegraf, Beats, or similar tools.
+* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
+* You _SHOULD_ use Vector in resource constrained environments (such as devices).
+* You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
+* You _SHOULD NOT_ use Vector to replace Kafka. Vector is designed to work with Kafka!
+* You _SHOULD NOT_ use Vector for non-observability data such as analytics data.
+
+#### Community
+
+* Vector is **downloaded over 100,000 times per day**.
+* Vector's largest user **processes over 10TB daily**.
+* Vector is **used by multiple fortune 500 companies** with stringent production requirements.
+* Vector has **over 15 active contributors** and growing.
 
 import Jump from '@site/src/components/Jump';
 
@@ -25,10 +41,5 @@ import Jump from '@site/src/components/Jump';
 
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
-[docs.data-model]: /docs/about/data-model/
 [docs.roles.agent]: /docs/setup/deployment/roles/agent/
-[docs.roles.service]: /docs/setup/deployment/roles/service/
-[pages.index#correctness]: /#correctness
-[pages.index#performance]: /#performance
 [urls.rust]: https://www.rust-lang.org/
-[urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/

@@ -7,6 +7,7 @@ egress_method = "streaming"
 function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]
+requirements = {}
 write_to_description = """\
 a blackhole that simply discards data, designed for testing and \
 benchmarking purposes\

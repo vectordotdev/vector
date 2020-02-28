@@ -233,30 +233,6 @@ dns_servers = ["0.0.0.0:53"]
   host_key = "host"
 
   #
-  # Multi-line
-  #
-
-  # When present, Vector will aggregate multiple lines into a single event, using
-  # this pattern as the indicator that the previous lines should be flushed and a
-  # new event started. The pattern will be matched against entire lines as a
-  # regular expression, so remember to anchor as appropriate.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  message_start_indicator = "^(INFO|ERROR)"
-
-  # When `message_start_indicator` is present, this sets the amount of time
-  # Vector will buffer lines into a single event before flushing, regardless of
-  # whether or not it has seen a line indicating the start of a new message.
-  #
-  # * optional
-  # * default: 1000
-  # * type: int
-  # * unit: milliseconds
-  multi_line_timeout = 1000
-
-  #
   # Priority
   #
 
@@ -313,6 +289,48 @@ dns_servers = ["0.0.0.0:53"]
     # * enum: "checksum" or "device_and_inode"
     strategy = "checksum"
     strategy = "device_and_inode"
+
+  #
+  # Multiline
+  #
+
+  [sources.file.multiline]
+    # Condition regex pattern to look for. Exact behavior is configured via `mode`.
+    #
+    # * required
+    # * type: string
+    condition_pattern = "^[\\s]+"
+    condition_pattern = "\\\\$"
+    condition_pattern = "^(INFO|ERROR) "
+    condition_pattern = ";$"
+
+    # Mode of operation, specifies how the `condition_pattern` is interpreted.
+    #
+    # * required
+    # * type: string
+    # * enum: "continue_through", "continue_past", "halt_before", and "halt_with"
+    mode = "continue_through"
+    mode = "continue_past"
+    mode = "halt_before"
+    mode = "halt_with"
+
+    # Start regex pattern to look for as a beginning of the message.
+    #
+    # * required
+    # * type: string
+    start_pattern = "^[^\\s]"
+    start_pattern = "\\\\$"
+    start_pattern = "^(INFO|ERROR) "
+    start_pattern = "[^;]$"
+
+    # The maximum time to wait for the continuation. Once this timeout is reached,
+    # the buffered message is guaraneed to be flushed, even if incomplete.
+    #
+    # * required
+    # * type: int
+    # * unit: milliseconds
+    timeout_ms = 1000
+    timeout_ms = 600000
 
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
@@ -464,6 +482,53 @@ dns_servers = ["0.0.0.0:53"]
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
 
+  #
+  # Tls
+  #
+
+  [sources.kafka.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
   # The component type. This is a required field that tells Vector which
@@ -571,6 +636,50 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "host"
   # * type: string
   host_key = "host"
+
+  #
+  # Tls
+  #
+
+  [sources.socket.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    # * relevant when mode = "tcp"
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_path = "/path/to/host_certificate.key"
 
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
@@ -711,8 +820,52 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   host_key = "host"
 
+  #
+  # Tls
+  #
+
+  [sources.syslog.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -739,13 +892,53 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: seconds
   shutdown_timeout_secs = 30
 
+  #
+  # Tls
+  #
+
+  [sources.vector.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 
 # ------------------------------------------------------------------------------
 # Transforms
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 
-# Accepts `log` events and allows you to add one or more log fields.
+# Accepts and outputs `log` events allowing you to add one or more log fields.
 [transforms.add_fields]
   #
   # General
@@ -784,7 +977,7 @@ dns_servers = ["0.0.0.0:53"]
     parent = {child = "child_value"}
     list_field = ["first", "second", "third"]
 
-# Accepts `metric` events and allows you to add one or more metric tags.
+# Accepts and outputs `metric` events allowing you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
@@ -817,7 +1010,7 @@ dns_servers = ["0.0.0.0:53"]
     static_tag = "my value"
     env_tag = "${ENV_VAR}"
 
-# Accepts `log` events and allows you to strips ANSI escape sequences from the specified field.
+# Accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -840,7 +1033,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   field = "message"
 
-# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+# Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -884,7 +1077,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   refresh_interval_secs = 10
 
-# Accepts `log` events and allows you to coerce log fields into fixed types.
+# Accepts and outputs `log` events allowing you to coerce log fields into fixed types.
 [transforms.coercer]
   #
   # General
@@ -934,7 +1127,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to concat (substrings) of other fields to a new one.
+# Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -973,7 +1166,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "dest_field_name"
 
-# Accepts `log` and `metric` events and allows you to filter events by a log field's value.
+# Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1002,7 +1195,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   value = "/var/log/nginx.log"
 
-# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1042,7 +1235,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "geoip"
 
-# Accepts `log` events and allows you to parse a log field value with Grok.
+# Accepts and outputs `log` events allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
   #
   # General
@@ -1102,7 +1295,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to parse a log field value as JSON.
+# Accepts and outputs `log` events allowing you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1159,7 +1352,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target_field = "target"
 
-# Accepts `log` events and allows you to convert logs into one or more metrics.
+# Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
@@ -1227,7 +1420,7 @@ dns_servers = ["0.0.0.0:53"]
       region = "us-east-1"
       status = "{{status}}"
 
-# Accepts `log` events and allows you to extract data from a logfmt-formatted log field.
+# Accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field.
 [transforms.logfmt_parser]
   #
   # General
@@ -1281,7 +1474,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1321,7 +1514,7 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
-# Accepts `log` events and allows you to merge partial log events into a single event.
+# Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1367,7 +1560,7 @@ end
   # * type: [string]
   stream_discriminant_fields = []
 
-# Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
+# Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
   # General
@@ -1427,7 +1620,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to remove one or more log fields.
+# Accepts and outputs `log` events allowing you to remove one or more log fields.
 [transforms.remove_fields]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1449,7 +1642,7 @@ end
   # * type: [string]
   fields = ["field1", "field2"]
 
-# Accepts `metric` events and allows you to remove one or more metric tags.
+# Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1471,7 +1664,38 @@ end
   # * type: [string]
   tags = ["tag1", "tag2"]
 
-# Accepts `log` events and allows you to sample events with a configurable rate.
+# Accepts and outputs `log` events allowing you to rename one or more log fields.
+[transforms.rename_fields]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "rename_fields"
+  type = "rename_fields"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Fields
+  #
+
+  [transforms.rename_fields.fields]
+    # The name of the field to move. Use `.` for adding nested fields.
+    #
+    # * required
+    # * type: *
+    old field name = "new field name"
+
+# Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1504,7 +1728,7 @@ end
   # * type: [string]
   pass_list = ["[error]", "field2"]
 
-# Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
 [transforms.split]
   #
   # General
@@ -1546,10 +1770,11 @@ end
   field_names = ["timestamp", "level", "message"]
 
   # The separator to split the field on. If no separator is given, it will split
-  # on whitespace.
+  # on all whitespace. 'Whitespace' is defined according to the terms of the
+  # Unicode Derived Core Property `White_Space`.
   #
   # * required
-  # * default: "whitespace"
+  # * default: "[whitespace]"
   # * type: [string]
   separator = ","
 
@@ -1572,7 +1797,62 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
+[transforms.swimlanes]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "swimlanes"
+  type = "swimlanes"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Lanes
+  #
+
+  [transforms.swimlanes.lanes]
+    [transforms.swimlanes.lanes.`<swimlane_id>`]
+      # The type of the condition to execute. Currently only the `check_fields` type
+      # is available.
+      #
+      # * required
+      # * type: string
+      type = "check_fields"
+
+      # Check whether a fields contents exactly matches the value specified.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      "message.eq" = "this is the content to match against"
+
+      # Check whether a field exists or does not exist, depending on the provided
+      # valuebeing `true` or `false` respectively.
+      #
+      # * optional
+      # * no default
+      # * type: bool
+      "host.exists" = true
+
+      # Check whether a fields contents does not match the value specified.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      "method.neq" = "POST"
+
+# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General
@@ -2411,7 +2691,7 @@ end
   filename_append_uuid = true
   filename_append_uuid = false
 
-  # The extension to use in the object name.
+  # The filename extension to use in the object name.
   #
   # * required
   # * default: "log"
@@ -2855,6 +3135,22 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.clickhouse.encoding]
+    # How to format event timestamps. Formats such as unix can be parsed as a
+    # Clickhouse DateTime, however, this loses precision as DateTimes are defined
+    # in seconds.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Request
   #
 
@@ -2942,7 +3238,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -3416,7 +3712,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -3507,6 +3803,330 @@ end
   encoding = "ndjson"
   encoding = "text"
 
+# Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
+[sinks.gcp_cloud_storage]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "gcp_cloud_storage"
+  type = "gcp_cloud_storage"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The GCS bucket name.
+  #
+  # * required
+  # * type: string
+  bucket = "my-bucket"
+
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the Cloud Storage API. If this is unset, Vector checks
+  # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+  #
+  # * required
+  # * type: string
+  credentials_path = "/path/to/credentials.json"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * required
+  # * default: true
+  # * type: bool
+  filename_append_uuid = true
+  filename_append_uuid = false
+
+  # The filename extension to use in the object name.
+  #
+  # * required
+  # * default: "log"
+  # * type: string
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * required
+  # * default: "%s"
+  # * type: string
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root GCS "folder".
+  #
+  # * optional
+  # * default: "date=%F/"
+  # * type: string
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  #
+  # Object Attributes
+  #
+
+  # Predefined ACL to apply to the created objects. For more information, see
+  # Predefined ACLs.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
+  acl = "authenticatedRead"
+  acl = "bucketOwnerFullControl"
+  acl = "bucketOwnerRead"
+  acl = "private"
+  acl = "projectPrivate"
+  acl = "publicRead"
+
+  # The set of metadata `key:value` pairs for the created objects. See the GCS
+  # custom metadata documentation for more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the GCP storage classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "STANDARD", "NEARLINE", "COLDLINE", and "ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "NEARLINE"
+  storage_class = "COLDLINE"
+  storage_class = "ARCHIVE"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_cloud_storage.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 10485760
+    # * type: int
+    # * unit: bytes
+    max_size = 10485760
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 300
+
+  #
+  # Buffer
+  #
+
+  [sinks.gcp_cloud_storage.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.gcp_cloud_storage.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 1000
+    # * type: int
+    rate_limit_num = 1000
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Tls
+  #
+
+  [sinks.gcp_cloud_storage.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface.
 [sinks.gcp_pubsub]
   #
@@ -3551,7 +4171,7 @@ end
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the pubsub project and topic. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-  # filename. Either this or `api_key` must be set.
+  # filename.
   #
   # * optional
   # * no default
@@ -3715,7 +4335,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -3772,7 +4392,7 @@ end
   inputs = ["my-source-id"]
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the stackdriver logging API. If this is unset, Vector
+  # authenticate access to the Stackdriver Logging API. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
@@ -4014,7 +4634,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -4304,7 +4924,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -4868,7 +5488,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -5352,7 +5972,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -5621,7 +6241,7 @@ end
   healthcheck = false
 
 # Batches `log` events to Sematext via the Elasticsearch API.
-[sinks.sematext]
+[sinks.sematext_logs]
   #
   # General
   #
@@ -5631,8 +6251,8 @@ end
   #
   # * required
   # * type: string
-  # * must be: "sematext"
-  type = "sematext"
+  # * must be: "sematext_logs"
+  type = "sematext_logs"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -5677,7 +6297,7 @@ end
   # Batch
   #
 
-  [sinks.sematext.batch]
+  [sinks.sematext_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * required
@@ -5698,7 +6318,7 @@ end
   # Buffer
   #
 
-  [sinks.sematext.buffer]
+  [sinks.sematext_logs.buffer]
     # The buffer's type and storage mechanism.
     #
     # * required
@@ -5738,7 +6358,7 @@ end
   # Request
   #
 
-  [sinks.sematext.request]
+  [sinks.sematext_logs.request]
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
@@ -5932,7 +6552,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
@@ -6178,7 +6798,7 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default

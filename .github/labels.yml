@@ -126,6 +126,9 @@
 - name: "platform: macos"
   description: Anything MacOS related
   color: ff9ff3
+- name: "platform: nixos"
+  description: Anything NixOS related
+  color: ff9ff3
 - name: "platform: raspbian"
   description: Anything Raspbian related
   color: ff9ff3
@@ -143,6 +146,9 @@
   color: ff9ff3
 - name: "platform: homebrew"
   description: Anything Homebrew related
+  color: ff9ff3
+- name: "platform: nix"
+  description: Anything Nix related
   color: ff9ff3
 - name: "platform: rpm"
   description: Anything RPM related
@@ -264,11 +270,17 @@
 - name: "transform: remove_tags"
   description: Anything `remove_tags` transform related
   color: 54a0ff
+- name: "transform: rename_fields"
+  description: Anything `rename_fields` transform related
+  color: 54a0ff
 - name: "transform: sampler"
   description: Anything `sampler` transform related
   color: 54a0ff
 - name: "transform: split"
   description: Anything `split` transform related
+  color: 54a0ff
+- name: "transform: swimlanes"
+  description: Anything `swimlanes` transform related
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
@@ -307,6 +319,9 @@
 - name: "sink: file"
   description: Anything `file` sink related
   color: 4ddbfb
+- name: "sink: gcp_cloud_storage"
+  description: Anything `gcp_cloud_storage` sink related
+  color: 4ddbfb
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
@@ -337,8 +352,8 @@
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb
-- name: "sink: sematext"
-  description: Anything `sematext` sink related
+- name: "sink: sematext_logs"
+  description: Anything `sematext_logs` sink related
   color: 4ddbfb
 - name: "sink: socket"
   description: Anything `socket` sink related

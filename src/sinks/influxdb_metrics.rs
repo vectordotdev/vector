@@ -7,7 +7,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use http::{Method, StatusCode, Uri};
 use hyper;
 use hyper_tls::HttpsConnector;
@@ -426,7 +426,7 @@ fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String,
 fn influx_line_protocol(
     measurement: String,
     metric_type: &str,
-    tags: Option<HashMap<String, String>>,
+    tags: Option<BTreeMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
     line_protocol: &mut String,
@@ -442,7 +442,7 @@ fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(|| HashMap::new());
+    let mut unwrapped_tags = tags.unwrap_or_else(|| BTreeMap::new());
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
@@ -465,7 +465,7 @@ fn encode_string(key: String, output: &mut String) {
     }
 }
 
-fn encode_tags(tags: HashMap<String, String>, output: &mut String) {
+fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
     let sorted = tags
         // sort by key
         .iter()
@@ -547,7 +547,7 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),
@@ -1161,7 +1161,7 @@ mod integration_tests {
     use crate::topology::SinkContext;
     use crate::Event;
     use chrono::Utc;
-    use futures::{stream, Sink};
+    use futures01::{stream, Sink};
 
     const ORG: &str = "my-org";
     const BUCKET: &str = "my-bucket";

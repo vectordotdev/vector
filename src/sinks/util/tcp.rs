@@ -1,15 +1,12 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        encode_event,
-        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
-        Encoding, SinkExt,
-    },
+    sinks::util::{encode_event, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
+    tls::{TlsConfig, TlsConnectorExt, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
-use futures::{
+use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
@@ -49,14 +46,6 @@ pub struct TcpSinkConfig {
     pub tls: Option<TlsConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct TlsConfig {
-    pub enabled: Option<bool>,
-    #[serde(flatten)]
-    pub options: TlsOptions,
-}
-
 impl TcpSinkConfig {
     pub fn new(address: String) -> Self {
         Self {
@@ -72,16 +61,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
 
-        let tls = match self.tls {
-            Some(ref tls) => {
-                if tls.enabled.unwrap_or(false) {
-                    Some(TlsSettings::from_options(&Some(tls.options.clone()))?)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        };
+        let tls = TlsSettings::from_config(&self.tls, false)?;
 
         let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(host, port, cx.resolver());
@@ -341,14 +321,14 @@ where
     type SinkItem = I;
     type SinkError = E;
 
-    fn start_send(&mut self, item: I) -> futures::StartSend<I, E> {
+    fn start_send(&mut self, item: I) -> futures01::StartSend<I, E> {
         match self {
             MaybeTlsStream::Raw(r) => r.start_send(item),
             MaybeTlsStream::Tls(t) => t.start_send(item),
         }
     }
 
-    fn poll_complete(&mut self) -> futures::Poll<(), E> {
+    fn poll_complete(&mut self) -> futures01::Poll<(), E> {
         match self {
             MaybeTlsStream::Raw(r) => r.poll_complete(),
             MaybeTlsStream::Tls(t) => t.poll_complete(),

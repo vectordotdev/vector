@@ -3,12 +3,12 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, Future};
+use futures01::{future, Future};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -151,7 +151,7 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Ndjson => {
-                let mut b = serde_json::to_vec(&event.unflatten())
+                let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                     .ok()?;
                 b.push(b'\n');
@@ -159,7 +159,7 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Json => {
-                let mut b = serde_json::to_vec(&event.unflatten())
+                let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                     .ok()?;
                 b.push(b',');
@@ -281,7 +281,7 @@ mod tests {
         topology::config::SinkContext,
     };
     use bytes::Buf;
-    use futures::{sync::mpsc, Future, Sink, Stream};
+    use futures01::{sync::mpsc, Future, Sink, Stream};
     use headers::{Authorization, HeaderMapExt};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
