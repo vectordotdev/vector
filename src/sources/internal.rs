@@ -6,10 +6,11 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::Future01CompatExt,
+    compat::{Future01CompatExt, Stream01CompatExt},
     future::{FutureExt, TryFutureExt},
+    stream::StreamExt,
 };
-use futures01::{sync::mpsc, Future, Sink, Stream};
+use futures01::{sync::mpsc, Future, Sink};
 use metrics_core::Key;
 use metrics_runtime::{Controller, Measurement};
 use serde::{Deserialize, Serialize};
@@ -60,15 +61,15 @@ async fn run(
     mut out: mpsc::Sender<Event>,
     mut tripwire: Tripwire,
 ) -> Result<(), ()> {
-    let mut interval = Interval::new_interval(Duration::from_secs(2));
-    loop {
+    let mut interval = Interval::new_interval(Duration::from_secs(2))
+        .compat()
+        .map(|_| ());
+
+    while let Some(()) = interval.next().await {
         // Check for shutdown signal
         if tripwire.poll().expect("polling tripwire").is_ready() {
-            return Ok(());
+            break;
         }
-
-        let (_, next) = interval.into_future().compat().await.expect("timers??");
-        interval = next;
 
         let metrics = controller
             .snapshot()
@@ -83,6 +84,8 @@ async fn run(
             .expect("sending??");
         out = sink;
     }
+
+    Ok(())
 }
 
 fn into_event(key: Key, measurement: Measurement) -> Event {
