@@ -12,6 +12,10 @@ use toml::Value;
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
+    /// Whether to skip the generation of global fields.
+    #[structopt(short, long)]
+    fragment: bool,
+
     /// Generate expression, e.g. 'stdin/json_parser,add_fields/console'
     ///
     /// Three comma-separated lists of sources, transforms and sinks, divided by
@@ -61,7 +65,7 @@ pub struct Config {
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-fn generate_example(expression: &str) -> Result<String, Vec<String>> {
+fn generate_example(include_globals: bool, expression: &str) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = expression
         .split(|c| c == '|' || c == '/')
         .map(|s| {
@@ -210,12 +214,16 @@ fn generate_example(expression: &str) -> Result<String, Vec<String>> {
         return Err(errs);
     }
 
-    let mut builder = match toml::to_string(&globals) {
-        Ok(s) => s,
-        Err(err) => {
-            errs.push(format!("failed to marshal globals: {}", err));
-            return Err(errs);
+    let mut builder = if include_globals {
+        match toml::to_string(&globals) {
+            Ok(s) => s,
+            Err(err) => {
+                errs.push(format!("failed to marshal globals: {}", err));
+                return Err(errs);
+            }
         }
+    } else {
+        String::new()
     };
     if let Some(sources) = config.sources {
         match toml::to_string(&{
@@ -256,7 +264,7 @@ fn generate_example(expression: &str) -> Result<String, Vec<String>> {
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match generate_example(&opts.expression) {
+    match generate_example(!opts.fragment, &opts.expression) {
         Ok(s) => {
             println!("{}", s);
             exitcode::OK
@@ -275,7 +283,7 @@ mod tests {
     #[test]
     fn generate_basic() {
         assert_eq!(
-            generate_example("stdin/json_parser/console"),
+            generate_example(true, "stdin/json_parser/console"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
@@ -308,7 +316,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example("stdin|json_parser|console"),
+            generate_example(true, "stdin|json_parser|console"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
@@ -341,7 +349,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example("stdin//console"),
+            generate_example(true, "stdin//console"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
@@ -368,7 +376,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example("//console"),
+            generate_example(true, "//console"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
@@ -391,7 +399,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example("/add_fields,json_parser,remove_fields"),
+            generate_example(true, "/add_fields,json_parser,remove_fields"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
@@ -400,6 +408,26 @@ message_key = "message"
 timestamp_key = "timestamp"
 host_key = "host"
 
+[transforms.transform0]
+inputs = []
+type = "add_fields"
+
+[transforms.transform1]
+inputs = ["transform0"]
+drop_field = true
+drop_invalid = false
+type = "json_parser"
+
+[transforms.transform2]
+inputs = ["transform1"]
+type = "remove_fields"
+"#
+            .to_string())
+        );
+
+        assert_eq!(
+            generate_example(false, "/add_fields,json_parser,remove_fields"),
+            Ok(r#"
 [transforms.transform0]
 inputs = []
 type = "add_fields"
