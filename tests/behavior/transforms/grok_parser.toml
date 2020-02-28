@@ -11,7 +11,6 @@
   [[tests.outputs]]
     extract_from = "grok_parser_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "timestamp.equals" = "12/Dec/2015:18:32:56 +0100"
       "message.equals" = "hello"
 
@@ -28,6 +27,5 @@
   [[tests.outputs]]
     extract_from = "grok_parser_nested"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "nested.timestamp.equals" = "12/Dec/2015:18:32:56 +0100"
       "doubly.nested.message.equals" = "hello"

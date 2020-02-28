@@ -286,8 +286,9 @@ pub struct TestOutput {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum TestCondition {
-    String(String),
     Embedded(Box<dyn conditions::ConditionConfig>),
+    NoTypeEmbedded(conditions::CheckFieldsConfig),
+    String(String),
 }
 
 // Helper methods for programming construction during tests

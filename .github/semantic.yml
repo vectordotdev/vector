@@ -45,12 +45,14 @@ scopes:
   - centos platform
   - debian platform
   - macos platform
+  - nixos platform
   - raspbian platform
   - rhel platform
   - ubuntu platform
   - windows platform
   - dpkg platform
   - homebrew platform
+  - nix platform
   - rpm platform
   - msi platform
 

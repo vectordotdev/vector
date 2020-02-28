@@ -13,7 +13,6 @@
   [[tests.outputs]]
     extract_from = "remove_fields_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "a.exists" = false
       "b.equals" = 4
 
@@ -32,6 +31,5 @@
   [[tests.outputs]]
     extract_from = "remove_fields_nested"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "a.b.equals" = 3
       "a.c.exists" = false
