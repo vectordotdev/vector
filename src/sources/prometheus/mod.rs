@@ -83,6 +83,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
     Box::new(task)
 }
 
+#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use super::*;

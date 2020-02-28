@@ -17,3 +17,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: "cd tests && make test-behavior"
+  check-component-features:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - run: "cd tests && make check-component-features"

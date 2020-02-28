@@ -1,5 +1,5 @@
 use crate::{
-    conditions::Condition,
+    conditions::{Condition, ConditionConfig},
     event::{Event, Value},
     runtime::Runtime,
     topology::config::{
@@ -447,6 +447,17 @@ fn build_unit_test(
                             ));
                         }
                     },
+                    TestCondition::NoTypeEmbedded(n) => match n.build() {
+                        Ok(c) => {
+                            conditions.push(c);
+                        }
+                        Err(e) => {
+                            errors.push(format!(
+                                "failed to create test condition '{}': {}",
+                                index, e,
+                            ));
+                        }
+                    },
                     TestCondition::String(_s) => {
                         errors.push(format!(
                             "failed to create test condition '{}': condition references are not yet supported",
@@ -507,7 +518,11 @@ pub fn build_unit_tests(config: &mut super::Config) -> Result<Vec<UnitTest>, Vec
     }
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "transforms-add_fields",
+    feature = "transforms-swimlanes"
+))]
 mod tests {
     use super::*;
     use crate::topology::config::Config;

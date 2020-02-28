@@ -1,11 +1,10 @@
 [<%= namespace %>.type]
 type = "string"
 required = true
-examples = ["check_fields"]
+examples = ["check_fields", "is_log", "is_metric"]
 common = true
 description = """\
-The type of the condition to execute. Currently only the `check_fields` type is \
-available.\
+The type of the condition to execute.\
 """
 
 [<%= namespace %>."`<field_name>`.eq"]
@@ -14,6 +13,7 @@ examples = [
   { "message.eq" = "this is the content to match against" }
 ]
 common = true
+relevant_when = {type = "check_fields"}
 description = """\
 Check whether a fields contents exactly matches the value specified.\
 """
@@ -24,6 +24,7 @@ examples = [
   { "method.neq" = "POST" }
 ]
 common = true
+relevant_when = {type = "check_fields"}
 description = """\
 Check whether a fields contents does not match the value specified.\
 """
@@ -34,6 +35,7 @@ examples = [
   { "host.exists" = true }
 ]
 common = true
+relevant_when = {type = "check_fields"}
 description = """\
 Check whether a field exists or does not exist, depending on the provided value\
 being `true` or `false` respectively.\

@@ -126,6 +126,9 @@
 - name: "platform: macos"
   description: Anything MacOS related
   color: ff9ff3
+- name: "platform: nixos"
+  description: Anything NixOS related
+  color: ff9ff3
 - name: "platform: raspbian"
   description: Anything Raspbian related
   color: ff9ff3
@@ -143,6 +146,9 @@
   color: ff9ff3
 - name: "platform: homebrew"
   description: Anything Homebrew related
+  color: ff9ff3
+- name: "platform: nix"
+  description: Anything Nix related
   color: ff9ff3
 - name: "platform: rpm"
   description: Anything RPM related

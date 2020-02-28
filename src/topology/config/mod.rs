@@ -286,8 +286,9 @@ pub struct TestOutput {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum TestCondition {
-    String(String),
     Embedded(Box<dyn conditions::ConditionConfig>),
+    NoTypeEmbedded(conditions::CheckFieldsConfig),
+    String(String),
 }
 
 // Helper methods for programming construction during tests
@@ -499,7 +500,7 @@ fn healthcheck_default() -> bool {
     true
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod test {
     use super::Config;
     use std::path::PathBuf;

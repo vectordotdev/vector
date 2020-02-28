@@ -529,7 +529,7 @@ fn handle_errors(
         })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
 mod tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::socket::SocketConfig;

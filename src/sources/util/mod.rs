@@ -1,7 +1,8 @@
+#![cfg(feature = "sources-socket")]
 mod tcp;
-#[cfg(unix)]
+#[cfg(all(unix))]
 mod unix;
 
 pub use tcp::{SocketListenAddr, TcpSource};
-#[cfg(unix)]
+#[cfg(all(unix))]
 pub use unix::build_unix_source;
