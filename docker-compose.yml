@@ -402,6 +402,8 @@ services:
         dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
+        TEST_LOG: debug
+        RUST_BACKTRACE: full
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
@@ -418,6 +420,8 @@ services:
         CARGO_TERM_COLOR: always
         AWS_ACCESS_KEY_ID: dummy
         AWS_SECRET_ACCESS_KEY: dummy
+        TEST_LOG: debug
+        RUST_BACKTRACE: full
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
