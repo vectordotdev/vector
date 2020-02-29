@@ -222,7 +222,7 @@ impl Transform for TagCardinalityLimit {
 #[cfg(test)]
 mod tests {
     use super::{LimitExceededAction, TagCardinalityLimit, TagCardinalityLimitConfig};
-    use crate::transforms::cardinality_limit::{BloomFilterConfig, Mode};
+    use crate::transforms::tag_cardinality_limit::{BloomFilterConfig, Mode};
     use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
     use std::collections::BTreeMap;
 
