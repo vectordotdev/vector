@@ -33,7 +33,7 @@ Examples of changes that do not require a RFC:
 
 1. Search Github for previous issues and RFCs on this topic.
 2. Open an issue representing the change for light discussion.
-3. In the isuee, obtain consensus that a RFC is necessary.  
+3. In the isuee, obtain consensus that a RFC is necessary.
    * The change might get quickly rejected.
    * The change might be on our long term roadmap and get deferred.
    * The change might be blocked by other work.
