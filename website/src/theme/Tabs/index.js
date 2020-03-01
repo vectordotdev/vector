@@ -53,19 +53,47 @@ function Tabs(props) {
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location && urlKey) {
-      let queryObj = queryString.parse(window.location.search);
+    if (!urlKey) {
+      return;
+    }
 
-      if (queryObj[urlKey])
-        setSelectedValue(queryObj[urlKey]);
+    function loadSelectedValue() {
+      if (typeof window !== 'undefined' && window.location) {
+        let queryObj = queryString.parse(window.location.search);
+
+        if (queryObj[urlKey])
+          setSelectedValue(queryObj[urlKey]);
+      }
+    }
+
+    loadSelectedValue();
+    window.addEventListener('pushstate', loadSelectedValue);
+
+    return () => {
+      window.removeEventListener('pushstate', loadSelectedValue);
     }
   }, []);
+
+  function onSelectedValue(selectedValue) {
+    if (urlKey) {
+      let queryObj = queryString.parse(window.location.search);
+
+      if (queryObj[urlKey] !== selectedValue) {
+        queryObj[urlKey] = selectedValue;
+
+        let search = queryString.stringify(queryObj);
+        window.history.replaceState(null, null, `${window.location.pathname}?${search}`);
+        window.dispatchEvent(new Event('pushstate'));
+      }
+    }
+    return setSelectedValue(selectedValue);
+  }
 
   return (
     <div>
       {values.length > 1 && (select ?
-        <SelectSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
-        <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
+        <SelectSwitcher selectedValue={selectedValue} setSelectedValue={onSelectedValue} {...props} /> :
+        <ListSwitcher selectedValue={selectedValue} setSelectedValue={onSelectedValue} {...props} />)}
       <div className="margin-vert--md">
         {
           Children.toArray(children).filter(

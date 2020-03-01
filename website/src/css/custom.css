@@ -763,6 +763,34 @@ ul.list--warnings > li {
 }
 
 /**
+ * list--infos
+ *
+ * Generic list with info signs as list styles.
+ */
+
+div.list--infos > ul,
+ul.list--infos {
+  list-style: none;
+  margin-left: 1em;
+  padding-left: 1em;
+}
+div.list--infos > ul > li:before,
+ul.list--infos > li:before {
+  content: "ℹ";
+  display: block;
+  float: left;
+  font-size: 1.25em;
+  font-weight: bold;
+  margin-left: -1.6em;
+  margin-top: -0.2em;
+}
+div.list--infos > ul > li,
+ul.list--infos > li {
+  margin: 0 0 1em 0;
+  padding: 0;
+}
+
+/**
  * menu
  *
  * Menu styling generally used as a navigation menu, such a the left-side

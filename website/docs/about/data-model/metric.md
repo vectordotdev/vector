@@ -32,6 +32,7 @@ import TabItem from '@theme/TabItem';
 <Tabs
   defaultValue="counter"
   select={true}
+  urlKey="kind"
   values={[
     { label: 'Counter', value: 'counter', },
     { label: 'Gauge', value: 'gauge', },

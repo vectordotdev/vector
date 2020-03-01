@@ -38,6 +38,7 @@ Steps](#next-steps) section.
 <Tabs
   block={true}
   defaultValue="linux"
+  urlKey="method"
   values={[
     { label: 'Linux', value: 'linux'},
     { label: 'Windows', value: 'windows'},
@@ -222,22 +223,22 @@ Building steps:
 2.  Build Vector using Docker
 
     <Tabs
-      defaultValue="x86_64-unknown-linux-musl"
-      urlKey="file_name"
+      defaultValue="x86_64"
+      urlKey="arch"
       values={
       [{
         "label":"Linux (x86_64)",
-        "value":"x86_64-unknown-linux-musl"
+        "value":"x86_64"
       }, {
         "label":"Linux (ARM64)",
-        "value":"aarch64-unknown-linux-musl"
+        "value":"ARM64"
       },{
         "label":"Linux (ARMv7)",
-        "value":"armv7-unknown-linux-musleabihf"
+        "value":"ARMv7"
       }]
       }>
 
-    <TabItem value="x86_64-unknown-linux-musl">
+    <TabItem value="x86_64">
 
     ```bash
     PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build
@@ -245,7 +246,7 @@ Building steps:
 
     </TabItem>
 
-    <TabItem value="aarch64-unknown-linux-musl">
+    <TabItem value="ARM64">
 
     ```bash
     PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-aarch64-unknown-linux-musl make build
@@ -253,7 +254,7 @@ Building steps:
 
     </TabItem>
 
-    <TabItem value="armv7-unknown-linux-musleabihf">
+    <TabItem value="ARMv7">
 
     ```bash
     PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-armv7-unknown-linux-musleabihf make build
