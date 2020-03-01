@@ -20,8 +20,8 @@ Examples of changes that require a RFC:
 * A new component that introduces new behavior.
 * Removing a feature.
 * Complicated tech-debt projects.
-* A substantial use visible change.
-* A change that questionable is outside of the scope of Vector.
+* A substantial user-visible change.
+* A change that is questionably outside of the scope of Vector.
 
 Examples of changes that do not require a RFC:
 
