@@ -27,7 +27,7 @@ enum BuildError {
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
@@ -49,9 +49,11 @@ fn default_message_timeout_ms() -> u64 {
     300000 // default in librdkafka
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
@@ -320,11 +322,10 @@ mod integration_test {
             bootstrap_servers: server.to_string(),
             topic: topic.clone(),
             encoding: Encoding::Text,
-            key_field: None,
             tls,
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            librdkafka_options: None,
+            ..Default::default()
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
