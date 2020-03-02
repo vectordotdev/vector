@@ -214,7 +214,7 @@ for your dataset, you can do so with these formulas:
 When using `fields.match`:
 Sum(the average size of the *data* (but not including the field name) for each field in `fields.match`) * `cache.num_entries`
 
-When using `fields.match`:
+When using `fields.ignore`:
 (Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_entries`
 
 
