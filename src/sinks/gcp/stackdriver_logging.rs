@@ -3,7 +3,9 @@ use crate::{
     event::{Event, LogEvent},
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
+            encoding::{
+                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
+            },
             http::{https_client, HttpRetryLogic, HttpService},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },

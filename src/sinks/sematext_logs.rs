@@ -1,7 +1,7 @@
 use crate::{
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         BatchBytesConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

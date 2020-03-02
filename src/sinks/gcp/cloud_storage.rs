@@ -3,7 +3,9 @@ use crate::{
     event::{self, Event},
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
+            encoding::{
+                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
+            },
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,

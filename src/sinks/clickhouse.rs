@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration, skip_serializing_if_default},
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,

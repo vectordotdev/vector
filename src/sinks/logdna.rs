@@ -3,8 +3,8 @@ use crate::{
     event::{self, Event},
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, skip_serializing_if_default}, BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
-        TowerRequestConfig, UriSerde,
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

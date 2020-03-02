@@ -1,6 +1,9 @@
 use crate::{
     sinks::splunk_hec::{Encoding, HecSinkConfig},
-    sinks::util::{encoding::{EncodingConfigWithDefault, skip_serializing_if_default}, BatchBytesConfig, TowerRequestConfig},
+    sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        BatchBytesConfig, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
