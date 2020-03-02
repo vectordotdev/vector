@@ -1,7 +1,8 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    kafka::KafkaTlsConfig,
+    kafka::{KafkaCompression, KafkaTlsConfig},
+    serde::to_string,
     sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -33,6 +34,7 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
+    compression: Option<KafkaCompression>,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
@@ -99,6 +101,10 @@ impl KafkaSinkConfig {
         if let Some(tls) = &self.tls {
             tls.apply(&mut client_config)?;
         }
+        client_config.set(
+            "compression.codec",
+            &to_string(self.compression.unwrap_or(KafkaCompression::default())),
+        );
         client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
         client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
         if let Some(ref librdkafka_options) = self.librdkafka_options {

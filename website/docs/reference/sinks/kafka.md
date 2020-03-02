@@ -54,6 +54,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding = "json" # example, enum
 
   # OPTIONAL - General
+  compression = "none" # default, enum
   healthcheck = true # default
 ```
 
@@ -75,6 +76,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding = "json" # example, enum
 
   # OPTIONAL - General
+  compression = "none" # default, enum
   healthcheck = true # default
   message_timeout_ms = 300000 # default
   socket_timeout_ms = 60000 # default
@@ -265,6 +267,29 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
+  examples={["none","gzip"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### compression
+
+Compression codec to use for compressing message sets
+
 
 </Field>
 
