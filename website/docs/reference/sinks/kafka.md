@@ -82,6 +82,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Advanced
   [sinks.my_sink_id.librdkafka_options]
     "client.id" = "${ENV_VAR}" # example
+    "fetch.error.backoff.ms" = "1000" # example
     "socket.send.buffer.bytes" = "100" # example
 
   # OPTIONAL - Buffer
@@ -143,7 +144,7 @@ import Field from '@site/src/components/Field';
 
 ### bootstrap_servers
 
-A comma delimited list of host and port pairs that the Kafka client should contact to bootstrap its cluster metadata.
+A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
 
 
 </Field>
@@ -354,7 +355,7 @@ The log field name to use for the topic key. If unspecified, the key will be ran
 
 ### librdkafka_options
 
-Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced options. See [the [`librdkafka`](#librdkafka) documentation][urls.lib_rdkafka_config] for details.
 
 
 <Fields filters={false}>
@@ -364,7 +365,7 @@ Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"socket.send.buffer.bytes":"100"}]}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}

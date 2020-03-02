@@ -77,6 +77,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sources.my_source_id.librdkafka_options]
     "client.id" = "${ENV_VAR}" # example
     "fetch.error.backoff.ms" = "1000" # example
+    "socket.send.buffer.bytes" = "100" # example
 
   # OPTIONAL - Tls
   [sources.my_source_id.tls]
@@ -244,7 +245,7 @@ The log field name to use for the topic key. If unspecified, the key would not b
 
 ### librdkafka_options
 
-Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced options. See [the [`librdkafka`](#librdkafka) documentation][urls.lib_rdkafka_config] for details.
 
 
 <Fields filters={false}>
@@ -254,7 +255,7 @@ Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"}]}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}
