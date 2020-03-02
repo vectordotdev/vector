@@ -200,9 +200,8 @@ impl Transform for TagCardinalityLimit {
                         }
                     }
                     LimitExceededAction::DropTag => {
-                        let tags_map_clone = tags_map.clone();
                         let mut to_delete = Vec::new();
-                        for (key, value) in &tags_map_clone {
+                        for (key, value) in tags_map.iter() {
                             if !self.try_accept_tag(key, value) {
                                 info!(
                                     message =
@@ -211,11 +210,11 @@ impl Transform for TagCardinalityLimit {
                                     tag_value = value.as_str(),
                                     rate_limit_secs = 10,
                                 );
-                                to_delete.push(key);
+                                to_delete.push(key.clone());
                             }
                         }
                         for key in to_delete {
-                            tags_map.remove(key);
+                            tags_map.remove(&key);
                         }
                     }
                 }
