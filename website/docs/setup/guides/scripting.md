@@ -10,8 +10,8 @@ import TabItem from '@theme/TabItem';
 import Alert from '@site/src/components/Alert';
 import CodeHeader from '@site/src/components/CodeHeader';
 
-When it happens that the built-in [transforms][docs.reference.transforms] are not expressive enough for you needs,
-it is possible to define your own transformation logic using Vector's scripted transforms.
+When Vector's built-in [transforms][docs.reference.transforms] are not expressive enough for you needs,
+it is possible to define your own transformation logic using scripted transforms.
 
 Currently there are two supported scripted transforms, [`lua`][docs.reference.transforms.lua] and
 [`javascript`][docs.reference.transforms.lua]. For most use cases they can be used interchangeably, so one
