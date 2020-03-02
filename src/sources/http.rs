@@ -1,12 +1,12 @@
 use crate::{
-    event::{self, flatten::flatten, Event},
+    event::{self, Event},
     sources::util::{ErrorMessage, HttpSource},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
 use codec::{self, BytesDelimitedCodec};
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
@@ -136,10 +136,12 @@ fn decode_body(buf: FullBody, enc: Encoding) -> Result<Vec<Event>, ErrorMessage>
 fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
-    log.insert(event::TIMESTAMP.clone(), Utc::now()); // Add timestamp
+    log.insert(event::log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
     match value {
         JsonValue::Object(map) => {
-            flatten(log, map);
+            for (k, v) in map {
+                log.insert(k, v);
+            }
             Ok(event)
         }
         _ => Err(json_error(format!(
@@ -191,7 +193,7 @@ mod tests {
         test_util::{self, collect_n},
         topology::config::{GlobalOptions, SourceConfig},
     };
-    use futures::sync::mpsc;
+    use futures01::sync::mpsc;
     use http::Method;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
@@ -251,14 +253,17 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&event::MESSAGE], "test body".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert_eq!(log[&event::log_schema().message_key()], "test body".into());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&event::MESSAGE], "test body 2".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert_eq!(
+                log[&event::log_schema().message_key()],
+                "test body 2".into()
+            );
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
     }
 
@@ -276,14 +281,17 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&event::MESSAGE], "test body".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert_eq!(log[&event::log_schema().message_key()], "test body".into());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&event::MESSAGE], "test body 2".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert_eq!(
+                log[&event::log_schema().message_key()],
+                "test body 2".into()
+            );
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
     }
 
@@ -299,8 +307,16 @@ mod tests {
         assert_eq!(200, send(addr, "[{},{},{}]"));
 
         let mut events = rt.block_on(collect_n(rx, 2)).unwrap();
-        assert!(events.remove(1).as_log().get(&event::TIMESTAMP).is_some());
-        assert!(events.remove(0).as_log().get(&event::TIMESTAMP).is_some());
+        assert!(events
+            .remove(1)
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
+        assert!(events
+            .remove(0)
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -316,13 +332,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key")], "value".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
     }
 
@@ -343,13 +359,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
     }
 
@@ -386,7 +402,7 @@ mod tests {
                 "false".into()
             );
             assert_eq!(log[&Atom::from("AbsentHeader")], "".into());
-            assert!(log.get(&event::TIMESTAMP).is_some());
+            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
         }
     }
 }

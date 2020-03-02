@@ -1,5 +1,5 @@
 use crate::event::Event;
-use futures::{sync::mpsc, Future, IntoFuture, Sink};
+use futures01::{sync::mpsc, Future, IntoFuture, Sink};
 use serde::Serialize;
 use std::error::Error;
 use std::fmt::{self, Display};
@@ -65,7 +65,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     .map_err(warp::reject::custom)
                     .into_future()
                     .and_then(|events| {
-                        out.send_all(futures::stream::iter_ok(events)).map_err(
+                        out.send_all(futures01::stream::iter_ok(events)).map_err(
                             move |e: mpsc::SendError<Event>| {
                                 //can only fail if receiving end disconnected, so shut down and make some error logs
                                 error!("Failed to forward events, downstream is closed");
