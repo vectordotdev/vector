@@ -441,6 +441,9 @@ dns_servers = ["0.0.0.0:53"]
   # * enum: "none", "gzip", "lz4", "snappy", and "zstd"
   compression = "none"
   compression = "gzip"
+  compression = "lz4"
+  compression = "snappy"
+  compression = "zstd"
 
   # Maximum time the broker may wait to fill the response.
   #
@@ -5391,6 +5394,9 @@ end
   # * enum: "none", "gzip", "lz4", "snappy", and "zstd"
   compression = "none"
   compression = "gzip"
+  compression = "lz4"
+  compression = "snappy"
+  compression = "zstd"
 
   # Enables/disables the sink healthcheck upon start.
   #

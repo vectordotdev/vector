@@ -12,7 +12,6 @@ to initially to bootstrap itself.\
 [<%= namespace %>.options.compression]
 type = "string"
 common = true
-examples = ["none","gzip"]
 default = "none"
 required = false
 description = "Compression codec to use for compressing message sets"

@@ -275,7 +275,7 @@ The behavior when the buffer becomes full.
   common={true}
   defaultValue={"none"}
   enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
-  examples={["none","gzip"]}
+  examples={["none","gzip","lz4","snappy","zstd"]}
   groups={[]}
   name={"compression"}
   path={null}
