@@ -33,7 +33,7 @@
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
 use crate::{event::Value, Event, Result};
-use nom::lib::std::collections::VecDeque;
+use std::collections::VecDeque;
 use serde::de::{MapAccess, Visitor};
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer},
@@ -320,6 +320,7 @@ where
     E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq + Default,
 {
     // Derived from https://serde.rs/string-or-struct.html
+    #[allow(dead_code)] // For supporting `--no-default-features`
     pub(crate) fn from_deserializer<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
