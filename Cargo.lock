@@ -482,7 +482,7 @@ dependencies = [
  "oorandom",
  "plotters",
  "rayon",
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_derive",
  "serde_json",
@@ -795,7 +795,7 @@ dependencies = [
  "atty",
  "humantime",
  "log 0.4.8",
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "termcolor",
 ]
 
@@ -808,7 +808,7 @@ dependencies = [
  "atty",
  "humantime",
  "log 0.4.8",
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "termcolor",
 ]
 
@@ -2571,7 +2571,7 @@ dependencies = [
  "rand 0.6.5",
  "rand_chacha 0.1.1",
  "rand_xorshift",
- "regex-syntax",
+ "regex-syntax 0.6.14",
  "rusty-fork",
  "tempfile",
 ]
@@ -2637,7 +2637,7 @@ dependencies = [
  "error-chain",
  "idna 0.2.0",
  "lazy_static",
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 2.1.1",
 ]
 
@@ -2967,12 +2967,23 @@ dependencies = [
 [[package]]
 name = "regex"
 version = "1.3.4"
+source = "git+https://github.com/timberio/regex?branch=extend-group-names#f4b9ea7315ef2fc7bf161adff15d06328e46a036"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax 0.6.15",
+ "thread_local",
+]
+
+[[package]]
+name = "regex"
+version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322cf97724bea3ee221b78fe25ac9c46114ebb51747ad5babd51a2fc6a8235a8"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-syntax",
+ "regex-syntax 0.6.14",
  "thread_local",
 ]
 
@@ -2983,7 +2994,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92b73c2a1770c255c240eaa4ee600df1704a38dc3feaa6e949e7fcd4f8dc09f9"
 dependencies = [
  "byteorder",
- "regex-syntax",
+ "regex-syntax 0.6.14",
  "utf8-ranges",
 ]
 
@@ -2992,6 +3003,11 @@ name = "regex-syntax"
 version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28dfe3fe9badec5dbf0a79a9cccad2cfc2ab5484bdb3e44cbd1ae8b3ba2be06"
+
+[[package]]
+name = "regex-syntax"
+version = "0.6.15"
+source = "git+https://github.com/timberio/regex?branch=extend-group-names#f4b9ea7315ef2fc7bf161adff15d06328e46a036"
 
 [[package]]
 name = "remove_dir_all"
@@ -3111,7 +3127,7 @@ dependencies = [
  "dirs 1.0.5",
  "futures 0.1.29",
  "hyper",
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_derive",
  "serde_json",
@@ -3280,7 +3296,7 @@ version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf737f37ca340201889b5f48ecde47f233e9da3cbf3d04be27883adac39b4da"
 dependencies = [
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -4424,7 +4440,7 @@ dependencies = [
  "chrono",
  "lazy_static",
  "matchers",
- "regex",
+ "regex 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "sharded-slab",
@@ -4833,7 +4849,7 @@ dependencies = [
  "prost-types",
  "rand 0.5.6",
  "rdkafka",
- "regex",
+ "regex 1.3.4 (git+https://github.com/timberio/regex?branch=extend-group-names)",
  "reqwest",
  "rlua",
  "rusoto_cloudwatch",
