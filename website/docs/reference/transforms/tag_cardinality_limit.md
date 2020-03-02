@@ -32,10 +32,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "tag_cardinality_limit" # must be: "tag_cardinality_limit"
   inputs = ["my-source-id"] # example
-  mode = "hash_set" # example, enum
+  mode = "exact" # example, enum
 
   # OPTIONAL
-  false_positive_rate = 1.0e-05 # default, relevant when mode = "bloom_filter"
+  false_positive_rate = 1.0e-05 # default, relevant when mode = "probabilistic"
   limit_exceeded_action = "drop_tag" # default, enum
   value_limit = 500 # default
 ```
@@ -58,7 +58,7 @@ import Field from '@site/src/components/Field';
   groups={[]}
   name={"false_positive_rate"}
   path={null}
-  relevantWhen={{"mode":"bloom_filter"}}
+  relevantWhen={{"mode":"probabilistic"}}
   required={false}
   templateable={false}
   type={"float"}
@@ -99,8 +99,8 @@ Controls what should happen when a metric comes in with a tag that would exceed 
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"hash_set":"Uses a HashSet internally to keep track of previously seen tag values. Has higher memory requirements than `bloom_filter`, but never falsely outputs metrics with new tags after the limit has been hit.","bloom_filter":"Uses a BloomFilter internally to keep track of previously seen tag values. Has lower memory requirements than `hash_set`, but may occassionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of [`false_positive_rate`](#false_positive_rate)."}}
-  examples={["hash_set","bloom_filter"]}
+  enumValues={{"exact":"Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit.","probabilistic":"Has lower memory requirements than `exact`, but may occassionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of [`false_positive_rate`](#false_positive_rate)."}}
+  examples={["exact","probabilistic"]}
   groups={[]}
   name={"mode"}
   path={null}
@@ -161,20 +161,20 @@ section.
 ### Memory Utilization
 
 This transform stores in memory a copy of the key for every tag on every metric
-event seen by this transform.  In mode `hash_set`, a copy of every distinct
+event seen by this transform.  In mode `exect`, a copy of every distinct
 value *for each key* is also kept in memory, until [`value_limit`](#value_limit) distinct values
 have been seen for a given key, at which point new values for that key will be
-rejected.  So to estimate the memory usage of this transform in mode `hash_set`
+rejected.  So to estimate the memory usage of this transform in mode `exact`
 you can use the following formula:
 (number of distinct field names in the tags for your metrics * average length of
 the field names for the tags) + (number of distinct field names in the tags of
 your metrics * [`value_limit`](#value_limit) * average length of the values of tags for your
 metrics)
 
-In mode `bloom_filter`, rather than storing all values seen for each key, each
+In mode `probabilistic`, rather than storing all values seen for each key, each
 distinct key has a bloom filter which can probabilistically determine whether
 a given value has been seen for that key.  The formula for estimating memory
-usage in mode `bloom_filter` is:
+usage in mode `probabilistic` is:
 (number of distinct field names in the tags for your metrics * average length of
 the field names for the tags) + (number of distinct field names in the tags of
 your metrics * size of each bloom filter)
@@ -192,7 +192,7 @@ You should be able to provide values for just 'n' and 'p' and get back the
 value for 'm' with an optional 'k' selected for you.  The value of 'm' that
 the calculator gives you will tell you the memory usage required by each
 bloom filter in this transform.  Generally speaking this mode should require
-much less memory than mode `hash_set`.
+much less memory than mode `exact`.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

@@ -40,14 +40,12 @@ tags and deterime when a tag on an incoming metric exceeds the limit.\
 """
 
 [transforms.tag_cardinality_limit.options.mode.enum]
-hash_set = """\
-Uses a HashSet internally to keep track of previously seen tag values. Has \
-higher memory requirements than `bloom_filter`, but never falsely outputs \
+exact = """\
+Has higher memory requirements than `probabilistic`, but never falsely outputs \
 metrics with new tags after the limit has been hit.\
 """
-bloom_filter= """\
-Uses a BloomFilter internally to keep track of previously seen tag values. \
-Has lower memory requirements than `hash_set`, but may occassionally allow \
+probabilistic = """\
+Has lower memory requirements than `exact`, but may occassionally allow \
 metric events to pass through the transform even when they contain new tags \
 that exceed the configured limit.  The rate at which this happens can be \
 controlled by changing the value of `false_positive_rate`.\
@@ -58,7 +56,7 @@ type = "float"
 common = true
 default = 0.00001
 examples = [0.00001]
-relevant_when = {mode = "bloom_filter"}
+relevant_when = {mode = "probabilistic"}
 description = """\
 Controls how likely it is that a metric with a new tag after the limit has \
 been reached isn't caught by the transform. Lower values make this less likely \

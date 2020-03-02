@@ -24,8 +24,8 @@ pub struct TagCardinalityLimitConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
-    HashSet,
-    BloomFilter(BloomFilterConfig),
+    Exact,
+    Probabilistic(BloomFilterConfig),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -95,11 +95,11 @@ enum TagValueSetStorage {
 impl TagValueSet {
     fn new(value_limit: u32, mode: &Mode) -> Self {
         match &mode {
-            Mode::HashSet => Self {
+            Mode::Exact => Self {
                 storage: TagValueSetStorage::Set(HashSet::with_capacity(value_limit as usize)),
                 num_elements: 0,
             },
-            Mode::BloomFilter(config) => Self {
+            Mode::Probabilistic(config) => Self {
                 storage: TagValueSetStorage::Bloom(BloomFilter::with_rate(
                     config.false_positive_rate,
                     value_limit,
@@ -249,7 +249,7 @@ mod tests {
         TagCardinalityLimit::new(TagCardinalityLimitConfig {
             value_limit,
             limit_exceeded_action,
-            mode: Mode::HashSet,
+            mode: Mode::Exact,
         })
     }
 
@@ -268,7 +268,7 @@ mod tests {
         TagCardinalityLimit::new(TagCardinalityLimitConfig {
             value_limit,
             limit_exceeded_action,
-            mode: Mode::BloomFilter(BloomFilterConfig {
+            mode: Mode::Probabilistic(BloomFilterConfig {
                 false_positive_rate,
             }),
         })

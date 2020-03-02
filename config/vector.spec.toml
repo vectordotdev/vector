@@ -1877,9 +1877,9 @@ end
   #
   # * required
   # * type: string
-  # * enum: "hash_set" or "bloom_filter"
-  mode = "hash_set"
-  mode = "bloom_filter"
+  # * enum: "exact" or "probabilistic"
+  mode = "exact"
+  mode = "probabilistic"
 
   # Controls how likely it is that a metric with a new tag after the limit has
   # been reached isn't caught by the transform. Lower values make this less
@@ -1888,7 +1888,7 @@ end
   # * optional
   # * default: 1.0e-05
   # * type: float
-  # * relevant when mode = "bloom_filter"
+  # * relevant when mode = "probabilistic"
   false_positive_rate = 1.0e-05
 
   # Controls what should happen when a metric comes in with a tag that would
