@@ -66,6 +66,21 @@ pub struct CloudwatchLogsSinkConfig {
     pub assume_role: Option<String>,
 }
 
+#[cfg(test)]
+fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
+    CloudwatchLogsSinkConfig {
+        group_name: Default::default(),
+        stream_name: Default::default(),
+        region: Default::default(),
+        encoding: e.into(),
+        create_missing_group: Default::default(),
+        create_missing_stream: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        assume_role: Default::default(),
+    }
+}
+
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         ..Default::default()
@@ -102,9 +117,8 @@ pub struct CloudwatchLogsPartitionSvc {
     resolver: Resolver,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
     Text,
     Json,
@@ -693,7 +707,7 @@ mod tests {
     fn cloudwatch_encoded_event_retains_timestamp() {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = svc(Default::default()).encode_log(event.clone());
+        let encoded = svc(default_config(Encoding::Json)).encode_log(event.clone());
 
         let ts = if let Value::Timestamp(ts) = event[&event::log_schema().timestamp_key()] {
             ts.timestamp_millis()
@@ -706,10 +720,7 @@ mod tests {
 
     #[test]
     fn cloudwatch_encode_log_as_json() {
-        let config = CloudwatchLogsSinkConfig {
-            encoding: Encoding::Json.into(),
-            ..Default::default()
-        };
+        let config = default_config(Encoding::Json);
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
@@ -719,10 +730,7 @@ mod tests {
 
     #[test]
     fn cloudwatch_encode_log_as_text() {
-        let config = CloudwatchLogsSinkConfig {
-            encoding: Encoding::Text.into(),
-            ..Default::default()
-        };
+        let config = default_config(Encoding::Text);
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
         let encoded = svc(config).encode_log(event.clone());
@@ -764,6 +772,7 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: GROUP_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            encoding: Encoding::Json.into(),
             ..Default::default()
         };
 

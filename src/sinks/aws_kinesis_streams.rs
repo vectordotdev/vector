@@ -63,7 +63,7 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
+    SinkDescription::new_without_default::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
 #[typetag::serde(name = "aws_kinesis_streams")]

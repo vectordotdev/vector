@@ -32,7 +32,14 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                     sinks::http::HttpSinkConfig {
                         uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                         compression: Some(sinks::util::Compression::None),
-                        ..Default::default()
+                        method: Default::default(),
+                        healthcheck_uri: Default::default(),
+                        auth: Default::default(),
+                        headers: Default::default(),
+                        batch: Default::default(),
+                        encoding: sinks::http::Encoding::Text.into(),
+                        request: Default::default(),
+                        tls: Default::default(),
                     },
                 );
 
@@ -82,7 +89,15 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                     &["in"],
                     sinks::http::HttpSinkConfig {
                         uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
-                        ..Default::default()
+                        compression: Default::default(),
+                        method: Default::default(),
+                        healthcheck_uri: Default::default(),
+                        auth: Default::default(),
+                        headers: Default::default(),
+                        batch: Default::default(),
+                        encoding: sinks::http::Encoding::Text.into(),
+                        request: Default::default(),
+                        tls: Default::default(),
                     },
                 );
 

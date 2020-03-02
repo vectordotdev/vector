@@ -34,7 +34,7 @@ enum BuildError {
     },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
@@ -43,17 +43,29 @@ pub struct HttpSinkConfig {
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
-    #[serde(
-        deserialize_with = "EncodingConfig::from_deserializer",
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+#[cfg(test)]
+fn default_config(e: Encoding) -> HttpSinkConfig {
+    HttpSinkConfig {
+        uri: Default::default(),
+        method: Default::default(),
+        healthcheck_uri: Default::default(),
+        auth: Default::default(),
+        headers: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        encoding: e.into(),
+        request: Default::default(),
+        tls: Default::default(),
+    }
 }
 
 lazy_static! {
@@ -83,7 +95,7 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new::<HttpSinkConfig>("http")
+    SinkDescription::new_without_default::<HttpSinkConfig>("http")
 }
 
 #[typetag::serde(name = "http")]
@@ -299,7 +311,7 @@ mod tests {
         let encoding = EncodingConfig::from(Encoding::Text);
         let event = Event::from("hello world");
 
-        let mut config = HttpSinkConfig::default();
+        let mut config = default_config(Encoding::Text);
         config.encoding = encoding.clone();
         let bytes = config.encode_event(event).unwrap();
 
@@ -311,7 +323,7 @@ mod tests {
         let encoding = EncodingConfig::from(Encoding::Ndjson);
         let event = Event::from("hello world");
 
-        let mut config = HttpSinkConfig::default();
+        let mut config = default_config(Encoding::Json);
         config.encoding = encoding.clone();
         let bytes = config.encode_event(event).unwrap();
 

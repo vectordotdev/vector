@@ -1,7 +1,7 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        encoding::{EncodingConfig},
         BatchBytesConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -34,14 +34,13 @@ pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
-
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        deserialize_with = "EncodingConfig::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default = "default_encoding"
     )]
     #[derivative(Default(value = "default_encoding()"))]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
 
@@ -53,8 +52,15 @@ inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
 }
 
-fn default_encoding() -> EncodingConfigWithDefault<Encoding> {
-    EncodingConfigWithDefault::from(Encoding::Json)
+fn default_encoding() -> EncodingConfig<Encoding> {
+    EncodingConfig::from(Encoding::Json)
+}
+
+// There is another one of these in `util::encoding`, but this one is specialized for New Relic.
+/// For encodings, answers "Is it possible to skip serializing this value, because it's the
+/// default?"
+pub(crate) fn skip_serializing_if_default(e: &EncodingConfig<Encoding>) -> bool {
+    e.format == default_encoding().format
 }
 
 #[typetag::serde(name = "new_relic_logs")]
@@ -122,7 +128,7 @@ impl NewRelicLogsConfig {
 
             tls: None,
 
-            ..Default::default()
+
         })
     }
 }

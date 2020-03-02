@@ -49,7 +49,7 @@ enum GcsError {
     BucketNotFound { bucket: String },
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
     bucket: String,
@@ -60,11 +60,7 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    #[serde(
-        deserialize_with = "EncodingConfig::from_deserializer",
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     encoding: EncodingConfig<Encoding>,
     compression: Compression,
     #[serde(default)]
@@ -74,6 +70,26 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     auth: GcpAuthConfig,
     tls: Option<TlsOptions>,
+}
+
+#[cfg(test)]
+fn default_config(e: Encoding) -> GcsSinkConfig {
+    GcsSinkConfig {
+        bucket: Default::default(),
+        acl: Default::default(),
+        storage_class: Default::default(),
+        metadata: Default::default(),
+        key_prefix: Default::default(),
+        filename_time_format: Default::default(),
+        filename_append_uuid: Default::default(),
+        filename_extension: Default::default(),
+        encoding: e.into(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        auth: Default::default(),
+        tls: Default::default(),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -108,11 +124,9 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 enum Encoding {
-    #[derivative(Default)]
     Text,
     Ndjson,
 }
@@ -126,9 +140,11 @@ impl Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 enum Compression {
+    #[derivative(Default)]
     Gzip,
     None,
 }
@@ -149,7 +165,7 @@ impl Compression {
 }
 
 inventory::submit! {
-    SinkDescription::new::<GcsSinkConfig>(NAME)
+    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
 }
 
 #[typetag::serde(name = "gcp_cloud_storage")]
@@ -526,7 +542,7 @@ mod tests {
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
             compression: compression,
-            ..Default::default()
+            ..default_config(Encoding::Ndjson)
         })
         .expect("Could not create request settings")
     }

@@ -60,7 +60,7 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
+    SinkDescription::new_without_default::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
