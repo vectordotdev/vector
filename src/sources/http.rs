@@ -1,7 +1,7 @@
 use crate::{
     event::{self, Event},
     sources::util::{ErrorMessage, HttpSource},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
@@ -21,6 +21,10 @@ pub struct SimpleHttpConfig {
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<SimpleHttpConfig>("http")
 }
 
 #[derive(Clone)]
