@@ -190,8 +190,10 @@ impl Transform for TagCardinalityLimit {
                         for (key, value) in tags_map {
                             if !self.try_accept_tag(key, value) {
                                 info!(
-                                    "Rejecting Metric Event containing tag with key: {}, value: {}",
-                                    key, value
+                                    message = "Rejecting Metric Event containing tag with new value after hitting configured 'value_limit'",
+                                    tag_key = key.as_str(),
+                                    tag_value = &value.as_str(),
+                                    rate_limit_secs = 10,
                                 );
                                 return None;
                             }
@@ -202,7 +204,13 @@ impl Transform for TagCardinalityLimit {
                         let mut to_delete = Vec::new();
                         for (key, value) in &tags_map_clone {
                             if !self.try_accept_tag(key, value) {
-                                info!("Rejecting tag with key: {}, value: {}", key, value);
+                                info!(
+                                    message =
+                                        "Rejecting tag after hitting configured 'value_limit'",
+                                    tag_key = key.as_str(),
+                                    tag_value = value.as_str(),
+                                    rate_limit_secs = 10,
+                                );
                                 to_delete.push(key);
                             }
                         }
