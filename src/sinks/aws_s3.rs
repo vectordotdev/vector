@@ -2,6 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
+    serde::to_string,
     sinks::util::{
         retries::RetryLogic, rusoto, BatchBytesConfig, Buffer, PartitionBuffer,
         PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
@@ -298,11 +299,6 @@ impl Service<Request> for S3Sink {
             })
             .instrument(info_span!("request"))
     }
-}
-
-fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(&value).unwrap();
-    value.as_str().unwrap().into()
 }
 
 fn build_request(
