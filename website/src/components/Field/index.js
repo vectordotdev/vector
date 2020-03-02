@@ -53,8 +53,14 @@ function Enum({values}) {
   return elements;
 }
 
-function Example({name, path, value}) {
-  return <code>{exampleToTOML(null, value)}</code>;
+function Example({name, path, unit, value}) {
+  let unitText = '';
+
+  if (unit) {
+    unitText = <> ({unit})</>;
+  }
+
+  return <><code>{exampleToTOML(null, value)}</code>{unitText}</>;
 }
 
 function Examples({name, path, values}) {
@@ -79,6 +85,17 @@ function Examples({name, path, values}) {
   );
 }
 
+function Groups({values}) {
+  let elements = [];
+
+  values.forEach(function (value) {
+    elements.push(<code key={value}>{value}</code>);
+    elements.push(" ");
+  })
+
+  return elements;
+}
+
 function RelevantWhen({value}) {
   let relKey = Object.keys(value)[0];
   let relValue = Object.values(value)[0];
@@ -94,15 +111,15 @@ function RelevantWhen({value}) {
   );
 }
 
-function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWhen}) {
+function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, unit}) {
   const [showExamples, setShowExamples] = useState(false);
 
-  if (defaultValue || enumValues || (examples && examples.length > 0)) {
+  if (defaultValue || enumValues || (examples && examples.length > 0) || (groups && groups.length > 0)) {
     return (
       <div className="info">
         {defaultValue !== undefined ?
           (defaultValue ?
-            <div>Default: <Example name={name} path={path} value={defaultValue} /></div> :
+            <div>Default: <Example name={name} path={path} value={defaultValue} unit={unit} /></div> :
             <div>No default</div>) :
           null}
         {enumValues ?
@@ -124,7 +141,7 @@ function FieldFooter({defaultValue, enumValues, examples, name, path, relevantWh
   }
 }
 
-function Field({children, common, defaultValue, enumValues, examples, name, path, relevantWhen, templateable, type, unit, required}) {
+function Field({children, common, defaultValue, enumValues, examples, groups, name, path, relevantWhen, templateable, type, unit, required}) {
   const [collapse, setCollapse] = useState(false);
 
   let filteredChildren = children;
@@ -136,18 +153,26 @@ function Field({children, common, defaultValue, enumValues, examples, name, path
   return (
     <div className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
-        {common && <span className="badge badge--primary" title="This is a popular that we recommend for getting started">common</span>}
+        {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
         {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
-        <span className="badge badge--secondary">{type}</span>
+        <span className="badge badge--secondary">{type}{unit && <> ({unit})</>}</span>
         {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary" title="This option is an enumation and only allows specific values">enum</span>}
-        {unit && <span className="badge badge--secondary">{unit}</span>}
+        {common && <span className="badge badge--primary" title="This is a popular that we recommend for getting started">common</span>}
         {required ?
           <span className="badge badge--danger">required</span> :
           <span className="badge badge--secondary">optional</span>}
       </div>
       {filteredChildren}
-      {!collapse &&
-        <FieldFooter defaultValue={defaultValue} enumValues={enumValues} examples={examples} name={name} path={path} relevantWhen={relevantWhen} />}
+      {!collapse && type != "table" &&
+        <FieldFooter
+          defaultValue={defaultValue}
+          enumValues={enumValues}
+          examples={examples}
+          groups={groups}
+          name={name}
+          path={path}
+          relevantWhen={relevantWhen}
+          unit={unit} />}
     </div>
   );
 }

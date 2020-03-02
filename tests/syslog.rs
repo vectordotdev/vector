@@ -1,10 +1,14 @@
+#![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
+
 use approx::assert_relative_eq;
-use futures::{Future, Sink, Stream};
+#[cfg(unix)]
+use futures01::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use sinks::socket::SocketSinkConfig;
 use sinks::util::Encoding;
 use std::{collections::HashMap, thread, time::Duration};
+#[cfg(unix)]
 use tokio::codec::{FramedWrite, LinesCodec};
 #[cfg(unix)]
 use tokio_uds::UnixStream;
@@ -30,6 +34,7 @@ fn test_tcp_syslog() {
         "in",
         SyslogConfig::new(Mode::Tcp {
             address: in_addr.into(),
+            tls: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
@@ -152,7 +157,7 @@ fn test_unix_stream_syslog() {
         .collect();
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
-    let input_stream = futures::stream::iter_ok::<_, ()>(input_lines.clone().into_iter());
+    let input_stream = futures01::stream::iter_ok::<_, ()>(input_lines.clone().into_iter());
 
     UnixStream::connect(&in_path)
         .map_err(|e| panic!("{:}", e))

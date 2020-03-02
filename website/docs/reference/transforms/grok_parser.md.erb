@@ -6,24 +6,20 @@
 
 <%= component_config_example(component) %>
 
-<%- if !component.requirements.nil? -%>
+<%- if component.requirements.any? -%>
 ## Requirements
 
-<Alert type="danger" fill={true} icon={false}>
-
-<%= component.requirements %>
-
-</Alert>
+<%= component_requirements(component) %>
 
 <%- end -%>
 ## Options
 
-<%= options(component.specific_options_list, heading_depth: 3) %>
+<%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= options(component.env_vars_list, heading_depth: 3) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 ## How It Works [[sort]]

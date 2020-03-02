@@ -103,6 +103,7 @@ test
 | `-t, --threads` | Limits the number of internal threads Vector can spawn. See the [Limiting Resources][docs.roles.agent#limiting-resources] in the [Agent role][docs.roles.agent] documentation. |
 | `-v, --verbose` | Drops the log level to `debug`. |
 | `-vv` | Drops the log level to `trace`, the lowest level possible. |
+| `-w, --watch-config` | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |
 
 ### Daemonizing
 
@@ -190,7 +191,7 @@ are:
 ## Reloading
 
 Vector can be reloaded, on the fly, to recognize any configuration changes by
-sending the Vector process a `SIGHUP` signal:
+sending the Vector process a `SIGHUP` signal.
 
 <Tabs
   block={true}
@@ -244,6 +245,13 @@ ps -ax vector | grep vector
 
 </TabItem>
 </Tabs>
+
+### Automatic Reload On Changes
+
+You can automatically reload Vector's configuration file when it changes via
+the `-w` or `--watch-config` flag upon [starting](#starting). This is
+particularly helpful in scenarios where configuration is managed for you, such
+as Kubernetes.
 
 ### Configuration Errors
 

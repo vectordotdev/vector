@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::{sink::Sink, stream::Stream, Future};
+use futures01::{sink::Sink, stream::Stream, Future};
 use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::codec::{BytesCodec, FramedWrite};
@@ -72,7 +72,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     Bytes::from(line)
                 });
 
-                let lines = futures::stream::iter_ok::<_, ()>(lines);
+                let lines = futures01::stream::iter_ok::<_, ()>(lines);
 
                 let pump = lines.forward(input);
                 let (_, _) = rt.block_on(pump).unwrap();

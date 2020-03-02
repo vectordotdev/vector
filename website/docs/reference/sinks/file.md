@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "File"
 sidebar_label: "file|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/
 status: "prod-ready"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,15 +43,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "file" # must be: "file"
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
+
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
+  # OPTIONAL - General
+  healthcheck = true # default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -61,16 +67,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
   path = "vector-%Y-%m-%d.log" # example
 
+  # REQUIRED - requests
+  encoding = "ndjson" # example, enum
+
   # OPTIONAL - General
   healthcheck = true # default
   idle_timeout_secs = "30" # default
-
-  # OPTIONAL - requests
-  encoding = "ndjson" # example, no default, enum
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -83,14 +88,15 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -105,10 +111,11 @@ The encoding format used to serialize the events before outputting.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -131,6 +138,7 @@ Enables/disables the sink healthcheck upon start.
   defaultValue={"30"}
   enumValues={null}
   examples={["30"]}
+  groups={[]}
   name={"idle_timeout_secs"}
   path={null}
   relevantWhen={null}
@@ -154,6 +162,7 @@ The amount of time a file can be idle  and stay open. After not receiving any ev
   defaultValue={null}
   enumValues={null}
   examples={["vector-%Y-%m-%d.log","application-{{ application_id }}-%Y-%m-%d.log"]}
+  groups={[]}
   name={"path"}
   path={null}
   relevantWhen={null}
@@ -175,7 +184,7 @@ File name to write events to. See [Template Syntax](#template-syntax) for more i
 
 ## How It Works
 
-### Dynamic file and directory creation
+### Dynamic File And Directory Creation
 
 Vector will attempt to create the entire directory structure and the file when
 emitting events to the file sink. This requires that the Vector agent have
@@ -198,8 +207,8 @@ event-by-event basis. It does not batch data.
 ### Template Syntax
 
 The [`path`](#path) options
-support [Vector's template syntax][docs.configuration#field-interpolation],
-enabling dynamic values derived from the event's data. This syntax accepts
+support [Vector's template syntax][docs.reference.templating], enabling dynamic
+values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
@@ -213,11 +222,11 @@ enabling dynamic values derived from the event's data. This syntax accepts
   # ...
 ```
 
-You can read more about the complete syntax in the
-[template syntax section][docs.configuration#field-interpolation].
+You can learn more about the complete syntax in the
+[templating reference][docs.reference.templating].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.configuration#field-interpolation]: /docs/setup/configuration/#field-interpolation
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.templating]: /docs/reference/templating/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

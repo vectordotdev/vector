@@ -9,7 +9,7 @@ module.exports = {
         "about/concepts",
         {
           type: 'category',
-          label: 'Data Model (Event)',
+          label: 'Data Model',
           items: [
             "about/data-model",
             "about/data-model/log",
@@ -43,6 +43,7 @@ module.exports = {
                 "setup/installation/package-managers",
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
+                  "setup/installation/package-managers/nix",
                   "setup/installation/package-managers/rpm",
                   "setup/installation/package-managers/msi",
               ],
@@ -56,6 +57,7 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
+                  "setup/installation/operating-systems/nixos",
                   "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
@@ -98,6 +100,7 @@ module.exports = {
             "setup/guides",
             "setup/guides/getting-started",
             "setup/guides/unit-testing",
+            "setup/guides/advanced-configs",
             "setup/guides/troubleshooting",
           ]
         },
@@ -182,9 +185,13 @@ module.exports = {
             
               "reference/transforms/remove_tags",
             
+              "reference/transforms/rename_fields",
+            
               "reference/transforms/sampler",
             
               "reference/transforms/split",
+            
+              "reference/transforms/swimlanes",
             
               "reference/transforms/tokenizer",
             
@@ -218,19 +225,29 @@ module.exports = {
             
               "reference/sinks/file",
             
+              "reference/sinks/gcp_cloud_storage",
+            
               "reference/sinks/gcp_pubsub",
             
               "reference/sinks/gcp_stackdriver_logging",
             
               "reference/sinks/http",
             
+              "reference/sinks/humio_logs",
+            
+              "reference/sinks/influxdb_metrics",
+            
               "reference/sinks/kafka",
+            
+              "reference/sinks/logdna",
+            
+              "reference/sinks/loki",
             
               "reference/sinks/new_relic_logs",
             
               "reference/sinks/prometheus",
             
-              "reference/sinks/sematext",
+              "reference/sinks/sematext_logs",
             
               "reference/sinks/socket",
             
@@ -248,6 +265,7 @@ module.exports = {
           items: [
             "reference/env-vars",
             "reference/global-options",
+            "reference/templating",
             "reference/tests",
           ]
         },

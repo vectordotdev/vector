@@ -3,11 +3,14 @@ title = "Regex Parser"
 allow_you_to_description = """\
 parse a log field's value with a [Regular Expression][urls.regex]\
 """
+beta = false
 common = true
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
-types_coercion = true
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "regex_parser") %>
 
 [transforms.regex_parser.options.drop_field]
 type = "bool"
@@ -35,3 +38,5 @@ required = true
 description = """\
 The Regular Expression to apply. Do not include the leading or trailing `/`.\
 """
+
+<%= render("_partials/_types.toml", namespace: "transforms.regex_parser", common: true) %>

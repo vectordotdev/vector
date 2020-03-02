@@ -103,7 +103,8 @@ environments. A feature is `prod-ready` if it meets the following criteria:
    a production environment for sustained periods without issue.
 2. The feature has had sufficient time (generally >4 months) to be community
    tested.
-3. There are no major [open bugs][urls.vector_bug_issues] for the feature.
+3. The feature API is stable and unlikely to change.
+4. There are no major [open bugs][urls.vector_bug_issues] for the feature.
 
 <Jump to="/components/?prod-ready=true">View all prod-ready components</Jump>
 

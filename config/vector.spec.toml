@@ -23,6 +23,10 @@
 # ------------------------------------------------------------------------------
 # Global options are relevant to Vector as a whole and apply to global behavior.
 
+#
+# General
+#
+
 # The directory used for persisting Vector state, such as on-disk buffers, file
 # checkpoints, and more. Please make sure the Vector project has write
 # permissions to this dir.
@@ -42,16 +46,51 @@ data_dir = "/var/lib/vector"
 # * type: [string]
 dns_servers = ["0.0.0.0:53"]
 
+#
+# Log schema
+#
+
+[.log_schema]
+  # The key used to hold the log host. See the log data model page for more info.
+  #
+  # * optional
+  # * default: "host"
+  # * type: string
+  host_key = "host"
+  host_key = "@host"
+  host_key = "instance"
+  host_key = "machine"
+
+  # The key used to hold the log message. See the log data model page for more
+  # info.
+  #
+  # * optional
+  # * default: "message"
+  # * type: string
+  message_key = "message"
+  message_key = "@message"
+  message_key = "msg"
+
+  # The key used to represent when the log was generated. See the log data model
+  # page for more info.
+  #
+  # * optional
+  # * default: "timestamp"
+  # * type: string
+  timestamp_key = "timestamp"
+  timestamp_key = "@timestamp"
+  timestamp_key = "datetime"
+
 # ------------------------------------------------------------------------------
 # Sources
 # ------------------------------------------------------------------------------
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
 
-# Ingests data through the docker engine daemon and outputs `log` events.
+# Ingests data through the Docker engine daemon and outputs `log` events.
 [sources.docker]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `docker`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -73,7 +112,7 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: [string]
-  include_containers = ["my_container_name", "container_prefix", "9b6247364a03"]
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"]
 
   # A list of image names to match against. If not provided, all images will be
   # included.
@@ -81,7 +120,7 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: [string]
-  include_images = ["my_image_name", "httpd", "redis"]
+  include_images = ["httpd", "redis"]
 
   # A list of container object labels to match against when filtering running
   # containers. This should follow the described label's synatx in docker object
@@ -90,7 +129,7 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: [string]
-  include_labels = ["label_key1=label_value1", "label_key2=label_value2"]
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
 
   # The field name to be added to events that are detected to contain an
   # incomplete message (i.e. partial events). If set to `""`, no field will be
@@ -108,7 +147,7 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `file`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -185,36 +224,13 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   file_key = "file"
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
   # * type: string
   host_key = "host"
-
-  #
-  # Multi-line
-  #
-
-  # When present, Vector will aggregate multiple lines into a single event, using
-  # this pattern as the indicator that the previous lines should be flushed and a
-  # new event started. The pattern will be matched against entire lines as a
-  # regular expression, so remember to anchor as appropriate.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  message_start_indicator = "^(INFO|ERROR)"
-
-  # When `message_start_indicator` is present, this sets the amount of time
-  # Vector will buffer lines into a single event before flushing, regardless of
-  # whether or not it has seen a line indicating the start of a new message.
-  #
-  # * optional
-  # * default: 1000
-  # * type: int
-  # * unit: milliseconds
-  multi_line_timeout = 1000
 
   #
   # Priority
@@ -274,10 +290,52 @@ dns_servers = ["0.0.0.0:53"]
     strategy = "checksum"
     strategy = "device_and_inode"
 
+  #
+  # Multiline
+  #
+
+  [sources.file.multiline]
+    # Condition regex pattern to look for. Exact behavior is configured via `mode`.
+    #
+    # * required
+    # * type: string
+    condition_pattern = "^[\\s]+"
+    condition_pattern = "\\\\$"
+    condition_pattern = "^(INFO|ERROR) "
+    condition_pattern = ";$"
+
+    # Mode of operation, specifies how the `condition_pattern` is interpreted.
+    #
+    # * required
+    # * type: string
+    # * enum: "continue_through", "continue_past", "halt_before", and "halt_with"
+    mode = "continue_through"
+    mode = "continue_past"
+    mode = "halt_before"
+    mode = "halt_with"
+
+    # Start regex pattern to look for as a beginning of the message.
+    #
+    # * required
+    # * type: string
+    start_pattern = "^[^\\s]"
+    start_pattern = "\\\\$"
+    start_pattern = "^(INFO|ERROR) "
+    start_pattern = "[^;]$"
+
+    # The maximum time to wait for the continuation. Once this timeout is reached,
+    # the buffered message is guaraneed to be flushed, even if incomplete.
+    #
+    # * required
+    # * type: int
+    # * unit: milliseconds
+    timeout_ms = 1000
+    timeout_ms = 600000
+
 # Ingests data through the HTTP protocol and outputs `log` events.
 [sources.http]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `http`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -319,7 +377,7 @@ dns_servers = ["0.0.0.0:53"]
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `journald`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -370,8 +428,12 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through Kafka 0.9 or later and outputs `log` events.
 [sources.kafka]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `kafka`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -413,6 +475,15 @@ dns_servers = ["0.0.0.0:53"]
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
+  # Maximum time the broker may wait to fill the response.
+  #
+  # * optional
+  # * default: 100
+  # * type: int
+  # * unit: milliseconds
+  fetch_wait_max_ms = 50
+  fetch_wait_max_ms = 100
+
   # The log field name to use for the topic key. If unspecified, the key would
   # not be added to the log event. If the message has null key, then this field
   # would not be added to the log event.
@@ -431,10 +502,79 @@ dns_servers = ["0.0.0.0:53"]
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+  # Default timeout for network requests.
+  #
+  # * optional
+  # * default: 60000
+  # * type: int
+  # * unit: milliseconds
+  socket_timeout_ms = 30000
+  socket_timeout_ms = 60000
+
+  #
+  # Advanced
+  #
+
+  [sources.kafka.librdkafka_options]
+    # The options and their values. Accepts `string` values.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    "client.id" = "${ENV_VAR}"
+    "fetch.error.backoff.ms" = "1000"
+
+  #
+  # Tls
+  #
+
+  [sources.kafka.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `logplex`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -450,7 +590,7 @@ dns_servers = ["0.0.0.0:53"]
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `prometheus`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -476,7 +616,7 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `socket`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -531,17 +671,62 @@ dns_servers = ["0.0.0.0:53"]
   # Context
   #
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
   # * type: string
   host_key = "host"
 
+  #
+  # Tls
+  #
+
+  [sources.socket.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    # * relevant when mode = "tcp"
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `splunk_hec`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -568,7 +753,7 @@ dns_servers = ["0.0.0.0:53"]
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `statsd`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -588,7 +773,7 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `stdin`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -607,21 +792,22 @@ dns_servers = ["0.0.0.0:53"]
   # Context
   #
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
   # * type: string
   host_key = "host"
 
-# Ingests data through the Syslog 5424 protocol and outputs `log` events.
+# Ingests data through the Syslog protocol and outputs `log` events.
 [sources.syslog]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `syslog`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -668,17 +854,62 @@ dns_servers = ["0.0.0.0:53"]
   # Context
   #
 
-  # The key name added to each event representing the current host.
+  # The key name added to each event representing the current host. This can also
+  # be globally set via the global `host_key` option.
   #
   # * required
   # * default: "host"
   # * type: string
   host_key = "host"
 
+  #
+  # Tls
+  #
+
+  [sources.syslog.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `vector`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -703,20 +934,60 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: seconds
   shutdown_timeout_secs = 30
 
+  #
+  # Tls
+  #
+
+  [sources.vector.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
 
 # ------------------------------------------------------------------------------
 # Transforms
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 
-# Accepts `log` events and allows you to add one or more log fields.
+# Accepts and outputs `log` events allowing you to add one or more log fields.
 [transforms.add_fields]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `add_fields`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -748,14 +1019,14 @@ dns_servers = ["0.0.0.0:53"]
     parent = {child = "child_value"}
     list_field = ["first", "second", "third"]
 
-# Accepts `metric` events and allows you to add one or more metric tags.
+# Accepts and outputs `metric` events allowing you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `add_tags`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -781,10 +1052,10 @@ dns_servers = ["0.0.0.0:53"]
     static_tag = "my value"
     env_tag = "${ENV_VAR}"
 
-# Accepts `log` events and allows you to strips ANSI characters from the specified field.
+# Accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field.
 [transforms.ansi_stripper]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `ansi_stripper`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -797,17 +1068,17 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The target field to strip ANSI characters from.
+  # The target field to strip ANSI escape sequences from.
   #
   # * required
   # * default: "message"
   # * type: string
   field = "message"
 
-# Accepts `log` events and allows you to enrich logs with AWS EC2 instance metadata.
+# Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `aws_ec2_metadata`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -848,14 +1119,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: int
   refresh_interval_secs = 10
 
-# Accepts `log` events and allows you to coerce log fields into fixed types.
+# Accepts and outputs `log` events allowing you to coerce log fields into fixed types.
 [transforms.coercer]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `coercer`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -895,15 +1166,13 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to concat (substrings) of other fields to a new one.
+# Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `concat`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -921,7 +1190,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: [string]
-  items = ["fist[..3]", "second[-5..]", "third[3..6]"]
+  items = ["first[..3]", "second[-5..]", "third[3..6]"]
 
   # The string that is used to join all items.
   #
@@ -939,10 +1208,10 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "dest_field_name"
 
-# Accepts `log` and `metric` events and allows you to filter events by a log field's value.
+# Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `field_filter`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -968,10 +1237,10 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   value = "/var/log/nginx.log"
 
-# Accepts `log` events and allows you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `geoip`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1008,14 +1277,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target = "geoip"
 
-# Accepts `log` events and allows you to parse a log field value with Grok.
+# Accepts and outputs `log` events allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `grok_parser`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1065,15 +1334,13 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to parse a log field value as JSON.
+# Accepts and outputs `log` events allowing you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `json_parser`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1086,7 +1353,8 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If the specified `field` should be dropped (removed) after parsing.
+  # If the specified `field` should be dropped (removed) after parsing. If
+  # parsing fails, the field will not be removed, irrespective of this setting.
   #
   # * required
   # * default: true
@@ -1126,14 +1394,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   target_field = "target"
 
-# Accepts `log` events and allows you to convert logs into one or more metrics.
+# Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `log_to_metric`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1194,14 +1462,14 @@ dns_servers = ["0.0.0.0:53"]
       region = "us-east-1"
       status = "{{status}}"
 
-# Accepts `log` events and allows you to extract data from a logfmt-formatted log field.
+# Accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field.
 [transforms.logfmt_parser]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `logfmt_parser`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1245,15 +1513,13 @@ dns_servers = ["0.0.0.0:53"]
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `lua`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1290,10 +1556,10 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
-# Accepts `log` events and allows you to merge partial log events into a single event.
+# Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `merge`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1336,14 +1602,14 @@ end
   # * type: [string]
   stream_discriminant_fields = []
 
-# Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
+# Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `regex_parser`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1393,15 +1659,13 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to remove one or more log fields.
+# Accepts and outputs `log` events allowing you to remove one or more log fields.
 [transforms.remove_fields]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `remove_fields`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1420,10 +1684,10 @@ end
   # * type: [string]
   fields = ["field1", "field2"]
 
-# Accepts `metric` events and allows you to remove one or more metric tags.
+# Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `remove_tags`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1442,10 +1706,41 @@ end
   # * type: [string]
   tags = ["tag1", "tag2"]
 
-# Accepts `log` events and allows you to sample events with a configurable rate.
+# Accepts and outputs `log` events allowing you to rename one or more log fields.
+[transforms.rename_fields]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "rename_fields"
+  type = "rename_fields"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Fields
+  #
+
+  [transforms.rename_fields.fields]
+    # The name of the field to move. Use `.` for adding nested fields.
+    #
+    # * required
+    # * type: *
+    old field name = "new field name"
+
+# Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `sampler`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1475,14 +1770,14 @@ end
   # * type: [string]
   pass_list = ["[error]", "field2"]
 
-# Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.
 [transforms.split]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `split`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1517,10 +1812,11 @@ end
   field_names = ["timestamp", "level", "message"]
 
   # The separator to split the field on. If no separator is given, it will split
-  # on whitespace.
+  # on all whitespace. 'Whitespace' is defined according to the terms of the
+  # Unicode Derived Core Property `White_Space`.
   #
   # * required
-  # * default: "whitespace"
+  # * default: "[whitespace]"
   # * type: [string]
   separator = ","
 
@@ -1540,19 +1836,76 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
+# Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
+[transforms.swimlanes]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "swimlanes"
+  type = "swimlanes"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Lanes
+  #
+
+  [transforms.swimlanes.lanes]
+    [transforms.swimlanes.lanes.`<swimlane_id>`]
+      # The type of the condition to execute.
+      #
+      # * required
+      # * type: string
+      type = "check_fields"
+      type = "is_log"
+      type = "is_metric"
+
+      # Check whether a fields contents exactly matches the value specified.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.eq" = "this is the content to match against"
+
+      # Check whether a field exists or does not exist, depending on the provided
+      # valuebeing `true` or `false` respectively.
+      #
+      # * optional
+      # * no default
+      # * type: bool
+      # * relevant when type = "check_fields"
+      "host.exists" = true
+
+      # Check whether a fields contents does not match the value specified.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "method.neq" = "POST"
+
+# Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `tokenizer`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1602,8 +1955,6 @@ end
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
@@ -1620,7 +1971,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `aws_cloudwatch_logs`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1646,6 +1997,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target CloudWatch Logs stream.
@@ -1687,7 +2039,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1703,8 +2056,7 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -1715,17 +2067,17 @@ end
   #
 
   [sinks.aws_cloudwatch_logs.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1049000
     # * type: int
     # * unit: bytes
-    max_events = 1049000
+    max_size = 1049000
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -1736,10 +2088,9 @@ end
   #
 
   [sinks.aws_cloudwatch_logs.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -1748,7 +2099,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -1757,8 +2108,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -1783,9 +2133,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -1794,7 +2145,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -1804,9 +2155,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -1818,7 +2169,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -1839,8 +2190,12 @@ end
 
 # Streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `aws_cloudwatch_metrics`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1864,7 +2219,15 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -1872,7 +2235,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1882,6 +2246,27 @@ end
   healthcheck = true
   healthcheck = false
 
+  #
+  # Batch
+  #
+
+  [sinks.aws_cloudwatch_metrics.batch]
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * required
+    # * default: 20
+    # * type: int
+    # * unit: events
+    max_events = 20
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
 # Batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.
 [sinks.aws_kinesis_firehose]
   #
@@ -1889,7 +2274,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `aws_kinesis_firehose`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -1907,6 +2292,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Firehose delivery stream.
@@ -1915,13 +2301,21 @@ end
   # * type: string
   stream_name = "my-stream"
 
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -1937,8 +2331,7 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -1949,17 +2342,17 @@ end
   #
 
   [sinks.aws_kinesis_firehose.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in events, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
-    # * unit: bytes
+    # * unit: events
     max_events = 500
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -1970,10 +2363,9 @@ end
   #
 
   [sinks.aws_kinesis_firehose.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -1982,7 +2374,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -1991,8 +2383,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -2017,9 +2408,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -2028,7 +2420,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -2038,9 +2430,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -2052,7 +2444,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -2078,7 +2470,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `aws_kinesis_streams`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -2096,6 +2488,7 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Logs stream.
@@ -2104,21 +2497,21 @@ end
   # * type: string
   stream_name = "my-stream"
 
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # The log field used as the Kinesis record's partition key value.
   #
@@ -2133,8 +2526,7 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -2145,17 +2537,17 @@ end
   #
 
   [sinks.aws_kinesis_streams.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in events, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
-    # * unit: bytes
+    # * unit: events
     max_events = 500
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -2166,10 +2558,9 @@ end
   #
 
   [sinks.aws_kinesis_streams.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -2178,7 +2569,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -2187,8 +2578,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -2213,9 +2603,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -2224,7 +2615,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -2234,9 +2625,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -2248,7 +2639,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -2274,7 +2665,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `aws_s3`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -2306,7 +2697,15 @@ end
   #
   # * required
   # * type: string
+  # * relevant when host = ""
   region = "us-east-1"
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -2314,7 +2713,8 @@ end
   # * optional
   # * no default
   # * type: string
-  endpoint = "127.0.0.0:5000"
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2337,7 +2737,7 @@ end
   filename_append_uuid = true
   filename_append_uuid = false
 
-  # The extension to use in the object name.
+  # The filename extension to use in the object name.
   #
   # * required
   # * default: "log"
@@ -2363,6 +2763,18 @@ end
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
   key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
 
   #
   # Object Attributes
@@ -2436,6 +2848,7 @@ end
   # * optional
   # * no default
   # * type: string
+  ssekms_key_id = "abcd1234"
 
   # The storage class for the created objects. See the S3 Storage Classes for
   # more details.
@@ -2461,26 +2874,13 @@ end
     Tag1 = "Value1"
 
   #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  #
   # Batch
   #
 
   [sinks.aws_s3.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -2488,7 +2888,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 300
     # * type: int
     # * unit: seconds
@@ -2499,10 +2899,9 @@ end
   #
 
   [sinks.aws_s3.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -2511,7 +2910,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -2520,8 +2919,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -2546,9 +2944,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -2557,7 +2956,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -2567,9 +2966,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -2581,7 +2980,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -2603,7 +3002,7 @@ end
 # Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `blackhole`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -2638,7 +3037,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `clickhouse`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -2686,9 +3085,10 @@ end
   # outputting.
   #
   # * optional
-  # * default: "gzip"
+  # * default: "none"
   # * type: string
-  # * must be: "gzip" (if supplied)
+  # * enum: "none" or "gzip"
+  compression = "none"
   compression = "gzip"
 
   #
@@ -2724,9 +3124,9 @@ end
   #
 
   [sinks.clickhouse.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -2734,7 +3134,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -2745,10 +3145,9 @@ end
   #
 
   [sinks.clickhouse.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -2757,7 +3156,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -2766,8 +3165,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -2783,6 +3181,22 @@ end
     when_full = "drop_newest"
 
   #
+  # Encoding
+  #
+
+  [sinks.clickhouse.encoding]
+    # How to format event timestamps. Formats such as unix can be parsed as a
+    # Clickhouse DateTime, however, this loses precision as DateTimes are defined
+    # in seconds.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
   # Request
   #
 
@@ -2792,9 +3206,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -2803,7 +3218,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -2813,9 +3228,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 9223372036854775807
+    # * default: -1
     # * type: int
-    retry_attempts = 9223372036854775807
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -2827,7 +3242,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -2869,11 +3284,12 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -2911,7 +3327,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `console`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -2947,8 +3363,7 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -2961,7 +3376,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `datadog_metrics`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -2978,7 +3393,8 @@ end
   #
   # * required
   # * type: string
-  api_key = "3111111111111111aaaaaaaaaaaaaaaa"
+  api_key = "${DATADOG_API_KEY_ENV_VAR}"
+  api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # A prefix that will be added to all metric names.
   #
@@ -3007,17 +3423,17 @@ end
   #
 
   [sinks.datadog_metrics.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in events, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 20
     # * type: int
-    # * unit: bytes
+    # * unit: events
     max_events = 20
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3033,9 +3449,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -3044,7 +3461,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -3054,9 +3471,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3068,7 +3485,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -3094,7 +3511,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `elasticsearch`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -3124,14 +3541,6 @@ end
   index = "application-{{ application_id }}-%Y-%m-%d"
   index = "vector-%Y-%m-%d"
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -3141,20 +3550,12 @@ end
   healthcheck = false
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example. This is required if the `provider` is not `"aws"`
+  # in the example.
   #
   # * optional
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
 
   #
   # Auth
@@ -3190,9 +3591,9 @@ end
   #
 
   [sinks.elasticsearch.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -3200,7 +3601,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3211,10 +3612,9 @@ end
   #
 
   [sinks.elasticsearch.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -3223,7 +3623,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -3232,8 +3632,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -3281,9 +3680,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -3292,7 +3692,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -3302,9 +3702,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3316,7 +3716,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -3358,11 +3758,12 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -3400,7 +3801,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `file`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -3442,12 +3843,335 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
+
+# Batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface.
+[sinks.gcp_cloud_storage]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "gcp_cloud_storage"
+  type = "gcp_cloud_storage"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The GCS bucket name.
+  #
+  # * required
+  # * type: string
+  bucket = "my-bucket"
+
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # The filename for a Google Cloud service account credentials JSON file used to
+  # authenticate access to the Cloud Storage API. If this is unset, Vector checks
+  # the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
+  #
+  # * required
+  # * type: string
+  credentials_path = "/path/to/credentials.json"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * required
+  # * default: true
+  # * type: bool
+  filename_append_uuid = true
+  filename_append_uuid = false
+
+  # The filename extension to use in the object name.
+  #
+  # * required
+  # * default: "log"
+  # * type: string
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * required
+  # * default: "%s"
+  # * type: string
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root GCS "folder".
+  #
+  # * optional
+  # * default: "date=%F/"
+  # * type: string
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # requests
+  #
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  #
+  # Object Attributes
+  #
+
+  # Predefined ACL to apply to the created objects. For more information, see
+  # Predefined ACLs.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
+  acl = "authenticatedRead"
+  acl = "bucketOwnerFullControl"
+  acl = "bucketOwnerRead"
+  acl = "private"
+  acl = "projectPrivate"
+  acl = "publicRead"
+
+  # The set of metadata `key:value` pairs for the created objects. See the GCS
+  # custom metadata documentation for more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+
+  # The storage class for the created objects. See the GCP storage classes for
+  # more details.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * enum: "STANDARD", "NEARLINE", "COLDLINE", and "ARCHIVE"
+  storage_class = "STANDARD"
+  storage_class = "NEARLINE"
+  storage_class = "COLDLINE"
+  storage_class = "ARCHIVE"
+
+  #
+  # Batch
+  #
+
+  [sinks.gcp_cloud_storage.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 10485760
+    # * type: int
+    # * unit: bytes
+    max_size = 10485760
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 300
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 300
+
+  #
+  # Buffer
+  #
+
+  [sinks.gcp_cloud_storage.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.gcp_cloud_storage.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 1000
+    # * type: int
+    rate_limit_num = 1000
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Tls
+  #
+
+  [sinks.gcp_cloud_storage.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface.
 [sinks.gcp_pubsub]
@@ -3456,7 +4180,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `gcp_pubsub`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -3487,15 +4211,18 @@ end
   # * optional
   # * no default
   # * type: string
+  api_key = "${GCP_API_KEY_ENV_VAR}"
+  api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # The filename for a Google Cloud service account credentials JSON file used to
   # authenticate access to the pubsub project and topic. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-  # filename. Either this or `api_key` must be set.
+  # filename.
   #
   # * optional
   # * no default
   # * type: string
+  credentials_path = "/path/to/credentials.json"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3510,9 +4237,9 @@ end
   #
 
   [sinks.gcp_pubsub.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 10485760
     # * type: int
     # * unit: bytes
@@ -3520,7 +4247,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3531,10 +4258,9 @@ end
   #
 
   [sinks.gcp_pubsub.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -3543,7 +4269,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -3552,8 +4278,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -3578,9 +4303,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -3589,7 +4315,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 100
@@ -3599,9 +4325,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 9223372036854775807
+    # * default: -1
     # * type: int
-    retry_attempts = 9223372036854775807
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3613,7 +4339,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -3655,11 +4381,12 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -3697,7 +4424,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `gcp_stackdriver_logging`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -3711,7 +4438,7 @@ end
   inputs = ["my-source-id"]
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the stackdriver logging API. If this is unset, Vector
+  # authenticate access to the Stackdriver Logging API. If this is unset, Vector
   # checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
   # filename.
   #
@@ -3781,9 +4508,9 @@ end
   #
 
   [sinks.gcp_stackdriver_logging.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 5242880
     # * type: int
     # * unit: bytes
@@ -3791,7 +4518,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3802,10 +4529,9 @@ end
   #
 
   [sinks.gcp_stackdriver_logging.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -3814,7 +4540,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -3823,8 +4549,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -3849,9 +4574,10 @@ end
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -3860,7 +4586,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 1000
@@ -3870,9 +4596,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 9223372036854775807
+    # * default: -1
     # * type: int
-    retry_attempts = 9223372036854775807
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -3884,7 +4610,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -3954,11 +4680,12 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -3996,7 +4723,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `http`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -4037,13 +4764,22 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
-  # * enum: "ndjson", "json", and "text"
-  encoding = "ndjson"
+  # * enum: "json", "ndjson", and "text"
   encoding = "json"
+  encoding = "ndjson"
   encoding = "text"
+
+  # The compression strategy used to compress the encoded event data before
+  # outputting.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   #
   # Auth
@@ -4078,9 +4814,9 @@ end
   #
 
   [sinks.http.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -4088,7 +4824,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -4099,10 +4835,9 @@ end
   #
 
   [sinks.http.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4111,7 +4846,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -4120,8 +4855,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -4158,9 +4892,10 @@ end
     # * optional
     # * default: 10
     # * type: int
+    # * unit: requests
     in_flight_limit = 10
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -4169,19 +4904,19 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
-    # * default: 10
+    # * default: 1000
     # * type: int
-    rate_limit_num = 10
+    rate_limit_num = 1000
 
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 10
+    # * default: -1
     # * type: int
-    retry_attempts = 10
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -4193,7 +4928,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -4235,11 +4970,12 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -4270,6 +5006,373 @@ end
     verify_hostname = true
     verify_hostname = false
 
+# Batches `log` events to Humio via the HEC API.
+[sinks.humio_logs]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "humio_logs"
+  type = "humio_logs"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Your Humio ingestion token.
+  #
+  # * required
+  # * type: string
+  token = "${TOKEN_ENV_VAR}"
+  token = "A94A8FE5CCB19BA61C4C08"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The optional host to send Humio logs to.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://myhumiohost.com"
+
+  #
+  # Batch
+  #
+
+  [sinks.humio_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.humio_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.humio_logs.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 10
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    rate_limit_num = 10
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+# Batches `metric` events to InfluxDB using v1 or v2 HTTP API.
+[sinks.influxdb_metrics]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "influxdb_metrics"
+  type = "influxdb_metrics"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The destination bucket for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  bucket = "vector-bucket"
+  bucket = "4d2225e4d3d49f75"
+
+  # Sets the target database for the write into InfluxDB 1.
+  #
+  # * required
+  # * type: string
+  database = "vector-database"
+  database = "iot-store"
+
+  # InfluxDB endpoint to send metrics to.
+  #
+  # * required
+  # * type: string
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  endpoint = "http://localhost:8086/"
+
+  # A prefix that will be added to all metric names.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # auth
+  #
+
+  # Specifies the destination organization for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  org = "Organization"
+  org = "33f2cff0a28e5b63"
+
+  # Authentication token for InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  token = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # Sets the password for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "influxdb4ever"
+
+  # Sets the username for authentication if you’ve enabled authentication for the
+  # write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  username = "todd"
+  username = "vector-source"
+
+  #
+  # persistence
+  #
+
+  # Sets the write consistency for the point for InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  consistency = "any"
+  consistency = "one"
+  consistency = "quorum"
+  consistency = "all"
+
+  # Sets the target retention policy for the write into InfluxDB 1.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  retention_policy_name = "autogen"
+  retention_policy_name = "one_day_only"
+
+  #
+  # Batch
+  #
+
+  [sinks.influxdb_metrics.batch]
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * required
+    # * default: 20
+    # * type: int
+    # * unit: events
+    max_events = 20
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Request
+  #
+
+  [sinks.influxdb_metrics.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Streams `log` events to Apache Kafka via the Kafka protocol.
 [sinks.kafka]
   #
@@ -4277,7 +5380,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `kafka`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -4311,14 +5414,6 @@ end
   # * type: string
   topic = "topic-1234"
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  endpoint = "127.0.0.0:5000"
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -4327,13 +5422,21 @@ end
   healthcheck = true
   healthcheck = false
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
+  # Local message timeout.
   #
   # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
+  # * default: 300000
+  # * type: int
+  message_timeout_ms = 150000
+  message_timeout_ms = 450000
+
+  # Default timeout for network requests.
+  #
+  # * optional
+  # * default: 60000
+  # * type: int
+  socket_timeout_ms = 30000
+  socket_timeout_ms = 90000
 
   #
   # requests
@@ -4341,22 +5444,33 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
   #
+  # Advanced
+  #
+
+  [sinks.kafka.librdkafka_options]
+    # The options and their values. Accepts `string` values.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    "client.id" = "${ENV_VAR}"
+    "socket.send.buffer.bytes" = "100"
+
+  #
   # Buffer
   #
 
   [sinks.kafka.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4365,7 +5479,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -4374,8 +5488,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -4421,11 +5534,12 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -4436,6 +5550,510 @@ end
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
+# Batches `log` events to LogDna's HTTP Ingestion API.
+[sinks.logdna]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "logdna"
+  type = "logdna"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The Ingestion API key.
+  #
+  # * required
+  # * type: string
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
+  api_key = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # The hostname that will be attached to each batch of events.
+  #
+  # * required
+  # * type: string
+  hostname = "my-local-machine"
+
+  # The default app that will be set for events that do not contain a `file` or
+  # `app` field.
+  #
+  # * optional
+  # * default: "vector"
+  # * type: string
+  default_app = "vector"
+  default_app = "myapp"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # An optional host that will override the default one.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host = "http://127.0.0.1"
+  host = "http://example.com"
+
+  # The IP address that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  ip = "0.0.0.0"
+
+  # The mac address that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  mac = "my-mac-address"
+
+  # The tags that will be attached to each batch of events.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  tags = ["tag1", "tag2"]
+
+  #
+  # Batch
+  #
+
+  [sinks.logdna.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.logdna.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.logdna.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+# Batches `log` events to Loki.
+[sinks.loki]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "loki"
+  type = "loki"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The encoding format used to serialize the events before outputting.
+  #
+  # * required
+  # * type: string
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
+
+  # The endpoint used to ship logs to.
+  #
+  # * required
+  # * type: string
+  endpoint = "http://localhost:3100"
+  endpoint = "http://127.0.0.1:8080"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # If this is set to `true` then when labels are collected from events those
+  # fields will also get removed from the event.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  remove_label_fields = false
+  remove_label_fields = true
+
+  # If this is set to `true` then the timestamp will be removed from the event.
+  # This is useful because loki uses the timestamp to index the event.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  remove_timestamp = true
+  remove_timestamp = false
+
+  # The tenant id that will be sent with every request, by default this is not
+  # required since a proxy should set this header. When running loki locally a
+  # tenant id is not required either.
+  #
+  # You can read more about tenant id's here
+  #
+  # * optional
+  # * no default
+  # * type: string
+  tenant_id = "some_tenant_id"
+
+  #
+  # Auth
+  #
+
+  [sinks.loki.auth]
+    # The authentication strategy to use.
+    #
+    # * required
+    # * type: string
+    # * must be: "basic"
+    strategy = "basic"
+
+    # The basic authentication password.If using GrafanaLab's hosted Loki then this
+    # must be setto your `instanceId`.
+    #
+    # * required
+    # * type: string
+    # * relevant when strategy = "basic"
+    password = "${PASSWORD_ENV_VAR}"
+    password = "password"
+
+    # The basic authentication user name.If using GrafanaLab's hosted Loki then
+    # this must be setto your Grafana.com api key.
+    #
+    # * required
+    # * type: string
+    # * relevant when strategy = "basic"
+    user = "${USERNAME_ENV_VAR}"
+    user = "username"
+
+  #
+  # Batch
+  #
+
+  [sinks.loki.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * required
+    # * default: 10490000
+    # * type: int
+    # * unit: bytes
+    max_size = 10490000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * required
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.loki.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * required
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * required
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * relevant when type = "disk"
+    max_size = 104900000
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Labels
+  #
+
+  [sinks.loki.labels]
+    # A key-value pair for labels.
+    #
+    # * required
+    # * type: string
+    key = "value"
+    key = "{{ event_field }}"
+
+  #
+  # Request
+  #
+
+  [sinks.loki.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Tls
+  #
+
+  [sinks.loki.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to New Relic's log service via their log API.
 [sinks.new_relic_logs]
   #
@@ -4443,7 +6061,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `new_relic_logs`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -4494,9 +6112,9 @@ end
   #
 
   [sinks.new_relic_logs.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 524000
     # * type: int
     # * unit: bytes
@@ -4504,7 +6122,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -4515,10 +6133,9 @@ end
   #
 
   [sinks.new_relic_logs.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4527,7 +6144,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -4536,8 +6153,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -4560,11 +6176,12 @@ end
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * default: 100
+    # * default: 5
     # * type: int
-    in_flight_limit = 100
+    # * unit: requests
+    in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -4573,7 +6190,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 100
@@ -4583,9 +6200,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 10
+    # * default: -1
     # * type: int
-    retry_attempts = 10
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -4597,7 +6214,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -4619,7 +6236,7 @@ end
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `prometheus`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -4670,18 +6287,18 @@ end
   healthcheck = false
 
 # Batches `log` events to Sematext via the Elasticsearch API.
-[sinks.sematext]
+[sinks.sematext_logs]
   #
   # General
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `sematext`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  # * must be: "sematext"
-  type = "sematext"
+  # * must be: "sematext_logs"
+  type = "sematext_logs"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -4693,6 +6310,7 @@ end
   #
   # * required
   # * type: string
+  token = "${SEMATEXT_TOKEN_ENV_VAR}"
   token = "some-sematext-token"
 
   # Enables/disables the sink healthcheck upon start.
@@ -4725,10 +6343,10 @@ end
   # Batch
   #
 
-  [sinks.sematext.batch]
-    # The maximum size of a batch before it is flushed.
+  [sinks.sematext_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -4736,7 +6354,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -4746,11 +6364,10 @@ end
   # Buffer
   #
 
-  [sinks.sematext.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+  [sinks.sematext_logs.buffer]
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4759,7 +6376,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -4768,8 +6385,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -4788,15 +6404,16 @@ end
   # Request
   #
 
-  [sinks.sematext.request]
+  [sinks.sematext_logs.request]
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
     # * default: 5
     # * type: int
+    # * unit: requests
     in_flight_limit = 5
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -4805,7 +6422,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 5
@@ -4815,9 +6432,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -4829,7 +6446,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -4855,7 +6472,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `socket`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -4904,8 +6521,7 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   # * enum: "json" or "text"
   encoding = "json"
@@ -4916,10 +6532,9 @@ end
   #
 
   [sinks.socket.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4928,7 +6543,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -4937,8 +6552,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -4984,11 +6598,12 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -5026,7 +6641,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `splunk_hec`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -5043,7 +6658,7 @@ end
   #
   # * required
   # * type: string
-  host = "my-splunk-host.com"
+  host = "http://my-splunk-host.com"
 
   # Your Splunk HEC token.
   #
@@ -5074,11 +6689,10 @@ end
 
   # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
+  # * enum: "json" or "text"
+  encoding = "json"
   encoding = "text"
 
   #
@@ -5086,9 +6700,9 @@ end
   #
 
   [sinks.splunk_hec.batch]
-    # The maximum size of a batch before it is flushed.
+    # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -5096,7 +6710,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * optional
+    # * required
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -5107,10 +6721,9 @@ end
   #
 
   [sinks.splunk_hec.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -5119,7 +6732,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -5128,8 +6741,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"
@@ -5154,9 +6766,10 @@ end
     # * optional
     # * default: 10
     # * type: int
+    # * unit: requests
     in_flight_limit = 10
 
-    # The window used for the `rate_limit_num` option
+    # The time window, in seconds, used for the `rate_limit_num` option.
     #
     # * optional
     # * default: 1
@@ -5165,7 +6778,7 @@ end
     rate_limit_duration_secs = 1
 
     # The maximum number of requests allowed within the `rate_limit_duration_secs`
-    # window.
+    # time window.
     #
     # * optional
     # * default: 10
@@ -5175,9 +6788,9 @@ end
     # The maximum number of retries to make for failed requests.
     #
     # * optional
-    # * default: 5
+    # * default: -1
     # * type: int
-    retry_attempts = 5
+    retry_attempts = -1
 
     # The amount of time to wait before attempting the first retry for a failed
     # request. Once, the first retry has failed the fibonacci sequence will be used
@@ -5189,7 +6802,7 @@ end
     # * unit: seconds
     retry_initial_backoff_secs = 1
 
-    # The maximum amount of time to wait between retries.
+    # The maximum amount of time, in seconds, to wait between retries.
     #
     # * optional
     # * default: 10
@@ -5231,11 +6844,12 @@ end
     crt_path = "/path/to/host_certificate.crt"
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
+    # `key_path` is set.
     #
     # * optional
     # * no default
     # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
@@ -5269,7 +6883,7 @@ end
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `statsd`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -5310,7 +6924,7 @@ end
   #
 
   # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `vector`.
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
@@ -5343,10 +6957,9 @@ end
   #
 
   [sinks.vector.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
+    # The buffer's type and storage mechanism.
     #
-    # * optional
+    # * required
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -5355,7 +6968,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * optional
+    # * required
     # * default: 500
     # * type: int
     # * unit: events
@@ -5364,8 +6977,7 @@ end
 
     # The maximum size of the buffer on the disk.
     #
-    # * optional
-    # * no default
+    # * required
     # * type: int
     # * unit: bytes
     # * relevant when type = "disk"

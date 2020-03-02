@@ -1,5 +1,8 @@
-use crate::event::{self, Event};
-use crate::sources::util::{SocketListenAddr, TcpSource};
+use crate::{
+    event::{self, Event},
+    sources::util::{SocketListenAddr, TcpSource},
+    tls::TlsConfig,
+};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use serde::{Deserialize, Serialize};
@@ -15,6 +18,7 @@ pub struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     pub host_key: Option<Atom>,
+    pub tls: Option<TlsConfig>,
 }
 
 fn default_max_length() -> usize {
@@ -32,6 +36,7 @@ impl TcpConfig {
             max_length: default_max_length(),
             host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            tls: Default::default(),
         }
     }
 }
@@ -54,7 +59,7 @@ impl TcpSource for RawTcpSource {
         let host_key = if let Some(key) = &self.config.host_key {
             key
         } else {
-            &event::HOST
+            &event::log_schema().host_key()
         };
 
         if let Some(host) = host {

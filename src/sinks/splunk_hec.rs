@@ -3,13 +3,13 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -60,7 +60,7 @@ pub enum Encoding {
 }
 
 fn default_host_field() -> Atom {
-    event::HOST.clone()
+    event::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -187,8 +187,8 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
         .collect::<LogEvent>();
 
     json!({
-        "fields": fields.unflatten(),
-        "event": event.unflatten(),
+        "fields": fields,
+        "event": event,
         "time": timestamp
     })
 }
@@ -202,16 +202,17 @@ fn encode_event(
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
-    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
-        ts.timestamp()
-    } else {
-        chrono::Utc::now().timestamp()
-    };
+    let timestamp =
+        if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key()) {
+            ts.timestamp()
+        } else {
+            chrono::Utc::now().timestamp()
+        };
 
     let mut body = match encoding {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
-            "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
+            "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
     };
@@ -231,13 +232,13 @@ mod tests {
     use super::*;
     use crate::event::{self, Event};
     use serde::Deserialize;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
     struct HecEvent {
         time: i64,
-        event: HashMap<String, String>,
-        fields: HashMap<String, String>,
+        event: BTreeMap<String, String>,
+        fields: BTreeMap<String, String>,
     }
 
     #[test]
@@ -255,10 +256,12 @@ mod tests {
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
-            event[&event::MESSAGE.to_string()],
+            event[&event::log_schema().message_key().to_string()],
             "hello world".to_string()
         );
-        assert!(event.get(&event::TIMESTAMP.to_string()).is_none());
+        assert!(event
+            .get(&event::log_schema().timestamp_key().to_string())
+            .is_none());
     }
 
     #[test]
@@ -283,7 +286,7 @@ mod integration_tests {
         topology::config::SinkContext,
         Event,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use http::StatusCode;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;

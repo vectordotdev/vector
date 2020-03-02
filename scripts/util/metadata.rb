@@ -1,3 +1,4 @@
+require "erb"
 require "json_schemer"
 require "ostruct"
 require "toml-rb"
@@ -17,6 +18,23 @@ require_relative "metadata/transform"
 # This represents the /.meta directory in object form. Sub-classes represent
 # each sub-component.
 class Metadata
+  module Template
+    extend self
+
+    def render(path, args = {})
+      context = binding
+
+      args.each do |key, value|
+        context.local_variable_set("#{key}", value)
+      end
+
+      full_path = path.start_with?("/") ? path : "#{META_ROOT}/#{path}"
+      body = File.read(full_path)
+      renderer = ERB.new(body, nil, '-')
+      renderer.result(context)
+    end
+  end
+
   class << self
     def load!(meta_dir, docs_root, pages_root)
       metadata = load_metadata!(meta_dir)
@@ -40,23 +58,31 @@ class Metadata
       def load_metadata!(meta_dir)
         metadata = {}
 
-        Dir.glob("#{meta_dir}/**/*.toml").each do |file|
-          hash = TomlRB.load_file(file)
-          metadata.deep_merge!(hash)
-        end
+        contents =
+          Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
+            Template.render(file)
+          end
 
-        metadata
+        content = contents.join("\n")
+        TomlRB.parse(content)
+      end
+
+      def posts
+        @posts ||=
+          Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
+            Post.new(path)
+          end.sort_by { |post| [ post.date, post.id ] }
       end
 
       def read_json(path)
-        json_data = File.read(path)
-        JSON.parse(json_data)
+        body = File.read(path)
+        JSON.parse(body)
       end
 
       def validate_schema!(schema, metadata)
         schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
         errors = schemer.validate(metadata).to_a
-        limit = 5
+        limit = 50
 
         if errors.any?
           error_messages =
@@ -89,7 +115,7 @@ class Metadata
     :log_fields,
     :metric_fields,
     :options,
-    :testing,
+    :tests,
     :posts,
     :releases,
     :sinks,
@@ -99,14 +125,14 @@ class Metadata
 
   def initialize(hash, docs_root, pages_root)
     @installation = OpenStruct.new()
-    @log_fields = Field.build_struct(hash["log_fields"] || {})
-    @metric_fields = Field.build_struct(hash["metric_fields"] || {})
-    @options = Option.build_struct(hash.fetch("options"))
+    @log_fields = hash.fetch("log_fields").to_struct_with_name(Field)
+    @metric_fields = hash.fetch("metric_fields").to_struct_with_name(Field)
+    @options = hash.fetch("options").to_struct_with_name(Field)
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
-    @testing = Option.build_struct(hash.fetch("testing"))
+    @tests = Field.new(hash.fetch("tests").merge({"name" => "tests"}))
 
     # domains
 
@@ -199,11 +225,11 @@ class Metadata
 
     # env vars
 
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
 
     components.each do |component|
       component.env_vars.to_h.each do |key, val|
-        @env_vars.send("#{key}=", val)
+        @env_vars["#{key}"] = val
       end
     end
 
@@ -316,6 +342,10 @@ class Metadata
 
   def relesed_versions
     releases
+  end
+
+  def service_providers
+    @service_providers ||= components.collect(&:service_providers).flatten.uniq
   end
 
   def sinks_list

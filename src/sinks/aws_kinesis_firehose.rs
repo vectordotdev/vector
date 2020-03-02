@@ -2,11 +2,15 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
-    sinks::util::{retries::RetryLogic, BatchEventsConfig, SinkExt, TowerRequestConfig},
+    sinks::util::{
+        retries::RetryLogic,
+        rusoto::{self, AwsCredentialsProvider},
+        BatchEventsConfig, SinkExt, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_firehose::{
@@ -36,6 +40,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchEventsConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub assume_role: Option<String>,
 }
 
 lazy_static! {
@@ -81,7 +86,11 @@ impl KinesisFirehoseService {
         config: KinesisFirehoseSinkConfig,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = create_client(config.region.clone().try_into()?, cx.resolver())?;
+        let client = create_client(
+            config.region.clone().try_into()?,
+            config.assume_role.clone(),
+            cx.resolver(),
+        )?;
 
         let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -163,7 +172,7 @@ fn healthcheck(
     config: KinesisFirehoseSinkConfig,
     resolver: Resolver,
 ) -> crate::Result<super::Healthcheck> {
-    let client = create_client(config.region.try_into()?, resolver)?;
+    let client = create_client(config.region.try_into()?, config.assume_role, resolver)?;
     let stream_name = config.stream_name;
 
     let fut = client
@@ -185,24 +194,24 @@ fn healthcheck(
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region, resolver: Resolver) -> crate::Result<KinesisFirehoseClient> {
-    use rusoto_credential::DefaultCredentialsProvider;
+fn create_client(
+    region: Region,
+    assume_role: Option<String>,
+    resolver: Resolver,
+) -> crate::Result<KinesisFirehoseClient> {
+    let client = rusoto::client(resolver)?;
+    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
 
-    let p = DefaultCredentialsProvider::new()?;
-    let d = crate::sinks::util::rusoto::client(resolver)?;
-
-    Ok(KinesisFirehoseClient::new_with(d, p, region))
+    Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
 fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
     let log = event.into_log();
     let data = match encoding {
-        Encoding::Json => {
-            serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
-        }
+        Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(&event::MESSAGE)
+            .get(&event::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -216,7 +225,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
 mod tests {
     use super::*;
     use crate::event::{self, Event};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn firehose_encode_event_text() {
@@ -233,9 +242,9 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &Encoding::Json).unwrap();
 
-        let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 }
@@ -254,7 +263,7 @@ mod integration_tests {
         test_util::{random_events_with_stream, random_string},
         topology::config::SinkContext,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
@@ -287,6 +296,7 @@ mod integration_tests {
                 retry_attempts: Some(0),
                 ..Default::default()
             },
+            ..Default::default()
         };
 
         let mut rt = runtime::Runtime::new().unwrap();
@@ -303,7 +313,7 @@ mod integration_tests {
 
         let config = ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4571".into()),
+            host: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()
         };
@@ -326,7 +336,7 @@ mod integration_tests {
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(rec.into_log().unflatten()).unwrap())
+            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
             let event = hit.into_document().unwrap();

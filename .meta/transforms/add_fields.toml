@@ -1,10 +1,14 @@
 [transforms.add_fields]
 title = "Add Fields"
 allow_you_to_description = "add one or more log fields"
+beta = false
 common = false
 function_category = "shape"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "add_fields") %>
 
 [transforms.add_fields.options.fields]
 type = "table"
@@ -15,9 +19,10 @@ A table of key/value pairs representing the keys to be added to the \
 event.\
 """
 
-[transforms.add_fields.options.fields.options."`[field-name]`"]
+[transforms.add_fields.options.fields.children."`[field-name]`"]
 type = "*"
 required = true
+templatable = true
 examples = [
   {"string_field" = "string value"},
   {"env_var_field" = "${ENV_VAR}"},
@@ -56,6 +61,7 @@ Given the following configuration:
     field6 = ["item 1", "item 2"]
     field7.nested = "nested value",
     field8 = "#{HOSTNAME}"
+    field9 = "{{field1}} {{field2}}"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

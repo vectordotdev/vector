@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
@@ -23,7 +22,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
             .context(super::InvalidRegex)?)
@@ -57,7 +56,7 @@ impl Transform for Sampler {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
-            .get(&event::MESSAGE)
+            .get(&event::log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 
@@ -146,7 +145,11 @@ mod tests {
         let mut sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| {
+                !s.as_log()[&event::log_schema().message_key()]
+                    .to_string_lossy()
+                    .contains("na")
+            })
             .find_map(|event| sampler.transform(event))
             .unwrap();
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
@@ -155,7 +158,11 @@ mod tests {
         let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| {
+                !s.as_log()[&event::log_schema().message_key()]
+                    .to_string_lossy()
+                    .contains("na")
+            })
             .find_map(|event| sampler.transform(event))
             .unwrap();
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());

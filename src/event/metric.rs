@@ -1,13 +1,13 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
     pub name: String,
     pub timestamp: Option<DateTime<Utc>>,
-    pub tags: Option<HashMap<String, String>>,
+    pub tags: Option<BTreeMap<String, String>>,
     pub kind: MetricKind,
     pub value: MetricValue,
 }
@@ -29,7 +29,7 @@ pub enum MetricValue {
         value: f64,
     },
     Set {
-        values: HashSet<String>,
+        values: BTreeSet<String>,
     },
     Distribution {
         values: Vec<f64>,
@@ -171,7 +171,7 @@ mod test {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),

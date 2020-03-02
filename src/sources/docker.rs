@@ -5,17 +5,18 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset, Utc};
-use futures::{
+use futures01::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
+use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
     rep::ContainerDetails,
     tty::{Chunk, StreamType},
-    Docker,
+    Docker, Error,
 };
 use std::borrow::Borrow;
 use std::sync::Arc;
@@ -582,9 +583,19 @@ impl EventStreamBuilder {
                         Ok(Async::Ready(None)) => break,
                         Ok(Async::NotReady) => Ok(Async::NotReady),
                         Err(error) => {
-                            error!(message = "docker API container logging error",%error);
-                            // On any error, restart connection
-                            break;
+                            match error {
+                                Error::Fault { code, .. } if code == StatusCode::NOT_IMPLEMENTED => {
+                                    error!(r#"docker engine is not using either `jsonfile` or `journald`
+                                            logging driver. Please enable one of these logging drivers
+                                            to get logs from the docker daemon."#);
+                                    break;
+                                }
+                                error => {
+                                    error!(message = "docker API container logging error",%error);
+                                    // On any error, restart connection
+                                    break;
+                                }
+                            }
                         }
                     };
                 }
@@ -789,14 +800,17 @@ impl ContainerLogInfo {
             let mut log_event = Event::new_empty_log().into_log();
 
             // The log message.
-            log_event.insert(event::MESSAGE.clone(), bytes_message.freeze());
+            log_event.insert(
+                event::log_schema().message_key().clone(),
+                bytes_message.freeze(),
+            );
 
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
-                log_event.insert(event::TIMESTAMP.clone(), timestamp);
+                log_event.insert(event::log_schema().timestamp_key().clone(), timestamp);
             }
 
             // Container ID.
@@ -834,8 +848,10 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state
-                        .merge_in_next_event(log_event, &[event::MESSAGE.clone()]);
+                    partial_event_merge_state.merge_in_next_event(
+                        log_event,
+                        &[event::log_schema().message_key().clone()],
+                    );
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -848,7 +864,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[event::MESSAGE.clone()]),
+                    .merge_in_final_event(log_event, &[event::log_schema().message_key().clone()]),
                 None => log_event,
             }
         } else {
@@ -916,7 +932,7 @@ mod tests {
     use super::*;
     use crate::runtime;
     use crate::test_util::{self, collect_n, trace_init};
-    use futures::future;
+    use futures01::future;
 
     static BUXYBOX_IMAGE_TAG: &'static str = "latest";
 
@@ -1171,7 +1187,10 @@ mod tests {
 
         // Wait for before message
         let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "before".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "before".into()
+        );
 
         id
     }
@@ -1196,7 +1215,7 @@ mod tests {
         container_remove(&id, &docker, &mut rt);
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::log_schema().message_key()], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
@@ -1218,8 +1237,14 @@ mod tests {
 
         container_remove(&id, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], message.into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
     }
 
     #[test]
@@ -1239,7 +1264,10 @@ mod tests {
         container_remove(&id0, &docker, &mut rt);
         container_remove(&id1, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        )
     }
 
     #[test]
@@ -1260,7 +1288,10 @@ mod tests {
         container_remove(&id0, &docker, &mut rt);
         container_remove(&id1, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        )
     }
 
     #[test]
@@ -1280,7 +1311,7 @@ mod tests {
         container_remove(&id, &docker, &mut rt);
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::MESSAGE], message.into());
+        assert_eq!(log[&event::log_schema().message_key()], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
@@ -1308,7 +1339,10 @@ mod tests {
 
         container_remove(&id, &docker, &mut rt);
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        )
     }
 
     #[test]

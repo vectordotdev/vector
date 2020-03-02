@@ -1,0 +1,48 @@
+[transforms.coercer_simple]
+  inputs = []
+  type = "coercer"
+  [transforms.coercer_simple.types]
+    integer_field = "int"
+    boolean_field = "bool"
+    float_field = "float"
+    string_field = "string"
+    timestamp_field = "timestamp"
+    timestamp_field_formatted = "timestamp|%Y-%m-%d %H:%M:%S"
+[[tests]]
+  name = "coercer_simple"
+  [tests.input]
+    insert_at = "coercer_simple"
+    type = "log"
+    [tests.input.log_fields]
+      integer_field = "123"
+      boolean_field = "true"
+      float_field = "3.1415926535"
+      string_field = -1
+      timestamp_field = "2020-02-20T12:34:56.123456789Z"
+      timestamp_field_formatted = "2020-02-20 12:34:56"
+  [[tests.outputs]]
+    extract_from = "coercer_simple"
+    [[tests.outputs.conditions]]
+      "integer_field.equals" = 123
+      "boolean_field.equals" = true
+      "float_field.equals" = 3.1415926535
+      "string_field.equals" = "-1"
+      "timestamp_field.equals" = "2020-02-20T12:34:56.123456789Z"
+      "timestamp_field_formatted.equals" = "2020-02-20T12:34:56Z"
+
+[transforms.coercer_nested]
+  inputs = []
+  type = "coercer"
+  [transforms.coercer_nested.types]
+    "nested.field" = "int"
+[[tests]]
+  name = "coercer_nested"
+  [tests.input]
+    insert_at = "coercer_nested"
+    type = "log"
+    [tests.input.log_fields]
+      "nested.field" = "1234"
+  [[tests.outputs]]
+    extract_from = "coercer_nested"
+    [[tests.outputs.conditions]]
+      "nested.field.equals" = 1234

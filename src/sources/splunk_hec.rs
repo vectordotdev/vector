@@ -1,11 +1,11 @@
 use crate::{
-    event::{self, flatten::flatten, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, Value},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{sync::mpsc, Async, Future, Sink, Stream};
+use futures01::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
@@ -30,12 +30,22 @@ lazy_static! {
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
     /// Local address on which to listen
     #[serde(default = "default_socket_address")]
     address: SocketAddr,
     /// Splunk HEC token
-    token: String,
+    token: Option<String>,
+}
+
+impl Default for SplunkConfig {
+    fn default() -> Self {
+        SplunkConfig {
+            address: default_socket_address(),
+            token: None,
+        }
+    }
 }
 
 fn default_socket_address() -> SocketAddr {
@@ -93,13 +103,16 @@ struct SplunkSource {
     /// Trigger for ending http server
     trigger: Arc<Mutex<Option<Trigger>>>,
 
-    credentials: Bytes,
+    credentials: Option<Bytes>,
 }
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, out: mpsc::Sender<Event>, trigger: Trigger) -> Self {
         SplunkSource {
-            credentials: format!("Splunk {}", config.token).into(),
+            credentials: config
+                .token
+                .as_ref()
+                .map(|token| format!("Splunk {}", token).into()),
             out,
             trigger: Arc::new(Mutex::new(Some(trigger))),
         }
@@ -170,7 +183,7 @@ impl SplunkSource {
             .and_then(
                 move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
                     // Construct event parser
-                    futures::stream::once(raw_event(body, gzip, channel, host))
+                    futures01::stream::once(raw_event(body, gzip, channel, host))
                         .forward(source.sink_with_shutdown())
                         .map(|_| ())
                 },
@@ -183,8 +196,11 @@ impl SplunkSource {
         let credentials = source.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
-                match token {
-                    Some(token) if token.as_bytes() == credentials => Ok(()),
+                match (token, credentials.as_ref()) {
+                    (_, None) => Ok(()),
+                    (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
+                        Ok(())
+                    }
                     _ => Err(Rejection::from(ApiError::BadRequest)),
                 }
             });
@@ -237,11 +253,16 @@ impl SplunkSource {
     fn authorization(&self) -> BoxedFilter<((),)> {
         let credentials = self.credentials.clone();
         warp::header::optional("Authorization")
-            .and_then(move |token: Option<String>| match token {
-                Some(token) if token.as_bytes() == credentials => Ok(()),
-                Some(_) => Err(Rejection::from(ApiError::InvalidAuthorization)),
-                None => Err(Rejection::from(ApiError::MissingAuthorization)),
-            })
+            .and_then(
+                move |token: Option<String>| match (token, credentials.as_ref()) {
+                    (_, None) => Ok(()),
+                    (Some(token), Some(password)) if token.as_bytes() == password.as_ref() => {
+                        Ok(())
+                    }
+                    (Some(_), Some(_)) => Err(Rejection::from(ApiError::InvalidAuthorization)),
+                    (None, Some(_)) => Err(Rejection::from(ApiError::MissingAuthorization)),
+                },
+            )
             .boxed()
     }
 
@@ -300,7 +321,7 @@ impl<R: Read> EventStream<R> {
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
-                    &event::HOST,
+                    &event::log_schema().host_key(),
                     host.map(|value| value.as_bytes().into()),
                 ),
                 DefaultExtractor::new("index", &INDEX),
@@ -358,27 +379,25 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(event::MESSAGE.clone(), string)
+                    log.insert(event::log_schema().message_key().clone(), string)
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
 
-                    // Add 'line' value as 'event::MESSAGE'
+                    // Add 'line' value as 'event::schema().message_key'
                     if let Some(line) = object.remove("line") {
                         match line {
-                            // This don't quite fit the meaning of a event::MESSAGE
-                            JsonValue::Array(_) | JsonValue::Object(_) => {
-                                event::flatten::insert(log, "line", line)
-                            }
-                            _ => {
-                                event::flatten::insert(log, event::MESSAGE.clone(), line);
-                            }
+                            // This don't quite fit the meaning of a event::schema().message_key
+                            JsonValue::Array(_) | JsonValue::Object(_) => log.insert("line", line),
+                            _ => log.insert(event::log_schema().message_key(), line),
                         }
                     }
 
-                    flatten(log, object);
+                    for (key, value) in object {
+                        log.insert(key, value);
+                    }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
             },
@@ -394,7 +413,9 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
-            flatten(log, object);
+            for (key, value) in object {
+                log.insert(key, value);
+            }
         }
 
         // Process time field
@@ -422,8 +443,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert(event::TIMESTAMP.clone(), time),
-            Time::Now(time) => log.insert(event::TIMESTAMP.clone(), time),
+            Time::Provided(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
+            Time::Now(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
         }
 
         // Extract default extracted fields
@@ -514,18 +535,18 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(event::MESSAGE.clone(), message);
+    log.insert(event::log_schema().message_key().clone(), message);
 
     // Add channel
     log.insert(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert(event::HOST.clone(), host.as_bytes());
+        log.insert(event::log_schema().host_key().clone(), host.as_bytes());
     }
 
     // Add timestamp
-    log.insert(event::TIMESTAMP.clone(), Utc::now());
+    log.insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
     Ok(event)
 }
@@ -653,6 +674,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
     }
 }
 
+#[cfg(features = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::SplunkConfig;
@@ -664,7 +686,7 @@ mod tests {
         event::{self, Event},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
-    use futures::{stream, sync::mpsc, Sink};
+    use futures01::{stream, sync::mpsc, Sink};
     use http::Method;
     use std::net::SocketAddr;
 
@@ -674,16 +696,17 @@ mod tests {
     const CHANNEL_CAPACITY: usize = 1000;
 
     fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
+        source_with(rt, Some(TOKEN.to_owned()))
+    }
+
+    fn source_with(rt: &mut Runtime, token: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         test_util::trace_init();
         let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
         let address = test_util::next_addr();
         rt.spawn(
-            SplunkConfig {
-                address,
-                token: TOKEN.to_owned(),
-            }
-            .build("default", &GlobalOptions::default(), sender)
-            .unwrap(),
+            SplunkConfig { address, token }
+                .build("default", &GlobalOptions::default(), sender)
+                .unwrap(),
         );
         (recv, address)
     }
@@ -765,8 +788,14 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -776,8 +805,14 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -792,8 +827,14 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source, &mut rt);
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
-            assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                msg.into()
+            );
+            assert!(event
+                .as_log()
+                .get(&event::log_schema().timestamp_key())
+                .is_some());
         }
     }
 
@@ -804,8 +845,14 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -820,8 +867,14 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source, &mut rt);
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[&event::MESSAGE], msg.into());
-            assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                msg.into()
+            );
+            assert!(event
+                .as_log()
+                .get(&event::log_schema().timestamp_key())
+                .is_some());
         }
     }
 
@@ -839,7 +892,10 @@ mod tests {
 
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -853,7 +909,10 @@ mod tests {
         let _ = rt.block_on(pump).unwrap();
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
 
-        assert_eq!(event.as_log()[&event::MESSAGE], "hello".into());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            "hello".into()
+        );
     }
 
     #[test]
@@ -865,9 +924,15 @@ mod tests {
         assert_eq!(200, post(address, "services/collector/raw", message));
 
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
-        assert_eq!(event.as_log()[&event::MESSAGE], message.into());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -896,6 +961,22 @@ mod tests {
     }
 
     #[test]
+    fn no_autorization() {
+        let message = "no_autorization";
+        let mut rt = test_util::runtime();
+        let (source, address) = source_with(&mut rt, None);
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip, rt.executor());
+        assert!(rt.block_on(health).is_ok());
+
+        let event = channel_n(vec![message], sink, source, &mut rt).remove(0);
+
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
+    }
+
+    #[test]
     fn partial() {
         let message = r#"{"event":"first"}{"event":"second""#;
         let mut rt = test_util::runtime();
@@ -904,8 +985,14 @@ mod tests {
         assert_eq!(400, post(address, "services/collector/event", message));
 
         let event = rt.block_on(collect_n(source, 1)).unwrap().remove(0);
-        assert_eq!(event.as_log()[&event::MESSAGE], "first".into());
-        assert!(event.as_log().get(&event::TIMESTAMP).is_some());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            "first".into()
+        );
+        assert!(event
+            .as_log()
+            .get(&event::log_schema().timestamp_key())
+            .is_some());
     }
 
     #[test]
@@ -918,13 +1005,22 @@ mod tests {
 
         let events = rt.block_on(collect_n(source, 3)).unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "first".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "first".into()
+        );
         assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "second".into());
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "second".into()
+        );
         assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
-        assert_eq!(events[2].as_log()[&event::MESSAGE], "third".into());
+        assert_eq!(
+            events[2].as_log()[&event::log_schema().message_key()],
+            "third".into()
+        );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
     }
 }

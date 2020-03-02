@@ -4,13 +4,15 @@ extern crate tracing;
 pub mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform};
-use futures::{future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::oneshot};
+use futures01::{
+    future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::oneshot,
+};
 use std::iter;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
-use vector::event::{Event, MESSAGE};
+use vector::event::{self, Event};
 use vector::test_util::{runtime, shutdown_on_idle, trace_init};
 use vector::topology;
 use vector::topology::config::Config;
@@ -30,7 +32,11 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 }
 
 fn into_message(event: Event) -> String {
-    event.as_log().get(&MESSAGE).unwrap().to_string_lossy()
+    event
+        .as_log()
+        .get(&event::log_schema().message_key())
+        .unwrap()
+        .to_string_lossy()
 }
 
 #[test]

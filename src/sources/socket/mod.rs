@@ -6,9 +6,10 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
+    tls::TlsSettings,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -77,15 +78,22 @@ impl SourceConfig for SocketConfig {
                 let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
-                tcp.run(config.address, config.shutdown_timeout_secs, out)
+                let tls = TlsSettings::from_config(&config.tls, true)?;
+                tcp.run(config.address, config.shutdown_timeout_secs, tls, out)
             }
             Mode::Udp(config) => {
-                let host_key = config.host_key.clone().unwrap_or(event::HOST.clone());
+                let host_key = config
+                    .host_key
+                    .clone()
+                    .unwrap_or(event::log_schema().host_key().clone());
                 Ok(udp::udp(config.address, host_key, out))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+                let host_key = config
+                    .host_key
+                    .clone()
+                    .unwrap_or(event::log_schema().host_key().to_string());
                 Ok(unix::unix(config.path, config.max_length, host_key, out))
             }
         }
@@ -109,16 +117,23 @@ mod test {
     use super::SocketConfig;
     use crate::event;
     use crate::runtime;
-    use crate::test_util::{block_on, collect_n, next_addr, send_lines, wait_for_tcp};
+    use crate::test_util::{
+        block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp,
+    };
+    use crate::tls::{TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures::sync::mpsc;
-    use futures::{Future, Sink, Stream};
+    use futures01::sync::mpsc;
+    use futures01::Stream;
+    #[cfg(unix)]
+    use futures01::{Future, Sink};
+    #[cfg(unix)]
+    use std::path::PathBuf;
     use std::{
         net::{SocketAddr, UdpSocket},
-        path::PathBuf,
         thread,
         time::Duration,
     };
+    #[cfg(unix)]
     use tokio::codec::{FramedWrite, LinesCodec};
     #[cfg(unix)]
     use tokio_uds::UnixStream;
@@ -141,7 +156,10 @@ mod test {
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
-        assert_eq!(event.as_log()[&event::HOST], "127.0.0.1".into());
+        assert_eq!(
+            event.as_log()[&event::log_schema().host_key()],
+            "127.0.0.1".into()
+        );
     }
 
     #[test]
@@ -169,11 +187,60 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(event.unwrap().as_log()[&event::MESSAGE], "short".into());
+        assert_eq!(
+            event.unwrap().as_log()[&event::log_schema().message_key()],
+            "short".into()
+        );
 
         let (event, _rx) = block_on(rx.into_future()).unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::MESSAGE],
+            event.unwrap().as_log()[&event::log_schema().message_key()],
+            "more short".into()
+        );
+    }
+
+    #[test]
+    fn tcp_with_tls() {
+        let (tx, rx) = mpsc::channel(10);
+
+        let addr = next_addr();
+
+        let mut config = TcpConfig::new(addr.into());
+        config.max_length = 10;
+        config.tls = Some(TlsConfig {
+            enabled: Some(true),
+            options: TlsOptions {
+                crt_path: Some("tests/data/localhost.crt".into()),
+                key_path: Some("tests/data/localhost.key".into()),
+                ..Default::default()
+            },
+        });
+
+        let server = SocketConfig::from(config)
+            .build("default", &GlobalOptions::default(), tx)
+            .unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+        wait_for_tcp(addr);
+
+        let lines = vec![
+            "short".to_owned(),
+            "this is too long".to_owned(),
+            "more short".to_owned(),
+        ];
+
+        rt.block_on(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
+            .unwrap();
+
+        let (event, rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(
+            event.unwrap().as_log()[&event::log_schema().message_key()],
+            "short".into()
+        );
+
+        let (event, _rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(
+            event.unwrap().as_log()[&event::log_schema().message_key()],
             "more short".into()
         );
     }
@@ -234,7 +301,10 @@ mod test {
         send_lines_udp(address, vec!["test"]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
     }
 
     #[test]
@@ -246,8 +316,14 @@ mod test {
         send_lines_udp(address, vec!["test\ntest2"]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "test2".into()
+        );
     }
 
     #[test]
@@ -259,8 +335,14 @@ mod test {
         send_lines_udp(address, vec!["test", "test2"]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "test2".into()
+        );
     }
 
     #[test]
@@ -272,7 +354,10 @@ mod test {
         let from = send_lines_udp(address, vec!["test"]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
-        assert_eq!(events[0].as_log()[&event::HOST], format!("{}", from).into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().host_key()],
+            format!("{}", from).into()
+        );
     }
 
     ////////////// UNIX TESTS //////////////
@@ -296,7 +381,7 @@ mod test {
     #[cfg(unix)]
     fn send_lines_unix<'a>(path: PathBuf, lines: Vec<&'a str>) {
         let input_stream =
-            futures::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
+            futures01::stream::iter_ok::<_, ()>(lines.clone().into_iter().map(|s| s.to_string()));
 
         UnixStream::connect(&path)
             .map_err(|e| panic!("{:}", e))
@@ -330,7 +415,10 @@ mod test {
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(1, events.len());
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
     }
 
     #[cfg(unix)]
@@ -344,8 +432,14 @@ mod test {
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(2, events.len());
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "test2".into()
+        );
     }
 
     #[cfg(unix)]
@@ -359,7 +453,13 @@ mod test {
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(2, events.len());
-        assert_eq!(events[0].as_log()[&event::MESSAGE], "test".into());
-        assert_eq!(events[1].as_log()[&event::MESSAGE], "test2".into());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "test2".into()
+        );
     }
 }

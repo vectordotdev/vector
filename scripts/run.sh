@@ -4,27 +4,32 @@
 #
 # SUMMARY
 #
-#   A simple script that runs commands in a Docker environment based on the
-#   presence of the `USE_DOCKER` environment variable.
+#   A simple script that runs commands in a container environment based
+#   on the presence of the `USE_CONTAINER` environment variable.
 #
-#   This helps to reduce the friction running various `make` commands. For
-#   example, the `make generate` command requires Ruby and other dependencies
-#   to be installed. Routing this command through a Docker images removes this.
+#   This helps to reduce the friction running various `make`
+#   commands. For example, the `make generate` command requires Ruby and
+#   other dependencies to be installed. Routing this command through a
+#   container images removes this.
 
 set -eou pipefail
 
-if [ "$USE_DOCKER" == "true" ]; then
-  echo "Executing within Docker. To disable set USE_DOCKER to false"
-  echo ""
-  echo "  make ... USE_DOCKER=false"
-  echo ""
+case "$USE_CONTAINER" in
+  docker | podman)
+    echo "Executing within $USE_CONTAINER. To disable set USE_CONTAINER to none"
+    echo ""
+    echo "  make ... USE_CONTAINER=none"
+    echo ""
 
-  scripts/docker-run.sh "$@"
-else
-  echo "Executing locally. To use Docker set USE_DOCKER to true"
-  echo ""
-  echo "  make ... USE_DOCKER=true"
-  echo ""
+    scripts/docker-run.sh "$@"
+    ;;
 
-  ${@:2}
-fi
+  *)
+    echo "Executing locally. To use Docker set USE_CONTAINER to docker or podman"
+    echo ""
+    echo "  make ... USE_CONTAINER=docker"
+    echo "  make ... USE_CONTAINER=podman"
+    echo ""
+
+    ${@:2}
+esac

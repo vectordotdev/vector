@@ -6,24 +6,20 @@
 
 <%= component_config_example(component) %>
 
-<%- if !component.requirements.nil? -%>
+<%- if component.requirements.any? -%>
 ## Requirements
 
-<Alert type="danger" fill={true} icon={false}>
-
-<%= component.requirements %>
-
-</Alert>
+<%= component_requirements(component) %>
 
 <%- end -%>
 ## Options
 
-<%= options(component.specific_options_list, heading_depth: 3) %>
+<%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= options(component.env_vars_list, heading_depth: 3) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 ## Output
@@ -101,6 +97,12 @@ variable representing the event:
 
 Note, a Lua `table` is an associative array. You can read more about
 [Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
+
+### Types
+
+Event fields can be set to scalar values (booleans, numbers, or strings),
+and the resulting event will keep the correct types. If an event field is
+set to an invalid value, a message will be logged and the field will be dropped.
 
 ### Nested Fields
 
