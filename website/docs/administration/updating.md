@@ -18,6 +18,7 @@ import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/setup/installation/package-managers/dpkg/#updating">DPKG</Jump>
 <Jump to="/docs/setup/installation/package-managers/homebrew/#updating">Homebrew</Jump>
+<Jump to="/docs/setup/installation/package-managers/nix/#updating">Nix</Jump>
 <Jump to="/docs/setup/installation/package-managers/rpm/#updating">RPM</Jump>
 <Jump to="/docs/setup/installation/package-managers/msi/#updating">MSI</Jump>
 

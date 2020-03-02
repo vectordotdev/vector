@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::{CheckFieldsConfig, Condition, ConditionConfig},
     event::Event,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
@@ -10,16 +10,26 @@ use serde::{Deserialize, Serialize};
 //------------------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum SwimlaneCondition {
+    FromType(Box<dyn ConditionConfig>),
+    NoTypeCondition(CheckFieldsConfig),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(flatten)]
-    condition: Box<dyn ConditionConfig>,
+    condition: SwimlaneCondition,
 }
 
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
     fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Swimlane::new(self.condition.build()?)))
+        Ok(Box::new(Swimlane::new(match &self.condition {
+            SwimlaneCondition::FromType(c) => c.build()?,
+            SwimlaneCondition::NoTypeCondition(c) => c.build()?,
+        })))
     }
 
     fn input_type(&self) -> DataType {
@@ -60,7 +70,7 @@ impl Transform for Swimlane {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
-    lanes: IndexMap<String, Box<dyn ConditionConfig>>,
+    lanes: IndexMap<String, SwimlaneCondition>,
 }
 
 inventory::submit! {

@@ -1,21 +1,34 @@
 use futures01::Future;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-docker")]
 pub mod docker;
+#[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(feature = "sources-journald")]
 pub mod journald;
-#[cfg(feature = "rdkafka")]
+#[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
+#[cfg(feature = "sources-kubernetes")]
 pub mod kubernetes;
+#[cfg(feature = "sources-logplex")]
 pub mod logplex;
+#[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
+#[cfg(feature = "sources-socket")]
 pub mod socket;
+#[cfg(feature = "sources-splunk_hec")]
 pub mod splunk_hec;
+#[cfg(feature = "sources-statsd")]
 pub mod statsd;
+#[cfg(feature = "sources-stdin")]
 pub mod stdin;
+#[cfg(feature = "sources-syslog")]
 pub mod syslog;
-mod util;
+#[cfg(feature = "sources-vector")]
 pub mod vector;
+
+mod util;
 
 pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
 

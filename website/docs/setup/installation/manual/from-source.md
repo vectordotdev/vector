@@ -354,7 +354,8 @@ are specified, then the `default` one is used.
 | `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. | |
 | `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies. | |
 
-Alternatively, for finer control, it is possible to use specific features from the list below:
+Alternatively, for finer control over dependencies and operating system features, it is possible to use specific
+features from the list below:
 
 | Feature | Description | Included in `default` feature |
 | :------ | :---------- | :----------------- |
@@ -365,6 +366,79 @@ Alternatively, for finer control, it is possible to use specific features from t
 | `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
 
+In addition, it is possible to pick only a subset of Vector's components for the build using feature flags. In order
+to do it, it instead of `default` features one has to pass a comma-separated list of component features.
+
+<details><summary>Click to see all supported component features</summary>
+<p>
+
+| Name  | Description |
+|:------|:------------|
+| `sources-docker` | Enables building of [`docker` source][docs.sources.docker].  Requires `unix` feature to be also enabled for support of Unix domain sockets.  |
+| `sources-file` | Enables building of [`file` source][docs.sources.file].  |
+| `sources-journald` | Enables building of [`journald` source][docs.sources.journald].  |
+| `sources-kafka` | Enables building of [`kafka` source][docs.sources.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
+| `sources-logplex` | Enables building of [`logplex` source][docs.sources.logplex].  |
+| `sources-prometheus` | Enables building of [`prometheus` source][docs.sources.prometheus].  |
+| `sources-socket` | Enables building of [`socket` source][docs.sources.socket].  |
+| `sources-splunk_hec` | Enables building of [`splunk_hec` source][docs.sources.splunk_hec].  |
+| `sources-statsd` | Enables building of [`statsd` source][docs.sources.statsd].  |
+| `sources-stdin` | Enables building of [`stdin` source][docs.sources.stdin].  |
+| `sources-syslog` | Enables building of [`syslog` source][docs.sources.syslog].  |
+| `sources-vector` | Enables building of [`vector` source][docs.sources.vector].  |
+| `transforms-add_fields` | Enables building of [`add_fields` transform][docs.transforms.add_fields].  |
+| `transforms-add_tags` | Enables building of [`add_tags` transform][docs.transforms.add_tags].  |
+| `transforms-ansi_stripper` | Enables building of [`ansi_stripper` transform][docs.transforms.ansi_stripper].  |
+| `transforms-aws_ec2_metadata` | Enables building of [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].  |
+| `transforms-coercer` | Enables building of [`coercer` transform][docs.transforms.coercer].  |
+| `transforms-concat` | Enables building of [`concat` transform][docs.transforms.concat].  |
+| `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.field_filter].  |
+| `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
+| `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
+| `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
+| `transforms-log_to_metric` | Enables building of [`log_to_metric` transform][docs.transforms.log_to_metric].  |
+| `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
+| `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
+| `transforms-merge` | Enables building of [`merge` transform][docs.transforms.merge].  |
+| `transforms-regex_parser` | Enables building of [`regex_parser` transform][docs.transforms.regex_parser].  |
+| `transforms-remove_fields` | Enables building of [`remove_fields` transform][docs.transforms.remove_fields].  |
+| `transforms-remove_tags` | Enables building of [`remove_tags` transform][docs.transforms.remove_tags].  |
+| `transforms-rename_fields` | Enables building of [`rename_fields` transform][docs.transforms.rename_fields].  |
+| `transforms-sampler` | Enables building of [`sampler` transform][docs.transforms.sampler].  |
+| `transforms-split` | Enables building of [`split` transform][docs.transforms.split].  |
+| `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
+| `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
+| `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
+| `sinks-aws_cloudwatch_metrics` | Enables building of [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics].  |
+| `sinks-aws_kinesis_firehose` | Enables building of [`aws_kinesis_firehose` sink][docs.sinks.aws_kinesis_firehose].  |
+| `sinks-aws_kinesis_streams` | Enables building of [`aws_kinesis_streams` sink][docs.sinks.aws_kinesis_streams].  |
+| `sinks-aws_s3` | Enables building of [`aws_s3` sink][docs.sinks.aws_s3].  |
+| `sinks-blackhole` | Enables building of [`blackhole` sink][docs.sinks.blackhole].  |
+| `sinks-clickhouse` | Enables building of [`clickhouse` sink][docs.sinks.clickhouse].  |
+| `sinks-console` | Enables building of [`console` sink][docs.sinks.console].  |
+| `sinks-datadog_metrics` | Enables building of [`datadog_metrics` sink][docs.sinks.datadog_metrics].  |
+| `sinks-elasticsearch` | Enables building of [`elasticsearch` sink][docs.sinks.elasticsearch].  |
+| `sinks-file` | Enables building of [`file` sink][docs.sinks.file].  |
+| `sinks-gcp_cloud_storage` | Enables building of [`gcp_cloud_storage` sink][docs.sinks.gcp_cloud_storage].  |
+| `sinks-gcp_pubsub` | Enables building of [`gcp_pubsub` sink][docs.sinks.gcp_pubsub].  |
+| `sinks-gcp_stackdriver_logging` | Enables building of [`gcp_stackdriver_logging` sink][docs.sinks.gcp_stackdriver_logging].  |
+| `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
+| `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
+| `sinks-influxdb_metrics` | Enables building of [`influxdb_metrics` sink][docs.sinks.influxdb_metrics].  |
+| `sinks-kafka` | Enables building of [`kafka` sink][docs.sinks.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
+| `sinks-logdna` | Enables building of [`logdna` sink][docs.sinks.logdna].  |
+| `sinks-loki` | Enables building of [`loki` sink][docs.sinks.loki].  |
+| `sinks-new_relic_logs` | Enables building of [`new_relic_logs` sink][docs.sinks.new_relic_logs].  |
+| `sinks-prometheus` | Enables building of [`prometheus` sink][docs.sinks.prometheus].  |
+| `sinks-sematext_logs` | Enables building of [`sematext_logs` sink][docs.sinks.sematext_logs].  |
+| `sinks-socket` | Enables building of [`socket` sink][docs.sinks.socket].  |
+| `sinks-splunk_hec` | Enables building of [`splunk_hec` sink][docs.sinks.splunk_hec].  |
+| `sinks-statsd` | Enables building of [`statsd` sink][docs.sinks.statsd].  |
+| `sinks-vector` | Enables building of [`vector` sink][docs.sinks.vector].  |
+
+</p>
+</details>
+
 
 [docs.configuration]: /docs/setup/configuration/
 [docs.containers]: /docs/setup/installation/containers/
@@ -372,8 +446,67 @@ Alternatively, for finer control, it is possible to use specific features from t
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary/#buffer
 [docs.package_managers]: /docs/setup/installation/package-managers/
+[docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
+[docs.sinks.aws_cloudwatch_metrics]: /docs/reference/sinks/aws_cloudwatch_metrics/
+[docs.sinks.aws_kinesis_firehose]: /docs/reference/sinks/aws_kinesis_firehose/
+[docs.sinks.aws_kinesis_streams]: /docs/reference/sinks/aws_kinesis_streams/
+[docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
+[docs.sinks.blackhole]: /docs/reference/sinks/blackhole/
+[docs.sinks.clickhouse]: /docs/reference/sinks/clickhouse/
+[docs.sinks.console]: /docs/reference/sinks/console/
+[docs.sinks.datadog_metrics]: /docs/reference/sinks/datadog_metrics/
+[docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
+[docs.sinks.file]: /docs/reference/sinks/file/
+[docs.sinks.gcp_cloud_storage]: /docs/reference/sinks/gcp_cloud_storage/
+[docs.sinks.gcp_pubsub]: /docs/reference/sinks/gcp_pubsub/
+[docs.sinks.gcp_stackdriver_logging]: /docs/reference/sinks/gcp_stackdriver_logging/
+[docs.sinks.http]: /docs/reference/sinks/http/
+[docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
+[docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/
+[docs.sinks.kafka]: /docs/reference/sinks/kafka/
+[docs.sinks.logdna]: /docs/reference/sinks/logdna/
+[docs.sinks.loki]: /docs/reference/sinks/loki/
+[docs.sinks.new_relic_logs]: /docs/reference/sinks/new_relic_logs/
+[docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
+[docs.sinks.sematext_logs]: /docs/reference/sinks/sematext_logs/
+[docs.sinks.socket]: /docs/reference/sinks/socket/
+[docs.sinks.splunk_hec]: /docs/reference/sinks/splunk_hec/
+[docs.sinks.statsd]: /docs/reference/sinks/statsd/
+[docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.docker]: /docs/reference/sources/docker/
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
+[docs.sources.logplex]: /docs/reference/sources/logplex/
+[docs.sources.prometheus]: /docs/reference/sources/prometheus/
+[docs.sources.socket]: /docs/reference/sources/socket/
+[docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
+[docs.sources.statsd]: /docs/reference/sources/statsd/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
+[docs.sources.syslog]: /docs/reference/sources/syslog/
+[docs.sources.vector]: /docs/reference/sources/vector/
+[docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
+[docs.transforms.add_tags]: /docs/reference/transforms/add_tags/
+[docs.transforms.ansi_stripper]: /docs/reference/transforms/ansi_stripper/
+[docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/
+[docs.transforms.coercer]: /docs/reference/transforms/coercer/
+[docs.transforms.concat]: /docs/reference/transforms/concat/
+[docs.transforms.field_filter]: /docs/reference/transforms/field_filter/
+[docs.transforms.geoip]: /docs/reference/transforms/geoip/
+[docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
+[docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
+[docs.transforms.log_to_metric]: /docs/reference/transforms/log_to_metric/
+[docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
+[docs.transforms.lua]: /docs/reference/transforms/lua/
+[docs.transforms.merge]: /docs/reference/transforms/merge/
+[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
+[docs.transforms.remove_tags]: /docs/reference/transforms/remove_tags/
+[docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
+[docs.transforms.sampler]: /docs/reference/transforms/sampler/
+[docs.transforms.split]: /docs/reference/transforms/split/
+[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka

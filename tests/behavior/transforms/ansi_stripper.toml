@@ -11,7 +11,6 @@
   [[tests.outputs]]
     extract_from = "ansi_stripper_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "message.equals" = "hello123"
 
 [transforms.ansi_stripper_nested]
@@ -28,5 +27,4 @@
   [[tests.outputs]]
     extract_from = "ansi_stripper_nested"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "a.b.equals" = "hello123"

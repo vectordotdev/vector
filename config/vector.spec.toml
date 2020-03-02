@@ -1823,18 +1823,20 @@ end
 
   [transforms.swimlanes.lanes]
     [transforms.swimlanes.lanes.`<swimlane_id>`]
-      # The type of the condition to execute. Currently only the `check_fields` type
-      # is available.
+      # The type of the condition to execute.
       #
       # * required
       # * type: string
       type = "check_fields"
+      type = "is_log"
+      type = "is_metric"
 
       # Check whether a fields contents exactly matches the value specified.
       #
       # * optional
       # * no default
       # * type: string
+      # * relevant when type = "check_fields"
       "message.eq" = "this is the content to match against"
 
       # Check whether a field exists or does not exist, depending on the provided
@@ -1843,6 +1845,7 @@ end
       # * optional
       # * no default
       # * type: bool
+      # * relevant when type = "check_fields"
       "host.exists" = true
 
       # Check whether a fields contents does not match the value specified.
@@ -1850,6 +1853,7 @@ end
       # * optional
       # * no default
       # * type: string
+      # * relevant when type = "check_fields"
       "method.neq" = "POST"
 
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.

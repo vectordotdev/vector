@@ -21,7 +21,6 @@
   [[tests.outputs]]
     extract_from = "rename_fields_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       # Plain
       "a.exists" = false
       "renamed_a.equals" = "a"

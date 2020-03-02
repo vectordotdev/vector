@@ -1,4 +1,6 @@
-use native_tls::{Certificate, Identity, TlsAcceptor, TlsConnectorBuilder};
+#[cfg(feature = "sources-socket")]
+use native_tls::TlsAcceptor;
+use native_tls::{Certificate, Identity, TlsConnectorBuilder};
 use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
@@ -178,6 +180,7 @@ impl TlsSettings {
         })
     }
 
+    #[cfg(feature = "sources-socket")]
     pub(crate) fn acceptor(&self) -> crate::Result<TlsAcceptor> {
         match self.identity() {
             None => Err(TlsError::MissingRequiredIdentity.into()),

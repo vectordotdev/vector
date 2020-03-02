@@ -674,6 +674,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
     }
 }
 
+#[cfg(features = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::SplunkConfig;
