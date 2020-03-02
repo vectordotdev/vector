@@ -49,6 +49,7 @@ tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.16"
 tokio-tls = "0.2.1"
+tokio-codec = "0.1.0"
 
 # Tracing
 tracing = "0.1.9"
@@ -202,6 +203,7 @@ leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 sources = [
   "sources-docker",
   "sources-file",
+  "sources-http",
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes",
@@ -221,6 +223,7 @@ sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
 sources-logplex = ["warp"]
 sources-prometheus = []
+sources-http = ["warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-uds"]
 sources-splunk_hec = ["bytesize", "warp"]
 sources-statsd = []

@@ -4858,6 +4858,7 @@ dependencies = [
  "syslog_loose",
  "tempfile",
  "tokio",
+ "tokio-codec",
  "tokio-retry",
  "tokio-signal",
  "tokio-threadpool",
