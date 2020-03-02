@@ -1,3 +1,4 @@
+use futures01::{try_ready, Async, Future, Poll, Stream};
 #[cfg(feature = "sources-socket")]
 use native_tls::TlsAcceptor;
 use native_tls::{Certificate, Identity, TlsConnectorBuilder};
@@ -10,8 +11,12 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::fmt;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read, Write};
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::tcp::{Incoming, TcpListener};
+use tokio_tls::TlsStream;
 
 #[derive(Debug, Snafu)]
 enum TlsError {
@@ -254,6 +259,137 @@ fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
         .with_context(|| FileReadFailed { note, filename })?;
 
     Ok(text)
+}
+
+pub struct MaybeTlsIncoming<I: Stream> {
+    incoming: I,
+    acceptor: Option<tokio_tls::TlsAcceptor>,
+    state: MaybeTlsIncomingState<I::Item>,
+}
+
+enum MaybeTlsIncomingState<S> {
+    Inner,
+    Accepting(tokio_tls::Accept<S>),
+}
+
+impl<I: Stream> MaybeTlsIncoming<I> {
+    pub fn new(incoming: I, tls: Option<TlsSettings>) -> crate::Result<Self> {
+        let acceptor = if let Some(tls) = tls {
+            let acceptor = tls.acceptor()?;
+            Some(acceptor.into())
+        } else {
+            None
+        };
+
+        let state = MaybeTlsIncomingState::Inner;
+
+        Ok(Self {
+            incoming,
+            acceptor,
+            state,
+        })
+    }
+}
+
+impl MaybeTlsIncoming<Incoming> {
+    pub fn bind(addr: &SocketAddr, tls: Option<TlsSettings>) -> crate::Result<Self> {
+        let listener = TcpListener::bind(addr)?;
+        let incoming = listener.incoming();
+
+        MaybeTlsIncoming::new(incoming, tls)
+    }
+}
+
+impl<I> Stream for MaybeTlsIncoming<I>
+where
+    I: Stream,
+    I::Item: AsyncRead + AsyncWrite,
+    I::Error: Into<crate::Error>,
+{
+    type Item = MaybeTlsStream<I::Item>;
+    type Error = crate::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        loop {
+            match &mut self.state {
+                MaybeTlsIncomingState::Inner => {
+                    let stream = if let Some(stream) =
+                        try_ready!(self.incoming.poll().map_err(Into::into))
+                    {
+                        stream
+                    } else {
+                        return Ok(Async::Ready(None));
+                    };
+
+                    if let Some(acceptor) = &mut self.acceptor {
+                        let fut = acceptor.accept(stream);
+
+                        self.state = MaybeTlsIncomingState::Accepting(fut);
+                        continue;
+                    } else {
+                        return Ok(Async::Ready(Some(MaybeTlsStream::Raw(stream))));
+                    }
+                }
+
+                MaybeTlsIncomingState::Accepting(fut) => {
+                    let stream = try_ready!(fut.poll().map_err(Box::new));
+                    self.state = MaybeTlsIncomingState::Inner;
+
+                    return Ok(Async::Ready(Some(MaybeTlsStream::Tls(stream))));
+                }
+            }
+        }
+    }
+}
+
+impl<I: Stream + fmt::Debug> fmt::Debug for MaybeTlsIncoming<I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MaybeTlsIncoming")
+            .field("incoming", &self.incoming)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub enum MaybeTlsStream<S> {
+    Tls(TlsStream<S>),
+    Raw(S),
+}
+
+impl<S: Read + Write> Read for MaybeTlsStream<S> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            MaybeTlsStream::Tls(s) => s.read(buf),
+            MaybeTlsStream::Raw(s) => s.read(buf),
+        }
+    }
+}
+
+impl<S: AsyncRead + AsyncWrite> AsyncRead for MaybeTlsStream<S> {}
+
+impl<S: Read + Write> Write for MaybeTlsStream<S> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            MaybeTlsStream::Tls(s) => s.write(buf),
+            MaybeTlsStream::Raw(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            MaybeTlsStream::Tls(s) => s.flush(),
+            MaybeTlsStream::Raw(s) => s.flush(),
+        }
+    }
+}
+
+impl<S: AsyncRead + AsyncWrite> AsyncWrite for MaybeTlsStream<S> {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        match self {
+            MaybeTlsStream::Tls(s) => s.shutdown(),
+            MaybeTlsStream::Raw(s) => s.shutdown(),
+        }
+    }
 }
 
 #[cfg(test)]

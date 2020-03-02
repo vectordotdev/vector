@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
@@ -37,6 +38,7 @@ pub struct SplunkConfig {
     address: SocketAddr,
     /// Splunk HEC token
     token: Option<String>,
+    tls: Option<TlsConfig>,
 }
 
 impl Default for SplunkConfig {
@@ -44,6 +46,7 @@ impl Default for SplunkConfig {
         SplunkConfig {
             address: default_socket_address(),
             token: None,
+            tls: None,
         }
     }
 }
@@ -81,8 +84,11 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        // Build server
-        let (_, server) = warp::serve(services).bind_with_graceful_shutdown(self.address, tripwire);
+        let tls = TlsSettings::from_config(&self.tls, true)?;
+        let incoming = MaybeTlsIncoming::bind(&self.address, tls)?;
+
+        let server =
+            warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);
 
         Ok(Box::new(server))
     }
