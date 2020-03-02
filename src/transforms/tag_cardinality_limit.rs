@@ -214,10 +214,9 @@ impl Transform for TagCardinalityLimit {
                                 to_delete.push(key);
                             }
                         }
-                        to_delete.into_iter().for_each(|key| {
+                        for key in to_delete {
                             tags_map.remove(key);
-                            ()
-                        });
+                        }
                     }
                 }
                 Some(event)
