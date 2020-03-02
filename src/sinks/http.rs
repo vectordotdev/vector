@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -44,11 +44,11 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        deserialize_with = "EncodingConfig::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -74,11 +74,9 @@ pub enum HttpMethod {
     Put,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Ndjson,
     Json,
@@ -298,7 +296,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let encoding = EncodingConfigWithDefault::from(Encoding::Text);
+        let encoding = EncodingConfig::from(Encoding::Text);
         let event = Event::from("hello world");
 
         let mut config = HttpSinkConfig::default();
@@ -310,7 +308,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_json() {
-        let encoding = EncodingConfigWithDefault::from(Encoding::Ndjson);
+        let encoding = EncodingConfig::from(Encoding::Ndjson);
         let event = Event::from("hello world");
 
         let mut config = HttpSinkConfig::default();

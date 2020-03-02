@@ -3,9 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::{
         util::{
-            encoding::{
-                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
-            },
+            encoding::{EncodingConfig, EncodingConfiguration},
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
@@ -63,11 +61,11 @@ pub struct GcsSinkConfig {
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
+        deserialize_with = "EncodingConfig::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default
     )]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -128,11 +126,9 @@ impl Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 enum Compression {
-    #[derivative(Default)]
     Gzip,
     None,
 }
@@ -416,7 +412,7 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 fn encode_event(
     mut event: Event,
     key_prefix: &Template,
-    encoding: &EncodingConfigWithDefault<Encoding>,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     encoding.apply_rules(&mut event);
     let key = key_prefix

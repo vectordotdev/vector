@@ -2070,21 +2070,20 @@ end
   #
 
   [sinks.aws_cloudwatch_logs.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "text"
-    # * type: string
-    # * enum: "text" or "json"
-    format = "json"
-    format = "text"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -2370,21 +2369,20 @@ end
   #
 
   [sinks.aws_kinesis_firehose.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "text"
-    # * type: string
-    # * enum: "text" or "json"
-    format = "json"
-    format = "text"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -2590,21 +2588,20 @@ end
   #
 
   [sinks.aws_kinesis_streams.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "json"
+    format = "json"
+    format = "text"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "text"
-    # * type: string
-    # * enum: "text" or "json"
-    format = "json"
-    format = "text"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -3245,14 +3242,6 @@ end
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
 
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "default"
-    # * type: string
-    # * must be: "default" (if supplied)
-    format = "default"
-
     # Limit the sink to only encoding the specified labels.
     #
     # * optional
@@ -3756,14 +3745,6 @@ end
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
 
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "default"
-    # * type: string
-    # * must be: "default" (if supplied)
-    format = "default"
-
     # Limit the sink to only encoding the specified labels.
     #
     # * optional
@@ -4199,21 +4180,20 @@ end
   #
 
   [sinks.gcp_cloud_storage.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text" or "ndjson"
+    format = "ndjson"
+    format = "text"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "text"
-    # * type: string
-    # * enum: "text" or "ndjson"
-    format = "ndjson"
-    format = "text"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -4486,14 +4466,6 @@ end
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "default"
-    # * type: string
-    # * must be: "default" (if supplied)
-    format = "default"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -4793,14 +4765,6 @@ end
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "default"
-    # * type: string
-    # * must be: "default" (if supplied)
-    format = "default"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -5120,22 +5084,21 @@ end
   #
 
   [sinks.http.encoding]
+    # The encoding format used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "text", "json", and "ndjson"
+    format = "json"
+    format = "ndjson"
+    format = "text"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "text"
-    # * type: string
-    # * enum: "text", "json", and "ndjson"
-    format = "json"
-    format = "ndjson"
-    format = "text"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -5403,14 +5366,6 @@ end
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "json"
-    # * type: string
-    # * must be: "json" (if supplied)
-    format = "json"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -6045,14 +6000,6 @@ end
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
 
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "default"
-    # * type: string
-    # * must be: "default" (if supplied)
-    format = "default"
-
     # Limit the sink to only encoding the specified labels.
     #
     # * optional
@@ -6588,14 +6535,6 @@ end
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
 
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "json"
-    # * type: string
-    # * must be: "json" (if supplied)
-    format = "json"
-
     # Limit the sink to only encoding the specified labels.
     #
     # * optional
@@ -6855,14 +6794,6 @@ end
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "default"
-    # * type: string
-    # * must be: "default" (if supplied)
-    format = "default"
 
     # Limit the sink to only encoding the specified labels.
     #

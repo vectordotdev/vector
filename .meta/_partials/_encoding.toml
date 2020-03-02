@@ -5,26 +5,28 @@ description = """\
 Configures the encoding specific sink behavior.\
 """
 
-[<%= namespace %>.encoding.children.format]
-type = "string"
-common = true
-<% if default %>
-required = false
-default = <%= default.to_toml %>
-examples = <%= encodings.to_toml %>
-<% else %>
-required = true
-examples = <%= encodings.to_toml %>
-<% end %>
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
+<% if encodings.length > 1 and default != "default" %>
+  [<%= namespace %>.encoding.children.format]
+  type = "string"
+  common = true
+  <% if default %>
+  required = false
+  default = <%= default.to_toml %>
+  examples = <%= encodings.to_toml %>
+  <% else %>
+  required = true
+  examples = <%= encodings.to_toml %>
+  <% end %>
+  description = """\
+  The encoding format used to serialize the events before outputting.\
+  """
 
-[<%= namespace %>.encoding.children.format.enum]
-<%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
-<%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
-<%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>
-<%- if encodings.include?("default") -%>default = "Each event is encoded according to the default for this sink."<%- end -%>
+  [<%= namespace %>.encoding.children.format.enum]
+  <%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
+  <%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
+  <%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>
+  <%- if encodings.include?("default") -%>default = "Each event is encoded according to the default for this sink."<%- end -%>
+<% end %>
 
 [<%= namespace %>.encoding.children.only_fields]
 type = "[string]"

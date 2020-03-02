@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, SinkExt, TowerRequestConfig,
@@ -32,19 +32,15 @@ pub struct KinesisService {
     config: KinesisSinkConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
     pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
     #[serde(default)]
@@ -61,9 +57,7 @@ lazy_static! {
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Json,
 }
@@ -227,7 +221,7 @@ fn create_client(
 fn encode_event(
     mut event: Event,
     partition_key_field: &Option<Atom>,
-    encoding: &EncodingConfigWithDefault<Encoding>,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
     encoding.apply_rules(&mut event);
     let partition_key = if let Some(partition_key_field) = partition_key_field {

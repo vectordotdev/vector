@@ -56,7 +56,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
     except_fields = ["timestamp", "message", "host"] # example, no default
-    format = "json" # default, must be: "json" (if supplied)
     only_fields = ["timestamp", "message", "host"] # example, no default
     timestamp_format = "rfc3339" # default, enum
 ```
@@ -96,7 +95,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
     except_fields = ["timestamp", "message", "host"] # example, no default
-    format = "json" # default, must be: "json" (if supplied)
     only_fields = ["timestamp", "message", "host"] # example, no default
     timestamp_format = "rfc3339" # default, enum
 
@@ -355,29 +353,6 @@ Configures the encoding specific sink behavior.
 #### except_fields
 
 Prevent the sink from encoding the specified labels.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={"json"}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["json"]}
-  groups={[]}
-  name={"format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### format
-
-The encoding format used to serialize the events before outputting.
 
 
 </Field>
