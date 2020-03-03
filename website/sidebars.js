@@ -121,6 +121,8 @@ module.exports = {
             
               "reference/sources/file",
             
+              "reference/sources/http",
+            
               "reference/sources/journald",
             
               "reference/sources/kafka",
