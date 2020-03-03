@@ -20,6 +20,7 @@ pub struct Pieces {
     pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_begun_triggers: HashMap<String, Trigger>,
+    pub shutdown_force_triggers: HashMap<String, Trigger>,
     pub shutdown_complete_tripwires: HashMap<String, Tripwire>,
 }
 
@@ -99,6 +100,7 @@ pub fn build_pieces(
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_begun_triggers = HashMap::new();
+    let mut shutdown_force_triggers = HashMap::new();
     let mut shutdown_complete_tripwires = HashMap::new();
 
     let mut errors = vec![];
@@ -121,13 +123,14 @@ pub fn build_pieces(
         let typetag = source.source_type();
 
         let (global_shutdown_begun_trigger, global_shutdown_begun_tripwire) = Tripwire::new();
+        let (global_force_shutdown_trigger, global_force_shutdown_tripwire) = Tripwire::new();
         let (local_shutdown_complete_trigger, local_shutdown_complete_tripwire) = Tripwire::new();
-        let shutdown = ShutdownSignals::new(
-            global_shutdown_begun_tripwire.clone(),
+        let source_shutdown_signals = ShutdownSignals::new(
+            global_shutdown_begun_tripwire,
             local_shutdown_complete_trigger,
         );
 
-        let server = match source.build(&name, &config.global, shutdown, tx) {
+        let server = match source.build(&name, &config.global, source_shutdown_signals, tx) {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;
@@ -139,9 +142,9 @@ pub fn build_pieces(
         let pump = rx.forward(output).map(|_| ());
         let pump = Task::new(&name, &typetag, pump);
 
-        // TODO: Remove this line once all Sources do this internally.
+        // todo comment what's happening here
         let server = server
-            .select(global_shutdown_begun_tripwire)
+            .select(global_force_shutdown_tripwire)
             .map(|_| ())
             .map_err(|_| ());
         let server = Task::new(&name, &typetag, server);
@@ -150,6 +153,7 @@ pub fn build_pieces(
         tasks.insert(name.clone(), pump);
         source_tasks.insert(name.clone(), server);
         shutdown_begun_triggers.insert(name.clone(), global_shutdown_begun_trigger);
+        shutdown_force_triggers.insert(name.clone(), global_force_shutdown_trigger);
         shutdown_complete_tripwires.insert(name.clone(), local_shutdown_complete_tripwire);
     }
 
@@ -263,6 +267,7 @@ pub fn build_pieces(
             source_tasks,
             healthchecks,
             shutdown_begun_triggers,
+            shutdown_force_triggers,
             shutdown_complete_tripwires,
         };
 

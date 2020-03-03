@@ -32,6 +32,7 @@ pub struct RunningTopology {
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     shutdown_begun_triggers: HashMap<String, Trigger>,
+    shutdown_force_triggers: HashMap<String, Trigger>,
     shutdown_complete_tripwires: HashMap<String, Tripwire>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
@@ -59,6 +60,7 @@ pub fn start_validated(
         outputs: HashMap::new(),
         config: Config::empty(),
         shutdown_begun_triggers: HashMap::new(),
+        shutdown_force_triggers: HashMap::new(),
         shutdown_complete_tripwires: HashMap::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -379,6 +381,9 @@ impl RunningTopology {
         let shutdown_begun_trigger = new_pieces.shutdown_begun_triggers.remove(name).unwrap();
         self.shutdown_begun_triggers
             .insert(name.to_string(), shutdown_begun_trigger);
+        let shutdown_force_trigger = new_pieces.shutdown_force_triggers.remove(name).unwrap();
+        self.shutdown_force_triggers
+            .insert(name.to_string(), shutdown_force_trigger);
         let shutdown_complete_tripwire =
             new_pieces.shutdown_complete_tripwires.remove(name).unwrap();
         self.shutdown_complete_tripwires
@@ -392,23 +397,32 @@ impl RunningTopology {
         );
     }
 
-    // Informs a Source that it should shut down, but does not wait for the shutdown to complete.
+    /// Informs a Source that it should shut down, but does not wait for the shutdown to complete.
     fn shutdown_source_begin(&mut self, name: &str) {
         self.shutdown_begun_triggers.remove(name).unwrap().cancel();
     }
 
-    // Waits for the Source to finish shutting down for up to 30 seconds and then forcibly shuts
-    // down the source if it hasn't finished by then.
+    /// Waits for the Source to finish shutting down for up to 30 seconds and then forcibly shuts
+    /// down the source if it hasn't finished by then.
     fn shutdown_source_end(&mut self, name: &str) {
         info!("Waiting for Source {} to shutdown", name);
         // TODO: add better logging for whether it succeeds or fails.
-        self.shutdown_complete_tripwires
+        let result = self
+            .shutdown_complete_tripwires
             .remove(name)
             .unwrap()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(30)) // TODO take timeout Instant as arg so we can't wait more than 30 seconds if multiple Sources fail to shut down.
             .wait();
+        if let Err(_) = result {
+            error!(
+                "Source '{}' failed to shutdown after 30 seconds. Forcing shutdown.",
+                name
+            );
+            self.shutdown_force_triggers.remove(name).unwrap().cancel();
+        } else {
+            self.shutdown_force_triggers.remove(name).unwrap().disable();
+        }
         self.source_tasks.remove(name).wait().unwrap();
-        // TODO: "force" the shutdown of the source... not sure how to do this...
     }
 
     fn remove_outputs(&mut self, name: &str) {
