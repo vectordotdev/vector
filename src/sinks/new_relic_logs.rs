@@ -1,9 +1,6 @@
 use crate::{
     sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{
-        encoding::{EncodingConfig},
-        BatchBytesConfig, Compression, TowerRequestConfig,
-    },
+    sinks::util::{encoding::EncodingConfig, BatchBytesConfig, Compression, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
@@ -127,8 +124,6 @@ impl NewRelicLogsConfig {
             request,
 
             tls: None,
-
-
         })
     }
 }

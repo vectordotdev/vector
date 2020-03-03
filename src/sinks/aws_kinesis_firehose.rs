@@ -298,7 +298,7 @@ mod integration_tests {
                 retry_attempts: Some(0),
                 ..Default::default()
             },
-            ..Default::default()
+            assume_role: None,
         };
 
         let mut rt = runtime::Runtime::new().unwrap();

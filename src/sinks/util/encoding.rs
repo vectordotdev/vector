@@ -33,12 +33,12 @@
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
 use crate::{event::Value, Event, Result};
-use std::collections::VecDeque;
 use serde::de::{MapAccess, Visitor};
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer},
     Deserialize, Serialize,
 };
+use std::collections::VecDeque;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
 use string_cache::DefaultAtom as Atom;
