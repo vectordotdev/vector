@@ -51,9 +51,7 @@ jobs:
         minikube-version: 1.7.3
         k8s-version: ${{ matrix.kube }}
     - name: Start minikube
-      run: |
-        minikube config set vm-driver kvm2
-        minikube start
+      run: sudo /home/runner/bin/minikube start --vm-driver=none
     - name: Build image
       run: |
         eval $(minikube docker-env)
@@ -67,16 +65,3 @@ jobs:
       run: |
         KUBE_TEST_IMAGE=vector_test
         cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
-  start-minikube:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        kube: [1.13] #, 1.14, 1.17]
-    steps:
-    - uses: opsgang/ga-setup-minikube@v0.1.1
-      with:
-        minikube-version: 1.7.3
-        k8s-version: ${{ matrix.kube }}
-    - name: Start minikube
-      run: sudo /home/runner/bin/minikube start --vm-driver=none
-
