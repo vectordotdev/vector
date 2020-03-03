@@ -1,5 +1,5 @@
 use futures01::{try_ready, Async, Future, Poll, Stream};
-#[cfg(feature = "sources-socket")]
+#[cfg(feature = "sources-tls")]
 use native_tls::TlsAcceptor;
 use native_tls::{Certificate, Identity, TlsConnectorBuilder};
 use openssl::{
@@ -12,10 +12,13 @@ use snafu::{ResultExt, Snafu};
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Read, Write};
+#[cfg(feature = "sources-tls")]
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::tcp::{Incoming, TcpListener};
+use tokio::net::tcp::Incoming;
+#[cfg(feature = "sources-tls")]
+use tokio::net::TcpListener;
 use tokio_tls::TlsStream;
 
 #[derive(Debug, Snafu)]
@@ -189,6 +192,7 @@ impl TlsSettings {
         })
     }
 
+    #[cfg(feature = "sources-tls")]
     pub(crate) fn acceptor(&self) -> crate::Result<TlsAcceptor> {
         match self.identity() {
             None => Err(TlsError::MissingRequiredIdentity.into()),
@@ -276,6 +280,7 @@ enum MaybeTlsIncomingState<S> {
 }
 
 impl<I: Stream> MaybeTlsIncoming<I> {
+    #[cfg(feature = "sources-tls")]
     pub fn new(incoming: I, tls: Option<TlsSettings>) -> crate::Result<Self> {
         let acceptor = if let Some(tls) = tls {
             let acceptor = tls.acceptor()?;
@@ -295,6 +300,7 @@ impl<I: Stream> MaybeTlsIncoming<I> {
 }
 
 impl MaybeTlsIncoming<Incoming> {
+    #[cfg(feature = "sources-tls")]
     pub fn bind(addr: &SocketAddr, tls: Option<TlsSettings>) -> crate::Result<Self> {
         let listener = TcpListener::bind(addr)?;
         let incoming = listener.incoming();
