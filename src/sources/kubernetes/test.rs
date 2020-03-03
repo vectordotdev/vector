@@ -24,6 +24,9 @@ static USER_POD_UID_MARKER: &'static str = "$(USER_POD_UIDS)";
 static ARGS_MARKER: &'static str = "$(ARGS_MARKER)";
 static ECHO_NAME: &'static str = "$(ECHO_NAME)";
 static WAIT_LIMIT: usize = 60; //s
+/// Environment variable which contains name of the image to be tested.
+static KUBE_TEST_IMAGE_ENV: &'static str = "KUBE_TEST_IMAGE";
+static IMAGE_MARKER: &'static str = "$(IMAGE)";
 
 // ******************************* CONFIG ***********************************//
 // Replacing configurations need to have :
@@ -112,8 +115,8 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-kube-watch-fix:latest
-        imagePullPolicy: Always
+        image: $(IMAGE)
+        imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
@@ -357,6 +360,14 @@ fn create_vector<'a>(
         .map(|uid| format!("\"{}\"", uid))
         .unwrap_or("".to_string());
 
+    let image_name = std::env::var(KUBE_TEST_IMAGE_ENV).expect(
+        format!(
+            "{} environment variable must be set with the image name to be tested.",
+            KUBE_TEST_IMAGE_ENV
+        )
+        .as_str(),
+    );
+
     // Start vector
     kube.create(
         Api::v1ConfigMap,
@@ -367,7 +378,12 @@ fn create_vector<'a>(
             .as_str(),
     );
 
-    kube.create(Api::v1DaemonSet, VECTOR_YAML)
+    kube.create(
+        Api::v1DaemonSet,
+        VECTOR_YAML
+            .replace(IMAGE_MARKER, image_name.as_str())
+            .as_str(),
+    )
 }
 
 fn start_vector<'a>(
