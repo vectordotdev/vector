@@ -82,6 +82,7 @@ pub trait TcpSource: Clone + Send + 'static {
                         .map_err(|err| panic!("Timer error: {:?}", err))
                 })
                 .shared();
+            let shutdown_complete = shutdown.shutdown_complete;
 
             let future = listener
                 .incoming()
@@ -111,6 +112,7 @@ pub trait TcpSource: Clone + Send + 'static {
                             )
                         })
                         .map_err(|_| ());
+                    let mut shutdown_complete = shutdown_complete.clone();
 
                     let source = self.clone();
                     span.in_scope(|| {
@@ -121,6 +123,7 @@ pub trait TcpSource: Clone + Send + 'static {
                         let events_in = FramedRead::new(socket, source.decoder())
                             .take_until(tripwire)
                             .filter_map(move |frame| {
+                                shutdown_complete.take();
                                 let host = host.clone();
                                 source.build_event(frame, host)
                             })
@@ -134,7 +137,6 @@ pub trait TcpSource: Clone + Send + 'static {
                     Ok(())
                 })
                 .inspect(|_| trigger.cancel());
-            // todo signal when shutdown is complete
             future::Either::A(future)
         });
 
@@ -197,7 +199,7 @@ mod test {
             test.addr,
             SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
                 Ipv4Addr::new(127, 1, 2, 3),
-                1234
+                1234,
             )))
         );
         let test: Config = toml::from_str(r#"addr="systemd""#).unwrap();

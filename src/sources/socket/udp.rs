@@ -67,6 +67,8 @@ pub fn udp(
                 .forward(out)
                 // Done with listening and sending
                 .map(move |_| {
+                    // Move the shutdown_complete handle into the future so that the handle gets
+                    // dropped only once all work for this source is complete.
                     shutdown_complete.take();
                 })
         }),
