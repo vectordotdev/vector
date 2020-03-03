@@ -35,7 +35,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   mode = "exact" # example, enum
 
   # OPTIONAL
-  false_positive_rate = 1.0e-05 # default, relevant when mode = "probabilistic"
+  cache_size_per_tag = 5120000 # default, bytes, relevant when mode = "probabilistic"
   limit_exceeded_action = "drop_tag" # default, enum
   value_limit = 500 # default
 ```
@@ -52,22 +52,22 @@ import Field from '@site/src/components/Field';
 
 <Field
   common={true}
-  defaultValue={1.0e-05}
+  defaultValue={5120000}
   enumValues={null}
-  examples={[1.0e-05]}
+  examples={[5120000]}
   groups={[]}
-  name={"false_positive_rate"}
+  name={"cache_size_per_tag"}
   path={null}
   relevantWhen={{"mode":"probabilistic"}}
   required={false}
   templateable={false}
-  type={"float"}
-  unit={null}
+  type={"int"}
+  unit={"bytes"}
   >
 
-### false_positive_rate
+### cache_size_per_tag
 
-Controls how likely it is that a metric with a new tag after the limit has been reached isn't caught by the transform. Lower values make this less likely at the cost of higher memory usage. See [Memory Utilization](#memory-utilization) for more info.
+The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits. See [Memory Utilization](#memory-utilization) for more info.
 
 
 </Field>
@@ -99,7 +99,7 @@ Controls what should happen when a metric comes in with a tag that would exceed 
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"exact":"Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit.","probabilistic":"Has lower memory requirements than `exact`, but may occassionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of [`false_positive_rate`](#false_positive_rate)."}}
+  enumValues={{"exact":"Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit.","probabilistic":"Has lower memory requirements than `exact`, but may occassionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of [`cache_size_per_tag`](#cache_size_per_tag)."}}
   examples={["exact","probabilistic"]}
   groups={[]}
   name={"mode"}
@@ -161,7 +161,7 @@ section.
 ### Memory Utilization
 
 This transform stores in memory a copy of the key for every tag on every metric
-event seen by this transform.  In mode `exect`, a copy of every distinct
+event seen by this transform.  In mode `exact`, a copy of every distinct
 value *for each key* is also kept in memory, until [`value_limit`](#value_limit) distinct values
 have been seen for a given key, at which point new values for that key will be
 rejected.  So to estimate the memory usage of this transform in mode `exact`
@@ -177,22 +177,23 @@ a given value has been seen for that key.  The formula for estimating memory
 usage in mode `probabilistic` is:
 (number of distinct field names in the tags for your metrics * average length of
 the field names for the tags) + (number of distinct field names in the tags of
-your metrics * size of each bloom filter)
+-your metrics * [`cache_size_per_tag`](#cache_size_per_tag))
 
-The size of each bloom filter will be based on the configured [`value_limit`](#value_limit)
-and [`false_positive_rate`](#false_positive_rate). Higher values for [`value_limit`](#value_limit) and lower values for
-`false_positive_rate` result in larger bloom filters.  The exact formula for
-calculating the size of the bloom filter is complex, but there are many
-free bloom filter size calculators available online. The formula is generally
-presented in terms of 'n', 'p', 'k', and 'm' where 'n' is the number of items
-in the filter (`value_limit` in our case), 'p' is the probability of false
-positives (`false_positive_rate` in our case), 'k' is the number of hash
-functions used internally, and 'm' is the number of bits in the bloom filter.
-You should be able to provide values for just 'n' and 'p' and get back the
-value for 'm' with an optional 'k' selected for you.  The value of 'm' that
-the calculator gives you will tell you the memory usage required by each
-bloom filter in this transform.  Generally speaking this mode should require
-much less memory than mode `exact`.
+The [`cache_size_per_tag`](#cache_size_per_tag) option controls the size of the bloom filter used
+for storing the set of acceptable values for any single key. The larger the
+bloom filter the lower the false positive rate, which in our case means the less
+likely we are to allow a new tag value that would otherwise violate a
+configured limit. If you want to know the exact false positive rate for a given
+`cache_size_per_tag` and [`value_limit`](#value_limit), there are many free online bloom filter
+calculators that can answer this. The formula is generally presented in terms of
+'n', 'p', 'k', and 'm' where 'n' is the number of items in the filter
+(`value_limit` in our case), 'p' is the probability of false positives (what we
+want to solve for), 'k' is the number of hash functions used internally, and 'm'
+is the number of bits in the bloom filter. You should be able to provide values
+for just 'n' and 'm' and get back the value for 'p' with an optimal 'k' selected
+for you.   Remember when converting from [`value_limit`](#value_limit) to the 'm' value to plug
+into the calculator that [`value_limit`](#value_limit) is in bytes, and 'm' is often presented
+in bits (1/8 of a byte).
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

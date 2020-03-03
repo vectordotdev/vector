@@ -33,7 +33,7 @@
 ### Memory Utilization
 
 This transform stores in memory a copy of the key for every tag on every metric
-event seen by this transform.  In mode `exect`, a copy of every distinct
+event seen by this transform.  In mode `exact`, a copy of every distinct
 value *for each key* is also kept in memory, until `value_limit` distinct values
 have been seen for a given key, at which point new values for that key will be
 rejected.  So to estimate the memory usage of this transform in mode `exact`
@@ -49,19 +49,20 @@ a given value has been seen for that key.  The formula for estimating memory
 usage in mode `probabilistic` is:
 (number of distinct field names in the tags for your metrics * average length of
 the field names for the tags) + (number of distinct field names in the tags of
-your metrics * size of each bloom filter)
+-your metrics * `cache_size_per_tag`)
 
-The size of each bloom filter will be based on the configured `value_limit`
-and `false_positive_rate`. Higher values for `value_limit` and lower values for
-`false_positive_rate` result in larger bloom filters.  The exact formula for
-calculating the size of the bloom filter is complex, but there are many
-free bloom filter size calculators available online. The formula is generally
-presented in terms of 'n', 'p', 'k', and 'm' where 'n' is the number of items
-in the filter (`value_limit` in our case), 'p' is the probability of false
-positives (`false_positive_rate` in our case), 'k' is the number of hash
-functions used internally, and 'm' is the number of bits in the bloom filter.
-You should be able to provide values for just 'n' and 'p' and get back the
-value for 'm' with an optional 'k' selected for you.  The value of 'm' that
-the calculator gives you will tell you the memory usage required by each
-bloom filter in this transform.  Generally speaking this mode should require
-much less memory than mode `exact`.
+The `cache_size_per_tag` option controls the size of the bloom filter used
+for storing the set of acceptable values for any single key. The larger the
+bloom filter the lower the false positive rate, which in our case means the less
+likely we are to allow a new tag value that would otherwise violate a
+configured limit. If you want to know the exact false positive rate for a given
+`cache_size_per_tag` and `value_limit`, there are many free online bloom filter
+calculators that can answer this. The formula is generally presented in terms of
+'n', 'p', 'k', and 'm' where 'n' is the number of items in the filter
+(`value_limit` in our case), 'p' is the probability of false positives (what we
+want to solve for), 'k' is the number of hash functions used internally, and 'm'
+is the number of bits in the bloom filter. You should be able to provide values
+for just 'n' and 'm' and get back the value for 'p' with an optimal 'k' selected
+for you.   Remember when converting from `value_limit` to the 'm' value to plug
+into the calculator that `value_limit` is in bytes, and 'm' is often presented
+in bits (1/8 of a byte).

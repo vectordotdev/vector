@@ -30,8 +30,8 @@ pub enum Mode {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BloomFilterConfig {
-    #[serde(default = "default_false_positive_rate")]
-    pub false_positive_rate: f32,
+    #[serde(default = "default_cache_size")]
+    pub cache_size_per_key: usize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -54,8 +54,8 @@ fn default_value_limit() -> u32 {
     500
 }
 
-fn default_false_positive_rate() -> f32 {
-    0.00001
+fn default_cache_size() -> usize {
+    5000 * 1024 // 5KB
 }
 
 inventory::submit! {
@@ -99,13 +99,17 @@ impl TagValueSet {
                 storage: TagValueSetStorage::Set(HashSet::with_capacity(value_limit as usize)),
                 num_elements: 0,
             },
-            Mode::Probabilistic(config) => Self {
-                storage: TagValueSetStorage::Bloom(BloomFilter::with_rate(
-                    config.false_positive_rate,
-                    value_limit,
-                )),
-                num_elements: 0,
-            },
+            Mode::Probabilistic(config) => {
+                let num_bits = config.cache_size_per_key / 8; // Convert bytes to bits
+                let num_hashes = bloom::optimal_num_hashes(num_bits, value_limit);
+
+                Self {
+                    storage: TagValueSetStorage::Bloom(BloomFilter::with_size(
+                        num_bits, num_hashes,
+                    )),
+                    num_elements: 0,
+                }
+            }
         }
     }
 
@@ -228,7 +232,7 @@ impl Transform for TagCardinalityLimit {
 #[cfg(test)]
 mod tests {
     use super::{LimitExceededAction, TagCardinalityLimit, TagCardinalityLimitConfig};
-    use crate::transforms::tag_cardinality_limit::{BloomFilterConfig, Mode};
+    use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
     use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
     use std::collections::BTreeMap;
 
@@ -257,19 +261,11 @@ mod tests {
         value_limit: u32,
         limit_exceeded_action: LimitExceededAction,
     ) -> TagCardinalityLimit {
-        make_transform_bloom_with_rate(value_limit, limit_exceeded_action, 0.0001)
-    }
-
-    fn make_transform_bloom_with_rate(
-        value_limit: u32,
-        limit_exceeded_action: LimitExceededAction,
-        false_positive_rate: f32,
-    ) -> TagCardinalityLimit {
         TagCardinalityLimit::new(TagCardinalityLimitConfig {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Probabilistic(BloomFilterConfig {
-                false_positive_rate,
+                cache_size_per_key: default_cache_size(),
             }),
         })
     }
