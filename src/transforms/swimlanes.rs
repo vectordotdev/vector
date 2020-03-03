@@ -60,7 +60,7 @@ impl Transform for Swimlane {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
-    lanes: IndexMap<String, AnyCondition>,
+    lanes: IndexMap<String, DefaultedCondition>,
 }
 
 inventory::submit! {

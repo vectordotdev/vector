@@ -1,0 +1,172 @@
+[transforms.transaction]
+  inputs = []
+  type = "transaction"
+  identifier_fields = [ "request_id" ]
+  [transforms.transaction.ends_when]
+    "test_end_message.exists" = true
+
+[[tests]]
+  name = "transaction_basic"
+
+  [[tests.inputs]]
+    insert_at = "transaction"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "first message value"
+      request_id = "1"
+      host = "host1"
+      counter = 5
+
+  [[tests.inputs]]
+    insert_at = "transaction"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "second message value"
+      request_id = "1"
+      host = "host2"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "transaction"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other transaction one"
+      request_id = "2"
+      host = "host3"
+      counter = 11
+
+  [[tests.inputs]]
+    insert_at = "transaction"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "third message value"
+      request_id = "1"
+      host = "host4"
+      counter = 9
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "transaction"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other transaction two"
+      request_id = "2"
+      host = "host5"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "transaction"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other transaction three"
+      request_id = "2"
+      host = "host6"
+      counter = 2
+      test_end_message = true
+
+  [[tests.outputs]]
+    extract_from = "transaction"
+    [[tests.outputs.conditions]]
+      "message.equals" = "first message value"
+      "host.equals" = "host1"
+      "request_id.equals" = "1"
+      "counter.equals" = 21
+      "timestamp_end.exists" = true
+    [[tests.outputs.conditions]]
+      "message.equals" = "other transaction one"
+      "host.equals" = "host3"
+      "request_id.equals" = "2"
+      "counter.equals" = 20
+      "timestamp_end.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.transaction_strats]
+  inputs = []
+  type = "transaction"
+  identifier_fields = [ "request_id" ]
+
+  [transforms.transaction_strats.merge_strategies]
+    "message" = "append"
+    "other_value" = "array"
+
+  [transforms.transaction_strats.ends_when]
+    "test_end_message.exists" = true
+
+[[tests]]
+  name = "transaction_merge_strategies"
+
+  [[tests.inputs]]
+    insert_at = "transaction_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "first message value"
+      request_id = "1"
+      other_value = "first"
+      host = "host1"
+      counter = 5
+
+  [[tests.inputs]]
+    insert_at = "transaction_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "second message value"
+      other_value = 2
+      request_id = "1"
+      host = "host2"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "transaction_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other transaction one"
+      request_id = "2"
+      host = "host3"
+      counter = 11
+
+  [[tests.inputs]]
+    insert_at = "transaction_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "third message value"
+      request_id = "1"
+      host = "host4"
+      counter = 9
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "transaction_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other transaction two"
+      other_value = "1"
+      request_id = "2"
+      host = "host5"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "transaction_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other transaction three"
+      request_id = "2"
+      other_value = true
+      host = "host6"
+      counter = 2
+      test_end_message = true
+
+  [[tests.outputs]]
+    extract_from = "transaction_strats"
+    [[tests.outputs.conditions]]
+      "message.equals" = "first message value second message value third message value"
+      "host.equals" = "host1"
+      "request_id.equals" = "1"
+      "counter.equals" = 21
+      "timestamp_end.exists" = true
+    [[tests.outputs.conditions]]
+      "message.equals" = "other transaction one other transaction two other transaction three"
+      "host.equals" = "host3"
+      "request_id.equals" = "2"
+      "counter.equals" = 20
+      "timestamp_end.exists" = true
