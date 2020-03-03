@@ -28,14 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Cache cargo build
-      id: cache-vector
-      uses: actions/cache@v1
-      with:
-        path: ./target/release/vector
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      if: steps.cache-vector.outputs.cache-hit != 'true'
       run: cargo build --release --no-default-features  --features "sources-kubernetes transforms-kubernetes sinks-console"
     - name: Save vector
       uses: actions/upload-artifact@v1
@@ -47,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [v1.13.2] #, v1.14.10, v1.17.2]
+        kube: [v1.13.2, v1.14.10, v1.17.2]
     steps:
     - name: Load vector
       uses: actions/download-artifact@v1
