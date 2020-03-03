@@ -32,10 +32,10 @@ channel.
 
 ### Phoning Home
 
-Vector, under no circumstances, will "phone home" and communicate with an
-external service that you did not explicitly configure as part of setting up
-Vector. This includes grey-area tactics such as version checks, capturing
-diagnostic information, and sharing crash reports.
+Vector, under no circumstances, now and in the future, will "phone home" and
+communicate with an external service that you did not explicitly configure as
+part of setting up Vector. This includes grey-area tactics such as version
+checks, capturing diagnostic information, and sharing crash reports.
 
 ## Vector Website & Docs
 
