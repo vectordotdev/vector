@@ -51,7 +51,9 @@ jobs:
         minikube-version: 1.7.3
         k8s-version: ${{ matrix.kube }}
     - name: Start minikube
-      run: sudo /home/runner/bin/minikube start --vm-driver=none
+      run: |
+        CHANGE_MINIKUBE_NONE_USER=true
+        sudo /home/runner/bin/minikube start --vm-driver=none
     - name: Build image
       run: |
         eval $(minikube docker-env)
