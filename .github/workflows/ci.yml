@@ -78,5 +78,5 @@ jobs:
         minikube-version: 1.7.3
         k8s-version: ${{ matrix.kube }}
     - name: Start minikube
-      run: sudo minikube start --vm-driver=none
+      run: minikube start --vm-driver=virtualbox
 
