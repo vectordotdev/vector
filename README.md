@@ -82,7 +82,8 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
 * [**Releases**][urls.vector_releases] - [v0.8.0 (latest)][urls.v0.8.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
-* Policies - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
+* **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
+
 
 ## Performance
 
