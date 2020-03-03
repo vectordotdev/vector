@@ -23,7 +23,7 @@ inventory::submit! {
     SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
 }
 
-#[typetag::serde(name = "humio")]
+#[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
