@@ -22,19 +22,22 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: "cd tests && make check-component-features"
-  test_kubernetes:
+  test-kubernetes:
     runs-on: ubuntu-latest    
     strategy:
       matrix:
-        kube: [1.13, 1.14, 1.17]        
+        kube: [1.13] #, 1.14, 1.17]        
     steps:
     - uses: actions/checkout@v2    
+    
+    - name: Build
+      run: cargo build --release --no-default-features  --features "sources-kubernetes transforms-kubernetes sinks-console"
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
         minikube-version: 1.7.3
         k8s-version: ${{ matrix.kube }}
-    - name: Build
-      run: cargo build --release --verbose
+    - name: Start minikube
+      run: minikube start
     - name: Build image
       run: |
         eval $(minikube docker-env) 
@@ -46,5 +49,5 @@ jobs:
     - name: Run kubernetes integration tests
       run: |
         KUBE_TEST_IMAGE=vector_test 
-        cargo test --verbose --lib --features "kubernetes-integration-tests" -- --test-threads=1 kubernetes 
+        cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes 
 
