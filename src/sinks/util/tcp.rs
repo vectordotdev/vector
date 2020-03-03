@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{encode_event, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
-    tls::{TlsConfig, TlsConnectorExt, TlsSettings},
+    tls::{tls_connector, TlsConfig, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -10,7 +10,7 @@ use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::{
@@ -26,8 +26,6 @@ use tracing::field;
 enum TcpBuildError {
     #[snafu(display("Must specify both TLS key_file and crt_file"))]
     MissingCrtKeyFile,
-    #[snafu(display("Could not build TLS connector: {}", source))]
-    TlsBuildError { source: native_tls::Error },
     #[snafu(display("Could not set TCP TLS identity: {}", source))]
     TlsIdentityError { source: native_tls::Error },
     #[snafu(display("Could not export identity to DER: {}", source))]
@@ -160,11 +158,7 @@ impl TcpSink {
                         debug!(message = "connected");
                         self.backoff = Self::fresh_backoff();
                         match self.tls {
-                            Some(ref tls) => match native_tls::TlsConnector::builder()
-                                .use_tls_settings(tls.clone())
-                                .build()
-                                .context(TlsBuildError)
-                            {
+                            Some(ref tls) => match tls_connector(Some(tls.clone())) {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
                                     TlsConnector::from(connector).connect(&self.host, socket),
                                 ),

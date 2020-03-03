@@ -6,7 +6,7 @@ use super::{
 use crate::{
     dns::Resolver,
     event::Event,
-    tls::{TlsConnectorExt, TlsSettings},
+    tls::{tls_connector, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -133,13 +133,7 @@ impl<B> HttpService<B> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
+        let tls = tls_connector(tls_settings).unwrap();
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
@@ -176,13 +170,7 @@ impl HttpServiceBuilder {
         let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
         http.enforce_http(false);
 
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = self.tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
+        let tls = tls_connector(self.tls_settings).unwrap();
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
@@ -209,11 +197,8 @@ pub fn connector(
     let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
-    let mut tls = native_tls::TlsConnector::builder();
-
-    tls.use_tls_settings(tls_settings);
-
-    let https = HttpsConnector::from((http, tls.build()?));
+    let tls = tls_connector(Some(tls_settings))?;
+    let https = HttpsConnector::from((http, tls));
 
     Ok(https)
 }

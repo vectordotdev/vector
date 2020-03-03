@@ -1,7 +1,7 @@
 use futures01::{try_ready, Async, Future, Poll, Stream};
 #[cfg(feature = "sources-tls")]
 use native_tls::TlsAcceptor;
-use native_tls::{Certificate, Identity, TlsConnectorBuilder};
+use native_tls::{Certificate, Identity, TlsConnector};
 use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
@@ -35,6 +35,8 @@ pub enum TlsError {
         filename: PathBuf,
         source: std::io::Error,
     },
+    #[snafu(display("Could not build TLS connector: {}", source))]
+    TlsBuildConnectorError { source: native_tls::Error },
     #[snafu(display("Could not set TCP TLS identity: {}", source))]
     TlsIdentityError { source: native_tls::Error },
     #[snafu(display("Could not export identity to DER: {}", source))]
@@ -201,28 +203,27 @@ impl TlsSettings {
     }
 }
 
+pub(crate) fn tls_connector(settings: Option<TlsSettings>) -> crate::Result<TlsConnector> {
+    let mut builder = TlsConnector::builder();
+    if let Some(settings) = settings {
+        builder.danger_accept_invalid_certs(!settings.verify_certificate);
+        builder.danger_accept_invalid_hostnames(!settings.verify_hostname);
+        settings
+            .identity()
+            .map(|identity| builder.identity(identity));
+        if let Some(certificate) = settings.authority {
+            builder.add_root_certificate(certificate);
+        }
+    }
+    Ok(builder.build().context(TlsBuildConnectorError)?)
+}
+
 impl fmt::Debug for TlsSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
             .finish()
-    }
-}
-
-pub trait TlsConnectorExt {
-    fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self;
-}
-
-impl TlsConnectorExt for TlsConnectorBuilder {
-    fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self {
-        self.danger_accept_invalid_certs(!settings.verify_certificate);
-        self.danger_accept_invalid_hostnames(!settings.verify_hostname);
-        settings.identity().map(|identity| self.identity(identity));
-        if let Some(certificate) = settings.authority {
-            self.add_root_certificate(certificate);
-        }
-        self
     }
 }
 
