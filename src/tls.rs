@@ -189,7 +189,6 @@ impl TlsSettings {
         })
     }
 
-    #[cfg(feature = "sources-socket")]
     pub(crate) fn acceptor(&self) -> crate::Result<TlsAcceptor> {
         match self.identity() {
             None => Err(TlsError::MissingRequiredIdentity.into()),
