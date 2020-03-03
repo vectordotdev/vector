@@ -6,11 +6,11 @@ route some of your most sensitive data and we want you to know that we do not
 take that lightly. This document clarifies how the Vector project thinks about
 privacy now and in the future.
 
-<!-- MarkdownTOC autolink="true" style="ordered" -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Vector Itself](#vector-itself)
-  1. [Downloads](#downloads)
-  1. [Phoning Home](#phoning-home)
+   1. [Downloads](#downloads)
+   1. [Phoning Home](#phoning-home)
 1. [Vector Website & Docs](#vector-website--docs)
 1. [Vector Community](#vector-community)
 
