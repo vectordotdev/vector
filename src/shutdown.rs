@@ -29,7 +29,9 @@ impl SourceShutdownHandle {
 
 impl Drop for SourceShutdownHandle {
     fn drop(&mut self) {
-        panic!("SourceShutdownHandle dropped without ever being taken");
+        if !self.taken {
+            panic!("SourceShutdownHandle dropped without ever being taken");
+        }
     }
 }
 
