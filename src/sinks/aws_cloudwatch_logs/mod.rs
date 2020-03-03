@@ -772,7 +772,7 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: GROUP_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            encoding: Encoding::Json.into(),
+            encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
             batch: Default::default(),
