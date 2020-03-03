@@ -82,6 +82,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
 * [**Releases**][urls.vector_releases] - [v0.8.0 (latest)][urls.v0.8.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
+* **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
 
 ## Performance
@@ -194,7 +195,7 @@ Or use your own [preferred method][docs.installation].
 ---
 
 <p align="center">
-  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong>
+  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
 
@@ -268,11 +269,14 @@ Or use your own [preferred method][docs.installation].
 [urls.v0.8.0]: https://vector.dev/releases/0.8.0/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_enriching_transforms]: https://vector.dev/components?functions[]=enrich
 [urls.vector_parsing_transforms]: https://vector.dev/components?functions[]=parse
+[urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
