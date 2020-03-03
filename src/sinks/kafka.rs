@@ -301,7 +301,7 @@ mod integration_test {
 
     #[test]
     fn kafka_happy_path_plaintext() {
-        kafka_happy_path("localhost:9092", None);
+        kafka_happy_path("localhost:9092", None, None);
     }
 
     const TEST_CA: &str = "tests/data/Vector_CA.crt";
@@ -317,10 +317,35 @@ mod integration_test {
                     ..Default::default()
                 },
             }),
+            None,
         );
     }
 
-    fn kafka_happy_path(server: &str, tls: Option<KafkaTlsConfig>) {
+    #[test]
+    fn kafka_happy_path_gzip() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Gzip));
+    }
+
+    #[test]
+    fn kafka_happy_path_lz4() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Lz4));
+    }
+
+    #[test]
+    fn kafka_happy_path_snappy() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Snappy));
+    }
+
+    #[test]
+    fn kafka_happy_path_zstd() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Zstd));
+    }
+
+    fn kafka_happy_path(
+        server: &str,
+        tls: Option<KafkaTlsConfig>,
+        compression: Option<KafkaCompression>,
+    ) {
         let topic = format!("test-{}", random_string(10));
 
         let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);
@@ -328,6 +353,7 @@ mod integration_test {
             bootstrap_servers: server.to_string(),
             topic: topic.clone(),
             encoding: Encoding::Text,
+            compression,
             tls,
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
