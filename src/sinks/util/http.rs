@@ -6,14 +6,14 @@ use super::{
 use crate::{
     dns::Resolver,
     event::Event,
-    tls::{tls_connector, TlsSettings},
+    tls::{tls_connector_builder, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
 use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -133,8 +133,8 @@ impl<B> HttpService<B> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector(tls_settings).unwrap();
-        let https = HttpsConnector::from((http, tls));
+        let tls = tls_connector_builder(tls_settings).unwrap();
+        let https = HttpsConnector::with_connector(http, tls).expect("FIXME");
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -170,8 +170,8 @@ impl HttpServiceBuilder {
         let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector(self.tls_settings).unwrap();
-        let https = HttpsConnector::from((http, tls));
+        let tls = tls_connector_builder(self.tls_settings).unwrap();
+        let https = HttpsConnector::with_connector(http, tls).expect("FIXME");
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -197,8 +197,8 @@ pub fn connector(
     let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
-    let tls = tls_connector(Some(tls_settings))?;
-    let https = HttpsConnector::from((http, tls));
+    let tls = tls_connector_builder(Some(tls_settings))?;
+    let https = HttpsConnector::with_connector(http, tls).expect("FIXME");
 
     Ok(https)
 }

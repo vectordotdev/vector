@@ -18,18 +18,12 @@ use tokio::{
     net::tcp::{ConnectFuture, TcpStream},
     timer::Delay,
 };
+use tokio_openssl::{ConnectAsync as SslConnectAsync, SslConnectorExt, SslStream};
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_tls::{Connect as TlsConnect, TlsConnector, TlsStream};
 use tracing::field;
 
 #[derive(Debug, Snafu)]
 enum TcpBuildError {
-    #[snafu(display("Must specify both TLS key_file and crt_file"))]
-    MissingCrtKeyFile,
-    #[snafu(display("Could not set TCP TLS identity: {}", source))]
-    TlsIdentityError { source: native_tls::Error },
-    #[snafu(display("Could not export identity to DER: {}", source))]
-    DerExportError { source: openssl::error::ErrorStack },
     #[snafu(display("Missing host in address field"))]
     MissingHost,
     #[snafu(display("Missing port in address field"))]
@@ -82,14 +76,14 @@ enum TcpSinkState {
     Disconnected,
     ResolvingDns(crate::dns::ResolverFuture),
     Connecting(ConnectFuture),
-    TlsConnecting(TlsConnect<TcpStream>),
+    TlsConnecting(SslConnectAsync<TcpStream>),
     Connected(TcpOrTlsStream),
     Backoff(Delay),
 }
 
 type TcpOrTlsStream = MaybeTlsStream<
     FramedWrite<TcpStream, BytesCodec>,
-    FramedWrite<TlsStream<TcpStream>, BytesCodec>,
+    FramedWrite<SslStream<TcpStream>, BytesCodec>,
 >;
 
 impl TcpSink {
@@ -160,7 +154,7 @@ impl TcpSink {
                         match self.tls {
                             Some(ref tls) => match tls_connector(Some(tls.clone())) {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
-                                    TlsConnector::from(connector).connect(&self.host, socket),
+                                    connector.connect_async(&self.host, socket),
                                 ),
                                 Err(err) => {
                                     error!(message = "unable to establish TLS connection.", error = %err);
