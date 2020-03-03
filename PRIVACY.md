@@ -13,6 +13,9 @@ privacy now and in the future.
    1. [Phoning Home](#phoning-home)
 1. [Vector Website & Docs](#vector-website--docs)
 1. [Vector Community](#vector-community)
+   1. [Vector Repository](#vector-repository)
+   1. [Vector Chat](#vector-chat)
+   1. [Vecotr Mailinglist](#vecotr-mailinglist)
 
 <!-- /MarkdownTOC -->
 
@@ -20,12 +23,12 @@ privacy now and in the future.
 
 ### Downloads
 
-Vector uses [Amaazon S3][], [Github assets][], and [Docker Hub][] to host
-release artifacts. Vector does track download counts in aggregate. For Github
-and Docker this data is anonymous, but for S3 IP addresses are logged. There
-is no way to disable IP address tracking within the S3 logs. If you are
-concerned about sharing your IP address we recommend using a proxy or
-downloading Vector from a different channel.
+Vector uses Amaazon S3, Github assets, and Docker Hub to host release artifacts.
+Vector does track download counts in aggregate. For Github and Docker this data
+is anonymous, but for S3 IP addresses are logged. There is no way to disable IP
+address tracking within the S3 logs. If you are concerned about sharing your IP
+address we recommend using a proxy or downloading Vector from a different
+channel.
 
 ### Phoning Home
 
@@ -38,13 +41,30 @@ diagnostic information, and sharing crash reports.
 
 The Vector website does not implement any front-end trackers. Aggregated
 analytics data is derived from backend server logs which are anonymized.
+Vector uses [Netlify analytics][netlify_analytics] for this.
 
 ## Vector Community
 
-The Vector community largely depends on hosted services. Each hosted service
-and it's privacy policy is below:
+### Vector Repository
 
-* Github - [Privacy Policy][github_pp]
-* Gitter - [Privacy Policy][gitter_pp]
+The Vector repository is hosted on Github. You can review their privacy policy
+[here][github_pp]. Additionally, Vector will not attempt to mine information
+about users that interact with Vector on Github. Vector team members will
+occassionaly reach out to active users offer help debugging or learn about
+ways Vector can improve.
+
+### Vector Chat
+
+The Vector chat uses Gitter, which is owned by Gitlab; you can review their
+privacy policy [here][gitter_pp].
+
+### Vecotr Mailinglist
+
+The Vector mailing list uses Vero; you can review their privacy policy
+[here][vero_pp]. Additionally, Vector will never share your email with 3rd party
+for any reason, and Vector will not send you spam email.
 
 [github_pp]: https://help.github.com/en/github/site-policy/github-privacy-statement
+[gitter_pp]: https://about.gitlab.com/privacy/
+[netlify_analytics]: https://www.netlify.com/products/analytics/
+[vero_pp]: https://www.getvero.com/privacy/
