@@ -19,7 +19,7 @@ use tokio::net::tcp::{Incoming, TcpListener};
 use tokio_tls::TlsStream;
 
 #[derive(Debug, Snafu)]
-enum TlsError {
+pub enum TlsError {
     #[snafu(display("Could not open {} file {:?}: {}", note, filename, source))]
     FileOpenFailed {
         note: &'static str,
@@ -62,6 +62,10 @@ enum TlsError {
     },
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
+    #[snafu(display("TLS handshake failed: {}", source))]
+    Handshake { source: native_tls::Error },
+    #[snafu(display("Incoming listener failed: {}", source))]
+    IncomingListener { source: crate::Error },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -307,14 +311,17 @@ where
     I::Error: Into<crate::Error>,
 {
     type Item = MaybeTlsStream<I::Item>;
-    type Error = crate::Error;
+    type Error = TlsError;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             match &mut self.state {
                 MaybeTlsIncomingState::Inner => {
-                    let stream = if let Some(stream) =
-                        try_ready!(self.incoming.poll().map_err(Into::into))
+                    let stream = if let Some(stream) = try_ready!(self
+                        .incoming
+                        .poll()
+                        .map_err(Into::into)
+                        .context(IncomingListener))
                     {
                         stream
                     } else {
@@ -332,7 +339,7 @@ where
                 }
 
                 MaybeTlsIncomingState::Accepting(fut) => {
-                    let stream = try_ready!(fut.poll().map_err(Box::new));
+                    let stream = try_ready!(fut.poll().context(Handshake));
                     self.state = MaybeTlsIncomingState::Inner;
 
                     return Ok(Async::Ready(Some(MaybeTlsStream::Tls(stream))));
