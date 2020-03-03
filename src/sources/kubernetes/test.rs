@@ -116,7 +116,7 @@ spec:
       containers:
       - name: vector
         image: $(IMAGE)
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         volumeMounts:
         - name: var-log
           mountPath: /var/log/

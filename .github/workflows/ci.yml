@@ -54,11 +54,11 @@ jobs:
     - name: Build image
       run: |
         eval $(minikube docker-env)
-        docker build -t "vector_test" -f - . << EOF
+        docker build -t "vector_test:latest" -f - . << EOF
         FROM buildpack-deps:18.04-curl
         COPY ./builds/vector /usr/local/bin
         ENTRYPOINT ["/usr/local/bin/vector"]
         EOF
     - uses: actions/checkout@v2
     - name: Run kubernetes integration tests
-      run: KUBE_TEST_IMAGE=vector_test cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+      run: KUBE_TEST_IMAGE=vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
