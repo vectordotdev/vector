@@ -66,7 +66,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 #### Reference
 
-* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], [syslog][docs.sources.syslog], and [6 more...][docs.sources]
+* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [17 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [21 more...][docs.sinks]
 
@@ -82,6 +82,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
 * [**Releases**][urls.vector_releases] - [v0.8.0 (latest)][urls.v0.8.0]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
+* **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
 
 ## Performance
@@ -194,7 +195,7 @@ Or use your own [preferred method][docs.installation].
 ---
 
 <p align="center">
-  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong>
+  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
 
@@ -241,10 +242,10 @@ Or use your own [preferred method][docs.installation].
 [docs.sources.docker]: https://vector.dev/docs/reference/sources/docker/
 [docs.sources.file#multiline]: https://vector.dev/docs/reference/sources/file/#multiline
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file/
+[docs.sources.http]: https://vector.dev/docs/reference/sources/http/
 [docs.sources.journald]: https://vector.dev/docs/reference/sources/journald/
 [docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka/
 [docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
-[docs.sources.syslog]: https://vector.dev/docs/reference/sources/syslog/
 [docs.sources]: https://vector.dev/docs/reference/sources/
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
@@ -268,11 +269,14 @@ Or use your own [preferred method][docs.installation].
 [urls.v0.8.0]: https://vector.dev/releases/0.8.0/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_enriching_transforms]: https://vector.dev/components?functions[]=enrich
 [urls.vector_parsing_transforms]: https://vector.dev/components?functions[]=parse
+[urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

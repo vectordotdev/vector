@@ -188,6 +188,9 @@
 - name: "source: file"
   description: Anything `file` source realted
   color: ff9ff3
+- name: "source: http"
+  description: Anything `http` source realted
+  color: ff9ff3
 - name: "source: journald"
   description: Anything `journald` source realted
   color: ff9ff3

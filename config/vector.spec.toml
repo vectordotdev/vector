@@ -332,6 +332,48 @@ dns_servers = ["0.0.0.0:53"]
     timeout_ms = 1000
     timeout_ms = 600000
 
+# Ingests data through the HTTP protocol and outputs `log` events.
+[sources.http]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "http"
+  type = "http"
+
+  # The address to listen for connections on
+  #
+  # * required
+  # * type: string
+  address = "0.0.0.0:80"
+  address = "localhost:8080"
+
+  # The expected encoding of received data. `text` indicates newline-delimited
+  # text, with each line forming a message. `ndjson` indicates newline-delimited
+  # JSON, where each line must contain a json object. `json` indicates a JSON
+  # payload, which must be a JSON array containing JSON objects. Note that for
+  # `json` and `ndjson` encodings, the fields of the JSON objects are output as
+  # separate fields.
+  #
+  # * required
+  # * default: "text"
+  # * type: string
+  # * enum: "text", "ndjson", and "json"
+  encoding = "text"
+  encoding = "ndjson"
+  encoding = "json"
+
+  # A list of HTTP headers to include in the log event. These will override any
+  # values included in the JSON payload with conflicting names. An empty string
+  # will be inserted into the log event if the corresponding HTTP header was
+  # missing.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  headers = ["User-Agent", "X-My-Custom-Header"]
+
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
   # The component type. This is a required field that tells Vector which

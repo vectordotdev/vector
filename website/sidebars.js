@@ -121,6 +121,8 @@ module.exports = {
             
               "reference/sources/file",
             
+              "reference/sources/http",
+            
               "reference/sources/journald",
             
               "reference/sources/kafka",
@@ -288,6 +290,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Privacy',
+          href: 'https://github.com/timberio/vector/blob/master/PRIVACY.md'
+        },
         {
           type: 'link',
           label: 'Security',
