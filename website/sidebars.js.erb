@@ -166,6 +166,11 @@ module.exports = {
         <%= metadata.links.fetch_id("docs.meta.glossary").to_json %>,
         {
           type: 'link',
+          label: 'Privacy',
+          href: '<%= metadata.links.fetch_id("urls.vector_privacy_policy") %>'
+        },
+        {
+          type: 'link',
           label: 'Security',
           href: '<%= metadata.links.fetch_id("urls.vector_security_policy") %>'
         },

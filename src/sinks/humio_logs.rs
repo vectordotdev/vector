@@ -37,7 +37,7 @@ fn default_encoding() -> EncodingConfigWithDefault<Encoding> {
     EncodingConfigWithDefault::from(Encoding::Json)
 }
 
-#[typetag::serde(name = "humio")]
+#[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         if self.encoding.codec != Encoding::Json {
