@@ -36,7 +36,8 @@ pub fn udp(
     let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     let begin_shutdown = shutdown.begin_shutdown;
-    let shutdown_complete = shutdown.shutdown_complete;
+    let mut shutdown_complete = shutdown.shutdown_complete;
+
     Box::new(
         future::lazy(move || {
             let socket = UdpSocket::bind(&address).expect("failed to bind to udp listener socket");
@@ -65,11 +66,8 @@ pub fn udp(
                 .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
                 .forward(out)
                 // Done with listening and sending
-                .map(|_| {
-                    // This source can signal shutdown complete directly because there's only a
-                    // single thread of control.
-                    shutdown_complete.cancel();
-                    ()
+                .map(move |_| {
+                    shutdown_complete.take();
                 })
         }),
     )

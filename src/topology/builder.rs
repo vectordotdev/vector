@@ -122,10 +122,10 @@ pub fn build_pieces(
 
         let (global_shutdown_begun_trigger, global_shutdown_begun_tripwire) = Tripwire::new();
         let (local_shutdown_complete_trigger, local_shutdown_complete_tripwire) = Tripwire::new();
-        let shutdown = ShutdownSignals {
-            begin_shutdown: global_shutdown_begun_tripwire.clone(),
-            shutdown_complete: local_shutdown_complete_trigger,
-        };
+        let shutdown = ShutdownSignals::new(
+            global_shutdown_begun_tripwire.clone(),
+            local_shutdown_complete_trigger,
+        );
 
         let server = match source.build(&name, &config.global, shutdown, tx) {
             Err(error) => {
