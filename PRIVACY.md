@@ -1,8 +1,10 @@
 # Privacy Policy
 
 It should go without saying, but Vector takes the privacy of your data,
-including how you use Vector, very seriously. This document clarifies how the
-Vector project thinks about privacy now and in the future.
+including how you use Vector, very seriously. Vector is used to collect and
+route some of your most sensitive data and we want you to know that we do not
+take that lightly. This document clarifies how the Vector project thinks about
+privacy now and in the future.
 
 <!-- MarkdownTOC autolink="true" style="ordered" -->
 
@@ -29,8 +31,8 @@ downloading Vector from a different channel.
 
 Vector, under no circumstances, will "phone home" and communicate with an
 external service that you did not explicitly configure as part of setting up
-Vector. This includes grey area tactices such as version checks, sharing
-diagnostic information, sharing crash reports, etc.
+Vector. This includes grey-area tactics such as version checks, capturing
+diagnostic information, and sharing crash reports.
 
 ## Vector Website & Docs
 
@@ -45,4 +47,4 @@ and it's privacy policy is below:
 * Github - [Privacy Policy][github_pp]
 * Gitter - [Privacy Policy][gitter_pp]
 
-github_pp: https://help.github.com/en/github/site-policy/github-privacy-statement
+[github_pp]: https://help.github.com/en/github/site-policy/github-privacy-statement
