@@ -61,6 +61,4 @@ jobs:
         EOF
     - uses: actions/checkout@v2
     - name: Run kubernetes integration tests
-      run: |
-        KUBE_TEST_IMAGE=vector_test
-        cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+      run: KUBE_TEST_IMAGE=vector_test cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
