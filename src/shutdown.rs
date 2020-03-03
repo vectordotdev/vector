@@ -6,15 +6,15 @@ use stream_cancel::{Trigger, Tripwire};
 /// handle remains alive for the entire lifetime of the Source.  Source implementations must call
 /// take() on this at least once, and when multiple threads do work on behalf of a single Source
 /// each thread should own a clone of this and call take() on it at least once.
-struct SourceShutdownHandle {
-    shutdown_complete: Arc<Trigger>,
+pub struct SourceShutdownHandle {
+    _shutdown_complete: Arc<Trigger>,
     taken: bool,
 }
 
 impl SourceShutdownHandle {
     fn new(shutdown_complete: Trigger) -> Self {
         Self {
-            shutdown_complete: Arc::new(shutdown_complete),
+            _shutdown_complete: Arc::new(shutdown_complete),
             taken: false,
         }
     }
