@@ -773,7 +773,11 @@ mod integration_tests {
             group_name: GROUP_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             encoding: Encoding::Json.into(),
-            ..Default::default()
+            create_missing_group: None,
+            create_missing_stream: None,
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -823,7 +827,12 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            ..Default::default()
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -874,11 +883,15 @@ mod integration_tests {
             stream_name: stream_name.clone().into(),
             group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
             batch: BatchEventsConfig {
                 timeout_secs: None,
                 max_events: Some(2),
             },
-            ..Default::default()
+            request: Default::default(),
+            assume_role: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -930,7 +943,12 @@ mod integration_tests {
             group_name: GROUP_NAME.into(),
             stream_name: format!("{}-{{{{key}}}}", stream_name).into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            ..Default::default()
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -1011,7 +1029,12 @@ mod integration_tests {
             stream_name: "test-stream".into(),
             group_name: GROUP_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            ..Default::default()
+            encoding: Encoding::Text.into(),
+            create_missing_group: None,
+            create_missing_stream: None,
+            batch: Default::default(),
+            request: Default::default(),
+            assume_role: None,
         };
 
         let mut rt = Runtime::single_threaded().unwrap();

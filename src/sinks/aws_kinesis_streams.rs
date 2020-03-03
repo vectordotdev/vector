@@ -351,12 +351,15 @@ mod integration_tests {
 
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
+            partition_key_field: None,
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
+            encoding: Encoding::Text.into(),
             batch: BatchEventsConfig {
                 max_events: Some(2),
                 timeout_secs: None,
             },
-            ..Default::default()
+            request: Default::default(),
+            assume_role: None,
         };
 
         let mut rt = runtime::Runtime::new().unwrap();
