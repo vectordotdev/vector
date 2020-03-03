@@ -217,7 +217,7 @@ fn encode_event(
             chrono::Utc::now().timestamp()
         };
 
-    let mut body = match encoding.format {
+    let mut body = match encoding.codec {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
             "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),

@@ -50,7 +50,7 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
-    pub(crate) format: E,
+    pub(crate) codec: E,
     #[serde(default)]
     pub(crate) only_fields: Option<Vec<Atom>>,
     #[serde(default)]
@@ -60,8 +60,8 @@ pub struct EncodingConfig<E> {
 }
 
 impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
-    fn format(&self) -> &E {
-        &self.format
+    fn codec(&self) -> &E {
+        &self.codec
     }
     fn only_fields(&self) -> &Option<Vec<Atom>> {
         &self.only_fields
@@ -83,7 +83,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    pub(crate) format: E,
+    pub(crate) codec: E,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(default)]
     pub(crate) only_fields: Option<Vec<Atom>>,
@@ -102,8 +102,8 @@ pub(crate) fn skip_serializing_if_default<E: Default + PartialEq>(e: &E) -> bool
 }
 
 impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
-    fn format(&self) -> &E {
-        &self.format
+    fn codec(&self) -> &E {
+        &self.codec
     }
     fn only_fields(&self) -> &Option<Vec<Atom>> {
         &self.only_fields
@@ -119,7 +119,7 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
 impl<E: Default + PartialEq> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E> {
     fn into(self) -> EncodingConfig<E> {
         EncodingConfig {
-            format: self.format,
+            codec: self.codec,
             only_fields: self.only_fields,
             except_fields: self.except_fields,
             timestamp_format: self.timestamp_format,
@@ -130,7 +130,7 @@ impl<E: Default + PartialEq> Into<EncodingConfig<E>> for EncodingConfigWithDefau
 impl<E: Default + PartialEq> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E> {
     fn into(self) -> EncodingConfigWithDefault<E> {
         EncodingConfigWithDefault {
-            format: self.format,
+            codec: self.codec,
             only_fields: self.only_fields,
             except_fields: self.except_fields,
             timestamp_format: self.timestamp_format,
@@ -142,7 +142,7 @@ impl<E: Default + PartialEq> Into<EncodingConfigWithDefault<E>> for EncodingConf
 pub trait EncodingConfiguration<E>: Into<EncodingConfig<E>> + From<E> {
     // Required Accessors
 
-    fn format(&self) -> &E;
+    fn codec(&self) -> &E;
     fn only_fields(&self) -> &Option<Vec<Atom>>;
     fn except_fields(&self) -> &Option<Vec<Atom>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
@@ -238,9 +238,9 @@ pub enum TimestampFormat {
 }
 
 impl<E> From<E> for EncodingConfig<E> {
-    fn from(format: E) -> Self {
+    fn from(codec: E) -> Self {
         Self {
-            format,
+            codec: codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -249,9 +249,9 @@ impl<E> From<E> for EncodingConfig<E> {
 }
 
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
-    fn from(format: E) -> Self {
+    fn from(codec: E) -> Self {
         Self {
-            format,
+            codec: codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -292,7 +292,7 @@ where
                 E: de::Error,
             {
                 Ok(Self::Value {
-                    format: T::deserialize(value.into_deserializer())?,
+                    codec: T::deserialize(value.into_deserializer())?,
                     only_fields: Default::default(),
                     except_fields: Default::default(),
                     timestamp_format: Default::default(),
@@ -349,7 +349,7 @@ where
                 E: de::Error,
             {
                 Ok(Self::Value {
-                    format: T::deserialize(value.into_deserializer())?,
+                    codec: T::deserialize(value.into_deserializer())?,
                     only_fields: Default::default(),
                     except_fields: Default::default(),
                     timestamp_format: Default::default(),
@@ -395,11 +395,11 @@ mod tests {
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
         config.encoding.validate().unwrap();
-        assert_eq!(config.encoding.format, TestEncoding::Snoot);
+        assert_eq!(config.encoding.codec, TestEncoding::Snoot);
     }
 
     const TOML_SIMPLE_STRUCT: &str = "
-        encoding.format = \"Snoot\"
+        encoding.codec = \"Snoot\"
         encoding.except_fields = [\"Doop\"]
         encoding.only_fields = [\"Boop\"]
     ";
@@ -407,13 +407,13 @@ mod tests {
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
         config.encoding.validate().unwrap();
-        assert_eq!(config.encoding.format, TestEncoding::Snoot);
+        assert_eq!(config.encoding.codec, TestEncoding::Snoot);
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
         assert_eq!(config.encoding.only_fields, Some(vec!["Boop".into()]));
     }
 
     const TOML_EXCLUSIVITY_VIOLATION: &str = "
-        encoding.format = \"Snoot\"
+        encoding.codec = \"Snoot\"
         encoding.except_fields = [\"Doop\"]
         encoding.only_fields = [\"Doop\"]
     ";
@@ -424,7 +424,7 @@ mod tests {
     }
 
     const TOML_EXCEPT_FIELD: &str = "
-        encoding.format = \"Snoot\"
+        encoding.codec = \"Snoot\"
         encoding.except_fields = [\"Doop\"]
     ";
     #[test]
@@ -443,7 +443,7 @@ mod tests {
     }
 
     const TOML_ONLY_FIELD: &str = "
-        encoding.format = \"Snoot\"
+        encoding.codec = \"Snoot\"
         encoding.only_fields = [\"Doop\"]
     ";
     #[test]
@@ -462,7 +462,7 @@ mod tests {
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = "
-        encoding.format = \"Snoot\"
+        encoding.codec = \"Snoot\"
         encoding.timestamp_format = \"unix\"
     ";
     #[test]

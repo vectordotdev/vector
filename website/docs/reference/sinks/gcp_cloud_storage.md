@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
     # REQUIRED
-    format = "ndjson" # example, enum
+    codec = "ndjson" # example, enum
 
     # OPTIONAL
     except_fields = ["timestamp", "message", "host"] # example, no default
@@ -116,7 +116,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
     # REQUIRED
-    format = "ndjson" # example, enum
+    codec = "ndjson" # example, enum
 
     # OPTIONAL
     except_fields = ["timestamp", "message", "host"] # example, no default
@@ -463,6 +463,29 @@ Configures the encoding specific sink behavior.
 
 
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+</Field>
+
+
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -480,29 +503,6 @@ Configures the encoding specific sink behavior.
 #### except_fields
 
 Prevent the sink from encoding the specified labels.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
-  groups={[]}
-  name={"format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### format
-
-The encoding format used to serialize the events before outputting.
 
 
 </Field>

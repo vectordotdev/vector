@@ -40,7 +40,7 @@ fn default_encoding() -> EncodingConfigWithDefault<Encoding> {
 #[typetag::serde(name = "humio")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        if self.encoding.format != Encoding::Json {
+        if self.encoding.codec != Encoding::Json {
             error!("Using an unsupported encoding for Humio");
         }
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());

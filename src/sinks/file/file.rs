@@ -65,7 +65,7 @@ impl File {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
 
-        match self.encoding.format {
+        match self.encoding.codec {
             Encoding::Ndjson => serde_json::to_vec(&log)
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),

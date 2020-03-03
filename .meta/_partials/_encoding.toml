@@ -6,7 +6,7 @@ Configures the encoding specific sink behavior.\
 """
 
 <% if encodings.length > 1 and default != "default" %>
-  [<%= namespace %>.encoding.children.format]
+  [<%= namespace %>.encoding.children.codec]
   type = "string"
   common = true
   <% if default %>
@@ -18,10 +18,10 @@ Configures the encoding specific sink behavior.\
   examples = <%= encodings.to_toml %>
   <% end %>
   description = """\
-  The encoding format used to serialize the events before outputting.\
+  The encoding codec used to serialize the events before outputting.\
   """
 
-  [<%= namespace %>.encoding.children.format.enum]
+  [<%= namespace %>.encoding.children.codec.enum]
   <%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
   <%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
   <%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>

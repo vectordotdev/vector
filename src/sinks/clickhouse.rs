@@ -312,7 +312,7 @@ mod integration_tests {
             compression: Some(Compression::None),
             encoding: EncodingConfigWithDefault {
                 timestamp_format: Some(TimestampFormat::Unix),
-                format: Encoding::Default,
+                codec: Encoding::Default,
                 except_fields: None,
                 only_fields: None,
             },

@@ -57,7 +57,7 @@ fn default_encoding() -> EncodingConfig<Encoding> {
 /// For encodings, answers "Is it possible to skip serializing this value, because it's the
 /// default?"
 pub(crate) fn skip_serializing_if_default(e: &EncodingConfig<Encoding>) -> bool {
-    e.format == default_encoding().format
+    e.codec == default_encoding().codec
 }
 
 #[typetag::serde(name = "new_relic_logs")]
@@ -79,7 +79,7 @@ impl SinkConfig for NewRelicLogsConfig {
 impl NewRelicLogsConfig {
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
-        if self.encoding.format != Encoding::Json {
+        if self.encoding.codec != Encoding::Json {
             error!("Using an unsupported encoding for New Relic")
         }
 

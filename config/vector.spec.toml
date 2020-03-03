@@ -2074,13 +2074,13 @@ end
   #
 
   [sinks.aws_cloudwatch_logs.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -2373,13 +2373,13 @@ end
   #
 
   [sinks.aws_kinesis_firehose.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -2592,13 +2592,13 @@ end
   #
 
   [sinks.aws_kinesis_streams.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -2957,13 +2957,13 @@ end
   #
 
   [sinks.aws_s3.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "ndjson"
-    format = "ndjson"
-    format = "text"
+    codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -3428,13 +3428,13 @@ end
   #
 
   [sinks.console.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -3960,13 +3960,13 @@ end
   #
 
   [sinks.file.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "ndjson"
-    format = "text"
-    format = "ndjson"
+    codec = "text"
+    codec = "ndjson"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -4184,13 +4184,13 @@ end
   #
 
   [sinks.gcp_cloud_storage.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "ndjson"
-    format = "ndjson"
-    format = "text"
+    codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -5088,14 +5088,14 @@ end
   #
 
   [sinks.http.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text", "json", and "ndjson"
-    format = "json"
-    format = "ndjson"
-    format = "text"
+    codec = "json"
+    codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -5774,13 +5774,13 @@ end
   #
 
   [sinks.kafka.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -6245,21 +6245,21 @@ end
   #
 
   [sinks.loki.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * enum: "text" or "json"
+    codec = "json"
+    codec = "text"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
     # * no default
     # * type: [string]
     except_fields = ["timestamp", "message", "host"]
-
-    # The encoding format used to serialize the events before outputting.
-    #
-    # * optional
-    # * default: "json"
-    # * type: string
-    # * enum: "text" or "json"
-    format = "json"
-    format = "text"
 
     # Limit the sink to only encoding the specified labels.
     #
@@ -6975,13 +6975,13 @@ end
   #
 
   [sinks.socket.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -7188,13 +7188,13 @@ end
   #
 
   [sinks.splunk_hec.encoding]
-    # The encoding format used to serialize the events before outputting.
+    # The encoding codec used to serialize the events before outputting.
     #
     # * required
     # * type: string
     # * enum: "text" or "json"
-    format = "json"
-    format = "text"
+    codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
