@@ -376,6 +376,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 |:------|:------------|
 | `sources-docker` | Enables building of [`docker` source][docs.sources.docker].  Requires `unix` feature to be also enabled for support of Unix domain sockets.  |
 | `sources-file` | Enables building of [`file` source][docs.sources.file].  |
+| `sources-http` | Enables building of [`http` source][docs.sources.http].  |
 | `sources-journald` | Enables building of [`journald` source][docs.sources.journald].  |
 | `sources-kafka` | Enables building of [`kafka` source][docs.sources.kafka].  Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.  |
 | `sources-logplex` | Enables building of [`logplex` source][docs.sources.logplex].  |
@@ -475,6 +476,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.http]: /docs/reference/sources/http/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.sources.logplex]: /docs/reference/sources/logplex/
