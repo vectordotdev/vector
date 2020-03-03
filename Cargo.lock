@@ -4661,7 +4661,6 @@ dependencies = [
  "http",
  "hyper",
  "hyper-openssl",
- "hyper-tls",
  "indexmap",
  "inventory",
  "jemallocator",
