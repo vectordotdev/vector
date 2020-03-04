@@ -49,16 +49,18 @@ jobs:
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
         minikube-version: 1.7.3
+    - name: Start local repository
+      run: docker run -d -p 5000:5000 --restart=always --name registry registry:2 
     - name: Start minikube
       run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=${{ matrix.kube }}
-    - name: Build image
+    - name: Build & push image
       run: |
-        eval $(minikube docker-env)
-        docker build -t "vector_test:local" -f - . << EOF
+        docker build -t "localhost:5000/vector_test:latest" -f - . << EOF
         FROM buildpack-deps:18.04-curl
         COPY ./builds/vector /usr/local/bin
         ENTRYPOINT ["/usr/local/bin/vector"]
         EOF
+        docker push localhost:5000/vector_test:latest
     - uses: actions/checkout@v2
     - name: Run kubernetes integration tests
-      run: KUBE_TEST_IMAGE=vector_test:local cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+      run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes

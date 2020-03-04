@@ -260,7 +260,7 @@ impl Kube {
                     ..
                 } if number_available == desired_number_scheduled => Ok(object.clone()),
                 status => Err(format!(
-                    "DaemonSet not yet ready with status: {:?}.\nPods status:\n{:?}",
+                    "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
                     status,
                     self.list(&object)
                         .into_iter()
