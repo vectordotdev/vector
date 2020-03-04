@@ -214,9 +214,10 @@ sources = [
   "sources-statsd",
   "sources-stdin",
   "sources-syslog",
+  "sources-tls",
   "sources-vector",
 ]
-sources-tls = []
+sources-tls = ["sources-http", "sources-logplex", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
 sources-journald = []
