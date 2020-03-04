@@ -36,7 +36,7 @@ jobs:
   #       name: builds
   #       path: ./target/release/vector
   test-kubernetes:
-    needs: build-vector-kubernetes
+    # needs: build-vector-kubernetes
     runs-on: ubuntu-latest
     strategy:
       matrix:
