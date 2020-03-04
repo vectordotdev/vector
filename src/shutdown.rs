@@ -27,7 +27,7 @@ impl SourceShutdownHandle {
 pub struct ShutdownSignals {
     /// This will be triggered when global shutdown has begun, and is a sign to the Source to begin
     /// its shutdown process.
-    begin_shutdown: Tripwire,
+    begin_shutdown: Option<Tripwire>,
 
     /// When a Source allows this to go out of scope it informs the global shutdown coordinator that
     /// this source's local shutdown process is complete.
@@ -35,14 +35,11 @@ pub struct ShutdownSignals {
 }
 
 impl Future for ShutdownSignals {
-    type Item = ();
+    type Item = Option<SourceShutdownHandle>;
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         match self.begin_shutdown.poll() {
-            Ok(Async::Ready(_)) => {
-                self.shutdown_complete.take();
-                Ok(Async::Ready(()))
-            }
+            Ok(Async::Ready(_)) => Ok(Async::Ready(self.shutdown_complete.take())),
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(_) => Err(()),
         }
@@ -52,12 +49,19 @@ impl Future for ShutdownSignals {
 impl ShutdownSignals {
     pub fn new(begin_shutdown: Tripwire, shutdown_complete: Trigger) -> Self {
         Self {
-            begin_shutdown,
+            begin_shutdown: Some(begin_shutdown),
             shutdown_complete: Some(SourceShutdownHandle::new(shutdown_complete)),
         }
     }
 
-    /// TODO
+    pub fn noop() -> Self {
+        Self {
+            begin_shutdown: None,
+            shutdown_complete: None,
+        }
+    }
+
+    /// TODO comment.  Note illegal to call after Future::poll()
     pub fn get_shutdown_complete_handle(&self) -> SourceShutdownHandle {
         self.shutdown_complete.as_ref().unwrap().clone()
     }

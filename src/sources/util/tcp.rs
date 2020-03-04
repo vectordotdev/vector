@@ -77,7 +77,9 @@ pub trait TcpSource: Clone + Send + 'static {
 
             let shutdown_complete_handle = shutdown.get_shutdown_complete_handle();
             let (trigger, tripwire) = Tripwire::new();
-            let tripwire = tripwire.select(shutdown);
+            let tripwire = tripwire
+                .and_then(|_| ShutdownSignals::noop())
+                .select(shutdown);
             let tripwire = tripwire
                 .and_then(move |_| {
                     timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
