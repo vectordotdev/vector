@@ -324,6 +324,34 @@ impl Debug for TlsSettings {
     }
 }
 
+#[cfg(feature = "sources-tls")]
+pub(crate) type MaybeTlsSettings = MaybeTls<(), TlsSettings>;
+
+#[cfg(feature = "sources-tls")]
+impl MaybeTlsSettings {
+    pub(crate) fn from_config(
+        config: &Option<TlsConfig>,
+        require_ident: bool,
+    ) -> crate::Result<Self> {
+        Ok(match TlsSettings::from_config(config, require_ident)? {
+            None => Self::Raw(()),
+            Some(tls) => Self::Tls(tls),
+        })
+    }
+
+    pub(crate) fn bind(&self, addr: &SocketAddr) -> crate::Result<MaybeTlsIncoming<Incoming>> {
+        let listener = TcpListener::bind(addr)?;
+        let incoming = listener.incoming();
+
+        let acceptor = match self {
+            Self::Tls(tls) => Some(tls.acceptor()?.into()),
+            Self::Raw(()) => None,
+        };
+
+        MaybeTlsIncoming::new(incoming, acceptor)
+    }
+}
+
 /// Load a private key from a named file
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
@@ -373,31 +401,12 @@ enum MaybeTlsIncomingState<S> {
 
 #[cfg(feature = "sources-tls")]
 impl<I: Stream> MaybeTlsIncoming<I> {
-    pub(crate) fn new(incoming: I, tls: Option<TlsSettings>) -> crate::Result<Self> {
-        let acceptor = if let Some(tls) = tls {
-            let acceptor = tls.acceptor()?;
-            Some(acceptor.into())
-        } else {
-            None
-        };
-
-        let state = MaybeTlsIncomingState::Inner;
-
+    pub(crate) fn new(incoming: I, acceptor: Option<SslAcceptor>) -> crate::Result<Self> {
         Ok(Self {
             incoming,
             acceptor,
-            state,
+            state: MaybeTlsIncomingState::Inner,
         })
-    }
-}
-
-#[cfg(feature = "sources-tls")]
-impl MaybeTlsIncoming<Incoming> {
-    pub(crate) fn bind(addr: &SocketAddr, tls: Option<TlsSettings>) -> crate::Result<Self> {
-        let listener = TcpListener::bind(addr)?;
-        let incoming = listener.incoming();
-
-        MaybeTlsIncoming::new(incoming, tls)
     }
 }
 
