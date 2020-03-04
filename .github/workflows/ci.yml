@@ -24,28 +24,28 @@ jobs:
     - run: "cd tests && make check-component-features"
 
 # Kubernetes
-  build-vector-kubernetes:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --release --no-default-features  --features "sources-kubernetes transforms-kubernetes sinks-console"
-    - name: Save vector
-      uses: actions/upload-artifact@v1
-      with:
-        name: builds
-        path: ./target/release/vector
+  # build-vector-kubernetes:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v2
+  #   - name: Build
+  #     run: cargo build --release --no-default-features  --features "sources-kubernetes transforms-kubernetes sinks-console"
+  #   - name: Save vector
+  #     uses: actions/upload-artifact@v1
+  #     with:
+  #       name: builds
+  #       path: ./target/release/vector
   test-kubernetes:
     needs: build-vector-kubernetes
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [v1.13.2, v1.14.10, v1.17.2]
+        kube: [v1.13.2] #, v1.14.10, v1.17.2]
     steps:
-    - name: Load vector
-      uses: actions/download-artifact@v1
-      with:
-        name: builds
+    # - name: Load vector
+    #   uses: actions/download-artifact@v1
+    #   with:
+    #     name: builds
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
         minikube-version: 1.7.3
@@ -56,9 +56,10 @@ jobs:
         eval $(minikube docker-env)
         docker build -t "vector_test:latest" -f - . << EOF
         FROM buildpack-deps:18.04-curl
-        COPY ./builds/vector /usr/local/bin
+        # COPY ./builds/vector /usr/local/bin
         ENTRYPOINT ["/usr/local/bin/vector"]
         EOF
-    - uses: actions/checkout@v2
-    - name: Run kubernetes integration tests
-      run: KUBE_TEST_IMAGE=vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+        docker ps
+    # - uses: actions/checkout@v2
+    # - name: Run kubernetes integration tests
+    #   run: KUBE_TEST_IMAGE=vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
