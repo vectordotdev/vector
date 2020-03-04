@@ -218,13 +218,10 @@ impl MetadataClient {
             retry_timeout = self.max_retry_timeout.min(retry_timeout * 2);
 
             while let Some(next) = watcher.next().await {
-                match next {
-                    Ok(event) => {
-                        self.delete_update();
-                        version = self.update(event).or(version);
+                self.delete_update();
 
-                        self.metadata.refresh();
-                    }
+                match next {
+                    Ok(event) => version = self.update(event).or(version),
                     Err(err) => {
                         match err {
                             // Keep the retry_timeout for errors that could
@@ -274,6 +271,8 @@ impl MetadataClient {
                 self.delete_queue
                     .push_back((uid, Instant::now() + self.cache_ttl));
             }
+
+            self.metadata.refresh();
         }
 
         Version::from_pod(&pod)
@@ -293,6 +292,7 @@ impl MetadataClient {
                 break;
             }
         }
+        self.metadata.refresh();
     }
 }
 
@@ -322,16 +322,18 @@ impl Transform for KubernetesPodMetadata {
 
             if found.is_none() {
                 warn!(
-                    message = "Metadata for pod not yet available.",
+                    message = "Failed enriching Event.",
                     pod_uid = ?std::str::from_utf8(pod_uid.as_ref()),
-                    rate_limit_secs = 10
+                    error = "Metadata for pod is not available.",
+                    rate_limit_secs = 30
                 );
             }
         } else {
             warn!(
-                message = "Event without field, so it can't be enriched with metadata.",
+                message = "Failed enriching Event.",
                 field = self.pod_uid.as_ref(),
-                rate_limit_secs = 10
+                error = "Missing field."
+                rate_limit_secs = 30
             );
         }
 
