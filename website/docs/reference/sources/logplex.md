@@ -68,6 +68,125 @@ The address to accept connections on. The address _must_ include a port.
 </Field>
 
 
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tls"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### tls
+
+Configures the TLS options for connections from this source.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
+  name={"crt_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### crt_path
+
+Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, [`key_path`](#key_path) must also be set. This is required if [`enabled`](#enabled) is set to `true`.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### enabled
+
+Require TLS for incoming connections. If this is set, an identity certificate is also required.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
+  name={"key_pass"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### key_pass
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  groups={[]}
+  name={"key_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### key_path
+
+Absolute path to a certificate key file used to identify this server, in DER or PEM format (PKCS#8).
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
 </Fields>
 
 ## How It Works

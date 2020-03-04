@@ -69,7 +69,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -143,7 +143,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -151,7 +151,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     ```
     git clone https://github.com/timberio/vector
-    git checkout v0.8.0
+    git checkout v0.8.1
     cd vector
     ```
 
@@ -195,7 +195,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.1)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 

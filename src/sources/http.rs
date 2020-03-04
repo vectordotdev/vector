@@ -1,6 +1,7 @@
 use crate::{
     event::{self, Event},
     sources::util::{ErrorMessage, HttpSource},
+    tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Buf, Bytes, BytesMut};
@@ -21,6 +22,7 @@ pub struct SimpleHttpConfig {
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
+    tls: Option<TlsConfig>,
 }
 
 inventory::submit! {
@@ -66,7 +68,7 @@ impl SourceConfig for SimpleHttpConfig {
             encoding: self.encoding,
             headers: self.headers.clone(),
         };
-        source.run(self.address, "", out)
+        source.run(self.address, "", &self.tls, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -216,6 +218,7 @@ mod tests {
                 address,
                 encoding,
                 headers,
+                tls: None,
             }
             .build("default", &GlobalOptions::default(), sender)
             .unwrap(),
