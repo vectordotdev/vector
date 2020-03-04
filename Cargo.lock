@@ -82,6 +82,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
+name = "async-trait"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "750b1c38a1dfadd108da0f01c08f4cdc7ff1bb39b325f9c82cc972361780a6e1"
+dependencies = [
+ "proc-macro2 1.0.8",
+ "quote 1.0.2",
+ "syn 1.0.14",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3881,6 +3892,7 @@ dependencies = [
  "fnv",
  "futures-core",
  "lazy_static",
+ "memchr",
  "mio",
  "num_cpus",
  "pin-project-lite",
@@ -4707,6 +4719,7 @@ name = "vector"
 version = "0.9.0"
 dependencies = [
  "approx",
+ "async-trait",
  "atty",
  "base64 0.10.1",
  "bloom",

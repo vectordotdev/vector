@@ -1,20 +1,32 @@
-mod file;
-
-use self::file::File;
+use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
-    event::Event,
+    event::{self, Event},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         SinkExt,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use async_trait::async_trait;
 use bytes::Bytes;
-use futures01::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::channel::mpsc::Receiver;
+use futures::{
+    future::{select, Either},
+    stream::StreamExt,
+};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Instant};
-use tokio::timer::Delay;
+use std::time::{Duration, Instant};
+use tokio02::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+};
+
+mod bytes_path;
+use bytes_path::BytesPath;
+
+mod streaming_sink;
+use streaming_sink::{StreamingSink, StreamingSinkAsSink01};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -45,9 +57,10 @@ impl Default for Encoding {
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = PartitionedFileSink::new(&self).stream_ack(cx.acker());
-
-        Ok((Box::new(sink), Box::new(future::ok(()))))
+        let sink = FileSink::new(&self);
+        let sink = StreamingSinkAsSink01::new_box(sink);
+        let sink = sink.stream_ack(cx.acker());
+        Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
     }
 
     fn input_type(&self) -> DataType {
@@ -59,27 +72,26 @@ impl SinkConfig for FileSinkConfig {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct PartitionedFileSink {
+#[derive(Debug)]
+pub struct FileSink {
     path: Template,
     encoding: EncodingConfigWithDefault<Encoding>,
-    idle_timeout_secs: u64,
-    partitions: HashMap<Bytes, File>,
-    last_accessed: HashMap<Bytes, Instant>,
-    closing: HashMap<Bytes, File>,
-    next_linger_timeout: Option<Delay>,
+    idle_timeout: Duration,
+    files: ExpiringHashMap<Bytes, File>,
 }
 
-impl PartitionedFileSink {
+impl FileSink {
     pub fn new(config: &FileSinkConfig) -> Self {
-        PartitionedFileSink {
+        Self {
             path: config.path.clone(),
-            idle_timeout_secs: config.idle_timeout_secs.unwrap_or(30),
             encoding: config.encoding.clone(),
-            ..Default::default()
+            idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
+            files: ExpiringHashMap::new(),
         }
     }
 
+    /// Uses pass the `event` to `self.path` template to obtain the file path
+    /// to store the event as.
     fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
@@ -94,98 +106,126 @@ impl PartitionedFileSink {
 
         Some(bytes)
     }
-}
 
-impl Sink for PartitionedFileSink {
-    type SinkItem = Event;
-    type SinkError = ();
-
-    fn start_send(&mut self, event: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if let Some(key) = self.partition_event(&event) {
-            let encoding = self.encoding.clone();
-
-            let partition = self
-                .partitions
-                .entry(key.clone())
-                .or_insert_with(|| File::new(key.clone(), encoding.clone()));
-
-            self.last_accessed.insert(key.clone(), Instant::now());
-
-            partition
-                .start_send(event)
-                .map_err(|error| error!(message = "Error writing to partition.", %error))
-        } else {
-            Ok(AsyncSink::Ready)
-        }
+    fn deadline_at(&self) -> Instant {
+        Instant::now()
+            .checked_add(self.idle_timeout)
+            .expect("unable to compute next deadline")
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        let mut all_files_ready = false;
-
-        for (file, partition) in &mut self.partitions {
-            let ready = match partition.poll_complete() {
-                Ok(Async::Ready(())) => true,
-                Ok(Async::NotReady) => false,
-                Err(error) => {
-                    let file = String::from_utf8_lossy(&file[..]);
-                    error!(message = "Unable to flush file.", %file, %error);
-                    true
+    async fn run(&mut self, mut input: Receiver<Event>) -> crate::Result<()> {
+        loop {
+            let what = select(input.next(), self.files.next()).await;
+            match what {
+                Either::Left((None, _)) => {
+                    // If we got `None` - terminate the processing.
+                    debug!("Receiver exausted, terminating the processing loop");
+                    break;
                 }
-            };
+                Either::Left((Some(event), _)) => {
+                    let path = match self.partition_event(&event) {
+                        Some(path) => path,
+                        None => {
+                            // We weren't able to find the path to use for the
+                            // file.
+                            // This is already logged at `partition_event`, so
+                            // here we just skip the event.
+                            warn!("Unable to partition an event, dropping it");
+                            continue;
+                        }
+                    };
 
-            all_files_ready = all_files_ready || ready;
-        }
+                    let next_deadline = self.deadline_at();
+                    trace!(next_deadline = ?next_deadline, "Computed next deadline");
 
-        for (key, last_accessed) in &self.last_accessed {
-            if last_accessed.elapsed().as_secs() > self.idle_timeout_secs {
-                if let Some(file) = self.partitions.remove(key) {
-                    let file_path = String::from_utf8_lossy(&key[..]);
-                    debug!(message = "Closing file.", file = %file_path);
-                    self.closing.insert(key.clone(), file);
+                    let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
+                        trace!(path = ?path, "Working with an already opened file");
+                        file
+                    } else {
+                        trace!(path = ?path, "Opening new file");
+                        let file = match open_file(BytesPath::new(path.clone())).await {
+                            Ok(file) => file,
+                            Err(err) => {
+                                // We coundn't open the file for this event.
+                                // Maybe other events will work though! Just log
+                                // the error and skip this event.
+                                error!(path = ?path, "Unable to open the file: {}", err);
+                                continue;
+                            }
+                        };
+                        self.files.insert_at(path.clone(), (file, next_deadline));
+                        self.files.get_mut(&path).unwrap()
+                    };
+
+                    trace!(path = ?path, "Writing an event to file");
+                    if let Err(err) = write_event_to_file(file, event, &self.encoding).await {
+                        error!(path = ?path, "Failed to write file: {}", err);
+                    }
+                }
+                Either::Right((None, _)) => {
+                    // Expiration queue is empty, whatever.
+                    debug!("File expiration queue empty");
+                    continue;
+                }
+                Either::Right((Some(Ok((mut expired_file, path))), _)) => {
+                    // We got an expired file. All we really want is to flush
+                    // and close it.
+                    if let Err(err) = expired_file.flush().await {
+                        error!(path = ?path.get_ref(), "Failed to flush file: {}", err);
+                    }
+                    drop(expired_file); // ignore close error
+                }
+                Either::Right((Some(Err(err)), _)) => {
+                    error!("An error occured while expiring a file: {}", err);
+                    continue;
                 }
             }
         }
+        Ok(())
+    }
+}
 
-        let mut closed_files = Vec::new();
+async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
+    let parent = path.as_ref().parent();
 
-        for (key, file) in &mut self.closing {
-            if let Async::Ready(()) = file.close().unwrap() {
-                closed_files.push(key.clone());
-            }
-        }
+    if let Some(parent) = parent {
+        fs::create_dir_all(parent).await?;
+    }
 
-        for closed_file in closed_files {
-            self.closing.remove(&closed_file);
-        }
+    fs::OpenOptions::new()
+        .read(false)
+        .write(true)
+        .create(true)
+        .open(path)
+        .await
+}
 
-        // Set `next_linger_timeout` to the oldest file's elapsed time since last
-        // write minus the idle_timeout.
-        if let Some(min_last_accessed) = self
-            .last_accessed
-            .iter()
-            .map(|(_, v)| v)
-            .filter(|l| l.elapsed().as_secs() < self.idle_timeout_secs)
-            .min()
-        {
-            let next_timeout = self.idle_timeout_secs - min_last_accessed.elapsed().as_secs();
-            let linger_deadline = *min_last_accessed - std::time::Duration::from_secs(next_timeout);
-            self.next_linger_timeout = Some(Delay::new(linger_deadline));
-        }
+pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: Event) -> Vec<u8> {
+    encoding.apply_rules(&mut event);
+    let log = event.into_log();
+    match encoding.codec {
+        Encoding::Ndjson => serde_json::to_vec(&log).expect("Unable to encode event as JSON."),
+        Encoding::Text => log
+            .get(&event::log_schema().message_key())
+            .map(|v| v.to_string_lossy().into_bytes())
+            .unwrap_or_default(),
+    }
+}
 
-        if let Some(next_linger) = &mut self.next_linger_timeout {
-            next_linger
-                .poll()
-                .expect("This is a bug; we are always in a timer context");
-        }
+async fn write_event_to_file(
+    file: &mut File,
+    event: Event,
+    encoding: &EncodingConfigWithDefault<Encoding>,
+) -> Result<(), std::io::Error> {
+    let mut buf = encode_event(encoding, event);
+    buf.push(b'\n');
+    file.write_all(&buf[..]).await
+}
 
-        // This sink has completely fnished when one of these is true in order:
-        // 1. There are no active partitions and not files currently closing.
-        // 2. All files have been flushed completely
-        if (self.partitions.is_empty() && self.closing.is_empty()) || all_files_ready {
-            Ok(Async::Ready(()))
-        } else {
-            Ok(Async::NotReady)
-        }
+#[async_trait]
+impl StreamingSink for FileSink {
+    async fn run(&mut self, input: Receiver<Event>) -> crate::Result<()> {
+        FileSink::run(self, input).await
     }
 }
 
@@ -195,14 +235,17 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
+            self, lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
             temp_file,
         },
     };
+    use futures01::sink::Sink;
     use futures01::stream;
 
     #[test]
     fn single_partition() {
+        test_util::trace_init();
+
         let template = temp_file();
 
         let config = FileSinkConfig {
@@ -211,7 +254,8 @@ mod tests {
             encoding: Encoding::Text.into(),
         };
 
-        let sink = PartitionedFileSink::new(&config);
+        let sink = FileSink::new(&config);
+        let sink = StreamingSinkAsSink01::new(sink);
         let (input, events) = random_lines_with_stream(100, 64);
 
         let mut rt = crate::test_util::runtime();
@@ -226,10 +270,14 @@ mod tests {
 
     #[test]
     fn many_partitions() {
+        test_util::trace_init();
+
         let directory = temp_dir();
 
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");
+
+        trace!("Template: {}", &template);
 
         let config = FileSinkConfig {
             path: template.clone().into(),
@@ -237,7 +285,8 @@ mod tests {
             encoding: Encoding::Text.into(),
         };
 
-        let sink = PartitionedFileSink::new(&config);
+        let sink = FileSink::new(&config);
+        let sink = StreamingSinkAsSink01::new(sink);
 
         let (mut input, _) = random_events_with_stream(32, 8);
         input[0].as_mut_log().insert("date", "2019-26-07");
