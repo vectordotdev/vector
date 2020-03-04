@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [v1.13.2] #, v1.14.10, v1.17.2]
+        kube: v1.17.2 #[v1.13.2, v1.14.10, v1.17.2]
     steps:
     # - name: Load vector
     #   uses: actions/download-artifact@v1
@@ -51,16 +51,16 @@ jobs:
         minikube-version: 1.7.3
     - name: Start minikube
       run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=${{ matrix.kube }}
-    - name: Build image
-      run: |
-        eval $(minikube docker-env)
-        docker build -t "vector_test:latest" -f - . << EOF
-        FROM buildpack-deps:18.04-curl
-        # COPY ./builds/vector /usr/local/bin
-        ENTRYPOINT ["/usr/local/bin/vector"]
-        EOF
-        docker ps
-        docker image ls
-    # - uses: actions/checkout@v2
-    # - name: Run kubernetes integration tests
-    #   run: KUBE_TEST_IMAGE=vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+    # - name: Build image
+    #   run: |
+    #     eval $(minikube docker-env)
+    #     docker build -t "vector_test:latest" -f - . << EOF
+    #     FROM buildpack-deps:18.04-curl
+    #     # COPY ./builds/vector /usr/local/bin
+    #     ENTRYPOINT ["/usr/local/bin/vector"]
+    #     EOF
+    #     docker ps
+    #     docker image ls
+    - uses: actions/checkout@v2
+    - name: Run kubernetes integration tests
+      run: KUBE_TEST_IMAGE=ktff/vector-kube-biger-test-logs:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
