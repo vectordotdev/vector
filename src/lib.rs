@@ -17,6 +17,8 @@ pub mod event;
 pub mod generate;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
+#[cfg(feature = "engine")]
+pub mod engine;
 pub mod list;
 pub mod metrics;
 pub mod region;

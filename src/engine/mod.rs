@@ -79,11 +79,13 @@ impl Engine for DefaultEngine {
         let output_file = self
             .config
             .artifact_cache
-            .join(path.file_name().ok_or("Must load files")?);
+            .join(path.file_stem().ok_or("Must load files")?)
+            .with_extension("so");
+
         fs::create_dir_all(&self.config.artifact_cache)?;
         compile(&path, &output_file)?;
         // load the compiled Lucet module
-        let dl_module = DlModule::load(&path).unwrap();
+        let dl_module = DlModule::load(&output_file).unwrap();
         self.modules.put(path, dl_module);
         Ok(())
     }
@@ -109,9 +111,17 @@ impl Engine for DefaultEngine {
             .instance_handles
             .get_mut(id)
             .ok_or("Could not load instance")?;
-        let retval = instance.run("process", &[])?;
-        Ok(event)
+        instance.insert_embed_ctx(EngineContext {
+            event,
+        });
+        instance.run("process", &[])?;
+        let context = instance.remove_embed_ctx::<EngineContext>().ok_or("No context")?;
+        Ok(context.event)
     }
+}
+
+struct EngineContext {
+    event: Event,
 }
 
 #[test]
@@ -120,7 +130,8 @@ fn engine() -> Result<()> {
     let event = Event::new_empty_log();
     engine.load("untitled.wasm")?;
     let id = engine.instantiate("untitled.wasm")?;
-    engine.process(&id, event)?;
+    let out = engine.process(&id, event.clone())?;
+    assert_eq!(event, out);
     Ok(())
 }
 
