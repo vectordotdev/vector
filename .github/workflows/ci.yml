@@ -60,6 +60,7 @@ jobs:
         ENTRYPOINT ["/usr/local/bin/vector"]
         EOF
         docker ps
+        docker image ls
     # - uses: actions/checkout@v2
     # - name: Run kubernetes integration tests
     #   run: KUBE_TEST_IMAGE=vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
