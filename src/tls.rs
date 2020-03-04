@@ -1,6 +1,6 @@
-use futures01::Poll;
 #[cfg(feature = "sources-tls")]
 use futures01::{try_ready, Async, Future, Stream};
+use futures01::{Poll, Sink, StartSend};
 #[cfg(feature = "sources-tls")]
 use openssl::ssl::{HandshakeError, SslAcceptor};
 use openssl::{
@@ -509,6 +509,29 @@ impl<R: AsyncWrite, T: AsyncWrite> AsyncWrite for MaybeTls<R, T> {
         match self {
             Self::Tls(s) => s.shutdown(),
             Self::Raw(s) => s.shutdown(),
+        }
+    }
+}
+
+impl<R, T, I, E> Sink for MaybeTls<R, T>
+where
+    R: Sink<SinkItem = I, SinkError = E>,
+    T: Sink<SinkItem = I, SinkError = E>,
+{
+    type SinkItem = I;
+    type SinkError = E;
+
+    fn start_send(&mut self, item: I) -> StartSend<I, E> {
+        match self {
+            Self::Raw(r) => r.start_send(item),
+            Self::Tls(t) => t.start_send(item),
+        }
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), E> {
+        match self {
+            Self::Raw(r) => r.poll_complete(),
+            Self::Tls(t) => t.poll_complete(),
         }
     }
 }

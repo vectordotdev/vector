@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
-    tls::{tls_connector, TlsConfig, TlsSettings},
+    tls::{tls_connector, MaybeTls, TlsConfig, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -81,10 +81,8 @@ enum TcpSinkState {
     Backoff(Delay),
 }
 
-type TcpOrTlsStream = MaybeTlsStream<
-    FramedWrite<TcpStream, BytesCodec>,
-    FramedWrite<SslStream<TcpStream>, BytesCodec>,
->;
+type TcpOrTlsStream =
+    MaybeTls<FramedWrite<TcpStream, BytesCodec>, FramedWrite<SslStream<TcpStream>, BytesCodec>>;
 
 impl TcpSink {
     pub fn new(host: String, port: u16, resolver: Resolver, tls: Option<TlsSettings>) -> Self {
@@ -161,7 +159,7 @@ impl TcpSink {
                                     TcpSinkState::Backoff(self.next_delay())
                                 }
                             },
-                            None => TcpSinkState::Connected(MaybeTlsStream::Raw(FramedWrite::new(
+                            None => TcpSinkState::Connected(MaybeTls::Raw(FramedWrite::new(
                                 socket,
                                 BytesCodec::new(),
                             ))),
@@ -180,7 +178,7 @@ impl TcpSink {
                         Ok(Async::Ready(socket)) => {
                             debug!(message = "negotiated TLS.");
                             self.backoff = Self::fresh_backoff();
-                            TcpSinkState::Connected(MaybeTlsStream::Tls(FramedWrite::new(
+                            TcpSinkState::Connected(MaybeTls::Tls(FramedWrite::new(
                                 socket,
                                 BytesCodec::new(),
                             )))
@@ -294,32 +292,4 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
     });
 
     Box::new(check)
-}
-
-enum MaybeTlsStream<R, T> {
-    Raw(R),
-    Tls(T),
-}
-
-impl<R, T, I, E> Sink for MaybeTlsStream<R, T>
-where
-    R: Sink<SinkItem = I, SinkError = E>,
-    T: Sink<SinkItem = I, SinkError = E>,
-{
-    type SinkItem = I;
-    type SinkError = E;
-
-    fn start_send(&mut self, item: I) -> futures01::StartSend<I, E> {
-        match self {
-            MaybeTlsStream::Raw(r) => r.start_send(item),
-            MaybeTlsStream::Tls(t) => t.start_send(item),
-        }
-    }
-
-    fn poll_complete(&mut self) -> futures01::Poll<(), E> {
-        match self {
-            MaybeTlsStream::Raw(r) => r.poll_complete(),
-            MaybeTlsStream::Tls(t) => t.poll_complete(),
-        }
-    }
 }
