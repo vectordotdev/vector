@@ -259,7 +259,14 @@ impl Kube {
                     number_available: Some(number_available),
                     ..
                 } if number_available == desired_number_scheduled => Ok(object.clone()),
-                status => Err(format!("DaemonSet not yet ready with status: {:?}", status)),
+                status => Err(format!(
+                    "DaemonSet not yet ready with status: {:?}.\nPods status:\n{:?}",
+                    status,
+                    self.list(&object)
+                        .into_iter()
+                        .map(|pod| pod.status)
+                        .collect::<Vec<_>>()
+                )),
             }
         })
     }
