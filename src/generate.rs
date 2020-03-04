@@ -30,15 +30,21 @@ pub struct Opts {
     ///
     /// `stdin//http` prints a `stdin` source and an `http` sink.
     ///
+    /// Generated components are given incremental names (`source1`, `source2`,
+    /// etc) which should be replaced in order to provide better context. You
+    /// can optionally specify the names of components by prefixing them with
+    /// `<name>:`, e.g.:
+    ///
+    /// `foo:stdin/bar:regex_parser/baz:http` prints a `stdin` source called
+    /// `foo`, a `regex_parser` transform called `bar`, and an `http` sink
+    /// called `baz`.
+    ///
     /// Vector makes a best attempt at constructing a sensible topology. The
     /// first transform generated will consume from all sources and subsequent
     /// transforms will consume from their predecessor. All sinks will consume
     /// from the last transform or, if none are specified, from all sources. It
     /// is then up to you to restructure the `inputs` of each component to build
     /// the topology you need.
-    ///
-    /// Generated components are given incremental names (`source1`, `source2`,
-    /// etc) which should be replaced in order to provide better context.
     expression: String,
 }
 
@@ -89,11 +95,26 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
     if let Some(source_types) = components.get(0) {
         let mut sources = IndexMap::new();
 
-        for (i, source_type) in source_types.iter().enumerate() {
-            let name = format!("source{}", i);
+        for (i, source_expr) in source_types.iter().enumerate() {
+            let (name, source_type) = if let Some(c_index) = source_expr.find(':') {
+                if c_index == 0 {
+                    errs.push(format!(
+                        "failed to generate source '{}': empty name is not allowed",
+                        source_expr
+                    ));
+                    continue;
+                }
+                let mut chopped_expr = source_expr.clone();
+                (
+                    chopped_expr.drain(..c_index).collect(),
+                    chopped_expr.drain(1..).collect(),
+                )
+            } else {
+                (format!("source{}", i), source_expr.clone())
+            };
             source_names.push(name.clone());
 
-            let mut example = match SourceDescription::example(source_type) {
+            let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
@@ -122,8 +143,23 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
     if let Some(transform_types) = components.get(1) {
         let mut transforms = IndexMap::new();
 
-        for (i, transform_type) in transform_types.iter().enumerate() {
-            let name = format!("transform{}", i);
+        for (i, transform_expr) in transform_types.iter().enumerate() {
+            let (name, transform_type) = if let Some(c_index) = transform_expr.find(':') {
+                if c_index == 0 {
+                    errs.push(format!(
+                        "failed to generate transform '{}': empty name is not allowed",
+                        transform_expr
+                    ));
+                    continue;
+                }
+                let mut chopped_expr = transform_expr.clone();
+                (
+                    chopped_expr.drain(..c_index).collect(),
+                    chopped_expr.drain(1..).collect(),
+                )
+            } else {
+                (format!("transform{}", i), transform_expr.clone())
+            };
             transform_names.push(name.clone());
 
             let targets = if i == 0 {
@@ -135,7 +171,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
                     .to_owned()]
             };
 
-            let mut example = match TransformDescription::example(transform_type) {
+            let mut example = match TransformDescription::example(&transform_type) {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
@@ -169,8 +205,25 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
     if let Some(sink_types) = components.get(2) {
         let mut sinks = IndexMap::new();
 
-        for (i, sink_type) in sink_types.iter().enumerate() {
-            let mut example = match SinkDescription::example(sink_type) {
+        for (i, sink_expr) in sink_types.iter().enumerate() {
+            let (name, sink_type) = if let Some(c_index) = sink_expr.find(':') {
+                if c_index == 0 {
+                    errs.push(format!(
+                        "failed to generate sink '{}': empty name is not allowed",
+                        sink_expr
+                    ));
+                    continue;
+                }
+                let mut chopped_expr = sink_expr.clone();
+                (
+                    chopped_expr.drain(..c_index).collect(),
+                    chopped_expr.drain(1..).collect(),
+                )
+            } else {
+                (format!("sink{}", i), sink_expr.clone())
+            };
+
+            let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
                     if err != ExampleError::MissingExample {
@@ -185,7 +238,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
                 .insert("type".into(), sink_type.to_owned().into());
 
             sinks.insert(
-                format!("sink{}", i),
+                name,
                 SinkOuter {
                     inputs: transform_names
                         .last()
