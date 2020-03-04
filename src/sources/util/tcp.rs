@@ -125,8 +125,8 @@ pub trait TcpSource: Clone + Send + 'static {
 
                         let events_in = FramedRead::new(socket, source.decoder())
                             .take_until(tripwire)
+                            .with_handle(shutdown_complete_handle)
                             .filter_map(move |frame| {
-                                shutdown_complete_handle.take();
                                 let host = host.clone();
                                 source.build_event(frame, host)
                             })

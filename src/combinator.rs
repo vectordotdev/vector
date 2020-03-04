@@ -11,6 +11,14 @@ pub struct TakeUntil<S, F, O> {
     free: bool,
 }
 
+/// A stream combinator which takes a handle to hold onto for the lifetime of the stream.
+///
+/// This structure is produced by the [`StreamExt::with_handle`] method.
+pub struct WithHandle<S, H> {
+    stream: S,
+    _handle: H,
+}
+
 /// This `Stream` extension trait provides a `take_until` method that terminates the stream once
 /// the given future resolves.
 pub trait StreamExt: Stream {
@@ -64,6 +72,16 @@ pub trait StreamExt: Stream {
             free: false,
         }
     }
+
+    fn with_handle<H>(self, handle: H) -> WithHandle<Self, H>
+    where
+        Self: Sized,
+    {
+        WithHandle {
+            stream: self,
+            _handle: handle,
+        }
+    }
 }
 
 impl<S> StreamExt for S where S: Stream {}
@@ -94,6 +112,18 @@ where
             }
         }
 
+        self.stream.poll()
+    }
+}
+
+impl<S, H> Stream for WithHandle<S, H>
+where
+    S: Stream,
+{
+    type Item = S::Item;
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         self.stream.poll()
     }
 }
