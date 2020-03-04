@@ -282,6 +282,33 @@ impl<E> EncodingConfiguration<E> for Inner<E> {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
+struct InnerWithDefault<E: Default> {
+    #[serde(default)]
+    pub(crate) codec: E,
+    #[serde(default)]
+    pub(crate) only_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    pub(crate) except_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    pub(crate) timestamp_format: Option<TimestampFormat>,
+}
+
+impl<E: Default> EncodingConfiguration<E> for InnerWithDefault<E> {
+    fn codec(&self) -> &E {
+        &self.codec
+    }
+    fn only_fields(&self) -> &Option<Vec<Atom>> {
+        &self.only_fields
+    }
+    fn except_fields(&self) -> &Option<Vec<Atom>> {
+        &self.except_fields
+    }
+    fn timestamp_format(&self) -> &Option<TimestampFormat> {
+        &self.timestamp_format
+    }
+}
+
 impl<'de, E> Deserialize<'de> for EncodingConfig<E>
 where
     E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
@@ -372,7 +399,7 @@ where
         where
             T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone + Default,
         {
-            type Value = EncodingConfigWithDefault<T>;
+            type Value = InnerWithDefault<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("string or map")
@@ -407,7 +434,14 @@ where
             }
         }
 
-        deserializer.deserialize_any(StringOrStruct(PhantomData))
+        let inner = deserializer.deserialize_any(StringOrStruct::<E>(PhantomData))?;
+
+        Ok(Self {
+            codec: inner.codec,
+            only_fields: inner.only_fields,
+            except_fields: inner.except_fields,
+            timestamp_format: inner.timestamp_format,
+        })
     }
 }
 
