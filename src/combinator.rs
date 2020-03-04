@@ -4,9 +4,10 @@ use futures::{Async, Future, IntoFuture, Poll, Stream};
 ///
 /// This structure is produced by the [`StreamExt::take_until`] method.
 #[derive(Clone, Debug)]
-pub struct TakeUntil<S, F> {
+pub struct TakeUntil<S, F, O> {
     stream: S,
     until: F,
+    until_res: Option<O>,
     free: bool,
 }
 
@@ -51,14 +52,15 @@ pub trait StreamExt: Stream {
     /// tx.send(()).unwrap();
     /// rt.shutdown_on_idle().wait().unwrap();
     /// ```
-    fn take_until<U>(self, until: U) -> TakeUntil<Self, U::Future>
+    fn take_until<U, O>(self, until: U) -> TakeUntil<Self, U::Future, O>
     where
-        U: IntoFuture<Item = (), Error = ()>,
+        U: IntoFuture<Item = O, Error = ()>,
         Self: Sized,
     {
         TakeUntil {
             stream: self,
             until: until.into_future(),
+            until_res: None,
             free: false,
         }
     }
@@ -66,10 +68,10 @@ pub trait StreamExt: Stream {
 
 impl<S> StreamExt for S where S: Stream {}
 
-impl<S, F> Stream for TakeUntil<S, F>
+impl<S, F, O> Stream for TakeUntil<S, F, O>
 where
     S: Stream,
-    F: Future<Item = (), Error = ()>,
+    F: Future<Item = O, Error = ()>,
 {
     type Item = S::Item;
     type Error = S::Error;
@@ -77,8 +79,9 @@ where
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         if !self.free {
             match self.until.poll() {
-                Ok(Async::Ready(_)) => {
+                Ok(Async::Ready(res)) => {
                     // future resolved -- terminate stream
+                    self.until_res = Some(res);
                     return Ok(Async::Ready(None));
                 }
                 Err(_) => {
