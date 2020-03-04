@@ -1,3 +1,4 @@
+use crate::combinator::StreamExt;
 use crate::shutdown::ShutdownSignals;
 use crate::Event;
 use bytes::Bytes;
@@ -9,7 +10,7 @@ use std::{
     net::SocketAddr,
     time::{Duration, Instant},
 };
-use stream_cancel::{StreamExt, Tripwire};
+use stream_cancel::Tripwire;
 use tokio::{
     codec::{Decoder, FramedRead},
     net::TcpListener,

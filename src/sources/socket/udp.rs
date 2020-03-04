@@ -1,3 +1,4 @@
+use crate::combinator::StreamExt;
 use crate::event::Event;
 use crate::shutdown::ShutdownSignals;
 use crate::sources::Source;
@@ -6,7 +7,6 @@ use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
-use stream_cancel::StreamExt;
 use string_cache::DefaultAtom as Atom;
 use tokio::net::udp::{UdpFramed, UdpSocket};
 
