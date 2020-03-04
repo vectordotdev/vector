@@ -78,6 +78,18 @@ pub enum TlsError {
     IncomingListener { source: crate::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
     CreateAcceptor { source: ErrorStack },
+    #[snafu(display("Error setting up the TLS certificate: {}", source))]
+    SetCertificate { source: ErrorStack },
+    #[snafu(display("Error setting up the TLS private key: {}", source))]
+    SetPrivateKey { source: ErrorStack },
+    #[snafu(display("Error setting up the TLS chain certificates: {}", source))]
+    AddExtraChainCert { source: ErrorStack },
+    #[snafu(display("Error creating a certificate store: {}", source))]
+    NewStoreBuilder { source: ErrorStack },
+    #[snafu(display("Error adding a certifcate to a store: {}", source))]
+    AddCertToStore { source: ErrorStack },
+    #[snafu(display("Error setting up the verification certificate: {}", source))]
+    SetVerifyCert { source: ErrorStack },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -230,18 +242,28 @@ impl TlsSettings {
             SslVerifyMode::NONE
         });
         if let Some(identity) = self.identity() {
-            context.set_certificate(&identity.cert).expect("FIXME");
-            context.set_private_key(&identity.pkey).expect("FIXME");
+            context
+                .set_certificate(&identity.cert)
+                .context(SetCertificate)?;
+            context
+                .set_private_key(&identity.pkey)
+                .context(SetPrivateKey)?;
             if let Some(chain) = identity.chain {
                 for cert in chain {
-                    context.add_extra_chain_cert(cert).expect("FIXME");
+                    context
+                        .add_extra_chain_cert(cert)
+                        .context(AddExtraChainCert)?;
                 }
             }
         }
         if let Some(certificate) = &self.authority {
-            let mut store = X509StoreBuilder::new().expect("FIXME");
-            store.add_cert(certificate.clone()).expect("FIXME");
-            context.set_verify_cert_store(store.build()).expect("FIXME");
+            let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
+            store
+                .add_cert(certificate.clone())
+                .context(AddCertToStore)?;
+            context
+                .set_verify_cert_store(store.build())
+                .context(SetVerifyCert)?;
         }
         Ok(())
     }
