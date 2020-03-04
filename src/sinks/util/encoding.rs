@@ -457,7 +457,8 @@ mod tests {
     ";
     #[test]
     fn exclusivity_violation() {
-        assert!(toml::from_str(TOML_EXCLUSIVITY_VIOLATION).is_err());
+        let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
+        assert!(config.is_err())
     }
 
     const TOML_EXCEPT_FIELD: &str = "
