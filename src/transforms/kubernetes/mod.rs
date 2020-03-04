@@ -11,6 +11,7 @@ use bytes::Bytes;
 use evmap::{ReadHandle, WriteHandle};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
+    future::{select, Either},
     stream::StreamExt,
 };
 use k8s_openapi::api::core::v1::Pod;
@@ -217,25 +218,39 @@ impl MetadataClient {
             let mut runtime_error = RuntimeError::WatchUnexpectedlyEnded;
             retry_timeout = self.max_retry_timeout.min(retry_timeout * 2);
 
-            while let Some(next) = watcher.next().await {
+            let mut watch = watcher.next();
+            loop {
+                let either = select(
+                    watch,
+                    Delay::new(Instant::now() + Duration::from_secs(1)).compat(),
+                )
+                .await;
+
                 self.delete_update();
 
-                match next {
-                    Ok(event) => version = self.update(event).or(version),
-                    Err(err) => {
-                        match err {
-                            // Keep the retry_timeout for errors that could
-                            // be caused by the api server being overloaded.
-                            RuntimeError::FailedConnecting { .. }
-                            | RuntimeError::ConnectionStatusNotOK { .. }
-                            | RuntimeError::WatchConnectionErrored { .. }
-                            | RuntimeError::WatchUnexpectedlyEnded => (),
-                            // Optimistically try the shortest timeout.
-                            _ => retry_timeout = Duration::from_secs(1),
+                match either {
+                    Either::Left((next, _)) => match next {
+                        Some(Ok(event)) => {
+                            version = self.update(event).or(version);
+                            watch = watcher.next();
                         }
-                        runtime_error = err;
-                        break;
-                    }
+                        Some(Err(err)) => {
+                            match err {
+                                // Keep the retry_timeout for errors that could
+                                // be caused by the api server being overloaded.
+                                RuntimeError::FailedConnecting { .. }
+                                | RuntimeError::ConnectionStatusNotOK { .. }
+                                | RuntimeError::WatchConnectionErrored { .. }
+                                | RuntimeError::WatchUnexpectedlyEnded => (),
+                                // Optimistically try the shortest timeout.
+                                _ => retry_timeout = Duration::from_secs(1),
+                            }
+                            runtime_error = err;
+                            break;
+                        }
+                        None => break,
+                    },
+                    Either::Right((_, rewatch)) => watch = rewatch,
                 }
             }
 
@@ -332,7 +347,7 @@ impl Transform for KubernetesPodMetadata {
             warn!(
                 message = "Failed enriching Event.",
                 field = self.pod_uid.as_ref(),
-                error = "Missing field."
+                error = "Missing field.",
                 rate_limit_secs = 30
             );
         }
