@@ -1,10 +1,6 @@
 [package]
 name = "vector"
-<<<<<<< HEAD
 version = "0.9.0"
-=======
-version = "0.8.1"
->>>>>>> bac375a3... chore: Prepare v0.8.1 release
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"

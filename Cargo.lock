@@ -4769,11 +4769,7 @@ checksum = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
 
 [[package]]
 name = "vector"
-<<<<<<< HEAD
 version = "0.9.0"
-=======
-version = "0.8.1"
->>>>>>> bac375a3... chore: Prepare v0.8.1 release
 dependencies = [
  "approx",
  "atty",
