@@ -116,7 +116,10 @@ spec:
       containers:
       - name: vector
         image: $(IMAGE)
-        imagePullPolicy: IfNotPresent
+        # By ommiting imagePullPolicy, https://kubernetes.io/docs/concepts/configuration/overview/#container-images comes into effect.
+        # This allows the caller to define imagePullPolicy with image tag:
+        # - tag is 'latest' => imagePullPolicy: Always
+        # - else => imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: var-log
           mountPath: /var/log/

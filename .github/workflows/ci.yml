@@ -54,7 +54,7 @@ jobs:
     # - name: Build image
     #   run: |
     #     eval $(minikube docker-env)
-    #     docker build -t "vector_test:latest" -f - . << EOF
+    #     docker build -t "vector_test:local" -f - . << EOF
     #     FROM buildpack-deps:18.04-curl
     #     # COPY ./builds/vector /usr/local/bin
     #     ENTRYPOINT ["/usr/local/bin/vector"]
