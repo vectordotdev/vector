@@ -10,30 +10,17 @@ use stream_cancel::{Trigger, Tripwire};
 #[derive(Clone)]
 pub struct SourceShutdownHandle {
     _shutdown_complete: Arc<Trigger>,
-    taken: bool,
 }
 
 impl SourceShutdownHandle {
     fn new(shutdown_complete: Trigger) -> Self {
         Self {
             _shutdown_complete: Arc::new(shutdown_complete),
-            taken: false,
         }
     }
 
-    /// Used to force moving this struct into a closure.
-    /// Every thread doing work on behalf of a Source must call this at least once.
-    pub fn take(&mut self) {
-        self.taken = true;
-    }
-}
-
-impl Drop for SourceShutdownHandle {
-    fn drop(&mut self) {
-        if !self.taken {
-            panic!("SourceShutdownHandle dropped without ever being taken");
-        }
-    }
+    /// No-op used to force moving this struct into a closure.
+    pub fn take(&self) {}
 }
 
 /// Passed to each Source to coordinate the global shutdown process.

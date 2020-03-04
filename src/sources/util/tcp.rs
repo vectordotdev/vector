@@ -112,7 +112,7 @@ pub trait TcpSource: Clone + Send + 'static {
                             )
                         })
                         .map_err(|_| ());
-                    let mut shutdown_complete_handle = shutdown_complete_handle.clone();
+                    let shutdown_complete_handle = shutdown_complete_handle.clone();
 
                     let source = self.clone();
                     span.in_scope(|| {
