@@ -25,6 +25,9 @@ static ARGS_MARKER: &'static str = "$(ARGS_MARKER)";
 static ECHO_NAME: &'static str = "$(ECHO_NAME)";
 static WAIT_LIMIT: usize = 60; //s
 /// Environment variable which contains name of the image to be tested.
+/// Image tag defines imagePullPolicy:
+/// - tag is 'latest' => imagePullPolicy: Always
+/// - else => imagePullPolicy: IfNotPresent
 static KUBE_TEST_IMAGE_ENV: &'static str = "KUBE_TEST_IMAGE";
 static IMAGE_MARKER: &'static str = "$(IMAGE)";
 
