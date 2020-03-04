@@ -46,6 +46,8 @@ jobs:
       uses: actions/download-artifact@v1
       with:
         name: builds
+    - name: Print permissions
+      run: ls -l ./builds/vector
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
         minikube-version: 1.7.3
@@ -58,6 +60,7 @@ jobs:
         docker build -t "localhost:5000/vector_test:latest" -f - . << EOF
         FROM buildpack-deps:18.04-curl
         COPY ./builds/vector /usr/local/bin
+        RUN chmod +x /usr/local/bin/vector
         ENTRYPOINT ["/usr/local/bin/vector"]
         EOF
         docker push localhost:5000/vector_test:latest
