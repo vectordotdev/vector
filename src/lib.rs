@@ -26,7 +26,7 @@ pub mod sinks;
 pub mod sources;
 pub mod template;
 pub mod test_util;
-mod tls;
+pub mod tls;
 pub mod topology;
 pub mod trace;
 pub mod transforms;

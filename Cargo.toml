@@ -139,7 +139,8 @@ inventory = "0.1"
 maxminddb = { version = "0.13.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0", optional = true }
 colored = "1.9"
-warp = { version = "0.1.20", optional = true }
+# Forked version to support graceful shutdown with custom tls impl
+warp = { version = "0.1", git = "https://github.com/timberio/warp", branch = "0.1.x", default-features = false, optional = true }
 evmap = { version = "7", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
@@ -216,16 +217,17 @@ sources = [
   "sources-syslog",
   "sources-vector",
 ]
+sources-tls = []
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
-sources-logplex = ["warp"]
+sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-http = ["warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-uds"]
-sources-splunk_hec = ["bytesize", "warp"]
+sources-http = ["warp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
+sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]

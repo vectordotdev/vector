@@ -334,6 +334,10 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the HTTP protocol and outputs `log` events.
 [sources.http]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -373,6 +377,46 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: [string]
   headers = ["User-Agent", "X-My-Custom-Header"]
+
+  #
+  # Tls
+  #
+
+  [sources.http.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
 
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
@@ -573,6 +617,10 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -586,6 +634,46 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   address = "0.0.0.0:8088"
+
+  #
+  # Tls
+  #
+
+  [sources.logplex.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
 
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
@@ -725,6 +813,10 @@ dns_servers = ["0.0.0.0:53"]
 
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -749,6 +841,46 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: string
   token = "A94A8FE5CCB19BA61C4C08"
+
+  #
+  # Tls
+  #
+
+  [sources.splunk_hec.tls]
+    # Absolute path to a certificate file used to identify this server, in DER or
+    # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
+    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Require TLS for incoming connections. If this is set, an identity certificate
+    # is also required.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this server, in DER
+    # or PEM format (PKCS#8).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
 
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]

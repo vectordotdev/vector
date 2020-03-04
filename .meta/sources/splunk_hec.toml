@@ -77,3 +77,5 @@ then the value of the `time` field will be used. If the \
 [Splunk HEC raw endpoint][urls.splunk_hec_raw_endpoint] is used, then the \
 current time the event was received will be used.\
 """
+
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.splunk_hec.options", relevant: "") %>
