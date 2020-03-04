@@ -35,7 +35,6 @@ pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
     key_field: Option<Atom>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]

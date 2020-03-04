@@ -47,9 +47,20 @@ use string_cache::DefaultAtom as Atom;
 ///
 /// This structure **does not** assume that there is a default format. Consider
 /// `EncodingConfigWithDefault<E>` instead if `E: Default`.
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
+    pub(crate) codec: E,
+    #[serde(default)]
+    pub(crate) only_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    pub(crate) except_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    pub(crate) timestamp_format: Option<TimestampFormat>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+struct Inner<E> {
     pub(crate) codec: E,
     #[serde(default)]
     pub(crate) only_fields: Option<Vec<Atom>>,
@@ -259,12 +270,11 @@ impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     }
 }
 
-impl<E> EncodingConfig<E>
+impl<'de, E> Deserialize<'de> for EncodingConfig<E>
 where
     E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
 {
-    // Derived from https://serde.rs/string-or-struct.html
-    pub(crate) fn from_deserializer<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -281,7 +291,7 @@ where
         where
             T: DeserializeOwned + Serialize + Debug + Eq + PartialEq + Clone,
         {
-            type Value = EncodingConfig<T>;
+            type Value = Inner<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("string or map")
@@ -311,7 +321,14 @@ where
             }
         }
 
-        deserializer.deserialize_any(StringOrStruct(PhantomData))
+        let inner = deserializer.deserialize_any(StringOrStruct::<E>(PhantomData))?;
+
+        Ok(Self {
+            codec: inner.codec,
+            only_fields: inner.only_fields,
+            except_fields: inner.except_fields,
+            timestamp_format: inner.timestamp_format,
+        })
     }
 }
 
@@ -384,7 +401,6 @@ mod tests {
     #[derive(Deserialize, Serialize, Debug)]
     #[serde(deny_unknown_fields)]
     struct TestConfig {
-        #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
         encoding: EncodingConfig<TestEncoding>,
     }
 

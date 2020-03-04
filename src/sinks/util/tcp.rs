@@ -46,7 +46,6 @@ enum TcpBuildError {
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     pub tls: Option<TlsConfig>,
 }

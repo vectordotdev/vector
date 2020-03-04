@@ -60,7 +60,6 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     encoding: EncodingConfig<Encoding>,
     compression: Compression,
     #[serde(default)]

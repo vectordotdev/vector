@@ -39,7 +39,6 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,

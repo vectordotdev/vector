@@ -27,7 +27,6 @@ use tracing::field;
 #[serde(deny_unknown_fields)]
 pub struct UnixSinkConfig {
     pub path: PathBuf,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
 }
 

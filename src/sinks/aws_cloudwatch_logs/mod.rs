@@ -55,7 +55,6 @@ pub struct CloudwatchLogsSinkConfig {
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,

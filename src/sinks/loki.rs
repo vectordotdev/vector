@@ -37,7 +37,6 @@ type Labels = Vec<(String, String)>;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<String>,

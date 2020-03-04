@@ -43,7 +43,6 @@ pub struct HttpSinkConfig {
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,

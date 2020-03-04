@@ -32,7 +32,6 @@ pub struct NewRelicLogsConfig {
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
     #[serde(
-        deserialize_with = "EncodingConfig::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default = "default_encoding"
     )]

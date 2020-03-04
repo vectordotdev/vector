@@ -29,7 +29,6 @@ impl Default for Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
 }
 

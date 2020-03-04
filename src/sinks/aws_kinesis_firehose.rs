@@ -36,7 +36,6 @@ pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(deserialize_with = "EncodingConfig::from_deserializer")]
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
