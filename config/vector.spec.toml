@@ -332,6 +332,48 @@ dns_servers = ["0.0.0.0:53"]
     timeout_ms = 1000
     timeout_ms = 600000
 
+# Ingests data through the HTTP protocol and outputs `log` events.
+[sources.http]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "http"
+  type = "http"
+
+  # The address to listen for connections on
+  #
+  # * required
+  # * type: string
+  address = "0.0.0.0:80"
+  address = "localhost:8080"
+
+  # The expected encoding of received data. `text` indicates newline-delimited
+  # text, with each line forming a message. `ndjson` indicates newline-delimited
+  # JSON, where each line must contain a json object. `json` indicates a JSON
+  # payload, which must be a JSON array containing JSON objects. Note that for
+  # `json` and `ndjson` encodings, the fields of the JSON objects are output as
+  # separate fields.
+  #
+  # * required
+  # * default: "text"
+  # * type: string
+  # * enum: "text", "ndjson", and "json"
+  encoding = "text"
+  encoding = "ndjson"
+  encoding = "json"
+
+  # A list of HTTP headers to include in the log event. These will override any
+  # values included in the JSON payload with conflicting names. An empty string
+  # will be inserted into the log event if the corresponding HTTP header was
+  # missing.
+  #
+  # * optional
+  # * no default
+  # * type: [string]
+  headers = ["User-Agent", "X-My-Custom-Header"]
+
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
   # The component type. This is a required field that tells Vector which
@@ -1823,18 +1865,20 @@ end
 
   [transforms.swimlanes.lanes]
     [transforms.swimlanes.lanes.`<swimlane_id>`]
-      # The type of the condition to execute. Currently only the `check_fields` type
-      # is available.
+      # The type of the condition to execute.
       #
       # * required
       # * type: string
       type = "check_fields"
+      type = "is_log"
+      type = "is_metric"
 
       # Check whether a fields contents exactly matches the value specified.
       #
       # * optional
       # * no default
       # * type: string
+      # * relevant when type = "check_fields"
       "message.eq" = "this is the content to match against"
 
       # Check whether a field exists or does not exist, depending on the provided
@@ -1843,6 +1887,7 @@ end
       # * optional
       # * no default
       # * type: bool
+      # * relevant when type = "check_fields"
       "host.exists" = true
 
       # Check whether a fields contents does not match the value specified.
@@ -1850,6 +1895,7 @@ end
       # * optional
       # * no default
       # * type: string
+      # * relevant when type = "check_fields"
       "method.neq" = "POST"
 
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.

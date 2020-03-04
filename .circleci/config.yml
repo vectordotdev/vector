@@ -188,6 +188,7 @@ jobs:
     <<: *docker-machine
     environment:
       RUST_BACKTRACE: full
+      TEST_LOG: debug
       AWS_ACCESS_KEY_ID: fake-aws-key
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-musl

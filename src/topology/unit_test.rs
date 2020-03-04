@@ -518,7 +518,11 @@ pub fn build_unit_tests(config: &mut super::Config) -> Result<Vec<UnitTest>, Vec
     }
 }
 
-#[cfg(test)]
+#[cfg(all(
+    test,
+    feature = "transforms-add_fields",
+    feature = "transforms-swimlanes"
+))]
 mod tests {
     use super::*;
     use crate::topology::config::Config;

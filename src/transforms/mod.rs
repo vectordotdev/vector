@@ -1,28 +1,51 @@
 use crate::Event;
 use snafu::Snafu;
 
+#[cfg(feature = "transforms-add_fields")]
 pub mod add_fields;
+#[cfg(feature = "transforms-add_tags")]
 pub mod add_tags;
+#[cfg(feature = "transforms-ansi_stripper")]
 pub mod ansi_stripper;
+#[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
+#[cfg(feature = "transforms-coercer")]
 pub mod coercer;
+#[cfg(feature = "transforms-concat")]
 pub mod concat;
+#[cfg(feature = "transforms-field_filter")]
 pub mod field_filter;
+#[cfg(feature = "transforms-geoip")]
 pub mod geoip;
+#[cfg(feature = "transforms-grok_parser")]
 pub mod grok_parser;
+#[cfg(feature = "transforms-json_parser")]
 pub mod json_parser;
+#[cfg(feature = "transforms-kubernetes")]
 pub mod kubernetes;
+#[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
+#[cfg(feature = "transforms-logfmt_parser")]
 pub mod logfmt_parser;
+#[cfg(feature = "transforms-lua")]
 pub mod lua;
+#[cfg(feature = "transforms-merge")]
 pub mod merge;
+#[cfg(feature = "transforms-regex_parser")]
 pub mod regex_parser;
+#[cfg(feature = "transforms-remove_fields")]
 pub mod remove_fields;
+#[cfg(feature = "transforms-remove_tags")]
 pub mod remove_tags;
+#[cfg(feature = "transforms-rename_fields")]
 pub mod rename_fields;
+#[cfg(feature = "transforms-sampler")]
 pub mod sampler;
+#[cfg(feature = "transforms-split")]
 pub mod split;
+#[cfg(feature = "transforms-swimlanes")]
 pub mod swimlanes;
+#[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
 use futures01::{sync::mpsc::Receiver, Stream};

@@ -1,3 +1,5 @@
+#![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
+
 use approx::assert_relative_eq;
 #[cfg(unix)]
 use futures01::{Future, Sink, Stream};

@@ -1,3 +1,5 @@
+#![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
+
 use approx::assert_relative_eq;
 use futures01::{Future, Stream};
 use stream_cancel::{StreamExt, Tripwire};

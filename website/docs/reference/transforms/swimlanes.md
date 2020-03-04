@@ -105,7 +105,7 @@ The identifier of a swimlane.
   groups={[]}
   name={"`<field_name>`.eq"}
   path={"lanes.`<swimlane_id>`"}
-  relevantWhen={null}
+  relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
   type={"string"}
@@ -128,7 +128,7 @@ Check whether a fields contents exactly matches the value specified.
   groups={[]}
   name={"`<field_name>`.exists"}
   path={"lanes.`<swimlane_id>`"}
-  relevantWhen={null}
+  relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
   type={"bool"}
@@ -151,7 +151,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   groups={[]}
   name={"`<field_name>`.neq"}
   path={"lanes.`<swimlane_id>`"}
-  relevantWhen={null}
+  relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
   type={"string"}
@@ -170,7 +170,7 @@ Check whether a fields contents does not match the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["check_fields"]}
+  examples={["check_fields","is_log","is_metric"]}
   groups={[]}
   name={"type"}
   path={"lanes.`<swimlane_id>`"}
@@ -183,7 +183,7 @@ Check whether a fields contents does not match the value specified.
 
 ##### type
 
-The type of the condition to execute. Currently only the `check_fields` type is available.
+The type of the condition to execute.
 
 
 </Field>
