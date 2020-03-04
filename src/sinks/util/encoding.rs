@@ -267,21 +267,6 @@ struct Inner<E> {
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E> EncodingConfiguration<E> for Inner<E> {
-    fn codec(&self) -> &E {
-        &self.codec
-    }
-    fn only_fields(&self) -> &Option<Vec<Atom>> {
-        &self.only_fields
-    }
-    fn except_fields(&self) -> &Option<Vec<Atom>> {
-        &self.except_fields
-    }
-    fn timestamp_format(&self) -> &Option<TimestampFormat> {
-        &self.timestamp_format
-    }
-}
-
 #[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
 struct InnerWithDefault<E: Default> {
     #[serde(default)]
@@ -292,21 +277,6 @@ struct InnerWithDefault<E: Default> {
     pub(crate) except_fields: Option<Vec<Atom>>,
     #[serde(default)]
     pub(crate) timestamp_format: Option<TimestampFormat>,
-}
-
-impl<E: Default> EncodingConfiguration<E> for InnerWithDefault<E> {
-    fn codec(&self) -> &E {
-        &self.codec
-    }
-    fn only_fields(&self) -> &Option<Vec<Atom>> {
-        &self.only_fields
-    }
-    fn except_fields(&self) -> &Option<Vec<Atom>> {
-        &self.except_fields
-    }
-    fn timestamp_format(&self) -> &Option<TimestampFormat> {
-        &self.timestamp_format
-    }
 }
 
 impl<'de, E> Deserialize<'de> for EncodingConfig<E>
@@ -356,23 +326,23 @@ where
                 // into a `Deserializer`, allowing it to be used as the input to T's
                 // `Deserialize` implementation. T then deserializes itself using
                 // the entries from the map visitor.
-                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map)).and_then(
-                    |c: Self::Value| {
-                        c.validate().map_err(|err| serde::de::Error::custom(err))?;
-                        Ok(c)
-                    },
-                )
+                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
             }
         }
 
         let inner = deserializer.deserialize_any(StringOrStruct::<E>(PhantomData))?;
 
-        Ok(Self {
+        let concrete = Self {
             codec: inner.codec,
             only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
-        })
+        };
+
+        concrete
+            .validate()
+            .map_err(|e| serde::de::Error::custom(e))?;
+        Ok(concrete)
     }
 }
 
@@ -425,23 +395,23 @@ where
                 // into a `Deserializer`, allowing it to be used as the input to T's
                 // `Deserialize` implementation. T then deserializes itself using
                 // the entries from the map visitor.
-                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map)).and_then(
-                    |c: Self::Value| {
-                        c.validate().map_err(|err| serde::de::Error::custom(err))?;
-                        Ok(c)
-                    },
-                )
+                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
             }
         }
 
         let inner = deserializer.deserialize_any(StringOrStruct::<E>(PhantomData))?;
 
-        Ok(Self {
+        let concrete = Self {
             codec: inner.codec,
             only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
-        })
+        };
+
+        concrete
+            .validate()
+            .map_err(|e| serde::de::Error::custom(e))?;
+        Ok(concrete)
     }
 }
 
