@@ -15,7 +15,7 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Formatter};
 use std::fs::File;
 use std::io::{self, Read, Write};
 #[cfg(feature = "sources-tls")]
@@ -27,6 +27,15 @@ use tokio::net::{tcp::Incoming, TcpListener, TcpStream};
 use tokio_openssl::SslStream;
 #[cfg(feature = "sources-tls")]
 use tokio_openssl::{AcceptAsync, SslAcceptorExt};
+
+/// A type wrapper for objects that can exist in either a raw state or
+/// wrapped by TLS handling.
+pub enum MaybeTls<R, T> {
+    Raw(R),
+    Tls(T),
+}
+
+pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
 #[derive(Debug, Snafu)]
 pub enum TlsError {
@@ -312,8 +321,8 @@ pub(crate) fn tls_connector(settings: Option<TlsSettings>) -> crate::Result<Conn
     Ok(configure)
 }
 
-impl fmt::Debug for TlsSettings {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Debug for TlsSettings {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
@@ -370,8 +379,7 @@ enum MaybeTlsIncomingState<S> {
 
 #[cfg(feature = "sources-tls")]
 impl<I: Stream> MaybeTlsIncoming<I> {
-    #[cfg(feature = "sources-tls")]
-    pub fn new(incoming: I, tls: Option<TlsSettings>) -> crate::Result<Self> {
+    pub(crate) fn new(incoming: I, tls: Option<TlsSettings>) -> crate::Result<Self> {
         let acceptor = if let Some(tls) = tls {
             let acceptor = tls.acceptor()?;
             Some(acceptor.into())
@@ -391,8 +399,7 @@ impl<I: Stream> MaybeTlsIncoming<I> {
 
 #[cfg(feature = "sources-tls")]
 impl MaybeTlsIncoming<Incoming> {
-    #[cfg(feature = "sources-tls")]
-    pub fn bind(addr: &SocketAddr, tls: Option<TlsSettings>) -> crate::Result<Self> {
+    pub(crate) fn bind(addr: &SocketAddr, tls: Option<TlsSettings>) -> crate::Result<Self> {
         let listener = TcpListener::bind(addr)?;
         let incoming = listener.incoming();
 
@@ -442,52 +449,66 @@ impl Stream for MaybeTlsIncoming<Incoming> {
 }
 
 #[cfg(feature = "sources-tls")]
-impl<I: Stream + fmt::Debug> fmt::Debug for MaybeTlsIncoming<I> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<I: Stream + Debug> Debug for MaybeTlsIncoming<I> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("MaybeTlsIncoming")
             .field("incoming", &self.incoming)
             .finish()
     }
 }
 
-#[derive(Debug)]
-pub enum MaybeTlsStream<S> {
-    Tls(SslStream<S>),
-    Raw(S),
-}
-
-impl<S: Read + Write> Read for MaybeTlsStream<S> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+// Conditionally implement Clone for Clonable types
+impl<R: Clone, T: Clone> Clone for MaybeTls<R, T> {
+    fn clone(&self) -> Self {
         match self {
-            MaybeTlsStream::Tls(s) => s.read(buf),
-            MaybeTlsStream::Raw(s) => s.read(buf),
+            Self::Raw(raw) => Self::Raw(raw.clone()),
+            Self::Tls(tls) => Self::Tls(tls.clone()),
         }
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> AsyncRead for MaybeTlsStream<S> {}
+// Conditionally implement Debug for Debugable types
+impl<R: Debug, T: Debug> Debug for MaybeTls<R, T> {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::Raw(raw) => write!(fmt, "MaybeTls::Raw({:?})", raw),
+            Self::Tls(tls) => write!(fmt, "MaybeTls::Tls({:?})", tls),
+        }
+    }
+}
 
-impl<S: Read + Write> Write for MaybeTlsStream<S> {
+impl<R: Read, T: Read> Read for MaybeTls<R, T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Tls(s) => s.read(buf),
+            Self::Raw(s) => s.read(buf),
+        }
+    }
+}
+
+impl<R: AsyncRead, T: AsyncRead> AsyncRead for MaybeTls<R, T> {}
+
+impl<R: Write, T: Write> Write for MaybeTls<R, T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            MaybeTlsStream::Tls(s) => s.write(buf),
-            MaybeTlsStream::Raw(s) => s.write(buf),
+            Self::Tls(s) => s.write(buf),
+            Self::Raw(s) => s.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            MaybeTlsStream::Tls(s) => s.flush(),
-            MaybeTlsStream::Raw(s) => s.flush(),
+            Self::Tls(s) => s.flush(),
+            Self::Raw(s) => s.flush(),
         }
     }
 }
 
-impl<S: AsyncRead + AsyncWrite> AsyncWrite for MaybeTlsStream<S> {
+impl<R: AsyncWrite, T: AsyncWrite> AsyncWrite for MaybeTls<R, T> {
     fn shutdown(&mut self) -> Poll<(), io::Error> {
         match self {
-            MaybeTlsStream::Tls(s) => s.shutdown(),
-            MaybeTlsStream::Raw(s) => s.shutdown(),
+            Self::Tls(s) => s.shutdown(),
+            Self::Raw(s) => s.shutdown(),
         }
     }
 }
