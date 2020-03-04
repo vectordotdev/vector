@@ -46,7 +46,6 @@ inventory::submit! {
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {

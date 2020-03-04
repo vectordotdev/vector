@@ -97,7 +97,6 @@ impl KinesisService {
         let batch = config.batch.unwrap_or(500, 1);
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
-        encoding.validate()?;
         let partition_key_field = config.partition_key_field.clone();
 
         let kinesis = KinesisService { client, config };

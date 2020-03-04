@@ -25,10 +25,7 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -59,7 +56,6 @@ pub enum Encoding {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let healthcheck = healthcheck(cx.resolver(), &self)?;
         let sink = clickhouse(self.clone(), cx)?;
 

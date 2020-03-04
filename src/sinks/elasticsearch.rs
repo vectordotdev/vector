@@ -33,10 +33,7 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -88,7 +85,6 @@ inventory::submit! {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(cx.resolver(), &common)?;
         let sink = es(self, common, cx);

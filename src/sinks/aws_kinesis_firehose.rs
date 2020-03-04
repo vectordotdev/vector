@@ -66,7 +66,6 @@ inventory::submit! {
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
-        config.encoding.validate()?;
         let healthcheck = healthcheck(self.clone(), cx.resolver())?;
         let sink = KinesisFirehoseService::new(config, cx)?;
         Ok((Box::new(sink), healthcheck))

@@ -1,10 +1,6 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        encode_event,
-        encoding::{EncodingConfig, EncodingConfiguration},
-        Encoding, SinkExt,
-    },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
     tls::{TlsConfig, TlsConnectorExt, TlsSettings},
     topology::config::SinkContext,
@@ -60,7 +56,6 @@ impl TcpSinkConfig {
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        self.encoding.validate()?;
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();

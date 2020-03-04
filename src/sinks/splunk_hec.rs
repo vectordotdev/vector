@@ -34,10 +34,7 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
@@ -76,7 +73,6 @@ inventory::submit! {
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
-        self.encoding.validate()?;
         let healthcheck = healthcheck(&self, cx.resolver())?;
         let sink = hec(self.clone(), cx)?;
 

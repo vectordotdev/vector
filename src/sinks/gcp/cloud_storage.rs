@@ -170,7 +170,6 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        self.encoding.validate()?;
         let sink = GcsSink::new(self, &cx)?;
         let healthcheck = sink.healthcheck()?;
         let service = sink.service(self, &cx)?;

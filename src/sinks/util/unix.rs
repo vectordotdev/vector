@@ -1,10 +1,6 @@
 use crate::sinks::util::SinkExt;
 use crate::{
-    sinks::util::{
-        encode_event,
-        encoding::{EncodingConfig, EncodingConfiguration},
-        Encoding,
-    },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding},
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
@@ -36,7 +32,6 @@ impl UnixSinkConfig {
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        self.encoding.validate()?;
         let encoding = self.encoding.clone();
 
         let sink = Box::new(

@@ -3,10 +3,7 @@ mod file;
 use self::file::File;
 use crate::{
     event::Event,
-    sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        SinkExt,
-    },
+    sinks::util::{encoding::EncodingConfigWithDefault, SinkExt},
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
 };
@@ -41,7 +38,6 @@ impl Default for Encoding {
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let sink = PartitionedFileSink::new(&self).stream_ack(cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))

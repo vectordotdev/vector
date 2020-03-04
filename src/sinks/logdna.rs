@@ -31,10 +31,7 @@ pub struct LogdnaConfig {
     ip: Option<String>,
     tags: Option<Vec<String>>,
 
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     default_app: Option<String>,

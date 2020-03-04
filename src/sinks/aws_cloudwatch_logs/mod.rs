@@ -137,7 +137,6 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let batch = self.batch.unwrap_or(1000, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 

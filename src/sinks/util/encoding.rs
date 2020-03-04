@@ -13,11 +13,8 @@
 //!
 //! To use an `EncodingConfig` involves three steps:
 //!
-//!  1. Use `#[serde(deserialize_with = "EncodingConfig::from_deserializer")]` or
-//!     `#[serde(deserialize_with = "EncodingConfigWithDefault::from_deserializer", default)]`
-//!     to deserialize the configuration in your sink configuration.
-//!  2. Call `validate()` on this config in the `build()` step of your sink.
-//!  3. Call `apply_rules(&mut event)` on this config **on each event** just before it gets sent.
+//!  1. Choose between `EncodingConfig` and `EncodingConfigWithDefault`.
+//!  2. Call `apply_rules(&mut event)` on this config **on each event** just before it gets sent.
 //!
 //! # Implementation notes
 //!
@@ -50,17 +47,6 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
-    pub(crate) codec: E,
-    #[serde(default)]
-    pub(crate) only_fields: Option<Vec<Atom>>,
-    #[serde(default)]
-    pub(crate) except_fields: Option<Vec<Atom>>,
-    #[serde(default)]
-    pub(crate) timestamp_format: Option<TimestampFormat>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-struct Inner<E> {
     pub(crate) codec: E,
     #[serde(default)]
     pub(crate) only_fields: Option<Vec<Atom>>,
@@ -150,7 +136,7 @@ impl<E: Default + PartialEq> Into<EncodingConfigWithDefault<E>> for EncodingConf
 }
 
 /// The behavior of a encoding configuration.
-pub trait EncodingConfiguration<E>: Into<EncodingConfig<E>> + From<E> {
+pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
@@ -270,6 +256,32 @@ impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+struct Inner<E> {
+    pub(crate) codec: E,
+    #[serde(default)]
+    pub(crate) only_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    pub(crate) except_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    pub(crate) timestamp_format: Option<TimestampFormat>,
+}
+
+impl<E> EncodingConfiguration<E> for Inner<E> {
+    fn codec(&self) -> &E {
+        &self.codec
+    }
+    fn only_fields(&self) -> &Option<Vec<Atom>> {
+        &self.only_fields
+    }
+    fn except_fields(&self) -> &Option<Vec<Atom>> {
+        &self.except_fields
+    }
+    fn timestamp_format(&self) -> &Option<TimestampFormat> {
+        &self.timestamp_format
+    }
+}
+
 impl<'de, E> Deserialize<'de> for EncodingConfig<E>
 where
     E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq,
@@ -317,7 +329,12 @@ where
                 // into a `Deserializer`, allowing it to be used as the input to T's
                 // `Deserialize` implementation. T then deserializes itself using
                 // the entries from the map visitor.
-                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map)).and_then(
+                    |c: Self::Value| {
+                        c.validate().map_err(|err| serde::de::Error::custom(err))?;
+                        Ok(c)
+                    },
+                )
             }
         }
 
@@ -333,7 +350,7 @@ where
 }
 
 impl<'de, E> Deserialize<'de> for EncodingConfigWithDefault<E>
-    where
+where
     E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq + Default,
 {
     // Derived from https://serde.rs/string-or-struct.html
@@ -381,7 +398,12 @@ impl<'de, E> Deserialize<'de> for EncodingConfigWithDefault<E>
                 // into a `Deserializer`, allowing it to be used as the input to T's
                 // `Deserialize` implementation. T then deserializes itself using
                 // the entries from the map visitor.
-                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+                Deserialize::deserialize(de::value::MapAccessDeserializer::new(map)).and_then(
+                    |c: Self::Value| {
+                        c.validate().map_err(|err| serde::de::Error::custom(err))?;
+                        Ok(c)
+                    },
+                )
             }
         }
 
@@ -435,8 +457,7 @@ mod tests {
     ";
     #[test]
     fn exclusivity_violation() {
-        let config: TestConfig = toml::from_str(TOML_EXCLUSIVITY_VIOLATION).unwrap();
-        assert!(config.encoding.validate().is_err());
+        assert!(toml::from_str(TOML_EXCLUSIVITY_VIOLATION).is_err());
     }
 
     const TOML_EXCEPT_FIELD: &str = "

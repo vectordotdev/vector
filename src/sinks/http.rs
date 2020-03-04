@@ -104,7 +104,6 @@ impl SinkConfig for HttpSinkConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
 
         let mut config = self.clone();
-        config.encoding.validate()?;
 
         config.uri = build_uri(config.uri.clone()).into();
         let gzip = match config.compression.unwrap_or(Compression::None) {

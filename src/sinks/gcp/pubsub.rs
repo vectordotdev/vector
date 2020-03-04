@@ -40,10 +40,7 @@ pub struct PubsubConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
@@ -64,7 +61,6 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        self.encoding.validate()?;
         let sink = PubsubSink::from_config(self)?;
         let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);
         let request_settings = self.request.unwrap_with(&Default::default());

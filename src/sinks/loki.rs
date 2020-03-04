@@ -77,7 +77,6 @@ impl SinkConfig for LokiConfig {
         if self.labels.is_empty() {
             return Err(format!("`labels` must include at least one label.").into());
         }
-        self.encoding.validate()?;
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.unwrap_or(bytesize::mib(10u64), 1);

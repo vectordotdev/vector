@@ -79,7 +79,6 @@ inventory::submit! {
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))

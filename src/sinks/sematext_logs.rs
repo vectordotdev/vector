@@ -1,7 +1,7 @@
 use crate::{
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
         BatchBytesConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -17,10 +17,7 @@ pub struct SematextLogsConfig {
     host: Option<String>,
     token: String,
 
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
@@ -44,7 +41,6 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.encoding.validate()?;
         let host = match (&self.host, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_string(),

@@ -39,10 +39,7 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
@@ -101,7 +98,6 @@ lazy_static! {
 #[typetag::serde(name = "gcp_stackdriver_logging")]
 impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        self.encoding.validate()?;
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
         let sink = self.service(&cx, &creds)?;
         let healthcheck = self.healthcheck(&cx, &creds)?;

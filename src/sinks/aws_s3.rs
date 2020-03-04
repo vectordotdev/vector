@@ -45,10 +45,7 @@ pub struct S3SinkConfig {
     options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Compression,
     #[serde(default)]
@@ -168,7 +165,6 @@ impl S3Sink {
     pub fn new(config: &S3SinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
-        encoding.validate()?;
 
         let compression = match config.compression {
             Compression::Gzip => true,
