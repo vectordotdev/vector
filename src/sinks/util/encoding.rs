@@ -89,7 +89,7 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
 ///
 /// This structure **does** assume that there is a default format. Consider
 /// `EncodingConfig<E>` instead if `E: !Default`.
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Default)]
+#[derive(Serialize, Debug, Eq, PartialEq, Clone, Default)]
 pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
@@ -332,13 +332,13 @@ where
     }
 }
 
-impl<E> EncodingConfigWithDefault<E>
-where
+impl<'de, E> Deserialize<'de> for EncodingConfigWithDefault<E>
+    where
     E: DeserializeOwned + Serialize + Debug + Clone + PartialEq + Eq + Default,
 {
     // Derived from https://serde.rs/string-or-struct.html
     #[allow(dead_code)] // For supporting `--no-default-features`
-    pub(crate) fn from_deserializer<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

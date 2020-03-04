@@ -15,7 +15,6 @@ pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default = "default_encoding"
     )]

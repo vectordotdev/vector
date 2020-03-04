@@ -41,7 +41,6 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default
     )]

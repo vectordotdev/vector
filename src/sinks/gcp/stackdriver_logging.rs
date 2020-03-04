@@ -40,7 +40,6 @@ pub struct StackdriverConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default
     )]

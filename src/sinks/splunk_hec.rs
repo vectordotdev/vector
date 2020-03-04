@@ -35,7 +35,6 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default
     )]

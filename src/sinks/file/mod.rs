@@ -21,10 +21,7 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
-        default
-    )]
+    #[serde(default)]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 }
 

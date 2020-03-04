@@ -26,7 +26,6 @@ pub struct ClickhouseConfig {
     pub database: Option<String>,
     pub compression: Option<Compression>,
     #[serde(
-        deserialize_with = "EncodingConfigWithDefault::from_deserializer",
         skip_serializing_if = "skip_serializing_if_default",
         default
     )]
