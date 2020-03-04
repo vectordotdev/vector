@@ -74,15 +74,15 @@ pub trait TcpSource: Clone + Send + 'static {
                 )
             );
 
+            let shutdown_complete_handle = shutdown.get_shutdown_complete_handle();
             let (trigger, tripwire) = Tripwire::new();
-            let tripwire = tripwire.select(shutdown.begin_shutdown);
+            let tripwire = tripwire.select(shutdown);
             let tripwire = tripwire
                 .and_then(move |_| {
                     timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
                         .map_err(|err| panic!("Timer error: {:?}", err))
                 })
                 .shared();
-            let shutdown_complete = shutdown.shutdown_complete;
 
             let future = listener
                 .incoming()
@@ -112,7 +112,7 @@ pub trait TcpSource: Clone + Send + 'static {
                             )
                         })
                         .map_err(|_| ());
-                    let mut shutdown_complete = shutdown_complete.clone();
+                    let mut shutdown_complete_handle = shutdown_complete_handle.clone();
 
                     let source = self.clone();
                     span.in_scope(|| {
@@ -123,7 +123,7 @@ pub trait TcpSource: Clone + Send + 'static {
                         let events_in = FramedRead::new(socket, source.decoder())
                             .take_until(tripwire)
                             .filter_map(move |frame| {
-                                shutdown_complete.take();
+                                shutdown_complete_handle.take();
                                 let host = host.clone();
                                 source.build_event(frame, host)
                             })

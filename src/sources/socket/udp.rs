@@ -35,9 +35,6 @@ pub fn udp(
 ) -> Source {
     let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
-    let begin_shutdown = shutdown.begin_shutdown;
-    let mut shutdown_complete = shutdown.shutdown_complete;
-
     Box::new(
         future::lazy(move || {
             let socket = UdpSocket::bind(&address).expect("failed to bind to udp listener socket");
@@ -51,7 +48,7 @@ pub fn udp(
             // UDP processes messages per packet, where messages are separated by newline.
             // And stretch to end of packet.
             UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
-                .take_until(begin_shutdown)
+                .take_until(shutdown)
                 .map(move |(line, addr): (Bytes, _)| {
                     let mut event = Event::from(line);
 
@@ -66,11 +63,7 @@ pub fn udp(
                 .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
                 .forward(out)
                 // Done with listening and sending
-                .map(move |_| {
-                    // Move the shutdown_complete handle into the future so that the handle gets
-                    // dropped only once all work for this source is complete.
-                    shutdown_complete.take();
-                })
+                .map(|_| ())
         }),
     )
 }

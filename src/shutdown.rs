@@ -1,3 +1,4 @@
+use futures::{Async, Future};
 use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};
 
@@ -39,18 +40,38 @@ impl Drop for SourceShutdownHandle {
 pub struct ShutdownSignals {
     /// This will be triggered when global shutdown has begun, and is a sign to the Source to begin
     /// its shutdown process.
-    pub begin_shutdown: Tripwire,
+    begin_shutdown: Tripwire,
 
     /// When a Source allows this to go out of scope it informs the global shutdown coordinator that
     /// this source's local shutdown process is complete.
-    pub shutdown_complete: SourceShutdownHandle,
+    shutdown_complete: Option<SourceShutdownHandle>,
+}
+
+impl Future for ShutdownSignals {
+    type Item = ();
+    type Error = ();
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+        match self.begin_shutdown.poll() {
+            Ok(Async::Ready(_)) => {
+                self.shutdown_complete.take();
+                Ok(Async::Ready(()))
+            }
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(_) => Err(()),
+        }
+    }
 }
 
 impl ShutdownSignals {
     pub fn new(begin_shutdown: Tripwire, shutdown_complete: Trigger) -> Self {
         Self {
             begin_shutdown,
-            shutdown_complete: SourceShutdownHandle::new(shutdown_complete),
+            shutdown_complete: Some(SourceShutdownHandle::new(shutdown_complete)),
         }
+    }
+
+    /// TODO
+    pub fn get_shutdown_complete_handle(&self) -> SourceShutdownHandle {
+        self.shutdown_complete.as_ref().unwrap().clone()
     }
 }
