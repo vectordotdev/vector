@@ -130,11 +130,7 @@ impl<B> HttpService<B> {
     where
         F: Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new_with_resolver(resolver.clone());
-        http.enforce_http(false);
-
-        let tls = tls_connector_builder(tls_settings).unwrap();
-        let https = HttpsConnector::with_connector(http, tls).expect("FIXME");
+        let https = connector(resolver, tls_settings).unwrap();
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -167,11 +163,7 @@ impl HttpServiceBuilder {
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
-        http.enforce_http(false);
-
-        let tls = tls_connector_builder(self.tls_settings).unwrap();
-        let https = HttpsConnector::with_connector(http, tls).expect("FIXME");
+        let https = connector(self.resolver, self.tls_settings).unwrap();
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -192,19 +184,19 @@ impl HttpServiceBuilder {
 
 pub fn connector(
     resolver: Resolver,
-    tls_settings: TlsSettings,
+    tls_settings: Option<TlsSettings>,
 ) -> crate::Result<HttpsConnector<HttpConnector<Resolver>>> {
     let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
-    let tls = tls_connector_builder(Some(tls_settings))?;
-    let https = HttpsConnector::with_connector(http, tls).expect("FIXME");
+    let tls = tls_connector_builder(tls_settings)?;
+    let https = HttpsConnector::with_connector(http, tls)?;
 
     Ok(https)
 }
 
 pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<HttpsClient> {
-    let https = connector(resolver, tls)?;
+    let https = connector(resolver, Some(tls))?;
     Ok(hyper::Client::builder().build(https))
 }
 
