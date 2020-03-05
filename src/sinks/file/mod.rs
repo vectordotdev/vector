@@ -1,5 +1,3 @@
-#![cfg(feature = "disabled")]
-
 mod file;
 
 use self::file::File;

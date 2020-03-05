@@ -1,5 +1,3 @@
-#![cfg(feature = "disabled")]
-
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures01::{sink::Sink, stream::Stream, Future};
