@@ -516,3 +516,84 @@ impl Transform for Transaction {
         )
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::TransactionConfig;
+    use crate::{
+        event::Value,
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
+
+    #[test]
+    fn transaction_from_condition() {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
+        let mut transaction = toml::from_str::<TransactionConfig>(
+            r#"
+identifier_fields = [ "request_id" ]
+[ends_when]
+  "test_end.exists" = true
+"#,
+        )
+        .unwrap()
+        .build(TransformContext::new_test(rt.executor()))
+        .unwrap();
+
+        let mut outputs = Vec::new();
+
+        let mut e = Event::from("test message 1");
+        e.as_mut_log().insert("counter", 1);
+        e.as_mut_log().insert("request_id", "1");
+        transaction.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 2");
+        e.as_mut_log().insert("counter", 2);
+        e.as_mut_log().insert("request_id", "2");
+        transaction.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 3");
+        e.as_mut_log().insert("counter", 3);
+        e.as_mut_log().insert("request_id", "1");
+        transaction.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 4");
+        e.as_mut_log().insert("counter", 4);
+        e.as_mut_log().insert("request_id", "1");
+        e.as_mut_log().insert("test_end", "yep");
+        transaction.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"message".into()],
+            "test message 1".into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"counter".into()],
+            Value::from(8)
+        );
+
+        outputs.clear();
+
+        let mut e = Event::from("test message 5");
+        e.as_mut_log().insert("counter", 5);
+        e.as_mut_log().insert("request_id", "2");
+        e.as_mut_log().insert("extra_field", "value1");
+        e.as_mut_log().insert("test_end", "yep");
+        transaction.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"message".into()],
+            "test message 2".into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            "value1".into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"counter".into()],
+            Value::from(7)
+        );
+    }
+}
