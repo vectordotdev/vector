@@ -31,6 +31,10 @@ Sell this change.
 
 What are the downsides of doing this?
 
+## Alternatives
+
+What some alternatives to this approach?
+
 ## Outstanding Questions
 
 List any outstanding questions that we can discuss and resolve.
