@@ -55,3 +55,9 @@ common = false
 required = true
 examples = ["this-is-a-topic"]
 description = "The topic within the project to which to publish logs."
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.gcp_pubsub.options",
+  encodings: ["default"],
+  default: "default"
+) %>

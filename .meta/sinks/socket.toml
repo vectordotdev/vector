@@ -14,18 +14,11 @@ write_to_description = "a socket, such as a TCP or Unix domain socket"
 
 <%= render("_partials/_buffer_options.toml", namespace: "sinks.socket.options") %>
 
-[sinks.socket.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.socket.options.encoding.enum]
-json = "Each event is encoded into JSON."
-text = "Each event is encoded into text via the `message` key."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.socket.options",
+  encodings: ["json", "text"],
+  default: false
+) %>
 
 [sinks.socket.options.mode]
 type = "string"

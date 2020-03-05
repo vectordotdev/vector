@@ -116,16 +116,11 @@ default = "log"
 required = true
 description = "The filename extension to use in the object name."
 
-[sinks.gcp_cloud_storage.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = "The encoding format used to serialize the events before outputting."
-
-[sinks.gcp_cloud_storage.options.encoding.enum]
-ndjson = "Each event is encoded into JSON and the payload is new line delimited."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.gcp_cloud_storage.options",
+  encodings: ["ndjson", "text"],
+  default: false,
+) %>
 
 [sinks.gcp_cloud_storage.options.compression]
 type = "string"

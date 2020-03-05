@@ -71,19 +71,11 @@ outputting.\
 none = "The payload will not be compressed."
 gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
 
-[sinks.http.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.http.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-ndjson = "Each event is encoded into JSON and the payload is new line delimited."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.http.options",
+  encodings: ["json", "ndjson", "text"],
+  default: false,
+) %>
 
 [sinks.http.options.headers]
 type = "table"

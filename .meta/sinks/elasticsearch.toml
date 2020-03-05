@@ -33,6 +33,12 @@ write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API
   timeout_secs: 60
 ) %>
 
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.elasticsearch.options",
+  encodings: ["default"],
+  default: "default"
+) %>
+
 [sinks.elasticsearch.options.auth]
 type = "table"
 common = false

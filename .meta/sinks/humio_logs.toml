@@ -41,3 +41,9 @@ type = "string"
 examples = ["http://myhumiohost.com"]
 required = false
 description = "The optional host to send Humio logs to."
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.humio_logs.options",
+  encodings: ["json"],
+  default: "json"
+) %>

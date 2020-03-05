@@ -50,13 +50,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
   region = "us-east-1" # example, relevant when host = ""
   stream_name = "{{ instance_id }}" # example
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
   # OPTIONAL - General
   create_missing_group = true # default
   create_missing_stream = true # default
   healthcheck = true # default
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
@@ -72,9 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   group_name = "{{ file }}" # example
   region = "us-east-1" # example, relevant when host = ""
   stream_name = "{{ instance_id }}" # example
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
 
   # OPTIONAL - General
   assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
@@ -97,6 +101,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
@@ -385,11 +399,33 @@ Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not a
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","text"]}
+  enumValues={null}
+  examples={[]}
   groups={[]}
   name={"encoding"}
   path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -397,10 +433,84 @@ Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not a
   unit={null}
   >
 
-### encoding
+#### codec
 
-The encoding format used to serialize the events before outputting.
+The encoding codec used to serialize the events before outputting.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
