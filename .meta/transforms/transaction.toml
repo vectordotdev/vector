@@ -10,13 +10,24 @@ requirements = {}
 
 <%= render("_partials/fields/_component_options.toml", type: "transform", name: "transaction") %>
 
-[transforms.transaction.options.flush_period_ms]
+[transforms.transaction.options.expire_after_ms]
 type = "int"
 common = false
 required = false
 default = 30000
 description = """\
-A maximum period of time to wait before transactions should be flushed.\
+A maximum period of time to wait before a transaction should be considered \
+complete after not having received another event.\
+"""
+
+[transforms.transaction.options.flush_period_ms]
+type = "int"
+common = false
+required = false
+default = 1000
+description = """\
+Controls the frequency that Vector checks for (and flushes) expired \
+transactions.\
 """
 
 [transforms.transaction.options.identifier_fields]

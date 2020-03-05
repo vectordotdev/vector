@@ -66,7 +66,8 @@ events of a matching transaction into a single event.
   # General
   type = "transaction" # required
   inputs = ["my-source-or-transform-id"] # required
-  flush_period_ms = 30000 # optional, default
+  expire_after_ms = 30000 # optional, default
+  flush_period_ms = 1000 # optional, default
   identifier_fields = [] # optional, default
 
   # Ends when
@@ -352,6 +353,30 @@ of the list matches.
   enumValues={null}
   examples={[30000]}
   groups={[]}
+  name={"expire_after_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  warnings={[]}
+  >
+
+### expire_after_ms
+
+A maximum period of time to wait before a transaction should be considered
+complete after not having received another event.
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={1000}
+  enumValues={null}
+  examples={[1000]}
+  groups={[]}
   name={"flush_period_ms"}
   path={null}
   relevantWhen={null}
@@ -364,7 +389,8 @@ of the list matches.
 
 ### flush_period_ms
 
-A maximum period of time to wait before transactions should be flushed.
+Controls the frequency that Vector checks for (and flushes) expired
+transactions.
 
 
 
