@@ -72,7 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     enabled = false # default
     key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
+    verify_certificate = false # default
 ```
 
 </TabItem>
@@ -273,9 +273,9 @@ Absolute path to a certificate key file used to identify this server, in DER or 
 
 <Field
   common={false}
-  defaultValue={true}
+  defaultValue={false}
   enumValues={null}
-  examples={[true,false]}
+  examples={[false,true]}
   groups={[]}
   name={"verify_certificate"}
   path={"tls"}
@@ -288,7 +288,7 @@ Absolute path to a certificate key file used to identify this server, in DER or 
 
 #### verify_certificate
 
-If `true` (the default), Vector will require a TLS certificate from the connecting host and terminate the connection if it is not valid. If `false`, Vector will ignore the presence of a client certificate.
+If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if it is not valid. If `false` (the default), Vector will ignore the presence of a client certificate.
 
 
 </Field>

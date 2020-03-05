@@ -128,15 +128,15 @@ pub struct IdentityStore(Vec<u8>, String);
 impl TlsSettings {
     pub fn from_config(
         config: &Option<TlsConfig>,
-        require_ident: bool,
+        for_server: bool,
     ) -> crate::Result<Option<Self>> {
         match config {
             None => Ok(None),
             Some(config) => match config.enabled.unwrap_or(false) {
                 false => Ok(None),
                 true => {
-                    let tls = Self::from_options(&Some(config.options.clone()))?;
-                    if require_ident && tls.identity.is_none() {
+                    let tls = Self::from_options_base(&Some(config.options.clone()), for_server)?;
+                    if for_server && tls.identity.is_none() {
                         Err(TlsError::MissingRequiredIdentity.into())
                     } else {
                         Ok(Some(tls))
@@ -147,14 +147,22 @@ impl TlsSettings {
     }
 
     pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
+        Self::from_options_base(options, false)
+    }
+
+    fn from_options_base(options: &Option<TlsOptions>, for_server: bool) -> crate::Result<Self> {
         let default = TlsOptions::default();
         let options = options.as_ref().unwrap_or(&default);
 
-        if options.verify_certificate == Some(false) {
-            warn!("`verify_certificate` is DISABLED, this may lead to security vulnerabilities");
-        }
-        if options.verify_hostname == Some(false) {
-            warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
+        if !for_server {
+            if options.verify_certificate == Some(false) {
+                warn!(
+                    "`verify_certificate` is DISABLED, this may lead to security vulnerabilities"
+                );
+            }
+            if options.verify_hostname == Some(false) {
+                warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
+            }
         }
 
         if options.key_path.is_some() && options.crt_path.is_none() {
@@ -205,8 +213,8 @@ impl TlsSettings {
         };
 
         Ok(Self {
-            verify_certificate: options.verify_certificate.unwrap_or(true),
-            verify_hostname: options.verify_hostname.unwrap_or(true),
+            verify_certificate: options.verify_certificate.unwrap_or(!for_server),
+            verify_hostname: options.verify_hostname.unwrap_or(!for_server),
             authority,
             identity,
         })
@@ -580,10 +588,10 @@ mod test {
         enabled: Option<bool>,
         set_crt: bool,
         set_key: bool,
-        require_ident: bool,
+        for_server: bool,
     ) -> Option<TlsSettings> {
         let config = make_config(enabled, set_crt, set_key);
-        TlsSettings::from_config(&Some(config), require_ident)
+        TlsSettings::from_config(&Some(config), for_server)
             .expect("Failed to generate settings from config")
     }
 

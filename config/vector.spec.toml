@@ -426,15 +426,15 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-    # If `true` (the default), Vector will require a TLS certificate from the
-    # connecting host and terminate the connection if it is not valid. If `false`,
-    # Vector will ignore the presence of a client certificate.
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
     #
     # * optional
-    # * default: true
+    # * default: false
     # * type: bool
-    verify_certificate = true
     verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
@@ -701,15 +701,15 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-    # If `true` (the default), Vector will require a TLS certificate from the
-    # connecting host and terminate the connection if it is not valid. If `false`,
-    # Vector will ignore the presence of a client certificate.
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
     #
     # * optional
-    # * default: true
+    # * default: false
     # * type: bool
-    verify_certificate = true
     verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
@@ -855,15 +855,15 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when mode = "tcp"
     key_path = "/path/to/host_certificate.key"
 
-    # If `true` (the default), Vector will require a TLS certificate from the
-    # connecting host and terminate the connection if it is not valid. If `false`,
-    # Vector will ignore the presence of a client certificate.
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
     #
     # * optional
-    # * default: true
+    # * default: false
     # * type: bool
-    verify_certificate = true
     verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
@@ -944,15 +944,15 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-    # If `true` (the default), Vector will require a TLS certificate from the
-    # connecting host and terminate the connection if it is not valid. If `false`,
-    # Vector will ignore the presence of a client certificate.
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
     #
     # * optional
-    # * default: true
+    # * default: false
     # * type: bool
-    verify_certificate = true
     verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
@@ -1114,15 +1114,15 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-    # If `true` (the default), Vector will require a TLS certificate from the
-    # connecting host and terminate the connection if it is not valid. If `false`,
-    # Vector will ignore the presence of a client certificate.
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
     #
     # * optional
-    # * default: true
+    # * default: false
     # * type: bool
-    verify_certificate = true
     verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
@@ -1204,15 +1204,15 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     key_path = "/path/to/host_certificate.key"
 
-    # If `true` (the default), Vector will require a TLS certificate from the
-    # connecting host and terminate the connection if it is not valid. If `false`,
-    # Vector will ignore the presence of a client certificate.
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
     #
     # * optional
-    # * default: true
+    # * default: false
     # * type: bool
-    verify_certificate = true
     verify_certificate = false
+    verify_certificate = true
 
 
 # ------------------------------------------------------------------------------

@@ -212,7 +212,6 @@ mod test {
             options: TlsOptions {
                 crt_path: Some("tests/data/localhost.crt".into()),
                 key_path: Some("tests/data/localhost.key".into()),
-                verify_certificate: Some(false),
                 ..Default::default()
             },
         });
