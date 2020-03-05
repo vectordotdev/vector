@@ -1,5 +1,5 @@
 use crate::{
-    sinks::splunk_hec::{Encoding, HecSinkConfig},
+    sinks::splunk_hec::{self, HecSinkConfig},
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
         BatchBytesConfig, TowerRequestConfig,
@@ -10,15 +10,11 @@ use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
-    #[serde(
-        skip_serializing_if = "skip_serializing_if_default",
-        default = "default_encoding"
-    )]
-    #[derivative(Default(value = "default_encoding()"))]
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
     encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
@@ -32,8 +28,18 @@ inventory::submit! {
     SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
 }
 
-fn default_encoding() -> EncodingConfigWithDefault<Encoding> {
-    EncodingConfigWithDefault::from(Encoding::Json)
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Json,
+}
+
+impl Into<splunk_hec::Encoding> for Encoding {
+    fn into(self) -> splunk_hec::Encoding {
+        splunk_hec::Encoding::Json
+    }
 }
 
 #[typetag::serde(name = "humio_logs")]
@@ -47,7 +53,12 @@ impl SinkConfig for HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             host,
-            encoding: self.encoding.clone(),
+            encoding: EncodingConfigWithDefault {
+                codec: self.encoding.codec.clone().into(),
+                only_fields: self.encoding.only_fields.clone(),
+                except_fields: self.encoding.except_fields.clone(),
+                timestamp_format: self.encoding.timestamp_format.clone(),
+            },
             batch: self.batch.clone(),
             request: self.request.clone(),
             ..Default::default()

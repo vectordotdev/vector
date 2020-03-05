@@ -3,7 +3,10 @@ mod file;
 use self::file::File;
 use crate::{
     event::Event,
-    sinks::util::{encoding::EncodingConfigWithDefault, SinkExt},
+    sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        SinkExt,
+    },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
 };
@@ -18,7 +21,7 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 }
 
