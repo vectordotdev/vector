@@ -80,16 +80,17 @@ impl Lua {
     }
 
     fn process(&self, event: Event) -> Result<Option<Event>, rlua::Error> {
-        self.lua.context(|ctx| {
+        let result = self.lua.context(|ctx| {
             let globals = ctx.globals();
 
             globals.set("event", event)?;
 
             let func = ctx.named_registry_value::<_, rlua::Function<'_>>("vector_func")?;
             func.call(())?;
-
             globals.get::<_, Option<Event>>("event")
-        })
+        });
+        self.lua.gc_collect()?;
+        result
     }
 }
 
