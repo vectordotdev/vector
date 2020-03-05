@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-06-11"
+last_modified_on: "2020-06-18"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -434,6 +434,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
 | `transforms-tag_cardinality_limit` | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].  |
 | `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
+| `transforms-transaction` | Enables building of [`transaction` transform][docs.transforms.transaction].  |
 | `transforms-wasm` | Enables building of [`wasm` transform][docs.transforms.wasm].  |
 | `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
 | `sinks-aws_cloudwatch_metrics` | Enables building of [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics].  |
@@ -548,6 +549,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
 [docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
+[docs.transforms.transaction]: /docs/reference/transforms/transaction/
 [docs.transforms.wasm]: /docs/reference/transforms/wasm/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb

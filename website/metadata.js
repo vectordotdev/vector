@@ -32648,6 +32648,43 @@ module.exports = {
 
       ]
     },
+    "transaction": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  inputs = [\"in\"] # required\n  type = \"transaction\" # required"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "aggregate",
+      "id": "transaction_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "transaction",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to reduce events of a matching transaction into a single event.",
+      "status": "beta",
+      "title": "Transaction",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "wasm": {
       "beta": true,
       "config_examples": {

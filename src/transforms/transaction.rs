@@ -24,6 +24,7 @@ pub struct TransactionConfig {
 
     /// An ordered list of fields to distinguish transactions by. Each
     /// transaction has a separate event merging state.
+    #[serde(default)]
     pub identifier_fields: Vec<Atom>,
 
     #[serde(default)]

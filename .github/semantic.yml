@@ -115,6 +115,7 @@ scopes:
   - swimlanes transform
   - tag_cardinality_limit transform
   - tokenizer transform
+  - transaction transform
   - wasm transform
 
   # sinks

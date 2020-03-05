@@ -183,6 +183,8 @@ module.exports = {
             
               "reference/transforms/tokenizer",
             
+              "reference/transforms/transaction",
+            
               "reference/transforms/wasm",
             
           ]

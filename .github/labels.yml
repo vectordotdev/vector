@@ -372,6 +372,9 @@
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
   color: 54a0ff
+- name: "transform: transaction"
+  description: Anything `transaction` transform related
+  color: 54a0ff
 - name: "transform: wasm"
   description: Anything `wasm` transform related
   color: 54a0ff
