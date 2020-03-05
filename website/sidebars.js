@@ -195,6 +195,8 @@ module.exports = {
             
               "reference/transforms/tokenizer",
             
+              "reference/transforms/transaction",
+            
           ]
         },
         {

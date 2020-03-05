@@ -104,6 +104,7 @@ scopes:
   - split transform
   - swimlanes transform
   - tokenizer transform
+  - transaction transform
 
   # sinks
   - aws_cloudwatch_logs sink

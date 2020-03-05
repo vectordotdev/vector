@@ -22694,6 +22694,28 @@ module.exports = {
       "unsupported_operating_systems": [
 
       ]
+    },
+    "transaction": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to reduce events of a matching transaction into a single event.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "merge",
+      "id": "transaction_transform",
+      "name": "transaction",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
     }
   }
 };

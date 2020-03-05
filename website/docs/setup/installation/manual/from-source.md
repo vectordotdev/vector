@@ -409,6 +409,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `transforms-split` | Enables building of [`split` transform][docs.transforms.split].  |
 | `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
 | `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
+| `transforms-transaction` | Enables building of [`transaction` transform][docs.transforms.transaction].  |
 | `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
 | `sinks-aws_cloudwatch_metrics` | Enables building of [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics].  |
 | `sinks-aws_kinesis_firehose` | Enables building of [`aws_kinesis_firehose` sink][docs.sinks.aws_kinesis_firehose].  |
@@ -509,6 +510,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.transforms.split]: /docs/reference/transforms/split/
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
+[docs.transforms.transaction]: /docs/reference/transforms/transaction/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
