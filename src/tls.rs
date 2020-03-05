@@ -7,7 +7,10 @@ use openssl::{
     error::ErrorStack,
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{SslConnector, SslConnectorBuilder, SslContextBuilder, SslMethod, SslVerifyMode},
+    ssl::{
+        ConnectConfiguration, SslConnector, SslConnectorBuilder, SslContextBuilder, SslMethod,
+        SslVerifyMode,
+    },
     x509::{store::X509StoreBuilder, X509},
 };
 use serde::{Deserialize, Serialize};
@@ -279,8 +282,17 @@ pub(crate) fn tls_connector_builder(
     Ok(builder)
 }
 
-pub(crate) fn tls_connector(settings: Option<TlsSettings>) -> crate::Result<SslConnector> {
-    Ok(tls_connector_builder(settings)?.build())
+pub(crate) fn tls_connector(settings: Option<TlsSettings>) -> crate::Result<ConnectConfiguration> {
+    let verify_hostname = settings
+        .as_ref()
+        .map(|settings| settings.verify_hostname)
+        .unwrap_or(true);
+    let configure = tls_connector_builder(settings)?
+        .build()
+        .configure()
+        .context(TlsBuildConnector)?
+        .verify_hostname(verify_hostname);
+    Ok(configure)
 }
 
 impl fmt::Debug for TlsSettings {

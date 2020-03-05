@@ -18,7 +18,7 @@ use tokio::{
     net::tcp::{ConnectFuture, TcpStream},
     timer::Delay,
 };
-use tokio_openssl::{ConnectAsync as SslConnectAsync, SslConnectorExt, SslStream};
+use tokio_openssl::{ConnectAsync as SslConnectAsync, ConnectConfigurationExt, SslStream};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
 
