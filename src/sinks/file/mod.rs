@@ -8,7 +8,7 @@ use crate::{
         SinkExt,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures01::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -23,6 +23,10 @@ pub struct FileSinkConfig {
     pub idle_timeout_secs: Option<u64>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub encoding: EncodingConfigWithDefault<Encoding>,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<FileSinkConfig>("file")
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
