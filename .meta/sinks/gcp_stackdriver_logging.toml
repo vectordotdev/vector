@@ -122,3 +122,9 @@ For example, Compute Engine VM instances use the labels `projectId`, \
 """
 
 <%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", can_enable: false, can_verify: true) %>
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.gcp_stackdriver_logging.options",
+  encodings: ["default"],
+  default: "default"
+) %>

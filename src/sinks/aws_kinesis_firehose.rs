@@ -3,6 +3,7 @@ use crate::{
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
         BatchEventsConfig, SinkExt, TowerRequestConfig,
@@ -29,13 +30,13 @@ pub struct KinesisFirehoseService {
     config: KinesisFirehoseSinkConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchEventsConfig,
     #[serde(default)]
@@ -50,17 +51,15 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Json,
 }
 
 inventory::submit! {
-    SinkDescription::new::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
+    SinkDescription::new_without_default::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
@@ -205,9 +204,10 @@ fn create_client(
     Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
-fn encode_event(event: Event, encoding: &Encoding) -> Option<Record> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
-    let data = match encoding {
+    let data = match encoding.codec {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn firehose_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text).unwrap();
+        let event = encode_event(message.clone().into(), &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -240,7 +240,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json).unwrap();
+        let event = encode_event(event, &Encoding::Json.into()).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
@@ -286,7 +286,7 @@ mod integration_tests {
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
-            encoding: Encoding::Json, // required for ES destination w/ localstack
+            encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
             batch: BatchEventsConfig {
                 max_events: Some(2),
                 timeout_secs: None,
@@ -296,7 +296,7 @@ mod integration_tests {
                 retry_attempts: Some(0),
                 ..Default::default()
             },
-            ..Default::default()
+            assume_role: None,
         };
 
         let mut rt = runtime::Runtime::new().unwrap();

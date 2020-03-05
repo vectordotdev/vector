@@ -56,11 +56,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
 
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
-
   # OPTIONAL - General
   healthcheck = true # default
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "ndjson" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
@@ -82,9 +89,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-
-  # REQUIRED - requests
-  encoding = "ndjson" # example, enum
 
   # OPTIONAL - General
   healthcheck = true # default
@@ -108,6 +112,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "ndjson" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
@@ -429,11 +443,33 @@ The filename for a Google Cloud service account credentials JSON file used to au
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
+  enumValues={null}
+  examples={[]}
   groups={[]}
   name={"encoding"}
   path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -441,10 +477,84 @@ The filename for a Google Cloud service account credentials JSON file used to au
   unit={null}
   >
 
-### encoding
+#### codec
 
-The encoding format used to serialize the events before outputting.
+The encoding codec used to serialize the events before outputting.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 

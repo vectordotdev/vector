@@ -30,18 +30,11 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
   timeout_secs: 60
 ) %>
 
-[sinks.splunk_hec.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.splunk_hec.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is new line delimited."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.splunk_hec.options",
+  encodings: ["json", "text"],
+  default: false
+) %>
 
 [sinks.splunk_hec.options.host]
 type = "string"

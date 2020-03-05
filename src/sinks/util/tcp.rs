@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{encode_event, Encoding, SinkExt},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
     tls::{TlsConfig, TlsConnectorExt, TlsSettings},
     topology::config::SinkContext,
@@ -42,15 +42,15 @@ enum TcpBuildError {
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
     pub tls: Option<TlsConfig>,
 }
 
 impl TcpSinkConfig {
-    pub fn new(address: String) -> Self {
+    pub fn new(address: String, encoding: EncodingConfig<Encoding>) -> Self {
         Self {
             address,
-            encoding: Encoding::Text,
+            encoding,
             tls: None,
         }
     }
@@ -267,7 +267,7 @@ pub fn raw_tcp(
     host: String,
     port: u16,
     cx: SinkContext,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     tls: Option<TlsSettings>,
 ) -> RouterSink {
     Box::new(

@@ -26,19 +26,11 @@ A comma delimited list of host and port pairs that the Kafka client should conta
 its cluster metadata.\
 """
 
-[sinks.kafka.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.kafka.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
-
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.kafka.options",
+  encodings: ["json", "text"],
+  default: false
+) %>
 
 [sinks.kafka.options.key_field]
 type = "string"

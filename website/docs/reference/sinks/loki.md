@@ -46,11 +46,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "loki" # must be: "loki"
   inputs = ["my-source-id"] # example
-  encoding = "json" # example, enum
   endpoint = "http://localhost:3100" # example
 
   # OPTIONAL - General
   healthcheck = true # default
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    codec = "json" # default, enum
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 
   # REQUIRED - Labels
   [sinks.my_sink_id.labels]
@@ -68,7 +74,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED - General
   type = "loki" # must be: "loki"
   inputs = ["my-source-id"] # example
-  encoding = "json" # example, enum
   endpoint = "http://localhost:3100" # example
 
   # OPTIONAL - General
@@ -97,6 +102,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # REQUIRED
     max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    codec = "json" # default, enum
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 
   # REQUIRED - Labels
   [sinks.my_sink_id.labels]
@@ -426,22 +438,118 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON","text":"Each event is encoded into text via the `message` key."}}
-  examples={["json","text"]}
+  enumValues={null}
+  examples={[]}
   groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
-  type={"string"}
+  type={"table"}
   unit={null}
   >
 
 ### encoding
 
-The encoding format used to serialize the events before outputting.
+Configures the encoding specific sink behavior.
 
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={"json"}
+  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -1008,7 +1116,7 @@ section.
 
 ### Event Ordering
 
-The `loki` sink will ensure that all logs are sorted via their `timestamp`. This
+The `loki` sink will ensure that all logs are sorted via their [`timestamp`](#timestamp). This
 is to ensure that logs will be accepted by Loki. If no timestamp is supplied
 with events then the Loki sink will supply its own monotonically increasing
 timestamp.

@@ -3,7 +3,10 @@ mod file;
 use self::file::File;
 use crate::{
     event::Event,
-    sinks::util::SinkExt,
+    sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        SinkExt,
+    },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
 };
@@ -18,7 +21,8 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    pub encoding: Encoding,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -54,7 +58,7 @@ impl SinkConfig for FileSinkConfig {
 #[derive(Debug, Default)]
 pub struct PartitionedFileSink {
     path: Template,
-    encoding: Encoding,
+    encoding: EncodingConfigWithDefault<Encoding>,
     idle_timeout_secs: u64,
     partitions: HashMap<Bytes, File>,
     last_accessed: HashMap<Bytes, Instant>,
@@ -200,7 +204,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text,
+            encoding: Encoding::Text.into(),
         };
 
         let sink = PartitionedFileSink::new(&config);
@@ -226,7 +230,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text,
+            encoding: Encoding::Text.into(),
         };
 
         let sink = PartitionedFileSink::new(&config);

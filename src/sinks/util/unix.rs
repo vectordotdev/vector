@@ -1,6 +1,6 @@
 use crate::sinks::util::SinkExt;
 use crate::{
-    sinks::util::{encode_event, Encoding},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding},
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
@@ -23,15 +23,12 @@ use tracing::field;
 #[serde(deny_unknown_fields)]
 pub struct UnixSinkConfig {
     pub path: PathBuf,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 impl UnixSinkConfig {
-    pub fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            encoding: Encoding::Text,
-        }
+    pub fn new(path: PathBuf, encoding: EncodingConfig<Encoding>) -> Self {
+        Self { path, encoding }
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
@@ -225,7 +222,7 @@ mod tests {
         let out_path = temp_uds_path("unix_test");
 
         // Set up Sink
-        let config = UnixSinkConfig::new(out_path.clone());
+        let config = UnixSinkConfig::new(out_path.clone(), Encoding::Text.into());
         let mut rt = Runtime::new().unwrap();
         let cx = SinkContext::new_test(rt.executor());
         let (sink, _healthcheck) = config.build(cx).unwrap();
