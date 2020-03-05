@@ -20,6 +20,8 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct TransactionConfig {
+    pub expire_after_ms: Option<u64>,
+
     pub flush_period_ms: Option<u64>,
 
     /// An ordered list of fields to distinguish transactions by. Each
@@ -371,8 +373,8 @@ impl TransactionState {
 //------------------------------------------------------------------------------
 
 pub struct Transaction {
+    expire_after: Duration,
     flush_period: Duration,
-    poll_period: Duration,
     identifier_fields: Vec<Atom>,
     merge_strategies: IndexMap<Atom, MergeStrategy>,
     transaction_merge_states: HashMap<Discriminant, TransactionState>,
@@ -387,8 +389,8 @@ impl Transaction {
             None
         };
         Ok(Transaction {
-            flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(30000)),
-            poll_period: Duration::from_millis(2000), // TODO: Configure this?
+            expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
+            flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
             identifier_fields: config.identifier_fields.clone(),
             merge_strategies: config.merge_strategies.clone(),
             transaction_merge_states: HashMap::new(),
@@ -399,7 +401,7 @@ impl Transaction {
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
         for (k, t) in &self.transaction_merge_states {
-            if t.stale_since.elapsed() >= self.flush_period {
+            if t.stale_since.elapsed() >= self.expire_after {
                 flush_discriminants.push(k.clone());
             }
         }
@@ -473,7 +475,7 @@ impl Transform for Transaction {
     {
         let mut me = self;
 
-        let flush_period = me.poll_period.clone();
+        let poll_period = me.flush_period.clone();
         let mut last_flush = Instant::now();
 
         let poll_flush = move || -> Poll<Option<StreamEvent>, ()> {
@@ -487,7 +489,7 @@ impl Transform for Transaction {
                     let now = Instant::now();
 
                     // And it has been long enough since the last flush
-                    if flush_period <= now.duration_since(last_flush) {
+                    if poll_period <= now.duration_since(last_flush) {
                         last_flush = now;
 
                         // Trigger a flush

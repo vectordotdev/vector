@@ -2110,12 +2110,21 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # A maximum period of time to wait before transactions should be flushed.
+  # A maximum period of time to wait before a transaction should be considered
+  # complete after not having received another event.
   #
   # * optional
   # * default: 30000
   # * type: int
-  flush_period_ms = 30000
+  expire_after_ms = 30000
+
+  # Controls the frequency that Vector checks for (and flushes) expired
+  # transactions.
+  #
+  # * optional
+  # * default: 1000
+  # * type: int
+  flush_period_ms = 1000
 
   # An ordered list of fields to distinguish transactions by. Each transaction
   # has a separate event combining state, and these fields should be used to

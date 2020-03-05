@@ -70,7 +70,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # example
 
   # OPTIONAL - General
-  flush_period_ms = 30000 # default
+  expire_after_ms = 30000 # default
+  flush_period_ms = 1000 # default
   identifier_fields = [] # default
 
   # OPTIONAL - Ends when
@@ -225,6 +226,29 @@ The type of the condition to execute.
   enumValues={null}
   examples={[30000]}
   groups={[]}
+  name={"expire_after_ms"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={null}
+  >
+
+### expire_after_ms
+
+A maximum period of time to wait before a transaction should be considered complete after not having received another event.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={1000}
+  enumValues={null}
+  examples={[1000]}
+  groups={[]}
   name={"flush_period_ms"}
   path={null}
   relevantWhen={null}
@@ -236,7 +260,7 @@ The type of the condition to execute.
 
 ### flush_period_ms
 
-A maximum period of time to wait before transactions should be flushed.
+Controls the frequency that Vector checks for (and flushes) expired transactions.
 
 
 </Field>
