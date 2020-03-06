@@ -2184,11 +2184,13 @@ end
     #
     # * required
     # * type: string
-    # * enum: "array", "append", "discard", and "sum"
+    # * enum: "array", "append", "discard", "sum", "max", and "min"
     `<field_name>` = "array"
     `<field_name>` = "append"
     `<field_name>` = "discard"
     `<field_name>` = "sum"
+    `<field_name>` = "max"
+    `<field_name>` = "min"
 
 
 # ------------------------------------------------------------------------------

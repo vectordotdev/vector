@@ -70,6 +70,8 @@ description = "The custom merge strategy to use for a field."
 "append" = "Append each string value (delimited with a space)."
 "discard" = "Discard all but the first value found."
 "sum" = "Sum all number values."
+"max" = "The maximum of all number values."
+"min" = "The minimum of all number values."
 
 [transforms.transaction.options.ends_when]
 type = "table"
