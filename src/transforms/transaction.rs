@@ -78,6 +78,8 @@ impl TransformConfig for TransactionConfig {
 pub enum MergeStrategy {
     Discard,
     Sum,
+    Max,
+    Min,
     Array,
     Append,
 }
@@ -218,6 +220,8 @@ impl From<f64> for NumberMergerValue {
     }
 }
 
+//------------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 struct AddNumbersMerger {
     v: NumberMergerValue,
@@ -242,6 +246,126 @@ impl TransactionValueMerger for AddNumbersMerger {
                 NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
                 NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
             },
+            _ => {
+                return Err(format!(
+                    "expected numeric value, found: '{}'",
+                    v.to_string_lossy()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
+        Ok(match self.v {
+            NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
+            NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
+        })
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct MaxNumberMerger {
+    v: NumberMergerValue,
+}
+
+impl MaxNumberMerger {
+    fn new(v: NumberMergerValue) -> Self {
+        return Self { v };
+    }
+}
+
+impl TransactionValueMerger for MaxNumberMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        // Try and keep max precision with integer values, but once we've
+        // received a float downgrade to float precision.
+        match v {
+            Value::Integer(i) => {
+                match self.v {
+                    NumberMergerValue::Int(i2) => {
+                        if i > i2 {
+                            self.v = NumberMergerValue::Int(i);
+                        }
+                    }
+                    NumberMergerValue::Float(f2) => {
+                        let f = i as f64;
+                        if f > f2 {
+                            self.v = NumberMergerValue::Float(f);
+                        }
+                    }
+                };
+            }
+            Value::Float(f) => {
+                let f2 = match self.v {
+                    NumberMergerValue::Int(i2) => i2 as f64,
+                    NumberMergerValue::Float(f2) => f2,
+                };
+                if f > f2 {
+                    self.v = NumberMergerValue::Float(f);
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "expected numeric value, found: '{}'",
+                    v.to_string_lossy()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn insert_into(self: Box<Self>, k: Atom, v: &mut LogEvent) -> Result<(), String> {
+        Ok(match self.v {
+            NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
+            NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
+        })
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct MinNumberMerger {
+    v: NumberMergerValue,
+}
+
+impl MinNumberMerger {
+    fn new(v: NumberMergerValue) -> Self {
+        return Self { v };
+    }
+}
+
+impl TransactionValueMerger for MinNumberMerger {
+    fn add(&mut self, v: Value) -> Result<(), String> {
+        // Try and keep max precision with integer values, but once we've
+        // received a float downgrade to float precision.
+        match v {
+            Value::Integer(i) => {
+                match self.v {
+                    NumberMergerValue::Int(i2) => {
+                        if i < i2 {
+                            self.v = NumberMergerValue::Int(i);
+                        }
+                    }
+                    NumberMergerValue::Float(f2) => {
+                        let f = i as f64;
+                        if f < f2 {
+                            self.v = NumberMergerValue::Float(f);
+                        }
+                    }
+                };
+            }
+            Value::Float(f) => {
+                let f2 = match self.v {
+                    NumberMergerValue::Int(i2) => i2 as f64,
+                    NumberMergerValue::Float(f2) => f2,
+                };
+                if f < f2 {
+                    self.v = NumberMergerValue::Float(f);
+                }
+            }
             _ => {
                 return Err(format!(
                     "expected numeric value, found: '{}'",
@@ -290,6 +414,22 @@ fn get_value_merger(
         MergeStrategy::Sum => match v {
             Value::Integer(i) => Ok(Box::new(AddNumbersMerger::new(i.into()))),
             Value::Float(f) => Ok(Box::new(AddNumbersMerger::new(f.into()))),
+            _ => Err(format!(
+                "expected number value, found: '{}'",
+                v.to_string_lossy()
+            )),
+        },
+        MergeStrategy::Max => match v {
+            Value::Integer(i) => Ok(Box::new(MaxNumberMerger::new(i.into()))),
+            Value::Float(f) => Ok(Box::new(MaxNumberMerger::new(f.into()))),
+            _ => Err(format!(
+                "expected number value, found: '{}'",
+                v.to_string_lossy()
+            )),
+        },
+        MergeStrategy::Min => match v {
+            Value::Integer(i) => Ok(Box::new(MinNumberMerger::new(i.into()))),
+            Value::Float(f) => Ok(Box::new(MinNumberMerger::new(f.into()))),
             _ => Err(format!(
                 "expected number value, found: '{}'",
                 v.to_string_lossy()

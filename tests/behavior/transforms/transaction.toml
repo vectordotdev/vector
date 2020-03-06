@@ -170,3 +170,80 @@
       "request_id.equals" = "2"
       "counter.equals" = 20
       "timestamp_end.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.transaction_numbers]
+  inputs = []
+  type = "transaction"
+
+  [transforms.transaction_numbers.merge_strategies]
+    "mins" = "min"
+    "maxs" = "max"
+
+  [transforms.transaction_numbers.ends_when]
+    "test_end_message.exists" = true
+
+[[tests]]
+  name = "transaction_number_strategies_1"
+
+  [[tests.inputs]]
+    insert_at = "transaction_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5.1
+      maxs = 3.3
+
+  [[tests.inputs]]
+    insert_at = "transaction_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 9
+      maxs = 7.2
+
+  [[tests.inputs]]
+    insert_at = "transaction_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5.2
+      maxs = 6
+      test_end_message = "exists"
+
+  [[tests.outputs]]
+    extract_from = "transaction_numbers"
+    [[tests.outputs.conditions]]
+      "mins.equals" = 5.1
+      "maxs.equals" = 7.2
+      "timestamp_end.exists" = true
+
+[[tests]]
+  name = "transaction_number_strategies_2"
+
+  [[tests.inputs]]
+    insert_at = "transaction_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5
+      maxs = 3
+
+  [[tests.inputs]]
+    insert_at = "transaction_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 9.1
+      maxs = 7
+
+  [[tests.inputs]]
+    insert_at = "transaction_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5
+      maxs = 6.2
+      test_end_message = "exists"
+
+  [[tests.outputs]]
+    extract_from = "transaction_numbers"
+    [[tests.outputs.conditions]]
+      "mins.equals" = 5
+      "maxs.equals" = 7
+      "timestamp_end.exists" = true

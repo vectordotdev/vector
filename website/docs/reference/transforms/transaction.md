@@ -453,8 +453,8 @@ The default behavior is as follows:
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"array":"Each value is appended to an array.","append":"Append each string value (delimited with a space).","discard":"Discard all but the first value found.","sum":"Sum all number values."}}
-  examples={["array","append","discard","sum"]}
+  enumValues={{"array":"Each value is appended to an array.","append":"Append each string value (delimited with a space).","discard":"Discard all but the first value found.","sum":"Sum all number values.","max":"The maximum of all number values.","min":"The minimum of all number values."}}
+  examples={["array","append","discard","sum","max","min"]}
   groups={[]}
   name={"`[field_name]`"}
   path={"merge_strategies"}
