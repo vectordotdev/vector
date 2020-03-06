@@ -13,21 +13,21 @@ Currently the [`lua` transform](https://vector.dev/docs/reference/transforms/lua
     ```lua
     event["nested.field"] = 5
     ```
-    
+
     However, users expect nested fields to be accessible as native Lua structures, for example like this:
-    
+
     ```lua
     event["nested"]["field"] = 5
     ```
-    
+
     See [#706](https://github.com/timberio/vector/issues/706) and [#1406](https://github.com/timberio/vector/issues/1406).
-    
+
 *   **Setup Code**
 
     Some scripts require expensive setup steps, for example, loading of modules or invoking shell commands. These steps should not be part of the main transform code.
-    
+
     For example, this code adding custom hostname
-    
+
     ```lua
     if event["host"] == nil then
       local f = io.popen ("/bin/hostname")
@@ -37,26 +37,26 @@ Currently the [`lua` transform](https://vector.dev/docs/reference/transforms/lua
       event["host"] = hostname
     end
     ```
-    
+
     Should be split into two parts, the first part executed just once at the initialization:
-    
+
     ```lua
     local f = io.popen ("/bin/hostname")
     local hostname = f:read("*a") or ""
     f:close()
     hostname = string.gsub(hostname, "\n$", "")
     ```
-    
+
     and the second part executed for each incoming event:
-    
+
     ```lua
     if event["host"] == nil then
       event["host"] = hostname
     end
     ```
-    
+
     See [#1864](https://github.com/timberio/vector/issues/1864).
-    
+
 *   **Control Flow**
 
     It should be possible to define channels for output events, similarly to how it is done in [`swimlanes`](https://vector.dev/docs/reference/transforms/swimlanes/) transform.
@@ -101,11 +101,11 @@ The fields are accessed through string indexes using [Vector's dot notation](htt
     final_stats_event = Event.new_log()
     final_stats_event["stats"] = { count = counter, interval = os.time() - previous_timestamp }
     final_stats_event["stats.rate"] = final_stats_event["stats"].count / final_stats_event["stats.interval"]
-    
+
     shutdown_event = Event.new_log()
     shutdown_event["message"] = "shutting down"
     shutdown_event:set_lane("auxiliary")
-    
+
     event = {final_stats_event, shutdown_event}
   """
   [[transforms.lua.timers]]
