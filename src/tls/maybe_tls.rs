@@ -1,0 +1,90 @@
+use futures01::{Poll, Sink, StartSend};
+use std::fmt::{self, Debug, Formatter};
+use std::io::{self, Read, Write};
+use tokio::io::{AsyncRead, AsyncWrite};
+
+/// A type wrapper for objects that can exist in either a raw state or
+/// wrapped by TLS handling.
+pub enum MaybeTls<R, T> {
+    Raw(R),
+    Tls(T),
+}
+
+// Conditionally implement Clone for Clonable types
+impl<R: Clone, T: Clone> Clone for MaybeTls<R, T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Raw(raw) => Self::Raw(raw.clone()),
+            Self::Tls(tls) => Self::Tls(tls.clone()),
+        }
+    }
+}
+
+// Conditionally implement Debug for Debugable types
+impl<R: Debug, T: Debug> Debug for MaybeTls<R, T> {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::Raw(raw) => write!(fmt, "MaybeTls::Raw({:?})", raw),
+            Self::Tls(tls) => write!(fmt, "MaybeTls::Tls({:?})", tls),
+        }
+    }
+}
+
+impl<R: Read, T: Read> Read for MaybeTls<R, T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Self::Tls(s) => s.read(buf),
+            Self::Raw(s) => s.read(buf),
+        }
+    }
+}
+
+impl<R: AsyncRead, T: AsyncRead> AsyncRead for MaybeTls<R, T> {}
+
+impl<R: Write, T: Write> Write for MaybeTls<R, T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Tls(s) => s.write(buf),
+            Self::Raw(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::Tls(s) => s.flush(),
+            Self::Raw(s) => s.flush(),
+        }
+    }
+}
+
+impl<R: AsyncWrite, T: AsyncWrite> AsyncWrite for MaybeTls<R, T> {
+    fn shutdown(&mut self) -> Poll<(), io::Error> {
+        match self {
+            Self::Tls(s) => s.shutdown(),
+            Self::Raw(s) => s.shutdown(),
+        }
+    }
+}
+
+impl<R, T, I, E> Sink for MaybeTls<R, T>
+where
+    R: Sink<SinkItem = I, SinkError = E>,
+    T: Sink<SinkItem = I, SinkError = E>,
+{
+    type SinkItem = I;
+    type SinkError = E;
+
+    fn start_send(&mut self, item: I) -> StartSend<I, E> {
+        match self {
+            Self::Raw(r) => r.start_send(item),
+            Self::Tls(t) => t.start_send(item),
+        }
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), E> {
+        match self {
+            Self::Raw(r) => r.poll_complete(),
+            Self::Tls(t) => t.poll_complete(),
+        }
+    }
+}
