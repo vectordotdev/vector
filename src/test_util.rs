@@ -197,7 +197,7 @@ pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = V
 }
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
-    trace!("Reading file {}", path.as_ref().display());
+    trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
     file.read_to_string(&mut output).unwrap();

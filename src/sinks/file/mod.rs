@@ -120,7 +120,7 @@ impl FileSink {
             match what {
                 Either::Left((None, _)) => {
                     // If we got `None` - terminate the processing.
-                    debug!("Receiver exausted, terminating the processing loop");
+                    debug!(message = "Receiver exausted, terminating the processing loop.");
                     break;
                 }
                 Either::Left((Some(event), _)) => {
@@ -131,26 +131,25 @@ impl FileSink {
                             // file.
                             // This is already logged at `partition_event`, so
                             // here we just skip the event.
-                            warn!("Unable to partition an event, dropping it");
                             continue;
                         }
                     };
 
                     let next_deadline = self.deadline_at();
-                    trace!(next_deadline = ?next_deadline, "Computed next deadline");
+                    trace!(message = "Computed next deadline.", ?next_deadline, ?path);
 
                     let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
-                        trace!(path = ?path, "Working with an already opened file");
+                        trace!(message = "Working with an already opened file.", ?path);
                         file
                     } else {
-                        trace!(path = ?path, "Opening new file");
+                        trace!(message = "Opening new file.", ?path);
                         let file = match open_file(BytesPath::new(path.clone())).await {
                             Ok(file) => file,
-                            Err(err) => {
+                            Err(error) => {
                                 // We coundn't open the file for this event.
                                 // Maybe other events will work though! Just log
                                 // the error and skip this event.
-                                error!(path = ?path, "Unable to open the file: {}", err);
+                                error!(message = "Unable to open the file.", ?path, %error);
                                 continue;
                             }
                         };
@@ -158,26 +157,29 @@ impl FileSink {
                         self.files.get_mut(&path).unwrap()
                     };
 
-                    trace!(path = ?path, "Writing an event to file");
-                    if let Err(err) = write_event_to_file(file, event, &self.encoding).await {
-                        error!(path = ?path, "Failed to write file: {}", err);
+                    trace!(message = "Writing an event to file.", ?path);
+                    if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
+                        error!(message = "Failed to write file.", ?path, %error);
                     }
                 }
                 Either::Right((None, _)) => {
                     // Expiration queue is empty, whatever.
-                    debug!("File expiration queue empty");
+                    debug!(
+                        message = "File expiration queue empty.",
+                        rate_limit_secs = 30,
+                    );
                     continue;
                 }
                 Either::Right((Some(Ok((mut expired_file, path))), _)) => {
                     // We got an expired file. All we really want is to flush
                     // and close it.
-                    if let Err(err) = expired_file.flush().await {
-                        error!(path = ?path.get_ref(), "Failed to flush file: {}", err);
+                    if let Err(error) = expired_file.flush().await {
+                        error!(message = "Failed to flush file.", path = ?path.get_ref(), %error);
                     }
                     drop(expired_file); // ignore close error
                 }
-                Either::Right((Some(Err(err)), _)) => {
-                    error!("An error occured while expiring a file: {}", err);
+                Either::Right((Some(Err(error)), _)) => {
+                    error!(message = "An error occured while expiring a file.", %error);
                     continue;
                 }
             }
@@ -282,7 +284,7 @@ mod tests {
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");
 
-        trace!("Template: {}", &template);
+        trace!(message = "Template", %template);
 
         let config = FileSinkConfig {
             path: template.clone().into(),
