@@ -191,6 +191,30 @@ Enables backtraces when errors are logged. Use this when debugging only since it
 </Field>
 
 
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["minikube"]}
+  groups={[]}
+  name={"VECTOR_NODE_NAME"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### VECTOR_NODE_NAME
+
+Node's name whose pod's logs should be enriched. Either this or `node_name` field must be defined. Defined automatically when using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
+
+
+
+</Field>
+
+
 </Fields>
 
 ## Custom Variables

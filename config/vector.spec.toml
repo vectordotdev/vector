@@ -61,6 +61,15 @@ dns_servers = ["0.0.0.0:53"]
   host_key = "instance"
   host_key = "machine"
 
+  # The key under which Kubernetes related fields are nested.
+  #
+  # * optional
+  # * default: "kubernetes"
+  # * type: string
+  kubernetes_key = "kubernetes"
+  kubernetes_key = "kube"
+  kubernetes_key = "k8s"
+
   # The key used to hold the log message. See the log data model page for more
   # info.
   #
@@ -1393,6 +1402,62 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: string
   target_field = "target"
+
+# Accepts and outputs `log` events allowing you to enrich pod's logs with Kubernetes Pod metadata.
+[transforms.kubernetes_pod_metadata]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "kubernetes_pod_metadata"
+  type = "kubernetes_pod_metadata"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # How many seconds will the metadata be available after its pod has been
+  # deleted.
+  #
+  # * optional
+  # * default: 3600
+  # * type: int
+  cache_ttl = 3600
+
+  # A list of fields to include in each event. They will be added under global
+  # `kubernetes_key` option. See Nesting for more info.
+  #
+  # * optional
+  # * default: ["name", "namespace", "labels", "annotations", "node_name"]
+  # * type: [string]
+  fields = ["name", "namespace", "labels", "annotations", "node_name"]
+
+  # When needing to connect to Kubernetes API server, for how long in seconds
+  # will the transform maximally wait before trying to connect. See Retry Policy
+  # section for more info.
+  #
+  # * optional
+  # * default: 1
+  # * type: int
+  max_retry_timeout = 1
+
+  # Node's name whose pod's logs should be enriched. Either this or
+  # `VECTOR_NODE_NAME` must be defined. Has priority over `VECTOR_NODE_NAME`.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  node_name = "minikube"
+
+  # Field containg Pod UID to which log belongs.
+  #
+  # * optional
+  # * default: "object_uid"
+  # * type: string
+  pod_uid = "object_uid"
 
 # Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]

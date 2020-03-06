@@ -1,0 +1,58 @@
+<%- component = metadata.transforms.kubernetes_pod_metadata -%>
+
+<%= component_header(component) %>
+
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+## Options
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+## Output
+
+<%= component_output(component, component.output.log, heading_depth: 3) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Connecting To The Kubernetes API server
+
+Vector will automatically attempt to connect to the [Kubernetes API server][https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/]
+server for you. If Vector is running in Kubernetes cluster then Vector
+will be connect to that cluster using [Kubernetes provided access information][https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod].
+
+### Retry Policy
+
+Vector will retry failed requests. Retries are done with a jitter with
+exponentionally increasing uniform distribution range whose upper limit
+You can control with `max_retry_timeout` option. Jitter, with maximal
+range size, is also applied when connecting to the Kubernetes API server
+for the first time.
+
+### Nesting fields
+
+Fields defined with `fields` option will be nested under global key `kubernetes_key`
+whose value can be changed. See [Changing The Default Schema][docs.reference.global-options#log_schema]
+for more info.
+
+### Minimal Kubernetes version
+
+Underlying requirement is the minimal Kubernetes API v1.15,
+which is supported since at least Kubernetes v1.13 .
+
+

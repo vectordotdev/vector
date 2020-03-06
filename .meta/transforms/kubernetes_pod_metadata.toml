@@ -1,0 +1,143 @@
+[transforms.kubernetes_pod_metadata]
+title = "Kubernetes Pod Metadata"
+allow_you_to_description = "enrich pod's logs with Kubernetes Pod metadata"
+beta = true
+common = false
+function_category = "enrich"
+input_types = ["log"]
+output_types = ["log"]
+requirements.network = true
+requirements.additional = """\
+Vector must be run inside a Kubernetes cluster for this transform to work. \
+See [Connecting To The Kubernetes API server section](#connecting-to-the-kubernetes-api-server) for more info.
+
+Vector must be given authorization to `watch` resource `pods`. \
+In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] \
+[RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
+"""
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "kubernetes_pod_metadata") %>
+
+
+[transforms.kubernetes_pod_metadata.env_vars.VECTOR_NODE_NAME]
+type = "string"
+examples = ["minikube"]
+required = true
+description = """\
+Node's name whose pod's logs should be enriched. \
+Either this or `node_name` field must be defined. \
+Defined automatically when using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
+"""
+
+[transforms.kubernetes_pod_metadata.options.fields]
+type = "[string]"
+common = true
+default = ["name","namespace","labels","annotations","node_name"]
+description ="""\
+A list of fields to include in each event. \
+They will be added under global [`kubernetes_key` option][docs.reference.global-options#kubernetes_key]. \
+See [Nesting](#nesting-fields) for more info.
+"""
+
+[transforms.kubernetes_pod_metadata.options.cache_ttl]
+type = "int"
+common = false
+default = 3600
+description = "How many seconds will the metadata be available after its pod has been deleted."
+
+[transforms.kubernetes_pod_metadata.options.node_name]
+type = "string"
+common = false
+examples = ["minikube"]
+description = """\
+Node's name whose pod's logs should be enriched. \
+Either this or `VECTOR_NODE_NAME` must be defined. \
+Has priority over `VECTOR_NODE_NAME`.
+"""
+
+[transforms.kubernetes_pod_metadata.options.pod_uid]
+type = "string"
+common = false
+default = "object_uid"
+description = "Field containg Pod UID to which log belongs."
+
+[transforms.kubernetes_pod_metadata.options.max_retry_timeout]
+type = "int"
+common = false
+default = 1
+description = """\
+When needing to connect to Kubernetes API server, for how long in seconds \
+will the transform maximally wait before trying to connect. \
+See [Retry Policy section](#retry-policy) for more info.
+"""
+
+
+[transforms.kubernetes_pod_metadata.output.log.fields.name]
+type = "string"
+examples = ["nginx"]
+description = "[Name][http://kubernetes.io/docs/user-guide/identifiers#names] of log's pod."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.namespace]
+type = "string"
+examples = ["default","telemetry","kube-system"]
+description = "[Namespace][http://kubernetes.io/docs/user-guide/namespaces] of log's pod."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.creation_timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47+00:00"]
+description = "Timestamp of when the pod was created."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.deletion_timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47+00:00"]
+description = "Timestamp of when the Pod was deleted."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.labels]
+type = "table"
+examples = [{release = "stable", tier = "frontend"}]
+description = "Pod's labels as keys and values nested under `labels` key."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.annotations]
+type = "table"
+examples = [{kubectl = { kubernetes = { io = "..."}}}]
+description = "Pod's annotations as keys and values nested under `annotations` key."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.node_name]
+type = "string"
+examples = ["minikube"]
+description = "Node on which the pod is."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.hostname]
+type = "string"
+examples = ["host"]
+description = "Hostname of the pod."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.priority]
+type = "int"
+examples = [0]
+description = "The priority value."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.priority_class_name]
+type = "string"
+examples = ["system-node-critical","system-cluster-critical"]
+description = "Indicates the pod's priority."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.service_account_name]
+type = "string"
+examples = ["default"]
+description = "The name of the [ServiceAccount][https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/] to use to run this pod"
+
+[transforms.kubernetes_pod_metadata.output.log.fields.subdomain]
+type = "string"
+examples = ["net"]
+description = "Specified subdomain of the pod."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.host_ip]
+type = "string"
+examples = ["192.168.99.106"]
+description = "IP address of the host to which the pod is assigned."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.ip]
+type = "string"
+examples = ["172.17.0.5"]
+description = "IP address allocated to the pod."

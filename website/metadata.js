@@ -26656,6 +26656,28 @@ module.exports = {
 
       ]
     },
+    "kubernetes_pod_metadata": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to enrich pod's logs with Kubernetes Pod metadata.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "enrich",
+      "id": "kubernetes_pod_metadata_transform",
+      "name": "kubernetes_pod_metadata",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "log_to_metric": {
       "beta": false,
       "delivery_guarantee": null,

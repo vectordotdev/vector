@@ -29,6 +29,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # OPTIONAL - Log schema
   [log_schema]
     host_key = "host" # default
+    kubernetes_key = "kubernetes" # default
     message_key = "message" # default
     timestamp_key = "timestamp" # default
 ```
@@ -129,6 +130,29 @@ The default log schema that all Vector components operate on. See the [log data 
 #### host_key
 
 The key used to hold the log host. See the [log data model page][docs.data-model.log#host] for more info.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"kubernetes"}
+  enumValues={null}
+  examples={["kubernetes","kube","k8s"]}
+  groups={[]}
+  name={"kubernetes_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### kubernetes_key
+
+The key under which Kubernetes related fields are nested.
 
 
 </Field>
