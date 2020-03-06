@@ -23,7 +23,6 @@ use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
 use tokio::timer::Delay;
 
-// *********************** Defined by Vector **************************** //
 
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
@@ -73,7 +72,7 @@ inventory::submit! {
 impl TransformConfig for KubePodMetadata {
     fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         // Main idea is to have a background task which will premptively
-        // acquire metadata for all pods on this node, and with it maintaine
+        // acquire metadata for all pods on this node, and with it maintain
         // a map of extracted metadata.
 
         // Detemine Node's name of whose Pod's metadata we will watch for.
@@ -155,7 +154,7 @@ enum BuildError {
     TooSmallMaxRetryTimeout,
 }
 
-/// Vlient which watches for Pod metadata changes, extracts fields,
+/// Client which watches for Pod metadata changes, extracts fields,
 /// and writes them to the metadata map.
 struct MetadataClient {
     fields: Vec<Field>,
@@ -194,7 +193,7 @@ impl MetadataClient {
         let mut version = None;
         let mut error = None;
         // Since this transform will in most cases be deployed on all Nodes
-        // and fairly simulationisly, we can immediately start with user
+        // and fairly simultaneously, we can immediately start with user
         // defined max_retry_timeout.
         let mut retry_timeout = self.max_retry_timeout;
         loop {
