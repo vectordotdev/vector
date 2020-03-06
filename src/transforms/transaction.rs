@@ -499,8 +499,9 @@ impl Transform for Transaction {
                     let now = Instant::now();
                     let since_last_flush = now.duration_since(last_flush);
 
-                    // And it has been long enough since the last flush
+                    // But it hasn't been long enough to flush again yet.
                     if let Some(flush_in) = poll_period.checked_sub(since_last_flush) {
+                        // Wake up when we're ready.
                         let thread_waker = ctx.waker().clone();
                         thread::spawn(move || {
                             thread::sleep(flush_in);
@@ -508,9 +509,9 @@ impl Transform for Transaction {
                         });
                         Poll::Pending
                     } else {
+                        // Otherwise, it has been long enough since the last
+                        // flush to trigger another.
                         last_flush = now;
-
-                        // Trigger a flush
                         Poll::Ready(Some(Ok(StreamEvent::Flush)))
                     }
                 }
