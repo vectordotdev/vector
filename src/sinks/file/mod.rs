@@ -10,10 +10,10 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::channel::mpsc::Receiver;
+use futures::pin_mut;
 use futures::{
     future::{select, Either},
-    stream::StreamExt,
+    stream::{Stream, StreamExt},
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
@@ -26,7 +26,7 @@ mod bytes_path;
 use bytes_path::BytesPath;
 
 mod streaming_sink;
-use streaming_sink::{StreamingSink, StreamingSinkAsSink01};
+use streaming_sink::StreamingSink;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -56,9 +56,9 @@ impl Default for Encoding {
 
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = FileSink::new(&self);
-        let sink = StreamingSinkAsSink01::new_box(sink);
+        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
         let sink = sink.stream_ack(cx.acker());
         Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
     }
@@ -113,7 +113,8 @@ impl FileSink {
             .expect("unable to compute next deadline")
     }
 
-    async fn run(&mut self, mut input: Receiver<Event>) -> crate::Result<()> {
+    async fn run(&mut self, input: impl Stream<Item = Event> + Send + Sync) -> crate::Result<()> {
+        pin_mut!(input);
         loop {
             let what = select(input.next(), self.files.next()).await;
             match what {
@@ -224,7 +225,10 @@ async fn write_event_to_file(
 
 #[async_trait]
 impl StreamingSink for FileSink {
-    async fn run(&mut self, input: Receiver<Event>) -> crate::Result<()> {
+    async fn run<'a>(
+        &'a mut self,
+        input: impl Stream<Item = Event> + Send + Sync + 'a,
+    ) -> crate::Result<()> {
         FileSink::run(self, input).await
     }
 }
@@ -239,8 +243,7 @@ mod tests {
             temp_file,
         },
     };
-    use futures01::sink::Sink;
-    use futures01::stream;
+    use futures::stream;
 
     #[test]
     fn single_partition() {
@@ -254,13 +257,15 @@ mod tests {
             encoding: Encoding::Text.into(),
         };
 
-        let sink = FileSink::new(&config);
-        let sink = StreamingSinkAsSink01::new(sink);
-        let (input, events) = random_lines_with_stream(100, 64);
+        let mut sink = FileSink::new(&config);
+        let (input, _) = random_lines_with_stream(100, 64);
+
+        let events = stream::iter(input.clone().into_iter().map(Event::from));
 
         let mut rt = crate::test_util::runtime();
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+        let _ = rt
+            .block_on_std(async move { sink.run(events).await })
+            .unwrap();
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -285,8 +290,7 @@ mod tests {
             encoding: Encoding::Text.into(),
         };
 
-        let sink = FileSink::new(&config);
-        let sink = StreamingSinkAsSink01::new(sink);
+        let mut sink = FileSink::new(&config);
 
         let (mut input, _) = random_events_with_stream(32, 8);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -306,10 +310,11 @@ mod tests {
         input[7].as_mut_log().insert("date", "2019-29-07");
         input[7].as_mut_log().insert("level", "error");
 
-        let events = stream::iter_ok(input.clone().into_iter());
+        let events = stream::iter(input.clone().into_iter());
         let mut rt = crate::test_util::runtime();
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+        let _ = rt
+            .block_on_std(async move { sink.run(events).await })
+            .unwrap();
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
