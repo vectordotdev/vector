@@ -126,26 +126,35 @@ pub struct TlsSettings {
 pub struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
+    /// Generate an optional settings struct from the given optional
+    /// configuration reference. If `config` is `None`, TLS is
+    /// disabled. The `for_server` parameter indicates the options
+    /// should be interpreted as being for a TLS server, which requires
+    /// an identity certificate and changes the certificate verification
+    /// default to false.
     pub fn from_config(
         config: &Option<TlsConfig>,
         for_server: bool,
     ) -> crate::Result<Option<Self>> {
         match config {
-            None => Ok(None),
+            None => Ok(None), // No config, no TLS settings
             Some(config) => match config.enabled.unwrap_or(false) {
-                false => Ok(None),
+                false => Ok(None), // Explicitly disabled, still no TLS settings
                 true => {
                     let tls = Self::from_options_base(&Some(config.options.clone()), for_server)?;
-                    if for_server && tls.identity.is_none() {
-                        Err(TlsError::MissingRequiredIdentity.into())
-                    } else {
-                        Ok(Some(tls))
+                    match (for_server, &tls.identity) {
+                        // Servers require an identity certificate
+                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
+                        _ => Ok(Some(tls)),
                     }
                 }
             },
         }
     }
 
+    /// Generate a filled out settings struct from the given optional
+    /// option set, interpreted as client options. If `options` is
+    /// `None`, the result is set to defaults (ie empty).
     pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
         Self::from_options_base(options, false)
     }
