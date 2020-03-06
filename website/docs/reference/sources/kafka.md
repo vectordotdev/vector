@@ -50,7 +50,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
 
   # OPTIONAL
-  compression = "none" # default, enum
   key_field = "user_id" # example, no default
 ```
 
@@ -69,7 +68,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - General
   auto_offset_reset = "largest" # default
-  compression = "none" # default, enum
   fetch_wait_max_ms = 100 # default, milliseconds
   key_field = "user_id" # example, no default
   session_timeout_ms = 10000 # default, milliseconds
@@ -154,29 +152,6 @@ If offsets for consumer group do not exist, set them using this strategy. [librd
 ### bootstrap_servers
 
 A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
-  examples={["none","gzip","lz4","snappy","zstd"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### compression
-
-Compression codec to use for compressing message sets
 
 
 </Field>

@@ -433,18 +433,6 @@ dns_servers = ["0.0.0.0:53"]
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
-  # Compression codec to use for compressing message sets
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none", "gzip", "lz4", "snappy", and "zstd"
-  compression = "none"
-  compression = "gzip"
-  compression = "lz4"
-  compression = "snappy"
-  compression = "zstd"
-
   # Maximum time the broker may wait to fill the response.
   #
   # * optional

@@ -9,20 +9,6 @@ Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects \
 to initially to bootstrap itself.\
 """
 
-[<%= namespace %>.options.compression]
-type = "string"
-common = true
-default = "none"
-required = false
-description = "Compression codec to use for compressing message sets"
-
-[<%= namespace %>.options.compression.enum]
-none = "No compression"
-gzip = "[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression"
-lz4 = "High speed [LZ4 compression](https://lz4.github.io/lz4/)"
-snappy = "High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression."
-zstd = "[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."
-
 [<%= namespace %>.options.librdkafka_options]
 type = "table"
 category = "Advanced"

@@ -1,7 +1,6 @@
 use crate::{
     event::Event,
     kafka::{KafkaCompression, KafkaTlsConfig},
-    serde::to_string,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -162,10 +161,6 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
             &config.commit_interval_ms.to_string(),
         )
         .set("enable.auto.offset.store", "false")
-        .set(
-            "compression.codec",
-            &to_string(config.compression.unwrap_or(KafkaCompression::default())),
-        )
         .set("client.id", "vector");
 
     if let Some(tls) = &config.tls {
