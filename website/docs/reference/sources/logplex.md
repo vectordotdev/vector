@@ -26,6 +26,17 @@ The Vector `logplex` source ingests data through the [Heroku Logplex HTTP Drain 
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -35,6 +46,30 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "logplex" # must be: "logplex"
   address = "0.0.0.0:8088" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  # REQUIRED - General
+  type = "logplex" # must be: "logplex"
+  address = "0.0.0.0:8088" # example
+
+  # OPTIONAL - Tls
+  [sources.my_source_id.tls]
+    ca_path = "/path/to/certificate_authority.crt" # example, no default
+    crt_path = "/path/to/host_certificate.crt" # example, no default
+    enabled = false # default
+    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
+    key_path = "/path/to/host_certificate.key" # example, no default
+    verify_certificate = false # default
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -88,6 +123,29 @@ The address to accept connections on. The address _must_ include a port.
 Configures the TLS options for connections from this source.
 
 <Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
+  name={"ca_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### ca_path
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+
+</Field>
 
 
 <Field
@@ -177,6 +235,29 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 #### key_path
 
 Absolute path to a certificate key file used to identify this server, in DER or PEM format (PKCS#8).
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"verify_certificate"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_certificate
+
+If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if it is not valid. If `false` (the default), Vector will ignore the presence of a client certificate.
 
 
 </Field>

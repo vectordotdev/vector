@@ -3988,17 +3988,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tls"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "354b8cd83825b3c20217a9dc174d6a0c67441a2fae5c41bcb1ea6679f6ae0f7c"
-dependencies = [
- "futures 0.1.29",
- "native-tls",
- "tokio-io",
-]
-
-[[package]]
 name = "tokio-udp"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4672,7 +4661,6 @@ dependencies = [
  "http",
  "hyper",
  "hyper-openssl",
- "hyper-tls",
  "indexmap",
  "inventory",
  "jemallocator",
@@ -4729,10 +4717,10 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-codec",
+ "tokio-openssl",
  "tokio-retry",
  "tokio-signal",
  "tokio-threadpool",
- "tokio-tls",
  "tokio-uds",
  "tokio01-test",
  "toml 0.4.10",

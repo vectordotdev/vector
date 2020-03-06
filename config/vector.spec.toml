@@ -383,6 +383,14 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.http.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
     # `key_path` must also be set. This is required if `enabled` is set to `true`.
@@ -417,6 +425,16 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
@@ -640,6 +658,14 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.logplex.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
     # `key_path` must also be set. This is required if `enabled` is set to `true`.
@@ -674,6 +700,16 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through the Prometheus text exposition format and outputs `metric` events.
 [sources.prometheus]
@@ -772,6 +808,14 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.socket.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
     # `key_path` must also be set. This is required if `enabled` is set to `true`.
@@ -810,6 +854,16 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     # * relevant when mode = "tcp"
     key_path = "/path/to/host_certificate.key"
+
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events.
 [sources.splunk_hec]
@@ -847,6 +901,14 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.splunk_hec.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
     # `key_path` must also be set. This is required if `enabled` is set to `true`.
@@ -881,6 +943,16 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
@@ -999,6 +1071,14 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.syslog.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
     # `key_path` must also be set. This is required if `enabled` is set to `true`.
@@ -1033,6 +1113,16 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    verify_certificate = false
+    verify_certificate = true
 
 # Ingests data through another upstream `vector` sink and outputs `log` and `metric` events.
 [sources.vector]
@@ -1071,6 +1161,14 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.vector.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
     # `key_path` must also be set. This is required if `enabled` is set to `true`.
@@ -1105,6 +1203,16 @@ dns_servers = ["0.0.0.0:53"]
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # If `true`, Vector will require a TLS certificate from the connecting host and
+    # terminate the connection if it is not valid. If `false` (the default), Vector
+    # will ignore the presence of a client certificate.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    verify_certificate = false
+    verify_certificate = true
 
 
 # ------------------------------------------------------------------------------
@@ -3550,16 +3658,6 @@ end
     verify_certificate = true
     verify_certificate = false
 
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
-
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
   #
@@ -4075,16 +4173,6 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
 
 # Streams `log` events to a file.
 [sinks.file]
@@ -5102,16 +5190,6 @@ end
     verify_certificate = true
     verify_certificate = false
 
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
-
 # Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
   #
@@ -5419,16 +5497,6 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
 
 # Batches `log` events to Humio via the HEC API.
 [sinks.humio_logs]
@@ -7506,16 +7574,6 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    #
-    # * optional
-    # * default: true
-    # * type: bool
-    verify_hostname = true
-    verify_hostname = false
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
