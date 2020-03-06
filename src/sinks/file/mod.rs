@@ -11,10 +11,7 @@ use crate::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::pin_mut;
-use futures::{
-    future::{select, Either},
-    stream::{Stream, StreamExt},
-};
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio02::{
@@ -116,33 +113,43 @@ impl FileSink {
     async fn run(&mut self, input: impl Stream<Item = Event> + Send + Sync) -> crate::Result<()> {
         pin_mut!(input);
         loop {
-            let what = select(input.next(), self.files.next()).await;
-            match what {
-                Either::Left((None, _)) => {
-                    // If we got `None` - terminate the processing.
-                    debug!(message = "Receiver exausted, terminating the processing loop.");
-                    break;
-                }
-                Either::Left((Some(event), _)) => self.process_event(event).await,
-                Either::Right((None, _)) => {
-                    // Expiration queue is empty, whatever.
-                    debug!(
-                        message = "File expiration queue empty.",
-                        rate_limit_secs = 30,
-                    );
-                    continue;
-                }
-                Either::Right((Some(Ok((mut expired_file, path))), _)) => {
-                    // We got an expired file. All we really want is to flush
-                    // and close it.
-                    if let Err(error) = expired_file.flush().await {
-                        error!(message = "Failed to flush file.", path = ?path.get_ref(), %error);
+            tokio02::select! {
+                event = input.next() => {
+                    match event {
+                        None => {
+                            // If we got `None` - terminate the processing.
+                            debug!(message = "Receiver exausted, terminating the processing loop.");
+                            break;
+                        }
+                        Some(event) => self.process_event(event).await,
                     }
-                    drop(expired_file); // ignore close error
                 }
-                Either::Right((Some(Err(error)), _)) => {
-                    error!(message = "An error occured while expiring a file.", %error);
-                    continue;
+                result = self.files.next() => {
+                    match result {
+                        None => {
+                            // Expiration queue is empty, whatever.
+                            debug!(
+                                message = "File expiration queue empty.",
+                                rate_limit_secs = 30,
+                            );
+                        }
+                        Some(Ok((mut expired_file, path))) => {
+                            // We got an expired file. All we really want is to
+                            // flush and close it.
+                            if let Err(error) = expired_file.flush().await {
+                                error!(
+                                    message = "Failed to flush file.",
+                                    path = ?path.get_ref(),
+                                    %error,
+                                );
+                            }
+                            drop(expired_file); // ignore close error
+                        }
+                        Some(Err(error)) => error!(
+                            message = "An error occured while expiring a file.",
+                            %error,
+                        ),
+                    }
                 }
             }
         }
