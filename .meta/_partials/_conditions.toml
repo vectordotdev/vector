@@ -40,3 +40,25 @@ description = """\
 Check whether a field exists or does not exist, depending on the provided value\
 being `true` or `false` respectively.\
 """
+
+[<%= namespace %>."`<field_name>`.contains"]
+type = "string"
+examples = [
+  { "message.contains" = "foo" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field contains a string argument.\
+"""
+
+[<%= namespace %>."`<field_name>`.prefix"]
+type = "string"
+examples = [
+  { "environment.prefix" = "staging-" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field has a string argument prefix.\
+"""
