@@ -51,6 +51,16 @@ impl Event {
         })
     }
 
+    pub fn new_empty_counter() -> Self {
+        Event::Metric(Metric {
+            name: "counter".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 1.0 },
+        })
+    }
+
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,

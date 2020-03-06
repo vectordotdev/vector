@@ -47,6 +47,8 @@ pub mod split;
 pub mod swimlanes;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
+#[cfg(feature = "transforms-type_filter")]
+pub mod type_filter;
 
 use futures01::{sync::mpsc::Receiver, Stream};
 
