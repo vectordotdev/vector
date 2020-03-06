@@ -123,45 +123,7 @@ impl FileSink {
                     debug!(message = "Receiver exausted, terminating the processing loop.");
                     break;
                 }
-                Either::Left((Some(event), _)) => {
-                    let path = match self.partition_event(&event) {
-                        Some(path) => path,
-                        None => {
-                            // We weren't able to find the path to use for the
-                            // file.
-                            // This is already logged at `partition_event`, so
-                            // here we just skip the event.
-                            continue;
-                        }
-                    };
-
-                    let next_deadline = self.deadline_at();
-                    trace!(message = "Computed next deadline.", ?next_deadline, ?path);
-
-                    let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
-                        trace!(message = "Working with an already opened file.", ?path);
-                        file
-                    } else {
-                        trace!(message = "Opening new file.", ?path);
-                        let file = match open_file(BytesPath::new(path.clone())).await {
-                            Ok(file) => file,
-                            Err(error) => {
-                                // We coundn't open the file for this event.
-                                // Maybe other events will work though! Just log
-                                // the error and skip this event.
-                                error!(message = "Unable to open the file.", ?path, %error);
-                                continue;
-                            }
-                        };
-                        self.files.insert_at(path.clone(), (file, next_deadline));
-                        self.files.get_mut(&path).unwrap()
-                    };
-
-                    trace!(message = "Writing an event to file.", ?path);
-                    if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
-                        error!(message = "Failed to write file.", ?path, %error);
-                    }
-                }
+                Either::Left((Some(event), _)) => self.process_event(event).await,
                 Either::Right((None, _)) => {
                     // Expiration queue is empty, whatever.
                     debug!(
@@ -185,6 +147,46 @@ impl FileSink {
             }
         }
         Ok(())
+    }
+
+    async fn process_event(&mut self, event: Event) {
+        let path = match self.partition_event(&event) {
+            Some(path) => path,
+            None => {
+                // We weren't able to find the path to use for the
+                // file.
+                // This is already logged at `partition_event`, so
+                // here we just skip the event.
+                return;
+            }
+        };
+
+        let next_deadline = self.deadline_at();
+        trace!(message = "Computed next deadline.", ?next_deadline, ?path);
+
+        let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
+            trace!(message = "Working with an already opened file.", ?path);
+            file
+        } else {
+            trace!(message = "Opening new file.", ?path);
+            let file = match open_file(BytesPath::new(path.clone())).await {
+                Ok(file) => file,
+                Err(error) => {
+                    // We coundn't open the file for this event.
+                    // Maybe other events will work though! Just log
+                    // the error and skip this event.
+                    error!(message = "Unable to open the file.", ?path, %error);
+                    return;
+                }
+            };
+            self.files.insert_at(path.clone(), (file, next_deadline));
+            self.files.get_mut(&path).unwrap()
+        };
+
+        trace!(message = "Writing an event to file.", ?path);
+        if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
+            error!(message = "Failed to write file.", ?path, %error);
+        }
     }
 }
 
