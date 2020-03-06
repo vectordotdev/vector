@@ -103,7 +103,7 @@ impl KafkaSinkConfig {
         }
         client_config.set(
             "compression.codec",
-            &to_string(self.compression.unwrap_or(KafkaCompression::default())),
+            &to_string(self.compression.unwrap_or_default()),
         );
         client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
         client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
