@@ -130,7 +130,7 @@ Represents the originating host of the log. This is automatically set within sel
 
 ### message
 
-Represents the log message. Change this field name via the [global `message_key` option][docs.reference.global-options#message-key] or the source-level `message_key` option for relevant sources.
+Represents the log message. Change this field name via the [global `message_key` option][docs.reference.global-options#message_key] or the source-level `message_key` option for relevant sources.
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
@@ -154,7 +154,7 @@ Represents the log message. Change this field name via the [global `message_key`
 
 ### timestamp
 
-A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this field name via the [global `timestamp_key` option][docs.reference.global-options#message-key] or the source-level `timestamp_key` option for relevant sources.
+A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this field name via the [global `timestamp_key` option][docs.reference.global-options#message_key] or the source-level `timestamp_key` option for relevant sources.
  See [Changing The Default Schema](#changing-the-default-schema) and [Timestamp Coercion](#timestamp-coercion) for more info.
 
 
@@ -265,7 +265,7 @@ stored as UTC.
 
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
-[docs.reference.global-options#message-key]: /docs/reference/global-options/#message-key
+[docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.issue_551]: https://github.com/timberio/vector/issues/551

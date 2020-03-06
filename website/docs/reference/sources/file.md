@@ -8,7 +8,7 @@ min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "File"
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sources/file.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sources/file/
 status: "prod-ready"
 title: "File Source"
 unsupported_operating_systems: []

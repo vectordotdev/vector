@@ -8,7 +8,7 @@ min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "GCP Cloud Storage (GCS)"
 sidebar_label: "gcp_cloud_storage|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp_cloud_storage.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/cloud_storage.rs
 status: "beta"
 title: "GCP Cloud Storage (GCS) Sink"
 unsupported_operating_systems: []
