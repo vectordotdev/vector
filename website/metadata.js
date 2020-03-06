@@ -257,35 +257,95 @@ module.exports = {
   "latest_release": {
     "commits": [
       {
-        "author": "Lucio Franco",
+        "author": "Ashley Jeffs",
         "breaking_change": false,
-        "date": "2020-03-03 15:21:30 +0000",
+        "date": "2020-03-05 09:25:36 +0000",
         "deletions_count": 1,
-        "description": "Correct typetag",
+        "description": "Enable file sink in generate subcmd",
         "files_count": 1,
         "group": "fix",
-        "insertions_count": 1,
-        "message": "fix(humio_logs sink): Correct typetag (#1972)",
-        "pr_number": 1972,
+        "insertions_count": 5,
+        "message": "fix(cli): Enable file sink in generate subcmd (#1989)",
+        "pr_number": 1989,
         "scope": {
-          "category": "sink",
-          "component_name": "humio_logs",
-          "component_type": "sink",
-          "name": "humio_logs sink"
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "cli"
         },
-        "sha": "5d9aa496338aff6926e8d447e150858468b8a603",
+        "sha": "361f5d1688a1573e9794c4decb0aec26e731de70",
         "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-03-06 11:37:19 +0000",
+        "deletions_count": 8,
+        "description": "Explicitly call GC in `lua` transform",
+        "files_count": 1,
+        "group": "fix",
+        "insertions_count": 25,
+        "message": "fix(lua transform): Explicitly call GC in `lua` transform (#1990)",
+        "pr_number": 1990,
+        "scope": {
+          "category": "transform",
+          "component_name": "lua",
+          "component_type": "transform",
+          "name": "lua transform"
+        },
+        "sha": "b709ce7a15e1b42bcaae765902968158b10567ac",
+        "type": "fix"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-03-06 12:26:59 +0000",
+        "deletions_count": 7,
+        "description": "Fix broken links",
+        "files_count": 5,
+        "group": "docs",
+        "insertions_count": 9,
+        "message": "docs: Fix broken links",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "core"
+        },
+        "sha": "bc81e26f137de5a7ff2b8f893d7839a2052bb8a8",
+        "type": "docs"
+      },
+      {
+        "author": "Alexander Rodin",
+        "breaking_change": false,
+        "date": "2020-03-06 12:51:52 +0000",
+        "deletions_count": 1,
+        "description": "Use new Homebrew installer in CI",
+        "files_count": 1,
+        "group": "chore",
+        "insertions_count": 1,
+        "message": "chore(testing): Use new Homebrew installer in CI",
+        "pr_number": null,
+        "scope": {
+          "category": "core",
+          "component_name": null,
+          "component_type": null,
+          "name": "testing"
+        },
+        "sha": "ee998b2078c7019481a25881ee71764e1260c6a5",
+        "type": "chore"
       }
     ],
-    "compare_url": "https://github.com/timberio/vector/compare/v0.8.0...v0.8.1",
-    "date": "2020-03-04",
-    "deletions_count": 1,
+    "compare_url": "https://github.com/timberio/vector/compare/v0.8.1...v0.8.2",
+    "date": "2020-03-06",
+    "deletions_count": 10,
     "description": "",
     "highlights": [
 
     ],
-    "insertions_count": 1,
-    "last_version": "0.8.0",
+    "insertions_count": 31,
+    "last_version": "0.8.1",
     "posts": [
 
     ],
@@ -295,7 +355,7 @@ module.exports = {
     "upgrade_guides": [
 
     ],
-    "version": "0.8.1"
+    "version": "0.8.2"
   },
   "post_tags": [
     "type: announcement",
@@ -21172,6 +21232,109 @@ module.exports = {
 
       ],
       "version": "0.8.1"
+    },
+    "0.8.2": {
+      "commits": [
+        {
+          "author": "Ashley Jeffs",
+          "breaking_change": false,
+          "date": "2020-03-05 09:25:36 +0000",
+          "deletions_count": 1,
+          "description": "Enable file sink in generate subcmd",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 5,
+          "message": "fix(cli): Enable file sink in generate subcmd (#1989)",
+          "pr_number": 1989,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "cli"
+          },
+          "sha": "361f5d1688a1573e9794c4decb0aec26e731de70",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-03-06 11:37:19 +0000",
+          "deletions_count": 8,
+          "description": "Explicitly call GC in `lua` transform",
+          "files_count": 1,
+          "group": "fix",
+          "insertions_count": 25,
+          "message": "fix(lua transform): Explicitly call GC in `lua` transform (#1990)",
+          "pr_number": 1990,
+          "scope": {
+            "category": "transform",
+            "component_name": "lua",
+            "component_type": "transform",
+            "name": "lua transform"
+          },
+          "sha": "b709ce7a15e1b42bcaae765902968158b10567ac",
+          "type": "fix"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-03-06 12:26:59 +0000",
+          "deletions_count": 7,
+          "description": "Fix broken links",
+          "files_count": 5,
+          "group": "docs",
+          "insertions_count": 9,
+          "message": "docs: Fix broken links",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "core"
+          },
+          "sha": "bc81e26f137de5a7ff2b8f893d7839a2052bb8a8",
+          "type": "docs"
+        },
+        {
+          "author": "Alexander Rodin",
+          "breaking_change": false,
+          "date": "2020-03-06 12:51:52 +0000",
+          "deletions_count": 1,
+          "description": "Use new Homebrew installer in CI",
+          "files_count": 1,
+          "group": "chore",
+          "insertions_count": 1,
+          "message": "chore(testing): Use new Homebrew installer in CI",
+          "pr_number": null,
+          "scope": {
+            "category": "core",
+            "component_name": null,
+            "component_type": null,
+            "name": "testing"
+          },
+          "sha": "ee998b2078c7019481a25881ee71764e1260c6a5",
+          "type": "chore"
+        }
+      ],
+      "compare_url": "https://github.com/timberio/vector/compare/v0.8.1...v0.8.2",
+      "date": "2020-03-06",
+      "deletions_count": 10,
+      "description": "",
+      "highlights": [
+
+      ],
+      "insertions_count": 31,
+      "last_version": "0.8.1",
+      "posts": [
+
+      ],
+      "subtitle": "",
+      "type": "initial dev",
+      "type_url": "https://semver.org/#spec-item-4",
+      "upgrade_guides": [
+
+      ],
+      "version": "0.8.2"
     }
   },
   "sinks": {
