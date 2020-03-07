@@ -1,11 +1,13 @@
 [<%= namespace %>.tls]
 type = "table"
+category = "TLS"
 common = false
 description = "Configures the TLS options for connections from this sink."
 
 <%- if can_enable -%>
 [<%= namespace %>.tls.children.enabled]
 type = "bool"
+common = true
 default = false
 sort = 1
 description = "Enable TLS during connections to the remote."
@@ -21,6 +23,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format \
 
 [<%= namespace %>.tls.children.crt_path]
 type = "string"
+common = true
 examples = ["/path/to/host_certificate.crt"]
 description = """\
 Absolute path to a certificate file used to identify this connection, in DER \
@@ -30,6 +33,7 @@ or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
 
 [<%= namespace %>.tls.children.key_path]
 type = "string"
+common = true
 examples = ["/path/to/host_certificate.key"]
 description = """\
 Absolute path to a certificate key file used to identify this connection, in \

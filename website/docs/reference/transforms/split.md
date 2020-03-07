@@ -29,23 +29,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "split" # must be: "split"
-  inputs = ["my-source-id"] # example
-  field_names = ["timestamp", "level", "message"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "split"
+  inputs = ["my-source-id"]
   drop_field = true # default
   field = "message" # default
+  field_names = ["timestamp", "level", "message"]
   separator = "[whitespace]" # default
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 ## Options
@@ -224,9 +221,8 @@ And the following configuration:
   separator = ","
   fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 
-  [transforms.<transform-id>.types]
-    status = "int"
-    bytes = "int"
+  types.status = "int"
+  types.bytes = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

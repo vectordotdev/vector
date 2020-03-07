@@ -29,10 +29,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "field_filter" # must be: "field_filter"
-  inputs = ["my-source-id"] # example
-  field = "file" # example
-  value = "/var/log/nginx.log" # example
+  type = "field_filter"
+  inputs = ["my-source-id"]
+  field = "file"
+  value = "/var/log/nginx.log"
 ```
 
 ## Options

@@ -43,11 +43,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "vector" # must be: "vector"
-  address = "0.0.0.0:9000" # example
-
-  # OPTIONAL
+  type = "vector"
+  address = "0.0.0.0:9000"
   shutdown_timeout_secs = 30 # default, seconds
 ```
 
@@ -58,21 +55,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "vector" # must be: "vector"
-  address = "0.0.0.0:9000" # example
-
-  # OPTIONAL - General
+  # General
+  type = "vector"
+  address = "0.0.0.0:9000"
   shutdown_timeout_secs = 30 # default, seconds
 
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = false # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.verify_certificate = false # default
 ```
 
 </TabItem>

@@ -15,7 +15,11 @@ write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface]
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.clickhouse.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.clickhouse.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.clickhouse.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -47,15 +51,15 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 [sinks.clickhouse.options.auth.children.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = "The basic authentication password."
 
 [sinks.clickhouse.options.auth.children.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = "The basic authentication user name."
 
 [sinks.clickhouse.options.compression]

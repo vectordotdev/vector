@@ -32,12 +32,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "blackhole" # must be: "blackhole"
-  inputs = ["my-source-id"] # example
-  print_amount = 1000 # example
-
-  # OPTIONAL
+  type = "blackhole"
+  inputs = ["my-source-id"]
+  print_amount = 1000
   healthcheck = true # default
 ```
 

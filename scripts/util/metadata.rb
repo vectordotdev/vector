@@ -31,6 +31,7 @@ class Metadata
       full_path = path.start_with?("/") ? path : "#{META_ROOT}/#{path}"
       body = File.read(full_path)
       renderer = ERB.new(body, nil, '-')
+
       renderer.result(context)
     end
   end
@@ -60,7 +61,22 @@ class Metadata
 
         contents =
           Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
-            Template.render(file)
+            begin
+              Template.render(file)
+            rescue e
+              error!(
+                <<~EOF
+                The follow metadata file failed to load:
+
+                  #{file}
+
+                The error received was:
+
+                  #{e.message}
+                  #{e.stacktrace.join("\n")}
+                EOF
+              )
+            end
           end
 
         content = contents.join("\n")

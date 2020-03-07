@@ -45,62 +45,30 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.bar]
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - General
-  name = "foo test" # example
-  no_outputs_from = ["foo"] # example
+  # General
+  name = "foo test"
 
-  # REQUIRED - Inputs
+  # Inputs
   [[tests.inputs]]
-    # REQUIRED - General
-    type = "raw" # example, enum
-    insert_at = "foo" # example
+    type = "raw"
+    insert_at = "foo"
+    value = "some message contents" # required when type = "raw"
 
-    # OPTIONAL - General
-    value = "some message contents" # example, no default, relevant when type = "raw"
-
-    # OPTIONAL - Log fields
-    [tests.inputs.log_fields]
-      message = "some message contents" # example
-      host = "myhost" # example
-
-    # OPTIONAL - Metric
-    [tests.inputs.metric]
-      # REQUIRED - General
-      type = "counter" # example, enum
-      name = "duration_total" # example
-      timestamp = "2019-11-01T21:15:47.443232Z" # example
-      val = 10.2 # example
-
-      # OPTIONAL - General
-      direction = "plus" # example, no default, enum
-      sample_rate = 1 # example, no default
-
-      # OPTIONAL - Tags
-      [tests.inputs.metric.tags]
-        host = "foohost" # example
-        region = "us-east-1" # example
-
-  # REQUIRED - Outputs
+  # Outputs
   [[tests.outputs]]
-    # REQUIRED - General
-    extract_from = "foo" # example
+    # General
+    extract_from = "foo"
 
-    # OPTIONAL - Conditions
-    [[tests.outputs.conditions]]
-      # REQUIRED
-      type = "check_fields" # example
-
-      # OPTIONAL
-      "message.contains" = "foo"
-      "message.eq" = "this is the content to match against"
-      "host.exists" = true
-      "method.neq" = "POST"
-      "environment.prefix" = "staging-"
+    # Conditions
+    conditions.type = "check_fields" # default
+    conditions.message.eq = "this is the content to match against"
+    conditions.message.contains = "foo"
+    conditions.environment.prefix = "staging-"
 ```
 
 </TabItem>
@@ -109,62 +77,51 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.bar]
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
 [[tests]]
-  # REQUIRED - General
-  name = "foo test" # example
-  no_outputs_from = ["foo"] # example
+  # General
+  name = "foo test"
+  no_outputs_from = ["foo"]
 
-  # REQUIRED - Inputs
+  # Inputs
   [[tests.inputs]]
-    # REQUIRED - General
-    type = "raw" # example, enum
-    insert_at = "foo" # example
+    # General
+    type = "raw"
+    insert_at = "foo"
+    value = "some message contents" # required when type = "raw"
 
-    # OPTIONAL - General
-    value = "some message contents" # example, no default, relevant when type = "raw"
+    # Log fields
+    log_fields.message = "some message contents"
+    log_fields.host = "myhost"
 
-    # OPTIONAL - Log fields
-    [tests.inputs.log_fields]
-      message = "some message contents" # example
-      host = "myhost" # example
+    # Metric
+    # General
+    metric.type = "counter"
+    metric.name = "duration_total"
+    metric.timestamp = "2019-11-01T21:15:47.443232Z"
+    metric.val = 10.2
+    metric.direction = "plus" # no default
+    metric.sample_rate = 1 # no default
 
-    # OPTIONAL - Metric
-    [tests.inputs.metric]
-      # REQUIRED - General
-      type = "counter" # example, enum
-      name = "duration_total" # example
-      timestamp = "2019-11-01T21:15:47.443232Z" # example
-      val = 10.2 # example
+    # Tags
+    metric.tags.host = "foohost"
+    metric.tags.region = "us-east-1"
 
-      # OPTIONAL - General
-      direction = "plus" # example, no default, enum
-      sample_rate = 1 # example, no default
-
-      # OPTIONAL - Tags
-      [tests.inputs.metric.tags]
-        host = "foohost" # example
-        region = "us-east-1" # example
-
-  # REQUIRED - Outputs
+  # Outputs
   [[tests.outputs]]
-    # REQUIRED - General
-    extract_from = "foo" # example
+    # General
+    extract_from = "foo"
 
-    # OPTIONAL - Conditions
-    [[tests.outputs.conditions]]
-      # REQUIRED
-      type = "check_fields" # example
-
-      # OPTIONAL
-      "message.contains" = "foo"
-      "message.eq" = "this is the content to match against"
-      "host.exists" = true
-      "method.neq" = "POST"
-      "environment.prefix" = "staging-"
+    # Conditions
+    conditions.type = "check_fields" # default
+    conditions.message.eq = "this is the content to match against"
+    conditions.host.exists = true
+    conditions.method.neq = "POST"
+    conditions.message.contains = "foo"
+    conditions.environment.prefix = "staging-"
 ```
 
 </TabItem>
@@ -236,7 +193,7 @@ The name of a transform, the input event will be delivered to this transform in 
   name={"log_fields"}
   path={"inputs"}
   relevantWhen={{"type":"log"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -286,7 +243,7 @@ A key/value pair representing a field to be added to the input event.
   name={"metric"}
   path={"inputs"}
   relevantWhen={{"type":"metric"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -445,7 +402,7 @@ Time metric was created/ingested.
   common={true}
   defaultValue={null}
   enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
-  examples={["counter"]}
+  examples={["counter","gauge","histogram","set"]}
   groups={[]}
   name={"type"}
   path={"inputs.metric"}
@@ -524,7 +481,7 @@ The event type.
   name={"value"}
   path={"inputs"}
   relevantWhen={{"type":"raw"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -567,7 +524,7 @@ A unique identifier for this test.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[["foo"]]}
@@ -635,123 +592,8 @@ A table that defines a collection of conditions to check against the output of a
 
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"message.contains":"foo"}]}
-  groups={[]}
-  name={"`<field_name>`.contains"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `<field_name>`.contains
-
-Checks whether a string field contains a string argument.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"message.eq":"this is the content to match against"}]}
-  groups={[]}
-  name={"`<field_name>`.eq"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `<field_name>`.eq
-
-Check whether a fields contents exactly matches the value specified.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host.exists":true}]}
-  groups={[]}
-  name={"`<field_name>`.exists"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-##### `<field_name>`.exists
-
-Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"method.neq":"POST"}]}
-  groups={[]}
-  name={"`<field_name>`.neq"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `<field_name>`.neq
-
-Check whether a fields contents does not match the value specified.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
-  groups={[]}
-  name={"`<field_name>`.prefix"}
-  path={"outputs.conditions"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-##### `<field_name>`.prefix
-
-Checks whether a string field has a string argument prefix.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
   examples={["check_fields","is_log","is_metric"]}
   groups={[]}
   name={"type"}
@@ -766,6 +608,121 @@ Checks whether a string field has a string argument prefix.
 ##### type
 
 The type of the condition to execute.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.eq":"this is the content to match against"}]}
+  groups={[]}
+  name={"`[field-name]`.eq"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field-name]`.eq
+
+Check whether a fields contents exactly matches the value specified.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host.exists":true}]}
+  groups={[]}
+  name={"`[field-name]`.exists"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+##### `[field-name]`.exists
+
+Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"method.neq":"POST"}]}
+  groups={[]}
+  name={"`[field-name]`.neq"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field-name]`.neq
+
+Check whether a fields contents does not match the value specified.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.contains":"foo"}]}
+  groups={[]}
+  name={"`[field_name]`.contains"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.contains
+
+Checks whether a string field contains a string argument.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.prefix":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.prefix"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.prefix
+
+Checks whether a string field has a string argument prefix.
 
 
 </Field>

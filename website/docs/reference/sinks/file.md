@@ -43,23 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
-  path = "vector-%Y-%m-%d.log" # example
-
-  # OPTIONAL - General
+  # General
+  type = "file"
+  inputs = ["my-source-id"]
+  path = "vector-%Y-%m-%d.log"
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "text" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
 ```
 
 </TabItem>
@@ -69,24 +60,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
-  path = "vector-%Y-%m-%d.log" # example
-
-  # OPTIONAL - General
+  # General
+  type = "file"
+  inputs = ["my-source-id"]
+  path = "vector-%Y-%m-%d.log"
   healthcheck = true # default
   idle_timeout_secs = "30" # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "text" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 ```
 
 </TabItem>

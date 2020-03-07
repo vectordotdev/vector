@@ -100,6 +100,10 @@ class Component
     types.uniq
   end
 
+  def field_notation_options
+    options_list.select(&:field_notation?)
+  end
+
   def only_service_provider?(provider_name)
     service_providers.length == 1 && service_provider?(provider_name)
   end
@@ -119,23 +123,31 @@ class Component
 
         if option_groups.any?
           option_groups.each do |group|
-            groups[group] = options_list.select do |option|
-              option.group?(group) && option.common?
-            end
+            groups[group] =
+              lambda do |option|
+                option.group?(group) && option.common?
+              end
           end
 
           if advanced_relevant?
             option_groups.each do |group|
-              groups["#{group} (advanced)"] = options_list.select do |option|
-                option.group?(group)
-              end
+              groups["#{group} (advanced)"] =
+                lambda do |option|
+                  option.group?(group)
+                end
             end
           end
         else
-          groups["Common"] = options_list.select(&:common?)
+          groups["Common"] =
+            lambda do |option|
+              option.common?
+            end
 
           if advanced_relevant?
-            groups["Advanced"] = options_list
+            groups["Advanced"] =
+              lambda do |option|
+                true
+              end
           end
         end
 
@@ -200,6 +212,20 @@ class Component
     }
   end
 
+  def to_toml_example(common: true)
+    example_options = options_list.sort_by(&:config_file_sort_token)
+    example_options = common ? example_options.select(&:common?) : example_options
+
+    option_examples =
+      included_options.collect do |option|
+        option.to_toml_example(common: common)
+      end
+
+    <<~EOF
+    [#{type.pluralize}.my_#{type}_id]
+    #{option_examples.join}
+    EOF
+  end
   def transform?
     type == "transform"
   end

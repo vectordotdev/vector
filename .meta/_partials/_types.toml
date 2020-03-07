@@ -5,7 +5,7 @@ description = "Key/Value pairs representing mapped log field types."
 
 [<%= namespace %>.options.types.children."`[field-name]`"]
 type = "string"
-common = <%= common %>
+common = true
 examples = [
 {status = "int"},
 {duration = "float"},

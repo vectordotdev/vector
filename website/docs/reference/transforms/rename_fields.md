@@ -29,13 +29,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "rename_fields" # must be: "rename_fields"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "rename_fields"
+  inputs = ["my-source-id"]
 
-  # REQUIRED - Fields
-  [transforms.my_transform_id.fields]
-    old field name = "new field name" # example
+  # Fields
+  fields.old_field_name = "new_field_name"
+  fields.parent.old_child_name = "parent.new_child_name"
 ```
 
 ## Options
@@ -73,7 +73,7 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"old field name":"new field name"}]}
+  examples={[{"old_field_name":"new_field_name"},{"parent.old_child_name":"parent.new_child_name"}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"fields"}
@@ -114,9 +114,8 @@ Given the following configuration:
   type = "rename_fields"
   inputs = [...]
 
-  [transforms.my_transform.fields]
-    old_field = "new_field"
-    old_nested.nested = "new_nested.nested",
+  fields.old_field = "new_field"
+  fields.old_nested.nested = "new_nested.nested",
 ```
 
 ## How It Works

@@ -43,25 +43,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example, relevant when mode = "tcp"
-  mode = "tcp" # example, enum
-  path = "/path/to/socket" # example, relevant when mode = "unix"
-
-  # OPTIONAL - General
+  # General
+  type = "socket"
+  inputs = ["my-source-id"]
+  address = "92.12.333.224:5000" # required when mode = "tcp"
+  mode = "tcp"
+  path = "/path/to/socket" # required when mode = "unix"
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
 ```
 
 </TabItem>
@@ -71,45 +62,34 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example, relevant when mode = "tcp"
-  mode = "tcp" # example, enum
-  path = "/path/to/socket" # example, relevant when mode = "unix"
-
-  # OPTIONAL - General
+  # General
+  type = "socket"
+  inputs = ["my-source-id"]
+  address = "92.12.333.224:5000" # required when mode = "tcp"
+  mode = "tcp"
+  path = "/path/to/socket" # required when mode = "unix"
   healthcheck = true # default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Buffer
+  buffer.type = "memory" # default
+  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.max_size = 104900000 # bytes, required when type = "disk"
+  buffer.when_full = "block" # default
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
-
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
-    verify_hostname = true # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.verify_certificate = true # default
+  tls.verify_hostname = true # default
 ```
 
 </TabItem>
@@ -193,7 +173,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -292,7 +272,7 @@ Configures the encoding specific sink behavior.
   common={true}
   defaultValue={null}
   enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["json","text"]}
+  examples={["text","json"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
@@ -477,7 +457,7 @@ Configures the TLS options for connections from this sink.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
@@ -523,7 +503,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -569,7 +549,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}

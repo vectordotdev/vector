@@ -43,16 +43,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "syslog" # must be: "syslog"
-  mode = "tcp" # example, enum
+  # General
+  type = "syslog"
+  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
+  mode = "tcp"
+  path = "/path/to/socket" # required when mode = "unix"
 
-  # OPTIONAL - Context
+  # Context
   host_key = "host" # default
-
-  # OPTIONAL - General
-  address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
 ```
 
 </TabItem>
@@ -62,26 +60,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "syslog" # must be: "syslog"
-  mode = "tcp" # example, enum
+  # General
+  type = "syslog"
+  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
+  mode = "tcp"
+  path = "/path/to/socket" # required when mode = "unix"
+  max_length = 102400 # default, bytes
 
-  # OPTIONAL - Context
+  # Context
   host_key = "host" # default
 
-  # OPTIONAL - General
-  address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
-  max_length = 102400 # default, bytes
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
-
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = false # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.verify_certificate = false # default
 ```
 
 </TabItem>
@@ -105,7 +100,7 @@ import Field from '@site/src/components/Field';
   name={"address"}
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -197,7 +192,7 @@ The input mode.
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}

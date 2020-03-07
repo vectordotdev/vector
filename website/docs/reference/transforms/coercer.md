@@ -40,17 +40,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "coercer" # must be: "coercer"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "coercer"
+  inputs = ["my-source-id"]
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 </TabItem>
@@ -60,20 +59,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "coercer" # must be: "coercer"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "coercer"
+  inputs = ["my-source-id"]
   drop_unspecified = false # default
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 </TabItem>
@@ -192,11 +188,10 @@ And the following configuration:
 [transforms.<transform-id>]
   type = "coercer"
 
-[transforms.<transform-id>.types]
-  bytes_in = "int"
-  bytes_out = "int"
-  timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-  status = "int"
+  types.bytes_in = "int"
+  types.bytes_out = "int"
+  types.timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+  types.status = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

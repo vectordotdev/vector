@@ -1,39 +1,40 @@
 <%- groups ||= [] -%>
 [<%= namespace %>.request]
 type = "table"
-common = <%= common %>
-groups = <%= groups.to_json %>
+category = "Request"
+common = <%= common.to_toml %>
+groups = <%= groups.to_toml %>
 description = "Configures the sink request behavior."
 
 [<%= namespace %>.request.children.in_flight_limit]
 type = "int"
-common = <%= common %>
+common = true
 default = <%= in_flight_limit %>
 unit = "requests"
 description = "The maximum number of in-flight requests allowed at any given time."
 
 [<%= namespace %>.request.children.rate_limit_duration_secs]
 type = "int"
-common = <%= common %>
+common = true
 default = <%= rate_limit_duration_secs %>
 unit = "seconds"
 description = "The time window, in seconds, used for the `rate_limit_num` option."
 
 [<%= namespace %>.request.children.rate_limit_num]
 type = "int"
-common = <%= common %>
+common = true
 default = <%= rate_limit_num %>
 description = "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 
 [<%= namespace %>.request.children.retry_attempts]
 type = "int"
-common = <%= common %>
+common = false
 default = <%= retry_attempts %>
 description = "The maximum number of retries to make for failed requests."
 
 [<%= namespace %>.request.children.retry_initial_backoff_secs]
 type = "int"
-common = <%= common %>
+common = false
 default = <%= retry_initial_backoff_secs %>
 unit = "seconds"
 description = """\
@@ -44,14 +45,14 @@ to select future backoffs.\
 
 [<%= namespace %>.request.children.retry_max_duration_secs]
 type = "int"
-common = <%= common %>
+common = false
 default = <%= retry_max_duration_secs %>
 unit = "seconds"
 description = "The maximum amount of time, in seconds, to wait between retries."
 
 [<%= namespace %>.request.children.timeout_secs]
 type = "int"
-common = <%= common %>
+common = true
 default = <%= timeout_secs %>
 unit = "seconds"
 description = """\

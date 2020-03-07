@@ -29,11 +29,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "ansi_stripper" # must be: "ansi_stripper"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
+  type = "ansi_stripper"
+  inputs = ["my-source-id"]
   field = "message" # default
 ```
 

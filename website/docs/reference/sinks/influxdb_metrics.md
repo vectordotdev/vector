@@ -43,19 +43,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  bucket = "vector-bucket" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
-
-  # REQUIRED - auth
-  org = "Organization" # example
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
-
-  # OPTIONAL - General
+  # General
+  type = "influxdb_metrics"
+  inputs = ["my-source-id"]
+  bucket = "vector-bucket"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  namespace = "service"
   healthcheck = true # default
+
+  # auth
+  org = "Organization"
+  token = "${INFLUXDB_TOKEN_ENV_VAR}"
 ```
 
 </TabItem>
@@ -65,23 +63,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  database = "vector-database" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
-
-  # OPTIONAL - General
+  # General
+  type = "influxdb_metrics"
+  inputs = ["my-source-id"]
+  database = "vector-database"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  namespace = "service"
   healthcheck = true # default
 
-  # OPTIONAL - auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
-  username = "todd" # example, no default
+  # auth
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # no default
+  username = "todd" # no default
 
-  # OPTIONAL - persistence
-  consistency = "any" # example, no default
-  retention_policy_name = "autogen" # example, no default
+  # persistence
+  consistency = "any" # no default
+  retention_policy_name = "autogen" # no default
 ```
 
 </TabItem>
@@ -91,34 +87,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  bucket = "vector-bucket" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
-
-  # REQUIRED - auth
-  org = "Organization" # example
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
-
-  # OPTIONAL - General
+  # General
+  type = "influxdb_metrics"
+  inputs = ["my-source-id"]
+  bucket = "vector-bucket"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  namespace = "service"
   healthcheck = true # default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
+  # auth
+  org = "Organization"
+  token = "${INFLUXDB_TOKEN_ENV_VAR}"
 
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
+  # Batch
+
+  # Request
 ```
 
 </TabItem>
@@ -128,38 +111,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  database = "vector-database" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
-
-  # OPTIONAL - General
+  # General
+  type = "influxdb_metrics"
+  inputs = ["my-source-id"]
+  database = "vector-database"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
+  namespace = "service"
   healthcheck = true # default
 
-  # OPTIONAL - auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
-  username = "todd" # example, no default
+  # auth
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # no default
+  username = "todd" # no default
 
-  # OPTIONAL - persistence
-  consistency = "any" # example, no default
-  retention_policy_name = "autogen" # example, no default
+  # persistence
+  consistency = "any" # no default
+  retention_policy_name = "autogen" # no default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
+  # Batch
 
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
+  # Request
 ```
 
 </TabItem>
@@ -454,7 +424,7 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -477,7 +447,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -500,7 +470,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -592,7 +562,7 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={60}
   enumValues={null}
   examples={[60]}

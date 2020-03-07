@@ -29,22 +29,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "tokenizer" # must be: "tokenizer"
-  inputs = ["my-source-id"] # example
-  field_names = ["timestamp", "level", "message"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "tokenizer"
+  inputs = ["my-source-id"]
   drop_field = true # default
   field = "message" # default
+  field_names = ["timestamp", "level", "message"]
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 ## Options

@@ -264,6 +264,7 @@ module.exports = {
           label: 'Advanced',
           items: [
             "reference/env-vars",
+            "reference/field-notation",
             "reference/global-options",
             "reference/templating",
             "reference/tests",

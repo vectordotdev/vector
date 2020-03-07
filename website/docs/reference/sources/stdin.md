@@ -43,10 +43,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "stdin" # must be: "stdin"
+  # General
+  type = "stdin"
 
-  # OPTIONAL - Context
+  # Context
   host_key = "host" # default
 ```
 
@@ -57,14 +57,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "stdin" # must be: "stdin"
-
-  # OPTIONAL - Context
-  host_key = "host" # default
-
-  # OPTIONAL - General
+  # General
+  type = "stdin"
   max_length = 102400 # default, bytes
+
+  # Context
+  host_key = "host" # default
 ```
 
 </TabItem>

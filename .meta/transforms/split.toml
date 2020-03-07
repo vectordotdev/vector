@@ -68,9 +68,8 @@ And the following configuration:
   separator = ","
   fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 
-  [transforms.<transform-id>.types]
-    status = "int"
-    bytes = "int"
+  types.status = "int"
+  types.bytes = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

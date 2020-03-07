@@ -43,13 +43,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "docker" # must be: "docker"
-
-  # OPTIONAL
-  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # example, no default
-  include_images = ["httpd", "redis"] # example, no default
-  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # example, no default
+  type = "docker"
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # no default
+  include_images = ["httpd", "redis"] # no default
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # no default
 ```
 
 </TabItem>
@@ -59,14 +56,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "docker" # must be: "docker"
-
-  # OPTIONAL
+  type = "docker"
   auto_partial_merge = true # default
-  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # example, no default
-  include_images = ["httpd", "redis"] # example, no default
-  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # example, no default
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # no default
+  include_images = ["httpd", "redis"] # no default
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # no default
   partial_event_marker_field = "_partial" # default
 ```
 

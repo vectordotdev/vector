@@ -29,23 +29,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "lua" # must be: "lua"
-  inputs = ["my-source-id"] # example
+  type = "lua"
+  inputs = ["my-source-id"]
   source = """
-require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
+  require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
 
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\n$", "")
-  event["host"] = hostname
-end
-"""
-
-  # OPTIONAL
-  search_dirs = ["/etc/vector/lua"] # example, no default
+  if event["host"] == nil then
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname = string.gsub(hostname, "\n$", "")
+    event["host"] = hostname
+  end
+  """
+  search_dirs = ["/etc/vector/lua"] # no default
 ```
 
 ## Options

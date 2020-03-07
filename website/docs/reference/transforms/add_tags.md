@@ -29,14 +29,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "add_tags" # must be: "add_tags"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "add_tags"
+  inputs = ["my-source-id"]
 
-  # REQUIRED - Tags
-  [transforms.my_transform_id.tags]
-    static_tag = "my value" # example
-    env_tag = "${ENV_VAR}" # example
+  # Tags
+  tags.static_tag = "my value"
+  tags.env_tag = "${ENV_VAR}"
 ```
 
 ## Options

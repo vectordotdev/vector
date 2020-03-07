@@ -29,11 +29,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "merge" # must be: "merge"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
+  type = "merge"
+  inputs = ["my-source-id"]
   merge_fields = ["message"] # default
   partial_event_marker_field = "_partial" # default
   stream_discriminant_fields = [] # default

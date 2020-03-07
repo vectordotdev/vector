@@ -1,5 +1,6 @@
 [<%= namespace %>.tls]
 type = "table"
+category = "TLS"
 common = false
 description = "Configures the TLS options for connections from this source."
 
@@ -60,5 +61,6 @@ default = false
 description = """\
 If `true`, Vector will require a TLS certificate from the connecting host \
 and terminate the connection if it is not valid. \
-If `false` (the default), Vector will ignore the presence of a client certificate.\
+If `false` (the default), Vector will ignore the presence of a client \
+certificate.\
 """

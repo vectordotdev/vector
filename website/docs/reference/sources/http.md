@@ -43,13 +43,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "http" # must be: "http"
-  address = "0.0.0.0:80" # example
-
-  # OPTIONAL
-  encoding = "text" # default, enum
-  headers = ["User-Agent", "X-My-Custom-Header"] # example, no default
+  type = "http"
+  address = "0.0.0.0:80"
+  encoding = "text" # default
+  headers = ["User-Agent", "X-My-Custom-Header"] # no default
 ```
 
 </TabItem>
@@ -59,22 +56,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "http" # must be: "http"
-  address = "0.0.0.0:80" # example
+  # General
+  type = "http"
+  address = "0.0.0.0:80"
+  encoding = "text" # default
+  headers = ["User-Agent", "X-My-Custom-Header"] # no default
 
-  # OPTIONAL - General
-  encoding = "text" # default, enum
-  headers = ["User-Agent", "X-My-Custom-Header"] # example, no default
-
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = false # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.verify_certificate = false # default
 ```
 
 </TabItem>

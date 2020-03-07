@@ -29,11 +29,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
+  type = "aws_ec2_metadata"
+  inputs = ["my-source-id"]
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
   host = "http://169.254.169.254" # default
   namespace = "" # default

@@ -43,12 +43,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example
-
-  # OPTIONAL
+  type = "vector"
+  inputs = ["my-source-id"]
+  address = "92.12.333.224:5000"
   healthcheck = true # default
 ```
 
@@ -59,23 +56,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example
-
-  # OPTIONAL - General
+  # General
+  type = "vector"
+  inputs = ["my-source-id"]
+  address = "92.12.333.224:5000"
   healthcheck = true # default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
-
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Buffer
+  buffer.type = "memory" # default
+  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.max_size = 104900000 # bytes, required when type = "disk"
+  buffer.when_full = "block" # default
 ```
 
 </TabItem>
@@ -159,7 +150,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}

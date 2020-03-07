@@ -31,11 +31,15 @@ vector test /etc/vector/*.toml
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.bar]
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.tests.children_list.select(&:common?), path: "tests", array: true) %>
+<%=
+  config_example(metadata.tests.children_list, table_path: ["tests"], array: true) do |option|
+    option.common?
+  end
+%>
 ```
 
 </TabItem>
@@ -44,11 +48,11 @@ vector test /etc/vector/*.toml
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-[transforms.bar]
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.tests.children_list, path: "tests", array: true) %>
+<%= config_example(metadata.tests.children_list, table_path: ["tests"], array: true) %>
 ```
 
 </TabItem>
