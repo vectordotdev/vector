@@ -2,6 +2,8 @@
 //!
 //! This module contains the Vector transparent WebAssembly Engine.
 
+// TODO: FreeBSD: https://github.com/bytecodealliance/lucet/pull/419
+
 use crate::{Error, Event, Result};
 use lru::LruCache;
 use lucet_runtime::c_api::*;
@@ -17,6 +19,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
 
+mod context;
+use context::EngineContext;
+mod hostcalls;
 mod defaults {
     use std::path::Path;
 
@@ -32,7 +37,7 @@ trait Engine {
     fn instantiate<P>(&mut self, path: P) -> Result<Uuid>
     where
         P: Into<PathBuf>;
-    fn process(&mut self, id: &Uuid, event: Event) -> Result<Event>;
+    fn process(&mut self, id: &Uuid, events: Vec<Event>) -> Result<Vec<Event>>;
 }
 
 #[derive(Derivative, Clone)]
@@ -106,32 +111,34 @@ impl Engine for DefaultEngine {
         Ok(id)
     }
 
-    fn process(&mut self, id: &Uuid, event: Event) -> Result<Event> {
+    fn process(&mut self, id: &Uuid, events: Vec<Event>) -> Result<Vec<Event>> {
         let instance = self
             .instance_handles
             .get_mut(id)
             .ok_or("Could not load instance")?;
-        instance.insert_embed_ctx(EngineContext {
-            event,
-        });
-        instance.run("process", &[])?;
-        let context = instance.remove_embed_ctx::<EngineContext>().ok_or("No context")?;
-        Ok(context.event)
-    }
-}
 
-struct EngineContext {
-    event: Event,
+        // The instance context is essentially an anymap, so this these aren't colliding!
+        let wasi_ctx = WasiCtxBuilder::new().build()?;
+        instance.insert_embed_ctx(wasi_ctx);
+        let engine_context = EngineContext::new(events);
+        instance.insert_embed_ctx(engine_context);
+
+        let _TODO = instance.run("process", &[])?;
+        let engine_context: EngineContext = instance.remove_embed_ctx()
+            .ok_or("Could not retrieve context after processing.")?;
+        let EngineContext { events } = engine_context;
+        Ok(events)
+    }
 }
 
 #[test]
 fn engine() -> Result<()> {
     let mut engine = DefaultEngine::build(Default::default());
-    let event = Event::new_empty_log();
+    let events = vec![Event::new_empty_log()];
     engine.load("untitled.wasm")?;
     let id = engine.instantiate("untitled.wasm")?;
-    let out = engine.process(&id, event.clone())?;
-    assert_eq!(event, out);
+    let out = engine.process(&id, events.clone())?;
+    assert_eq!(events, out);
     Ok(())
 }
 
