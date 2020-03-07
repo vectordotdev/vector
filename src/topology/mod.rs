@@ -247,10 +247,10 @@ impl RunningTopology {
         info!("Waiting for up to 30 seconds for sources to finish shutting down");
         let deadline = Instant::now() + Duration::from_secs(30);
         for name in &sources_to_remove {
-            self.shutdown_source_end(name, &deadline);
+            self.shutdown_source_end(rt, name, deadline.clone());
         }
         for name in &sources_to_change {
-            self.shutdown_source_end(name, &deadline);
+            self.shutdown_source_end(rt, name, deadline);
 
             self.setup_outputs(name, &mut new_pieces);
             self.spawn_source(name, &mut new_pieces, rt);
@@ -388,9 +388,9 @@ impl RunningTopology {
 
     /// Waits for the Source to finish shutting down until a given deadline and then forcibly shuts
     /// down the source if it hasn't finished by then.
-    fn shutdown_source_end(&mut self, name: &str, deadline: &Instant) {
+    fn shutdown_source_end(&mut self, rt: &mut runtime::Runtime, name: &str, deadline: Instant) {
         self.shutdown_coordinator
-            .shutdown_source_end(name, deadline);
+            .shutdown_source_end(rt, name.to_string(), deadline);
         self.source_tasks.remove(name).wait().unwrap();
     }
 
