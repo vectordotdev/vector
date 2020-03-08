@@ -191,6 +191,7 @@ However, because of the specificity of the observability data, there seems to be
 * Should timestamps be automatically inserted to created logs and metrics created as tables inside the transform is they are not present?
 * Are there better alternatives to the proposed solution for supporting of the timestamp type?
 * Could some users be surprised if the transform which doesn't call `emit` function doesn't output anything?
+* `null` might present in the events would be lost because in Lua setting a field to `nil` means deletion. Is it acceptable? If it is not, it is possible to introduce a new kind of `userdata` for representing `null` values.
 
 ## Plan of Action
 
