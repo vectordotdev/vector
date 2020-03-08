@@ -106,7 +106,7 @@ The fields are accessed through string indexes using [Vector's dot notation](htt
     final_stats_event = {
       log = {
         count = counter,
-        timestamp = timestamp(),
+        timestamp = os.date("!*t"),
         interval = os.time() - previous_timestamp
       }
     }
@@ -115,7 +115,8 @@ The fields are accessed through string indexes using [Vector's dot notation](htt
 
     emit({
       log = {
-        message = "shutting down"
+        message = "shutting down",
+        timestamp = os.date("!*t"),
       }
     }, "auxiliary")
   """
@@ -187,6 +188,7 @@ However, because of the specificity of the observability data, there seems to be
 
 ## Outstanding Questions
 
+* Should timestamps be automatically inserted to created logs and metrics created as tables inside the transform is they are not present?
 * Are there better alternatives to the proposed solution for supporting of the timestamp type?
 * Could some users be surprised if the transform which doesn't call `emit` function doesn't output anything?
 
