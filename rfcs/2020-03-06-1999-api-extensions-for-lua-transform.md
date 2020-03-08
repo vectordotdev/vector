@@ -85,6 +85,7 @@ The fields are accessed through string indexes using [Vector's dot notation](htt
 [transforms.lua]
   type = "lua"
   inputs = []
+  version = "2" # defaults to 1
   source = """
     counter = counter + 1
     -- without calling `emit` function nothing is produced by default
@@ -153,6 +154,7 @@ The code above consumes the incoming events, counts them, and then emits these s
 
 ### Proposed changes
 
+* Add `version` configuration option which would allow the users to chose between the new API described in this RFC (version 2) and the old one (version 1).
 * Hooks for initialization and shutdown called `init` and `shutdown`. They are defined as strings of Lua code in the `hooks` section of the configuration of the transform.
 * Timers which define pieces of code that are executed periodically. They are defined in array `timers`, each timer takes two configuration options: `interval` which is the interval for execution in seconds and `source` which is the code which is to be executed periodically.
 * Events are produced by the transform by calling function `emit` with the first argument being the event and the second option argument being the name of the lane where to emit the event. Outputting the events by storing them to the `event` global variable should not be supported, so its content would be ignored.
@@ -190,6 +192,7 @@ However, because of the specificity of the observability data, there seems to be
 
 ## Plan of Action
 
+- [ ] Implement support for `version` config option and split implementations for versions 1 and 2.
 - [ ] Implement access to the nested structure of logs events.
 - [ ] Support creation of logs events as table inside the transform.
 - [ ] Implement metrics support.
