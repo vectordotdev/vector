@@ -96,11 +96,10 @@ The fields are accessed through string indexes using [Vector's dot notation](htt
     previous_timestamp = os.time()
     emit({
       log = {
-        messge = "starting up",
+        message = "starting up",
         timestamp = os.date("!*t),
       }
-    Event = Event.new_log()
-    event["log"]["message"] = "starting up"
+    }, "auxiliary")
   """
   shutdown = """
     final_stats_event = {
