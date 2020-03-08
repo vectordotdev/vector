@@ -4,7 +4,7 @@ This RFC proposes a new API for the `lua` transform.
 
 ## Motivation
 
-Currently the [`lua` transform](https://vector.dev/docs/reference/transforms/lua/) has some limitations in its API. In particular, the following features are missing:
+Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lua/) has some limitations in its API. In particular, the following features are missing:
 
 *   **Nested Fields**
 
@@ -87,42 +87,66 @@ The fields are accessed through string indexes using [Vector's dot notation](htt
   inputs = []
   source = """
     counter = counter + 1
-    event = nil
+    -- without calling `emit` function nothing is produced by default
   """
   [transforms.lua.hooks]
   init = """
     counter = 0
     previous_timestamp = os.time()
+    emit({
+      log = {
+        messge = "starting up",
+        timestamp = os.date("!*t),
+      }
     Event = Event.new_log()
-    event["message"] = "starting up"
-    event:set_lane("auxiliary")
+    event["log"]["message"] = "starting up"
   """
   shutdown = """
-    final_stats_event = Event.new_log()
-    final_stats_event["stats"] = { count = counter, interval = os.time() - previous_timestamp }
-    final_stats_event["stats.rate"] = final_stats_event["stats"].count / final_stats_event["stats.interval"]
+    final_stats_event = {
+      log = {
+        count = counter,
+        timestamp = timestamp(),
+        interval = os.time() - previous_timestamp
+      }
+    }
+    final_stats_event.log.stats.rate = final_stats_event["log"]["stats"].count / final_stats_event.log.stats.interval
+    emit(final_stats_event)
 
-    shutdown_event = Event.new_log()
-    shutdown_event["message"] = "shutting down"
-    shutdown_event:set_lane("auxiliary")
-
-    event = {final_stats_event, shutdown_event}
+    emit({
+      log = {
+        message = "shutting down"
+      }
+    }, "auxiliary")
   """
   [[transforms.lua.timers]]
   interval = 10
   source = """
-    event = Event.new_log()
-    event["stats"] = { count = counter, interval = 10 }
-    event["stats.rate"] = event["stats"].count / event["stats.interval"]
-    counter = 0
-    previous_timestamp = os.time()
+    emit {
+      metric = {
+        name = "response_time_ms",
+        timestamp = os.date("!*t"),
+        kind = "absolute",
+        tags = {
+          host = "localhost"
+        },
+        value = {
+          type = "counter",
+          value = 24.2
+        }
+      }
+    }
   """
   [[transforms.lua.timers]]
   interval = 60
   source = """
-    event["message"] = "heartbeat"
-    event:set_lane("auxiliary")
-  ""
+    event = {
+      log = {
+        message = "heartbeat",
+        timestamp = os.date("!*t),
+      }
+    }
+    emit(event, "auxiliary")
+  """
 ```
 
 The code above consumes the incoming events, counts them, and then emits these stats about these counts every 10 seconds. In addition, it sends debug logs about its functioning into a separate lane called `auxiliary`.
@@ -131,16 +155,16 @@ The code above consumes the incoming events, counts them, and then emits these s
 
 * Hooks for initialization and shutdown called `init` and `shutdown`. They are defined as strings of Lua code in the `hooks` section of the configuration of the transform.
 * Timers which define pieces of code that are executed periodically. They are defined in array `timers`, each timer takes two configuration options: `interval` which is the interval for execution in seconds and `source` which is the code which is to be executed periodically.
-* Support for setting the output lane using `set_lane` method on the event which takes a string as the parameter. It should also be possible to read the lane using `get_lane` method. Reading from the lanes can be done in the downstream sinks by specifying the name of transform suffixed by a dot and the name of the lane.
-* Support multiple output events by making it possible to set the `event` global variable to an [sequence](https://www.lua.org/pil/11.1.html) of events.
+* Events are produced by the transform by calling function `emit` with the first argument being the event and the second option argument being the name of the lane where to emit the event. Outputting the events by storing them to the `event` global variable should not be supported, so its content would be ignored.
 * Support direct access to the nested fields (in both maps and arrays).
+* Add support for the timestamp type as a `userdata` object with the same visible fields as in the table returned by [`os.date`](https://www.lua.org/manual/5.3/manual.html#pdf-os.date). In addition, monkey-patch `os.date` function available inside Lua scripts to make it return the same kind of userdata instead of a table if it is called with `*t` or `!*t` as the argument. This is necessary to allow one-to-one correspondence between types in Vector and Lua.
 
 ## Sales Pitch
 
 The proposal
 
 * gives users more power to create custom transforms;
-* does not break backward compatibility (except `pairs` method in case of nested fields);
+* supports both logs and metrics;
 * makes it possible to add complexity to the configuration of the transform gradually only when needed.
 
 ## Drawbacks
@@ -161,15 +185,15 @@ However, because of the specificity of the observability data, there seems to be
 
 ## Outstanding Questions
 
-* In access to the arrays should the indexes be 0-based or 1-based? Vector uses 0-based indexing, while in Lua the indexing is traditionally 1-based. However, technically it is possible to implement 0-based indexing for arrays which are stored inside events, as both [`__index`](https://www.lua.org/pil/13.4.1.html) and [`__len`](https://www.lua.org/manual/5.3/manual.html#3.4.7) need to have custom implementations in any case.
-
-* Is it confusing that the same global variable name `event` used also for outputting multiple events? The alternative, using a different name, for example, `events`, would lead to questions of precedence in case if both `event` and `events` are set.
+* Are there better alternatives to the proposed solution for supporting of the timestamp type?
+* Could some users be surprised if the transform which doesn't call `emit` function doesn't output anything?
 
 ## Plan of Action
 
+- [ ] Implement access to the nested structure of logs events.
+- [ ] Support creation of logs events as table inside the transform.
+- [ ] Implement metrics support.
+- [ ] Add `emit` function.
 - [ ] Add `init` and `shutdown` hooks.
 - [ ] Add timers.
-- [ ] Implement `set_lane` and `get_lane` methods on the events.
-- [ ] Support multiple output events.
-- [ ] Implement `Event.new_log()` function.
-- [ ] Support direct access to the nested fields in addition to the dot notation.
+- [ ] Implement support for the timestamp type compatible with the result of execution of `os.date("!*t")`.
