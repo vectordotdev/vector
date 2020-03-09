@@ -1,7 +1,7 @@
 use crate::{
     event::metric::{Metric, MetricValue},
     sinks::util::{
-        http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
+        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
         BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -45,7 +45,7 @@ enum ConfigError {
 #[derive(Clone)]
 struct InfluxDBSvc {
     config: InfluxDBConfig,
-    inner: HttpService,
+    inner: HttpBatchService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -188,7 +188,7 @@ impl InfluxDBSvc {
             builder.body(body).unwrap()
         };
 
-        let http_service = HttpService::new(cx.resolver(), None, build_request);
+        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
 
         let influxdb_http_service = InfluxDBSvc {
             config,

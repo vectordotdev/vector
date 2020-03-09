@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, Auth, HttpRetryLogic, HttpService, Response},
+        http::{https_client, Auth, HttpBatchService, HttpRetryLogic, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -109,7 +109,7 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
         request
     };
 
-    let http_service = HttpService::new(cx.resolver(), tls_settings, build_request);
+    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
     let sink = request
         .batch_sink(

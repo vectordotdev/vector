@@ -1,5 +1,5 @@
 #![cfg(feature = "rusoto_core")]
-use crate::{dns::Resolver, sinks::util::http::HttpService};
+use crate::{dns::Resolver, sinks::util::http::HttpBatchService};
 use futures01::{
     future::{Future, FutureResult},
     Async, Poll, Stream,

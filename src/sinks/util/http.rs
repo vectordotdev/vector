@@ -39,7 +39,8 @@ where
     B::Output: Clone,
 {
     sink: Arc<T>,
-    inner: BatchSink<B, TowerBatchedSink<B::Output, HttpRetryLogic, B, HttpService<B::Output>>>,
+    inner:
+        BatchSink<B, TowerBatchedSink<B::Output, HttpRetryLogic, B, HttpBatchService<B::Output>>>,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
@@ -62,7 +63,8 @@ where
     ) -> Self {
         let sink = Arc::new(sink);
         let sink1 = sink.clone();
-        let svc = HttpService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
+        let svc =
+            HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
         let service_sink = request_settings.batch_sink(HttpRetryLogic, svc, cx.acker());
         let inner = BatchSink::from_settings(service_sink, batch, batch_settings);
@@ -100,7 +102,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct HttpService<B = Vec<u8>> {
+pub struct HttpBatchService<B = Vec<u8>> {
     inner: InstrumentedService<
         Client<HttpsConnector<HttpConnector<Resolver>>, Vec<u8>>,
         Request<Vec<u8>>,
@@ -109,12 +111,12 @@ pub struct HttpService<B = Vec<u8>> {
     version: HeaderValue,
 }
 
-impl<B> HttpService<B> {
+impl<B> HttpBatchService<B> {
     pub fn new(
         resolver: Resolver,
         tls_settings: impl Into<Option<TlsSettings>>,
         request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-    ) -> HttpService<B> {
+    ) -> HttpBatchService<B> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
@@ -134,7 +136,7 @@ impl<B> HttpService<B> {
 
         let version = crate::get_version();
 
-        HttpService {
+        HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
             version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
@@ -163,7 +165,7 @@ pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<Https
     Ok(hyper::Client::builder().build(https))
 }
 
-impl<B> Service<B> for HttpService<B> {
+impl<B> Service<B> for HttpBatchService<B> {
     type Response = Response;
     type Error = Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -286,7 +288,7 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpService::new(resolver, None, move |body: Vec<u8>| {
+        let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());

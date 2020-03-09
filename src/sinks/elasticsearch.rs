@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{https_client, HttpBatchService, HttpRetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
@@ -267,7 +267,7 @@ fn es(
         }
     };
 
-    let http_service = HttpService::new(cx.resolver(), tls_settings, build_request);
+    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())

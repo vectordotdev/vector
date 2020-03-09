@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{https_client, HttpBatchService, HttpRetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
@@ -124,7 +124,7 @@ pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::Route
         builder.body(body).unwrap()
     };
 
-    let http_service = HttpService::new(cx.resolver(), tls_settings, build_request);
+    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
     let indexed_fields = config.indexed_fields.clone();
 
