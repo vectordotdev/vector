@@ -36,7 +36,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   type = "console" # required
   inputs = ["my-source-id"] # required
-  healthcheck = true # optional, default
   target = "stdout" # optional, default
 
   # Encoding
@@ -167,29 +166,6 @@ How to format event timestamps.
 
 
 </Fields>
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
 
 </Field>
 

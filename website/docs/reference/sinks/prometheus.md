@@ -48,7 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   address = "0.0.0.0:9598" # required
   namespace = "service" # required
-  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -64,7 +63,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   namespace = "service" # required
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
   flush_period_secs = 60 # optional, default, seconds
-  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -154,29 +152,6 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
 ### flush_period_secs
 
 Time interval between [set][docs.data-model.metric#set] values are reset.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
 
 
 </Field>

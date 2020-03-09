@@ -3407,14 +3407,6 @@ end
   # * type: int
   print_amount = 1000
 
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
 # Batches `log` events to Clickhouse via the `HTTP` Interface.
 [sinks.clickhouse]
   #
@@ -3726,14 +3718,6 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
 
   # The standard stream to write to.
   #
@@ -6981,14 +6965,6 @@ end
   # * type: int
   # * unit: seconds
   flush_period_secs = 60
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
 
 # Batches `log` events to Sematext via the Elasticsearch API.
 [sinks.sematext_logs]
