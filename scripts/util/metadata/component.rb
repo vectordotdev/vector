@@ -4,10 +4,6 @@ require_relative "field"
 require_relative "requirements"
 
 class Component
-  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
-  EVENT_TYPES = ["log", "metric"].freeze
-  OPERATING_SYSTEMS = ["Linux", "MacOS", "Windows"].freeze
-
   include Comparable
 
   attr_reader :beta,
@@ -87,17 +83,24 @@ class Component
   end
 
   def event_types
-    types = []
+    @event_types ||=
+      begin
+        types = []
 
-    if respond_to?(:input_types)
-      types += input_types
-    end
+        if respond_to?(:input_types)
+          types += input_types
+        end
 
-    if respond_to?(:output_types)
-      types += output_types
-    end
+        if respond_to?(:output_types)
+          types += output_types
+        end
 
-    types.uniq
+        types.uniq
+      end
+  end
+
+  def field_path_notation_options
+    options_list.select(&:field_path_notation?)
   end
 
   def only_service_provider?(provider_name)
@@ -119,23 +122,31 @@ class Component
 
         if option_groups.any?
           option_groups.each do |group|
-            groups[group] = options_list.select do |option|
-              option.group?(group) && option.common?
-            end
+            groups[group] =
+              lambda do |option|
+                option.group?(group) && option.common?
+              end
           end
 
           if advanced_relevant?
             option_groups.each do |group|
-              groups["#{group} (advanced)"] = options_list.select do |option|
-                option.group?(group)
-              end
+              groups["#{group} (advanced)"] =
+                lambda do |option|
+                  option.group?(group)
+                end
             end
           end
         else
-          groups["Common"] = options_list.select(&:common?)
+          groups["Common"] =
+            lambda do |option|
+              option.common?
+            end
 
           if advanced_relevant?
-            groups["Advanced"] = options_list
+            groups["Advanced"] =
+              lambda do |option|
+                true
+              end
           end
         end
 
@@ -198,6 +209,21 @@ class Component
       type: type,
       unsupported_operating_systems: unsupported_operating_systems
     }
+  end
+
+  def to_toml_example(common: true)
+    example_options = options_list.sort_by(&:config_file_sort_token)
+    example_options = common ? example_options.select(&:common?) : example_options
+
+    option_examples =
+      included_options.collect do |option|
+        option.to_toml_example(common: common)
+      end
+
+    <<~EOF
+    [#{type.pluralize}.my_#{type}_id]
+    #{option_examples.join}
+    EOF
   end
 
   def transform?

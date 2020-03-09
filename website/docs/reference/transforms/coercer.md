@@ -2,6 +2,7 @@
 component_title: "Coercer"
 description: "The Vector `coercer` transform accepts and outputs `log` events allowing you to coerce log fields into fixed types."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
 min_version: null
 service_name: "Coercer"
@@ -40,17 +41,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "coercer" # must be: "coercer"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "coercer"
+  inputs = ["my-source-id"]
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 </TabItem>
@@ -60,20 +60,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "coercer" # must be: "coercer"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "coercer"
+  inputs = ["my-source-id"]
   drop_unspecified = false # default
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 </TabItem>
@@ -128,7 +125,7 @@ Set to `true` to drop all fields that are not specified in the [`types`](#types)
 
 ### types
 
-Key/Value pairs representing mapped log field types.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types.
 
 <Fields filters={false}>
 
@@ -192,11 +189,10 @@ And the following configuration:
 [transforms.<transform-id>]
   type = "coercer"
 
-[transforms.<transform-id>.types]
-  bytes_in = "int"
-  bytes_out = "int"
-  timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-  status = "int"
+  types.bytes_in = "int"
+  types.bytes_out = "int"
+  types.timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+  types.status = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

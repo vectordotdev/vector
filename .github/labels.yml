@@ -107,8 +107,11 @@
 - name: "needs: outside help"
   description: Needs help outside of the Vector core team
   color: feca57
+- name: "needs: rfc"
+  description: Needs an RFC process before work can begin
+  color: feca57
 - name: "needs: spec"
-  description: Needs a specification before work can begin
+  description: Needs a light specification before work can begin
   color: feca57
 
 - name: "platform: docker"

@@ -15,7 +15,11 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.splunk_hec.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.splunk_hec.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.splunk_hec.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -58,4 +62,4 @@ relevant_when = {encoding = "json"}
 required = false
 description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>

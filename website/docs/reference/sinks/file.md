@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,23 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
-  path = "vector-%Y-%m-%d.log" # example
-
-  # OPTIONAL - General
+  # General
+  type = "file"
+  inputs = ["my-source-id"]
+  path = "vector-%Y-%m-%d.log"
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "text" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
 ```
 
 </TabItem>
@@ -69,24 +61,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
-  path = "vector-%Y-%m-%d.log" # example
-
-  # OPTIONAL - General
+  # General
+  type = "file"
+  inputs = ["my-source-id"]
+  path = "vector-%Y-%m-%d.log"
   healthcheck = true # default
   idle_timeout_secs = "30" # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "text" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 ```
 
 </TabItem>

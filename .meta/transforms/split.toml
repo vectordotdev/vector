@@ -17,13 +17,16 @@ requirements = {}
 type = "string"
 common = true
 default = "message"
+examples = ["message", "parent.child"]
+field_path_notation = true
 required = true
 description = "The field to apply the split on."
 
 [transforms.split.options.field_names]
 type = "[string]"
 common = true
-examples = [["timestamp", "level", "message"]]
+examples = [["timestamp", "level", "message", "parent.child"]]
+field_path_notation = true
 required = true
 description = "The field names assigned to the resulting tokens, in order."
 
@@ -68,9 +71,8 @@ And the following configuration:
   separator = ","
   fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 
-  [transforms.<transform-id>.types]
-    status = "int"
-    bytes = "int"
+  types.status = "int"
+  types.bytes = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

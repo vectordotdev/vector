@@ -21,9 +21,11 @@ event.\
 
 [transforms.rename_fields.options.fields.children."`[field-name]`"]
 type = "*"
+field_path_notation = true
 required = true
 examples = [
-  {"old field name" = "new field name"},
+  {"old_field_name" = "new_field_name"},
+  {"parent.old_child_name" = "parent.new_child_name"},
 ]
 description = """\
 The name of the field to move. Use `.` for adding nested fields.\
@@ -42,8 +44,7 @@ Given the following configuration:
   type = "rename_fields"
   inputs = [...]
 
-  [transforms.my_transform.fields]
-    old_field = "new_field"
-    old_nested.nested = "new_nested.nested",
+  fields.old_field = "new_field"
+  fields.old_nested.nested = "new_nested.nested",
 ```
 """

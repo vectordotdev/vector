@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Firehose"
 description: "The Vector `aws_kinesis_firehose` sink batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_firehose%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,24 +44,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
-  inputs = ["my-source-id"] # example
-  region = "us-east-1" # example, relevant when host = ""
-  stream_name = "my-stream" # example
-
-  # OPTIONAL - General
+  # General
+  type = "aws_kinesis_firehose"
+  inputs = ["my-source-id"]
+  region = "us-east-1" # required when endpoint = ""
+  stream_name = "my-stream"
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
 ```
 
 </TabItem>
@@ -70,51 +62,39 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_kinesis_firehose" # must be: "aws_kinesis_firehose"
-  inputs = ["my-source-id"] # example
-  region = "us-east-1" # example, relevant when host = ""
-  stream_name = "my-stream" # example
-
-  # OPTIONAL - General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
+  # General
+  type = "aws_kinesis_firehose"
+  inputs = ["my-source-id"]
+  endpoint = "127.0.0.0:5000/path/to/service" # required when region = ""
+  region = "us-east-1" # required when endpoint = ""
+  stream_name = "my-stream"
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # no default
   healthcheck = true # default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 500 # default, events
-    timeout_secs = 1 # default, seconds
+  # Batch
+  batch.max_events = 500 # default, events
+  batch.timeout_secs = 1 # default, seconds
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Buffer
+  buffer.type = "memory" # default
+  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.max_size = 104900000 # bytes, required when type = "disk"
+  buffer.when_full = "block" # default
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
+  # Request
+  request.in_flight_limit = 5 # default, requests
+  request.rate_limit_duration_secs = 1 # default, seconds
+  request.rate_limit_num = 5 # default
+  request.retry_attempts = -1 # default
+  request.retry_initial_backoff_secs = 1 # default, seconds
+  request.retry_max_duration_secs = 10 # default, seconds
+  request.timeout_secs = 30 # default, seconds
 ```
 
 </TabItem>
@@ -271,7 +251,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer. See [Buff
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -370,7 +350,7 @@ Configures the encoding specific sink behavior.
   common={true}
   defaultValue={null}
   enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["json","text"]}
+  examples={["text","json"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
@@ -472,7 +452,7 @@ How to format event timestamps.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -517,7 +497,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   groups={[]}
   name={"region"}
   path={null}
-  relevantWhen={{"host":""}}
+  relevantWhen={{"endpoint":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -555,7 +535,7 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -578,7 +558,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -601,7 +581,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -693,7 +673,7 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={30}
   enumValues={null}
   examples={[30]}

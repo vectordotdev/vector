@@ -2,6 +2,7 @@
 component_title: "LUA"
 description: "The Vector `lua` transform accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log"]
+function_category: "program"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
 min_version: null
 service_name: "LUA"
@@ -29,23 +30,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "lua" # must be: "lua"
-  inputs = ["my-source-id"] # example
+  type = "lua"
+  inputs = ["my-source-id"]
   source = """
-require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
+  require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
 
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\n$", "")
-  event["host"] = hostname
-end
-"""
-
-  # OPTIONAL
-  search_dirs = ["/etc/vector/lua"] # example, no default
+  if event["host"] == nil then
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname = string.gsub(hostname, "\n$", "")
+    event["host"] = hostname
+  end
+  """
+  search_dirs = ["/etc/vector/lua"] # no default
 ```
 
 ## Options

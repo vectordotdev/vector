@@ -46,8 +46,17 @@ impl TransformConfig for LuaConfig {
     }
 }
 
+// Lua's garbage collector sometimes seems to be not executed automatically on high event rates,
+// which leads to leak-like RAM consumption pattern. This constant sets the number of invocations of
+// the Lua transform after which GC would be called, thus ensuring that the RAM usage is not too high.
+//
+// This constant is larger than 1 because calling GC is an expensive operation, so doing it
+// after each transform would have significant footprint on the performance.
+const GC_INTERVAL: usize = 16;
+
 pub struct Lua {
     lua: rlua::Lua,
+    invocations_after_gc: usize,
 }
 
 impl Lua {
@@ -76,20 +85,28 @@ impl Lua {
         })
         .context(InvalidLua)?;
 
-        Ok(Self { lua })
+        Ok(Self {
+            lua,
+            invocations_after_gc: 0,
+        })
     }
 
-    fn process(&self, event: Event) -> Result<Option<Event>, rlua::Error> {
-        self.lua.context(|ctx| {
+    fn process(&mut self, event: Event) -> Result<Option<Event>, rlua::Error> {
+        let result = self.lua.context(|ctx| {
             let globals = ctx.globals();
 
             globals.set("event", event)?;
 
             let func = ctx.named_registry_value::<_, rlua::Function<'_>>("vector_func")?;
             func.call(())?;
-
             globals.get::<_, Option<Event>>("event")
-        })
+        });
+        self.invocations_after_gc += 1;
+        if self.invocations_after_gc % GC_INTERVAL == 0 {
+            self.lua.gc_collect()?;
+            self.invocations_after_gc = 0;
+        }
+        result
     }
 }
 
@@ -336,7 +353,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_write() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event[false] = "hello"
             "#,
@@ -351,7 +368,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_read() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               print(event[false])
             "#,
@@ -366,7 +383,7 @@ mod tests {
 
     #[test]
     fn lua_script_error() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               error("this is an error")
             "#,

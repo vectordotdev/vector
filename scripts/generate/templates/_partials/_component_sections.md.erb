@@ -85,7 +85,31 @@ The `address` option determines the address and port the data is made available
 on. You'll need to configure your networking so that the configured port is
 accessible by the downstream service doing the scraping.
 <%- end -%>
+<%- if component.field_path_notation_options.any? -%>
+
+### Field Notation Syntax
+
+The <%= option_names(component.field_path_notation_options).to_sentence %> options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[<%= component.type.pluralize %>.my_<%= component.id %>_id]
+  # ...
+  <%- option = component.field_path_notation_options.fetch(0) -%>
+  <%- option.examples.each do |example| -%>
+  <%= option.name %> = <%= example.to_toml %>
+  <%- end -%>
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+<%- end -%>
 <%- if component.sink? && component.service_provider?("Google") -%>
+
 ### GCP Authentication
 
 GCP offers a [variety of authentication methods][urls.gcp_authentication] and
@@ -100,7 +124,7 @@ If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring#logs].
 
 <%- end -%>
-<% if component.sink? && component.healthcheck? -%>
+<%- if component.sink? && component.healthcheck? -%>
 
 ### Health Checks
 
@@ -172,8 +196,7 @@ Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
 with the Vector team by [opening an issie][urls.new_<%= component.id %>_issue].
 <%- end -%>
-<%- if component.options.respond_to?(:request)
- -%>
+<%- if component.options.respond_to?(:request) -%>
 
 ### Retry Policy
 

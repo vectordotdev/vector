@@ -153,8 +153,8 @@ import TabItem from '@theme/TabItem';
 The metric data model is comprised of 6 types: `aggregated_histogram`, `aggregated_summary`, `counter`, `distribution`, `gauge`, `set`.
 You'll notice that certain fields are shared across all types.
 
-<%= fields(metadata.metric_fields_list, heading_depth: 3) %>
+<%= fields(metadata.data_model.metric.schema_list, heading_depth: 3) %>
 
 ## Components
 
-<Jump to="[[[pages.components]]]?metric=true">View all metric compatible components</Jump>
+<Jump to="[[[pages.components]]]?event-types[]=metrics">View all metric compatible components</Jump>

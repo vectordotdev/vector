@@ -37,8 +37,8 @@ a port.
 type = "string"
 common = true
 examples = ["/path/to/socket"]
-required = true
 relevant_when = {mode = "unix"}
+required = true
 description = """The unix socket path. *This should be absolute path*.\
 """
 
@@ -64,9 +64,9 @@ The maximum bytes size of incoming messages before they are discarded.\
 [sources.socket.options.shutdown_timeout_secs]
 type = "int"
 default = 30
-required = true
 unit = "seconds"
 relevant_when = {mode = "tcp"}
+required = true
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\
 """

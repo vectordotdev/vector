@@ -1,6 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{self, Event},
+    serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
@@ -309,11 +310,6 @@ impl Service<RequestWrapper> for GcsSink {
 
         self.client.request(request)
     }
-}
-
-fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(value).unwrap();
-    value.as_str().unwrap().into()
 }
 
 #[derive(Clone, Debug)]

@@ -22,15 +22,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-# OPTIONAL - General
-  data_dir = "/var/lib/vector" # example, no default
-  dns_servers = ["0.0.0.0:53"] # example, no default
+# General
+data_dir = "/var/lib/vector" # no default
+dns_servers = ["0.0.0.0:53"] # no default
 
-  # OPTIONAL - Log schema
-  [log_schema]
-    host_key = "host" # default
-    message_key = "message" # default
-    timestamp_key = "timestamp" # default
+# Log schema
+log_schema.host_key = "host" # default
+log_schema.message_key = "message" # default
+log_schema.timestamp_key = "timestamp" # default
 ```
 
 ## Options

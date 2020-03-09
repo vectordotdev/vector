@@ -10,6 +10,18 @@ enum KafkaError {
     InvalidPath { path: PathBuf },
 }
 
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum KafkaCompression {
+    #[derivative(Default)]
+    None,
+    Gzip,
+    Snappy,
+    Lz4,
+    Zstd,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct KafkaTlsConfig {
     pub enabled: Option<bool>,

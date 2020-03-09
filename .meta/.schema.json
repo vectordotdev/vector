@@ -80,11 +80,6 @@
           "description": "The human friendly description of this option, markdown syntax is supported.",
           "minLength": 10
         },
-        "display": {
-          "type": "string",
-          "description": "Only relevant for `object` types. This determine the TOML display style.",
-          "enum": ["inline"]
-        },
         "enum": {
           "type": "object",
           "description": "Enumeration values for this option.",
@@ -98,6 +93,10 @@
         "examples": {
           "type": "array",
           "description": "An array of example values used for documentation purposes."
+        },
+        "field_path_notation": {
+          "type": "boolean",
+          "description": "Does this option support the field notation syntax?"
         },
         "groups": {
           "type": "array",
@@ -125,6 +124,14 @@
         "templateable": {
           "type": "boolean",
           "description": "If this option support Vectors template/event field interpolation syntax."
+        },
+        "toml_display": {
+          "type": "string",
+          "description": "How to display this option in TOML examples.",
+          "enum": [
+            "normal",
+            "inline"
+          ]
         },
         "type": {
           "type": "string",
@@ -260,7 +267,6 @@
           "type": "string",
           "description": "The function category the sink serves. Used for filtering.",
           "enum": [
-            "proxy",
             "test",
             "transmit"
           ]
@@ -372,7 +378,6 @@
           "description": "The source's function category, used for filtering.",
           "enum": [
             "collect",
-            "proxy",
             "receive"
           ]
         },
@@ -459,14 +464,14 @@
           "type": "string",
           "description": "The function category this transform performed. Used for filtering.",
           "enum": [
+            "aggregate",
             "convert",
             "enrich",
             "filter",
             "parse",
             "program",
             "sanitize",
-            "shape",
-            "merge"
+            "shape"
           ]
         },
         "input_types": {

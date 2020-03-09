@@ -1,25 +1,32 @@
-use futures01::{try_ready, Async, Future, Poll, Stream};
+use futures01::Poll;
 #[cfg(feature = "sources-tls")]
-use native_tls::TlsAcceptor;
-use native_tls::{Certificate, Identity, TlsConnectorBuilder};
+use futures01::{try_ready, Async, Future, Stream};
+#[cfg(feature = "sources-tls")]
+use openssl::ssl::{HandshakeError, SslAcceptor};
 use openssl::{
-    pkcs12::Pkcs12,
+    error::ErrorStack,
+    pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
-    x509::X509,
+    ssl::{
+        ConnectConfiguration, SslConnector, SslConnectorBuilder, SslContextBuilder, SslMethod,
+        SslVerifyMode,
+    },
+    x509::{store::X509StoreBuilder, X509},
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::fmt;
+use std::fmt::{self, Debug};
 use std::fs::File;
 use std::io::{self, Read, Write};
 #[cfg(feature = "sources-tls")]
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::tcp::Incoming;
 #[cfg(feature = "sources-tls")]
-use tokio::net::TcpListener;
-use tokio_tls::TlsStream;
+use tokio::net::{tcp::Incoming, TcpListener, TcpStream};
+use tokio_openssl::SslStream;
+#[cfg(feature = "sources-tls")]
+use tokio_openssl::{AcceptAsync, SslAcceptorExt};
 
 #[derive(Debug, Snafu)]
 pub enum TlsError {
@@ -35,40 +42,57 @@ pub enum TlsError {
         filename: PathBuf,
         source: std::io::Error,
     },
+    #[snafu(display("Could not build TLS connector: {}", source))]
+    TlsBuildConnector { source: ErrorStack },
     #[snafu(display("Could not set TCP TLS identity: {}", source))]
-    TlsIdentityError { source: native_tls::Error },
+    TlsIdentityError { source: ErrorStack },
     #[snafu(display("Could not export identity to DER: {}", source))]
-    DerExportError { source: openssl::error::ErrorStack },
+    DerExportError { source: ErrorStack },
     #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
     CertificateParseError {
         filename: PathBuf,
-        source: native_tls::Error,
+        source: ErrorStack,
     },
     #[snafu(display("Must specify both TLS key_file and crt_file"))]
     MissingCrtKeyFile,
     #[snafu(display("Could not parse X509 certificate in {:?}: {}", filename, source))]
     X509ParseError {
         filename: PathBuf,
-        source: openssl::error::ErrorStack,
+        source: ErrorStack,
     },
     #[snafu(display("Could not parse private key in {:?}: {}", filename, source))]
     PrivateKeyParseError {
         filename: PathBuf,
-        source: openssl::error::ErrorStack,
+        source: ErrorStack,
     },
     #[snafu(display("Could not build PKCS#12 archive for identity: {}", source))]
-    Pkcs12Error { source: openssl::error::ErrorStack },
+    Pkcs12Error { source: ErrorStack },
     #[snafu(display("Could not parse identity in {:?}: {}", filename, source))]
     IdentityParseError {
         filename: PathBuf,
-        source: native_tls::Error,
+        source: ErrorStack,
     },
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
+    #[cfg(feature = "sources-tls")]
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: native_tls::Error },
+    Handshake { source: HandshakeError<TcpStream> },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: crate::Error },
+    #[snafu(display("Creating the TLS acceptor failed: {}", source))]
+    CreateAcceptor { source: ErrorStack },
+    #[snafu(display("Error setting up the TLS certificate: {}", source))]
+    SetCertificate { source: ErrorStack },
+    #[snafu(display("Error setting up the TLS private key: {}", source))]
+    SetPrivateKey { source: ErrorStack },
+    #[snafu(display("Error setting up the TLS chain certificates: {}", source))]
+    AddExtraChainCert { source: ErrorStack },
+    #[snafu(display("Error creating a certificate store: {}", source))]
+    NewStoreBuilder { source: ErrorStack },
+    #[snafu(display("Error adding a certifcate to a store: {}", source))]
+    AddCertToStore { source: ErrorStack },
+    #[snafu(display("Error setting up the verification certificate: {}", source))]
+    SetVerifyCert { source: ErrorStack },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -94,43 +118,60 @@ pub struct TlsOptions {
 pub struct TlsSettings {
     verify_certificate: bool,
     verify_hostname: bool,
-    authority: Option<Certificate>,
-    identity: Option<IdentityStore>, // native_tls::Identity doesn't implement Clone yet
+    authority: Option<X509>,
+    identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
 }
 
 #[derive(Clone)]
 pub struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
+    /// Generate an optional settings struct from the given optional
+    /// configuration reference. If `config` is `None`, TLS is
+    /// disabled. The `for_server` parameter indicates the options
+    /// should be interpreted as being for a TLS server, which requires
+    /// an identity certificate and changes the certificate verification
+    /// default to false.
     pub fn from_config(
         config: &Option<TlsConfig>,
-        require_ident: bool,
+        for_server: bool,
     ) -> crate::Result<Option<Self>> {
         match config {
-            None => Ok(None),
+            None => Ok(None), // No config, no TLS settings
             Some(config) => match config.enabled.unwrap_or(false) {
-                false => Ok(None),
+                false => Ok(None), // Explicitly disabled, still no TLS settings
                 true => {
-                    let tls = Self::from_options(&Some(config.options.clone()))?;
-                    if require_ident && tls.identity.is_none() {
-                        Err(TlsError::MissingRequiredIdentity.into())
-                    } else {
-                        Ok(Some(tls))
+                    let tls = Self::from_options_base(&Some(config.options.clone()), for_server)?;
+                    match (for_server, &tls.identity) {
+                        // Servers require an identity certificate
+                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
+                        _ => Ok(Some(tls)),
                     }
                 }
             },
         }
     }
 
+    /// Generate a filled out settings struct from the given optional
+    /// option set, interpreted as client options. If `options` is
+    /// `None`, the result is set to defaults (ie empty).
     pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
+        Self::from_options_base(options, false)
+    }
+
+    fn from_options_base(options: &Option<TlsOptions>, for_server: bool) -> crate::Result<Self> {
         let default = TlsOptions::default();
         let options = options.as_ref().unwrap_or(&default);
 
-        if options.verify_certificate == Some(false) {
-            warn!("`verify_certificate` is DISABLED, this may lead to security vulnerabilities");
-        }
-        if options.verify_hostname == Some(false) {
-            warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
+        if !for_server {
+            if options.verify_certificate == Some(false) {
+                warn!(
+                    "`verify_certificate` is DISABLED, this may lead to security vulnerabilities"
+                );
+            }
+            if options.verify_hostname == Some(false) {
+                warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
+            }
         }
 
         if options.key_path.is_some() && options.crt_path.is_none() {
@@ -139,7 +180,7 @@ impl TlsSettings {
 
         let authority = match options.ca_path {
             None => None,
-            Some(ref path) => Some(load_certificate(path)?),
+            Some(ref path) => Some(load_x509(path)?),
         };
 
         let identity = match options.crt_path {
@@ -149,12 +190,18 @@ impl TlsSettings {
                 let cert_data = open_read(crt_path, "certificate")?;
                 let key_pass: &str = options.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
 
-                match Identity::from_pkcs12(&cert_data, key_pass) {
-                    Ok(_) => Some(IdentityStore(cert_data, key_pass.to_string())),
+                match Pkcs12::from_der(&cert_data) {
+                    // Certificate file is DER encoded PKCS#12 archive
+                    Ok(pkcs12) => {
+                        // Verify password
+                        pkcs12.parse(&key_pass)?;
+                        Some(IdentityStore(cert_data, key_pass.to_string()))
+                    }
                     Err(err) => {
                         if options.key_path.is_none() {
                             return Err(err.into());
                         }
+                        // Identity is a PEM encoded certficate+key pair
                         let crt = load_x509(crt_path)?;
                         let key_path = options.key_path.as_ref().unwrap();
                         let key = load_key(&key_path, &options.key_pass)?;
@@ -163,11 +210,10 @@ impl TlsSettings {
                             .context(Pkcs12Error)?;
                         let identity = pkcs12.to_der().context(DerExportError)?;
 
-                        // Build the resulting Identity, but don't store it, as
-                        // it cannot be cloned.  This is just for error
-                        // checking.
-                        let _identity =
-                            Identity::from_pkcs12(&identity, "").context(TlsIdentityError)?;
+                        // Build the resulting parsed PKCS#12 archive,
+                        // but don't store it, as it cannot be cloned.
+                        // This is just for error checking.
+                        pkcs12.parse("").context(TlsIdentityError)?;
 
                         Some(IdentityStore(identity, "".into()))
                     }
@@ -176,29 +222,94 @@ impl TlsSettings {
         };
 
         Ok(Self {
-            verify_certificate: options.verify_certificate.unwrap_or(true),
-            verify_hostname: options.verify_hostname.unwrap_or(true),
+            verify_certificate: options.verify_certificate.unwrap_or(!for_server),
+            verify_hostname: options.verify_hostname.unwrap_or(!for_server),
             authority,
             identity,
         })
     }
 
-    pub fn identity(&self) -> Option<Identity> {
+    fn identity(&self) -> Option<ParsedPkcs12> {
         // This data was test-built previously, so we can just use it
         // here and expect the results will not fail. This can all be
-        // reworked when `native_tls::Identity` gains the Clone impl.
+        // reworked when `openssl::pkcs12::ParsedPkcs12` gains the Clone
+        // impl.
         self.identity.as_ref().map(|identity| {
-            Identity::from_pkcs12(&identity.0, &identity.1).expect("Could not build identity")
+            Pkcs12::from_der(&identity.0)
+                .expect("Could not build PKCS#12 archive from parsed data")
+                .parse(&identity.1)
+                .expect("Could not parse stored PKCS#12 archive")
         })
     }
 
     #[cfg(feature = "sources-tls")]
-    pub(crate) fn acceptor(&self) -> crate::Result<TlsAcceptor> {
-        match self.identity() {
+    pub(crate) fn acceptor(&self) -> crate::Result<SslAcceptor> {
+        match self.identity {
             None => Err(TlsError::MissingRequiredIdentity.into()),
-            Some(identity) => TlsAcceptor::new(identity).map_err(Into::into),
+            Some(_) => {
+                let mut acceptor =
+                    SslAcceptor::mozilla_intermediate(SslMethod::tls()).context(CreateAcceptor)?;
+                self.apply_context(&mut acceptor)?;
+                Ok(acceptor.build())
+            }
         }
     }
+
+    fn apply_context(&self, context: &mut SslContextBuilder) -> crate::Result<()> {
+        context.set_verify(if self.verify_certificate {
+            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
+        } else {
+            SslVerifyMode::NONE
+        });
+        if let Some(identity) = self.identity() {
+            context
+                .set_certificate(&identity.cert)
+                .context(SetCertificate)?;
+            context
+                .set_private_key(&identity.pkey)
+                .context(SetPrivateKey)?;
+            if let Some(chain) = identity.chain {
+                for cert in chain {
+                    context
+                        .add_extra_chain_cert(cert)
+                        .context(AddExtraChainCert)?;
+                }
+            }
+        }
+        if let Some(certificate) = &self.authority {
+            let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
+            store
+                .add_cert(certificate.clone())
+                .context(AddCertToStore)?;
+            context
+                .set_verify_cert_store(store.build())
+                .context(SetVerifyCert)?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn tls_connector_builder(
+    settings: Option<TlsSettings>,
+) -> crate::Result<SslConnectorBuilder> {
+    let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnector)?;
+    if let Some(settings) = settings {
+        settings.apply_context(&mut builder)?;
+    }
+    Ok(builder)
+}
+
+pub(crate) fn tls_connector(settings: Option<TlsSettings>) -> crate::Result<ConnectConfiguration> {
+    let verify_hostname = settings
+        .as_ref()
+        .map(|settings| settings.verify_hostname)
+        .unwrap_or(true);
+    let configure = tls_connector_builder(settings)?
+        .build()
+        .configure()
+        .context(TlsBuildConnector)?
+        .verify_hostname(verify_hostname);
+    Ok(configure)
 }
 
 impl fmt::Debug for TlsSettings {
@@ -208,30 +319,6 @@ impl fmt::Debug for TlsSettings {
             .field("verify_hostname", &self.verify_hostname)
             .finish()
     }
-}
-
-pub trait TlsConnectorExt {
-    fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self;
-}
-
-impl TlsConnectorExt for TlsConnectorBuilder {
-    fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self {
-        self.danger_accept_invalid_certs(!settings.verify_certificate);
-        self.danger_accept_invalid_hostnames(!settings.verify_hostname);
-        settings.identity().map(|identity| self.identity(identity));
-        if let Some(certificate) = settings.authority {
-            self.add_root_certificate(certificate);
-        }
-        self
-    }
-}
-
-/// Load a `native_tls::Certificate` (X.509) from a named file
-fn load_certificate(filename: &Path) -> crate::Result<Certificate> {
-    let data = open_read(filename, "certificate")?;
-    Ok(Certificate::from_der(&data)
-        .or_else(|_| Certificate::from_pem(&data))
-        .with_context(|| CertificateParseError { filename })?)
 }
 
 /// Load a private key from a named file
@@ -268,17 +355,20 @@ fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
     Ok(text)
 }
 
-pub struct MaybeTlsIncoming<I: Stream> {
+#[cfg(feature = "sources-tls")]
+pub(crate) struct MaybeTlsIncoming<I: Stream> {
     incoming: I,
-    acceptor: Option<tokio_tls::TlsAcceptor>,
+    acceptor: Option<SslAcceptor>,
     state: MaybeTlsIncomingState<I::Item>,
 }
 
+#[cfg(feature = "sources-tls")]
 enum MaybeTlsIncomingState<S> {
     Inner,
-    Accepting(tokio_tls::Accept<S>),
+    Accepting(AcceptAsync<S>),
 }
 
+#[cfg(feature = "sources-tls")]
 impl<I: Stream> MaybeTlsIncoming<I> {
     #[cfg(feature = "sources-tls")]
     pub fn new(incoming: I, tls: Option<TlsSettings>) -> crate::Result<Self> {
@@ -299,6 +389,7 @@ impl<I: Stream> MaybeTlsIncoming<I> {
     }
 }
 
+#[cfg(feature = "sources-tls")]
 impl MaybeTlsIncoming<Incoming> {
     #[cfg(feature = "sources-tls")]
     pub fn bind(addr: &SocketAddr, tls: Option<TlsSettings>) -> crate::Result<Self> {
@@ -309,13 +400,9 @@ impl MaybeTlsIncoming<Incoming> {
     }
 }
 
-impl<I> Stream for MaybeTlsIncoming<I>
-where
-    I: Stream,
-    I::Item: AsyncRead + AsyncWrite,
-    I::Error: Into<crate::Error>,
-{
-    type Item = MaybeTlsStream<I::Item>;
+#[cfg(feature = "sources-tls")]
+impl Stream for MaybeTlsIncoming<Incoming> {
+    type Item = MaybeTlsStream<TcpStream>;
     type Error = TlsError;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -334,7 +421,7 @@ where
                     };
 
                     if let Some(acceptor) = &mut self.acceptor {
-                        let fut = acceptor.accept(stream);
+                        let fut = acceptor.accept_async(stream);
 
                         self.state = MaybeTlsIncomingState::Accepting(fut);
                         continue;
@@ -354,6 +441,7 @@ where
     }
 }
 
+#[cfg(feature = "sources-tls")]
 impl<I: Stream + fmt::Debug> fmt::Debug for MaybeTlsIncoming<I> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MaybeTlsIncoming")
@@ -364,7 +452,7 @@ impl<I: Stream + fmt::Debug> fmt::Debug for MaybeTlsIncoming<I> {
 
 #[derive(Debug)]
 pub enum MaybeTlsStream<S> {
-    Tls(TlsStream<S>),
+    Tls(SslStream<S>),
     Raw(S),
 }
 
@@ -509,10 +597,10 @@ mod test {
         enabled: Option<bool>,
         set_crt: bool,
         set_key: bool,
-        require_ident: bool,
+        for_server: bool,
     ) -> Option<TlsSettings> {
         let config = make_config(enabled, set_crt, set_key);
-        TlsSettings::from_config(&Some(config), require_ident)
+        TlsSettings::from_config(&Some(config), for_server)
             .expect("Failed to generate settings from config")
     }
 
