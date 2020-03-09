@@ -116,7 +116,7 @@ The log field to parse. See [Field Notation Syntax](#field-notation-syntax) for 
 
 ### types
 
-Key/Value pairs representing mapped log field types.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types.
 
 <Fields filters={false}>
 

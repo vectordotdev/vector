@@ -140,7 +140,7 @@ The Regular Expression to apply. Do not include the leading or trailing `/`. See
 
 ### types
 
-Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-syntax) for more info.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types. See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
 

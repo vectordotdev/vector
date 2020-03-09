@@ -125,7 +125,7 @@ Set to `true` to drop all fields that are not specified in the [`types`](#types)
 
 ### types
 
-Key/Value pairs representing mapped log field types.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types.
 
 <Fields filters={false}>
 
