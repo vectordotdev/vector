@@ -67,7 +67,7 @@ where
         Some(value)
     }
 
-    pub fn remove<Q>(&mut self, k: &Q) -> Option<(V, delay_queue::Expired<K>)>
+    pub fn remove<Q>(&mut self, k: &Q) -> Option<ExpiredItem<K, V>>
     where
         K: Borrow<Q>,
         Q: ?Sized + Hash + Eq,
