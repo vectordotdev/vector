@@ -11,7 +11,7 @@ use lucet_runtime::{
     DlModule, Instance, InstanceBuilder, InstanceHandle, Limits, MmapRegion, Region,
 };
 use lucet_wasi::WasiCtxBuilder;
-use lucetc::HeapSettings;
+use lucetc::{HeapSettings, Bindings};
 use lucetc::{Lucetc, LucetcOpts};
 use std::collections::BTreeMap;
 use std::fs;
@@ -21,7 +21,9 @@ use uuid::Uuid;
 
 mod context;
 use context::EngineContext;
-mod hostcalls;
+use crate::topology::unit_test::build_unit_tests;
+
+pub mod hostcall; // Pub is required for lucet.
 mod defaults {
     use std::path::Path;
 
@@ -52,6 +54,8 @@ struct EngineConfig {
 }
 
 fn compile(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<()> {
+    let mut bindings = lucet_wasi::bindings();
+    bindings.extend(&Bindings::from_str(include_str!("hostcall/bindings.json"))?)?;
     Ok(Lucetc::new(input)
         .with_bindings(lucet_wasi::bindings())
         .shared_object_file(output)?)
