@@ -76,9 +76,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   socket_timeout_ms = 60000 # optional, default
 
   # Advanced
-  librdkafka_options.client.id = "${ENV_VAR}"
-  librdkafka_options.fetch.error.backoff.ms = "1000"
-  librdkafka_options.socket.send.buffer.bytes = "100"
+  librdkafka_options.client.id = "${ENV_VAR}" # example
+  librdkafka_options.fetch.error.backoff.ms = "1000" # example
+  librdkafka_options.socket.send.buffer.bytes = "100" # example
 
   # Buffer
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"

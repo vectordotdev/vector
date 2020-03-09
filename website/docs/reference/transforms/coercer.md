@@ -46,11 +46,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 </TabItem>
@@ -66,11 +66,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   drop_unspecified = false # optional, default
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 </TabItem>

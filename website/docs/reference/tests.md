@@ -66,9 +66,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # Conditions
     conditions.type = "check_fields" # optional, default
-    conditions.message.eq = "this is the content to match against"
-    conditions.message.contains = "foo"
-    conditions.environment.prefix = "staging-"
+    conditions.message.eq = "this is the content to match against" # example
+    conditions.message.contains = "foo" # example
+    conditions.environment.prefix = "staging-" # example
 ```
 
 </TabItem>
@@ -94,8 +94,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
     value = "some message contents" # required, required when type = "raw"
 
     # Log fields
-    log_fields.message = "some message contents"
-    log_fields.host = "myhost"
+    log_fields.message = "some message contents" # example
+    log_fields.host = "myhost" # example
 
     # Metric
     # General
@@ -107,8 +107,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
     metric.sample_rate = 1 # optional, no default
 
     # Tags
-    metric.tags.host = "foohost"
-    metric.tags.region = "us-east-1"
+    metric.tags.host = "foohost" # example
+    metric.tags.region = "us-east-1" # example
 
   # Outputs
   [[tests.outputs]]
@@ -117,11 +117,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # Conditions
     conditions.type = "check_fields" # optional, default
-    conditions.message.eq = "this is the content to match against"
-    conditions.host.exists = true
-    conditions.method.neq = "POST"
-    conditions.message.contains = "foo"
-    conditions.environment.prefix = "staging-"
+    conditions.message.eq = "this is the content to match against" # example
+    conditions.host.exists = true # example
+    conditions.method.neq = "POST" # example
+    conditions.message.contains = "foo" # example
+    conditions.environment.prefix = "staging-" # example
 ```
 
 </TabItem>

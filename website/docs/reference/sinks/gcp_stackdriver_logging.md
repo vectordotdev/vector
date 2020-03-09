@@ -97,8 +97,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Resource
   resource.type = "global" # required
-  resource.projectId = "vector-123456"
-  resource.zone = "Twilight"
+  resource.projectId = "vector-123456" # example
+  resource.zone = "Twilight" # example
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default

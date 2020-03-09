@@ -90,11 +90,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Headers
-  headers.Authorization = "${TOKEN_ENV_VAR}"
-  headers.X-Powered-By = "Vector"
+  headers.Authorization = "${TOKEN_ENV_VAR}" # example
+  headers.X-Powered-By = "Vector" # example
 
   # Query
-  query.X-Powered-By = "Vector"
+  query.X-Powered-By = "Vector" # example
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests

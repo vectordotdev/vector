@@ -35,14 +35,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Fields
-  fields.string_field = "string value"
-  fields.env_var_field = "${ENV_VAR}"
-  fields.int_field = 1
-  fields.float_field = 1.2
-  fields.bool_field = true
-  fields.timestamp_field = 1979-05-27T00:32:00Z
-  fields.parent.child_field = "child_value"
-  fields.list_field = ["first", "second", "third"]
+  fields.string_field = "string value" # example
+  fields.env_var_field = "${ENV_VAR}" # example
+  fields.int_field = 1 # example
+  fields.float_field = 1.2 # example
+  fields.bool_field = true # example
+  fields.timestamp_field = 1979-05-27T00:32:00Z # example
+  fields.parent.child_field = "child_value" # example
+  fields.list_field = ["first", "second", "third"] # example
 ```
 
 ## Options

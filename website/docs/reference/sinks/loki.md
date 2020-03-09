@@ -54,8 +54,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding.codec = "json" # optional, default
 
   # Labels
-  labels.key = "value"
-  labels.key = "{{ event_field }}"
+  labels.key = "value" # example
+  labels.key = "{{ event_field }}" # example
 ```
 
 </TabItem>
@@ -96,8 +96,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Labels
-  labels.key = "value"
-  labels.key = "{{ event_field }}"
+  labels.key = "value" # example
+  labels.key = "{{ event_field }}" # example
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests

@@ -79,7 +79,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Object Attributes
   acl = "authenticatedRead" # optional, no default
-  metadata.Key1 = "Value1"
+  metadata.Key1 = "Value1" # example
   storage_class = "STANDARD" # optional, no default
 
   # Object Names

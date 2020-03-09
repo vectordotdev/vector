@@ -121,7 +121,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Metadata
-  tags.Tag1 = "Value1"
+  tags.Tag1 = "Value1" # example
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests

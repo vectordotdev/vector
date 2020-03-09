@@ -35,8 +35,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Tags
-  tags.static_tag = "my value"
-  tags.env_tag = "${ENV_VAR}"
+  tags.static_tag = "my value" # example
+  tags.env_tag = "${ENV_VAR}" # example
 ```
 
 ## Options

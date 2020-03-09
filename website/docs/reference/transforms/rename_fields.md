@@ -35,8 +35,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Fields
-  fields.old_field_name = "new_field_name"
-  fields.parent.old_child_name = "parent.new_child_name"
+  fields.old_field_name = "new_field_name" # example
+  fields.parent.old_child_name = "parent.new_child_name" # example
 ```
 
 ## Options

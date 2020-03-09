@@ -27,7 +27,7 @@ class Templates
             end
           elsif field.wildcard?
             field.examples.each do |example|
-              writer.hash(example, path: key_path)
+              writer.hash(example, path: key_path, tags: ["example"])
             end
           else
             value = field.default || field.examples.first

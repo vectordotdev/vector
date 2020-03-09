@@ -37,11 +37,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   field = "message" # optional, default
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
 ```
 
 ## Options

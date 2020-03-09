@@ -24,9 +24,9 @@ class Templates
         puts("# #{name}")
       end
 
-      def hash(hash, path: [])
+      def hash(hash, path: [], tags: [])
         hash.each do |key, value|
-          kv(key, value, path: path)
+          kv(key, value, path: path, tags: tags)
         end
       end
 

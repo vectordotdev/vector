@@ -37,9 +37,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
     type = "check_fields" # optional, default
-    message.eq = "this is the content to match against"
-    message.contains = "foo"
-    environment.prefix = "staging-"
+    message.eq = "this is the content to match against" # example
+    message.contains = "foo" # example
+    environment.prefix = "staging-" # example
 ```
 
 ## Options
