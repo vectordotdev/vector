@@ -101,8 +101,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   token = "${INFLUXDB_TOKEN_ENV_VAR}"
 
   # Batch
+  batch.max_events = 20 # default, events
+  batch.timeout_secs = 1 # default, seconds
 
   # Request
+  request.in_flight_limit = 5 # default, requests
+  request.rate_limit_duration_secs = 1 # default, seconds
+  request.rate_limit_num = 5 # default
+  request.retry_attempts = -1 # default
+  request.retry_initial_backoff_secs = 1 # default, seconds
+  request.retry_max_duration_secs = 10 # default, seconds
+  request.timeout_secs = 60 # default, seconds
 ```
 
 </TabItem>
@@ -129,8 +138,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
   retention_policy_name = "autogen" # no default
 
   # Batch
+  batch.max_events = 20 # default, events
+  batch.timeout_secs = 1 # default, seconds
 
   # Request
+  request.in_flight_limit = 5 # default, requests
+  request.rate_limit_duration_secs = 1 # default, seconds
+  request.rate_limit_num = 5 # default
+  request.retry_attempts = -1 # default
+  request.retry_initial_backoff_secs = 1 # default, seconds
+  request.retry_max_duration_secs = 10 # default, seconds
+  request.timeout_secs = 60 # default, seconds
 ```
 
 </TabItem>
@@ -172,7 +190,7 @@ Configures the sink batching behavior.
   defaultValue={20}
   enumValues={null}
   examples={[20]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
@@ -195,7 +213,7 @@ The maximum size of a batch, in events, before it is flushed.
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
@@ -429,7 +447,7 @@ Configures the sink request behavior.
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -452,7 +470,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -475,7 +493,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -498,7 +516,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -521,7 +539,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -544,7 +562,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -567,7 +585,7 @@ The maximum amount of time, in seconds, to wait between retries.
   defaultValue={60}
   enumValues={null}
   examples={[60]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}

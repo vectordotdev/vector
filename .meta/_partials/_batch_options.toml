@@ -11,6 +11,7 @@ description = "Configures the sink batching behavior."
 type = "int"
 common = true
 default = <%= max_events.to_toml %>
+groups = <%= groups.to_toml %>
 required = true
 unit = "events"
 description = "The maximum size of a batch, in events, before it is flushed."
@@ -21,6 +22,7 @@ description = "The maximum size of a batch, in events, before it is flushed."
 type = "int"
 common = true
 default = <%= max_size.to_toml %>
+groups = <%= groups.to_toml %>
 required = true
 unit = "bytes"
 description = "The maximum size of a batch, in bytes, before it is flushed."
@@ -30,6 +32,7 @@ description = "The maximum size of a batch, in bytes, before it is flushed."
 type = "int"
 common = true
 default = <%= timeout_secs.to_toml %>
+groups = <%= groups.to_toml %>
 required = true
 unit = "seconds"
 description = "The maximum age of a batch before it is flushed."
