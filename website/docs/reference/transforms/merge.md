@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "merge"
-  inputs = ["my-source-id"]
-  merge_fields = ["message"] # default
-  partial_event_marker_field = "_partial" # default
-  stream_discriminant_fields = [] # default
+  type = "merge" # required
+  inputs = ["my-source-id"] # required
+  merge_fields = ["message"] # optional, default
+  partial_event_marker_field = "_partial" # optional, default
+  stream_discriminant_fields = [] # optional, default
 ```
 
 ## Options

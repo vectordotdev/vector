@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "geoip"
-  inputs = ["my-source-id"]
-  database = "/path/to/GeoLite2-City.mmdb"
-  source = "ip_address"
-  target = "geoip" # default
+  type = "geoip" # required
+  inputs = ["my-source-id"] # required
+  database = "/path/to/GeoLite2-City.mmdb" # required
+  source = "ip_address" # required
+  target = "geoip" # optional, default
 ```
 
 ## Options
@@ -102,7 +102,7 @@ The field name that contains the IP address. This field should contain a valid I
   name={"target"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

@@ -23,7 +23,6 @@ The name for the new label.\
 type = "string"
 default = " "
 examples = [" ", ",", "_", "+"]
-required = true
 description = """\
 The string that is used to join all items.\
 """

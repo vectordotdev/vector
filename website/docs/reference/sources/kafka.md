@@ -44,11 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "kafka"
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-  group_id = "consumer-group-name"
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
-  key_field = "user_id" # no default
+  type = "kafka" # required
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
+  group_id = "consumer-group-name" # required
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
+  key_field = "user_id" # optional, no default
 ```
 
 </TabItem>
@@ -59,15 +59,15 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "kafka"
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-  group_id = "consumer-group-name"
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
-  auto_offset_reset = "largest" # default
-  fetch_wait_max_ms = 100 # default, milliseconds
-  key_field = "user_id" # no default
-  session_timeout_ms = 10000 # default, milliseconds
-  socket_timeout_ms = 60000 # default, milliseconds
+  type = "kafka" # required
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
+  group_id = "consumer-group-name" # required
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
+  auto_offset_reset = "largest" # optional, default
+  fetch_wait_max_ms = 100 # optional, default, milliseconds
+  key_field = "user_id" # optional, no default
+  session_timeout_ms = 10000 # optional, default, milliseconds
+  socket_timeout_ms = 60000 # optional, default, milliseconds
 
   # Advanced
   librdkafka_options.client.id = "${ENV_VAR}"
@@ -75,11 +75,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   librdkafka_options.socket.send.buffer.bytes = "100"
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
 
 </TabItem>

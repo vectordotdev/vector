@@ -45,11 +45,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "logdna"
-  inputs = ["my-source-id"]
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
-  hostname = "my-local-machine"
-  healthcheck = true # default
+  type = "logdna" # required
+  inputs = ["my-source-id"] # required
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  hostname = "my-local-machine" # required
+  healthcheck = true # optional, default
 
   # Encoding
 ```
@@ -62,40 +62,40 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "logdna"
-  inputs = ["my-source-id"]
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
-  hostname = "my-local-machine"
-  default_app = "vector" # default
-  healthcheck = true # default
-  host = "http://127.0.0.1" # no default
-  ip = "0.0.0.0" # no default
-  mac = "my-mac-address" # no default
-  tags = ["tag1", "tag2"] # no default
+  type = "logdna" # required
+  inputs = ["my-source-id"] # required
+  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  hostname = "my-local-machine" # required
+  default_app = "vector" # optional, default
+  healthcheck = true # optional, default
+  host = "http://127.0.0.1" # optional, no default
+  ip = "0.0.0.0" # optional, no default
+  mac = "my-mac-address" # optional, no default
+  tags = ["tag1", "tag2"] # optional, no default
 
   # Batch
-  batch.max_size = 10490000 # default, bytes
-  batch.timeout_secs = 1 # default, seconds
+  batch.max_size = 10490000 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 5 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 5 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 60 # default, seconds
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
@@ -164,7 +164,7 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -187,7 +187,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -237,7 +237,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -283,7 +283,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

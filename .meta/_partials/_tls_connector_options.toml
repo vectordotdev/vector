@@ -1,7 +1,9 @@
+<%- groups ||= [] -%>
 [<%= namespace %>.tls]
 type = "table"
 category = "TLS"
 common = false
+groups = <%= groups.to_toml %>
 description = "Configures the TLS options for connections from this sink."
 
 <%- if can_enable -%>
@@ -9,6 +11,7 @@ description = "Configures the TLS options for connections from this sink."
 type = "bool"
 common = true
 default = false
+groups = <%= groups.to_toml %>
 sort = 1
 description = "Enable TLS during connections to the remote."
 <%- end -%>
@@ -16,6 +19,7 @@ description = "Enable TLS during connections to the remote."
 [<%= namespace %>.tls.children.ca_path]
 type = "string"
 examples = ["/path/to/certificate_authority.crt"]
+groups = <%= groups.to_toml %>
 description = """\
 Absolute path to an additional CA certificate file, in DER or PEM format \
 (X.509).\
@@ -25,6 +29,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format \
 type = "string"
 common = true
 examples = ["/path/to/host_certificate.crt"]
+groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a certificate file used to identify this connection, in DER \
 or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
@@ -35,6 +40,7 @@ or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
 type = "string"
 common = true
 examples = ["/path/to/host_certificate.key"]
+groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a certificate key file used to identify this connection, in \
 DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.\
@@ -43,6 +49,7 @@ DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.\
 [<%= namespace %>.tls.children.key_pass]
 type = "string"
 examples = ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+groups = <%= groups.to_toml %>
 description = """\
 Pass phrase used to unlock the encrypted key file. This has no effect unless \
 `key_path` is set.\
@@ -52,6 +59,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless \
 [<%= namespace %>.tls.children.verify_certificate]
 type = "bool"
 default = true
+groups = <%= groups.to_toml %>
 description = """\
 If `true` (the default), Vector will validate the TLS certificate of the \
 remote host. Do NOT set this to `false` unless you understand the risks of not \
@@ -63,6 +71,7 @@ verifying the remote certificate.\
 [<%= namespace %>.tls.children.verify_hostname]
 type = "bool"
 default = true
+groups = <%= groups.to_toml %>
 description = """\
 If `true` (the default), Vector will validate the configured remote host name \
 against the remote host's TLS certificate. Do NOT set this to `false` unless \

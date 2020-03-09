@@ -44,11 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # General
-  type = "stdin"
-
-  # Context
-  host_key = "host" # default
+  type = "stdin" # required
 ```
 
 </TabItem>
@@ -59,11 +55,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "stdin"
-  max_length = 102400 # default, bytes
+  type = "stdin" # required
+  max_length = 102400 # optional, default, bytes
 
   # Context
-  host_key = "host" # default
+  host_key = "host" # optional, default
 ```
 
 </TabItem>
@@ -79,7 +75,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
@@ -87,7 +83,7 @@ import Field from '@site/src/components/Field';
   name={"host_key"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

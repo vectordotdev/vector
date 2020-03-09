@@ -30,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_tags"
-  inputs = ["my-source-id"]
-  tags = ["tag1", "tag2"]
+  type = "remove_tags" # required
+  inputs = ["my-source-id"] # required
+  tags = ["tag1", "tag2"] # required
 ```
 
 ## Options

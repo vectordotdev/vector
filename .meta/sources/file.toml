@@ -40,7 +40,6 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.\
 type = "string"
 category = "Context"
 default = "file"
-required = true
 description = """\
 The key name added to each event with the full path of the file.\
 """
@@ -48,7 +47,6 @@ The key name added to each event with the full path of the file.\
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
-required = true
 unit = "milliseconds"
 description = """\
 Delay between file discovery calls. This controls the interval at which \
@@ -59,7 +57,6 @@ Vector searches for files.\
 type = "string"
 category = "Context"
 default = "host"
-required = true
 description = """\
 The key name added to each event representing the current host. This can also \
 be globally set via the \
@@ -88,7 +85,6 @@ files.\
 [sources.file.options.start_at_beginning]
 type = "bool"
 common = true
-required = true
 default = false
 description = """\
 For files with a stored checkpoint at startup, setting this option \
@@ -118,7 +114,6 @@ device_and_inode = "Uses the [device and inode][urls.inode] to unique identify f
 [sources.file.options.fingerprinting.children.fingerprint_bytes]
 type = "int"
 default = 256
-required = true
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
 description = """\
@@ -129,7 +124,6 @@ fingerprint.\
 [sources.file.options.fingerprinting.children.ignored_header_bytes]
 type = "int"
 default = 0
-required = true
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
 description = """\
@@ -150,7 +144,6 @@ time.\
 [sources.file.options.multiline]
 type = "table"
 category = "Multiline"
-required = false
 description = """\
 Multiline parsing configuration (per file).
 If not speicified, multiline parsing is disabled.\

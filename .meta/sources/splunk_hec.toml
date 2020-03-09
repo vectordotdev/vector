@@ -14,7 +14,6 @@ through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_he
 type = "string"
 common = true
 default = "0.0.0.0:8088"
-required = true
 description = """\
 The address to accept connections on.\
 """

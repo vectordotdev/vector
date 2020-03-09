@@ -45,24 +45,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "gcp_cloud_storage"
-  inputs = ["my-source-id"]
-  compression = "gzip"
-  credentials_path = "/path/to/credentials.json"
-  healthcheck = true # default
+  type = "gcp_cloud_storage" # required
+  inputs = ["my-source-id"] # required
+  compression = "gzip" # required
+  credentials_path = "/path/to/credentials.json" # required
+  healthcheck = true # optional, default
 
   # Object Names
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F/" # optional, default
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "text" # required
 ```
 
 </TabItem>
@@ -73,56 +70,56 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "gcp_cloud_storage"
-  inputs = ["my-source-id"]
-  bucket = "my-bucket"
-  compression = "gzip"
-  credentials_path = "/path/to/credentials.json"
-  healthcheck = true # default
-
-  # Object Names
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  type = "gcp_cloud_storage" # required
+  inputs = ["my-source-id"] # required
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  credentials_path = "/path/to/credentials.json" # required
+  healthcheck = true # optional, default
 
   # Object Attributes
-  acl = "authenticatedRead" # no default
+  acl = "authenticatedRead" # optional, no default
   metadata.Key1 = "Value1"
-  storage_class = "STANDARD" # no default
+  storage_class = "STANDARD" # optional, no default
+
+  # Object Names
+  filename_append_uuid = true # optional, default
+  filename_extension = "log" # optional, default
+  filename_time_format = "%s" # optional, default
+  key_prefix = "date=%F/" # optional, default
 
   # Batch
-  batch.max_size = 10485760 # default, bytes
-  batch.timeout_secs = 300 # default, seconds
+  batch.max_size = 10485760 # optional, default, bytes
+  batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.codec = "text" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 5 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 1000 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 60 # default, seconds
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 1000 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = true # default
-  tls.verify_hostname = true # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = true # optional, default
+  tls.verify_hostname = true # optional, default
 ```
 
 </TabItem>
@@ -192,7 +189,7 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -215,7 +212,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -288,7 +285,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -334,7 +331,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -542,7 +539,7 @@ How to format event timestamps.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -550,7 +547,7 @@ How to format event timestamps.
   name={"filename_append_uuid"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -565,7 +562,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"log"}
   enumValues={null}
   examples={["log"]}
@@ -573,7 +570,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
   name={"filename_extension"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -588,7 +585,7 @@ The filename extension to use in the object name.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"%s"}
   enumValues={null}
   examples={["%s"]}
@@ -596,7 +593,7 @@ The filename extension to use in the object name.
   name={"filename_time_format"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

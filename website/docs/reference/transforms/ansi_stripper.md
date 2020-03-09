@@ -30,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "ansi_stripper"
-  inputs = ["my-source-id"]
-  field = "message" # default
+  type = "ansi_stripper" # required
+  inputs = ["my-source-id"] # required
+  field = "message" # optional, default
 ```
 
 ## Options
@@ -53,7 +53,7 @@ import Field from '@site/src/components/Field';
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

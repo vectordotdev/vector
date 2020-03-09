@@ -44,11 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"]
-  namespace = "service"
-  region = "us-east-1" # required when endpoint = ""
-  healthcheck = true # default
+  type = "aws_cloudwatch_metrics" # required
+  inputs = ["my-source-id"] # required
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
+  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -59,17 +59,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"]
-  endpoint = "127.0.0.0:5000/path/to/service" # required when region = ""
-  namespace = "service"
-  region = "us-east-1" # required when endpoint = ""
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # no default
-  healthcheck = true # default
+  type = "aws_cloudwatch_metrics" # required
+  inputs = ["my-source-id"] # required
+  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  healthcheck = true # optional, default
 
   # Batch
-  batch.max_events = 20 # default, events
-  batch.timeout_secs = 1 # default, seconds
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 ```
 
 </TabItem>
@@ -138,7 +138,7 @@ Configures the sink batching behavior.
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -161,7 +161,7 @@ The maximum size of a batch, in events, before it is flushed.
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}

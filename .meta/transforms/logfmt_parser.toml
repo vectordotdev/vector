@@ -18,14 +18,12 @@ common = true
 default = "message"
 examples = ["message", "parent.child", "array[0]"]
 field_path_notation = true
-required = true
 description = "The log field to parse."
 
 [transforms.logfmt_parser.options.drop_field]
 type = "bool"
 common = true
 default = true
-required = true
 description = "If the specified `field` should be dropped (removed) after parsing."
 
 <%= render("_partials/_types.toml", namespace: "transforms.logfmt_parser", common: true) %>

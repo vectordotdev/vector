@@ -31,8 +31,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "rename_fields"
-  inputs = ["my-source-id"]
+  type = "rename_fields" # required
+  inputs = ["my-source-id"] # required
 
   # Fields
   fields.old_field_name = "new_field_name"

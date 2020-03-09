@@ -44,10 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "docker"
-  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # no default
-  include_images = ["httpd", "redis"] # no default
-  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # no default
+  type = "docker" # required
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
+  include_images = ["httpd", "redis"] # optional, no default
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # optional, no default
 ```
 
 </TabItem>
@@ -57,12 +57,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "docker"
-  auto_partial_merge = true # default
-  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # no default
-  include_images = ["httpd", "redis"] # no default
-  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # no default
-  partial_event_marker_field = "_partial" # default
+  type = "docker" # required
+  auto_partial_merge = true # optional, default
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
+  include_images = ["httpd", "redis"] # optional, no default
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # optional, no default
+  partial_event_marker_field = "_partial" # optional, default
 ```
 
 </TabItem>
@@ -213,7 +213,7 @@ The field name to be added to events that are detected to contain an incomplete 
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
@@ -221,7 +221,7 @@ The field name to be added to events that are detected to contain an incomplete 
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -236,7 +236,7 @@ The docker host to connect to. See [Connecting To The Docker Daemon](#connecting
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -244,7 +244,7 @@ The docker host to connect to. See [Connecting To The Docker Daemon](#connecting
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}

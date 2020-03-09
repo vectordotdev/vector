@@ -30,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_fields"
-  inputs = ["my-source-id"]
-  fields = ["field1", "field2", "parent.child"]
+  type = "remove_fields" # required
+  inputs = ["my-source-id"] # required
+  fields = ["field1", "field2", "parent.child"] # required
 ```
 
 ## Options

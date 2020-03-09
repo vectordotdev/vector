@@ -44,10 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "vector"
-  inputs = ["my-source-id"]
-  address = "92.12.333.224:5000"
-  healthcheck = true # default
+  type = "vector" # required
+  inputs = ["my-source-id"] # required
+  address = "92.12.333.224:5000" # required
+  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -58,16 +58,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "vector"
-  inputs = ["my-source-id"]
-  address = "92.12.333.224:5000"
-  healthcheck = true # default
+  type = "vector" # required
+  inputs = ["my-source-id"] # required
+  address = "92.12.333.224:5000" # required
+  healthcheck = true # optional, default
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>
@@ -136,7 +136,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -182,7 +182,7 @@ The maximum size of the buffer on the disk.
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

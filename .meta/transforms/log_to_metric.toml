@@ -43,7 +43,6 @@ description = "The log field to use as the metric."
 type = "bool"
 default = false
 relevant_when = {type = "counter"}
-required = true
 description = """\
 If `true` the metric will be incremented by the `field` value. If `false` \
 the metric will be incremented by 1 regardless of the `field` value.\

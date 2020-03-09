@@ -30,10 +30,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "sampler"
-  inputs = ["my-source-id"]
-  rate = 10
-  pass_list = ["[error]", "field2"] # no default
+  type = "sampler" # required
+  inputs = ["my-source-id"] # required
+  rate = 10 # required
+  pass_list = ["[error]", "field2"] # optional, no default
 ```
 
 ## Options

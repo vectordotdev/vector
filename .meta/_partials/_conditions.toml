@@ -1,6 +1,5 @@
 [<%= namespace %>.type]
 type = "string"
-required = true
 common = true
 default = "check_fields"
 description = """\

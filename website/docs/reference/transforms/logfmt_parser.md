@@ -31,10 +31,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "logfmt_parser"
-  inputs = ["my-source-id"]
-  drop_field = true # default
-  field = "message" # default
+  type = "logfmt_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
 
   # Types
   types.status = "int"
@@ -62,7 +62,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -85,7 +85,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

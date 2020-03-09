@@ -44,14 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # General
-  type = "syslog"
-  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
-  mode = "tcp"
-  path = "/path/to/socket" # required when mode = "unix"
-
-  # Context
-  host_key = "host" # default
+  type = "syslog" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
 ```
 
 </TabItem>
@@ -62,22 +58,22 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "syslog"
-  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
-  mode = "tcp"
-  path = "/path/to/socket" # required when mode = "unix"
-  max_length = 102400 # default, bytes
+  type = "syslog" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+  max_length = 102400 # optional, default, bytes
 
   # Context
-  host_key = "host" # default
+  host_key = "host" # optional, default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = false # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
 ```
 
 </TabItem>
@@ -116,7 +112,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
@@ -124,7 +120,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
   name={"host_key"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

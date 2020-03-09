@@ -41,11 +41,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "json_parser"
-  inputs = ["my-source-id"]
-  drop_field = true # default
-  drop_invalid = true
-  field = "message" # default
+  type = "json_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_invalid = true # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
 ```
 
 </TabItem>
@@ -55,13 +55,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "json_parser"
-  inputs = ["my-source-id"]
-  drop_field = true # default
-  drop_invalid = true
-  field = "message" # default
-  overwrite_target = false # default
-  target_field = "root_field" # no default
+  type = "json_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_invalid = true # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  overwrite_target = false # optional, default
+  target_field = "root_field" # optional, no default
 ```
 
 </TabItem>
@@ -85,7 +85,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -131,7 +131,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

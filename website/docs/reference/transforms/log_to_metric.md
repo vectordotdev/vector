@@ -96,7 +96,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
@@ -104,7 +104,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   name={"increment_by_value"}
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}

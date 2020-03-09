@@ -34,9 +34,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "prometheus"
-  hosts = ["http://localhost:9090"]
-  scrape_interval_secs = 1
+  type = "prometheus" # required
+  hosts = ["http://localhost:9090"] # required
+  scrape_interval_secs = 1 # required
 ```
 
 ## Options
