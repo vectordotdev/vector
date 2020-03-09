@@ -2,7 +2,7 @@
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
 event_types: ["log"]
-function_category: "merge"
+function_category: "aggregate"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+merge%22
 min_version: null
 service_name: "Merge"

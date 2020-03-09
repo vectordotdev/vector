@@ -49,6 +49,4 @@ REFERENCE_ROOT = File.join(ROOT_DIR, "website", "docs", "reference").freeze
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases".freeze
 PARTIALS_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates", "_partials").freeze
 
-DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
-EVENT_TYPES = ["log", "metric"].freeze
 OPERATING_SYSTEMS = ["Linux", "MacOS", "Windows"].freeze

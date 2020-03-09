@@ -21977,7 +21977,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "proxy",
+      "function_category": "transmit",
       "id": "vector_sink",
       "name": "vector",
       "operating_systems": [
@@ -22291,7 +22291,7 @@ module.exports = {
         "log",
         "metric"
       ],
-      "function_category": "proxy",
+      "function_category": "receive",
       "id": "vector_source",
       "name": "vector",
       "operating_systems": [
@@ -22671,7 +22671,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "merge",
+      "function_category": "aggregate",
       "id": "merge_transform",
       "name": "merge",
       "operating_systems": [
