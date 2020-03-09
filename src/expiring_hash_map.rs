@@ -16,6 +16,8 @@ pub struct ExpiringHashMap<K, V> {
     expiration_queue: DelayQueue<K>,
 }
 
+impl<K, V> Unpin for ExpiringHashMap<K, V> {}
+
 impl<K, V> ExpiringHashMap<K, V>
 where
     K: Eq + Hash + Clone,
@@ -94,8 +96,7 @@ where
 
 impl<K, V> Stream for ExpiringHashMap<K, V>
 where
-    K: Unpin + Eq + Hash + Clone,
-    V: Unpin,
+    K: Eq + Hash + Clone,
 {
     type Item = Result<ExpiredItem<K, V>, Error>;
 
