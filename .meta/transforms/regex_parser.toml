@@ -16,7 +16,6 @@ requirements = {}
 type = "bool"
 common = true
 default = true
-required = true
 description = "If the specified `field` should be dropped (removed) after parsing."
 
 [transforms.regex_parser.options.field]
@@ -25,7 +24,6 @@ common = true
 default = "message"
 examples = ["message", "parent.child"]
 field_path_notation = true
-required = true
 description = "The log field to parse."
 
 [transforms.regex_parser.options.regex]

@@ -62,10 +62,6 @@ class Component
     name <=> other.name
   end
 
-  def advanced_relevant?
-    options_list.any?(&:advanced?)
-  end
-
   def beta?
     beta == true
   end
@@ -128,9 +124,9 @@ class Component
               end
           end
 
-          if advanced_relevant?
-            option_groups.each do |group|
-              groups["#{group} (advanced)"] =
+          option_groups.each do |group|
+            if options_list.any? { |option| option.group?(group) && !option.common? }
+              groups["#{group} (adv)"] =
                 lambda do |option|
                   option.group?(group)
                 end
@@ -142,7 +138,7 @@ class Component
               option.common?
             end
 
-          if advanced_relevant?
+          if options_list.any? { |option| !option.common? }
             groups["Advanced"] =
               lambda do |option|
                 true
@@ -168,7 +164,7 @@ class Component
 
   def sorted_option_group_keys
     option_example_groups.keys.sort_by do |key|
-      if key.downcase.include?("advanced")
+      if key.downcase.include?("adv")
         -1
       else
         1

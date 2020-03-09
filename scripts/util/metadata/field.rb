@@ -50,7 +50,7 @@ class Field
       raise ArgumentError.new("#{@name}.name must be in the format of \"`[..]`\" instead of \"<...>\"")
     end
 
-    if @required == true && !@defualt.nil?
+    if @required == true && !@default.nil?
       raise ArgumentError.new("#{@name}.required must be false if there is a default")
     end
 

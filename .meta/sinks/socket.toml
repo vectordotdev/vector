@@ -15,18 +15,21 @@ write_to_description = "a socket, such as a TCP or Unix domain socket"
 <%= render(
   "_partials/_buffer_options.toml",
   namespace: "sinks.socket.options",
-  common: false
+  common: false,
+  groups: ["tcp", "unix"]
 ) %>
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.socket.options",
   encodings: ["json", "text"],
-  default: false
+  default: false,
+  groups: ["tcp", "unix"]
 ) %>
 
 [sinks.socket.options.mode]
 type = "string"
 common = true
+groups = ["tcp", "unix"]
 required = true
 description = "The type of socket to use."
 
@@ -38,6 +41,7 @@ unix = "Unix Domain Socket."
 type = "string"
 common = true
 examples = ["92.12.333.224:5000"]
+groups = ["tcp"]
 relevant_when = {mode = "tcp"}
 required = true
 description = "The address to connect to. The address _must_ include a port."
@@ -46,10 +50,18 @@ description = "The address to connect to. The address _must_ include a port."
 type = "string"
 common = true
 examples = ["/path/to/socket"]
+groups = ["unix"]
 relevant_when = {mode = "unix"}
 required = true
 description = """The unix socket path. This should be the absolute path.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.socket.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: true) %>
+<%= render(
+  "_partials/_tls_connector_options.toml",
+  namespace: "sinks.socket.options",
+  can_enable: true,
+  can_verify_certificate: true,
+  can_verify_hostname: true,
+  groups: ["tcp"]
+) %>
 

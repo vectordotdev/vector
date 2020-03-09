@@ -27,17 +27,6 @@ The Vector `console` sink [streams](#streaming) [`log`][docs.data-model.log] and
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -45,37 +34,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "console"
-  inputs = ["my-source-id"]
-  target = "stdout" # default
-  healthcheck = true # default
+  type = "console" # required
+  inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
+  target = "stdout" # optional, default
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "text" # required
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[sinks.my_sink_id]
-  # General
-  type = "console"
-  inputs = ["my-source-id"]
-  target = "stdout" # default
-  healthcheck = true # default
-
-  # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
-```
-
-</TabItem>
-</Tabs>
 
 ## Options
 
@@ -237,7 +203,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   name={"target"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

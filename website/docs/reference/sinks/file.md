@@ -45,13 +45,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "file"
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
-  healthcheck = true # default
+  type = "file" # required
+  inputs = ["my-source-id"] # required
+  path = "vector-%Y-%m-%d.log" # required
+  healthcheck = true # optional, default
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "text" # required
 ```
 
 </TabItem>
@@ -62,17 +62,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "file"
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
-  healthcheck = true # default
-  idle_timeout_secs = "30" # default
+  type = "file" # required
+  inputs = ["my-source-id"] # required
+  path = "vector-%Y-%m-%d.log" # required
+  healthcheck = true # optional, default
+  idle_timeout_secs = "30" # optional, default
 
   # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.codec = "text" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 ```
 
 </TabItem>

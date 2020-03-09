@@ -38,7 +38,6 @@ common = true
 default = "geoip"
 examples = ["geoip", "parent.child"]
 field_path_notation = true
-required = true
 description = """\
 The default field to insert the resulting GeoIP data into. See \
 [output](#output) for more info.\

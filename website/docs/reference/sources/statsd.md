@@ -33,8 +33,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "statsd"
-  address = "127.0.0.1:8126"
+  type = "statsd" # required
+  address = "127.0.0.1:8126" # required
 ```
 
 ## Options

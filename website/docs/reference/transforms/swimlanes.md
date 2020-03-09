@@ -24,17 +24,6 @@ The Vector `swimlanes` transform accepts and [outputs `log` events](#output) all
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -42,40 +31,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "swimlanes"
-  inputs = ["my-source-id"]
+  type = "swimlanes" # required
+  inputs = ["my-source-id"] # required
 
   # Lanes
   [transforms.my_transform_id.lanes.`[swimlane-id]`]
-    type = "check_fields" # default
+    type = "check_fields" # optional, default
     message.eq = "this is the content to match against"
     message.contains = "foo"
     environment.prefix = "staging-"
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[transforms.my_transform_id]
-  # General
-  type = "swimlanes"
-  inputs = ["my-source-id"]
-
-  # Lanes
-  [transforms.my_transform_id.lanes.`[swimlane-id]`]
-    type = "check_fields" # default
-    message.eq = "this is the content to match against"
-    host.exists = true
-    method.neq = "POST"
-    message.contains = "foo"
-    environment.prefix = "staging-"
-```
-
-</TabItem>
-</Tabs>
 
 ## Options
 
@@ -139,7 +104,7 @@ The identifier of a swimlane.
   name={"type"}
   path={"lanes.`[swimlane-id]`"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -286,10 +251,14 @@ The `swimlanes` transform accepts and [outputs `log` events](#output) allowing y
 For example:
 
 
+import Tabs from '@theme/Tabs';
+
 <Tabs
   block={true}
   defaultValue="ifelse"
   values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
+
+import TabItem from '@theme/TabItem';
 
 <TabItem value="ifelse">
 

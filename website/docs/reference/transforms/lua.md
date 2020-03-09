@@ -30,8 +30,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "lua"
-  inputs = ["my-source-id"]
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
   source = """
   require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
 
@@ -42,8 +42,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
     hostname = string.gsub(hostname, "\n$", "")
     event["host"] = hostname
   end
-  """
-  search_dirs = ["/etc/vector/lua"] # no default
+  """ # required
+  search_dirs = ["/etc/vector/lua"] # optional, no default
 ```
 
 ## Options

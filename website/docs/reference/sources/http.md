@@ -44,10 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "http"
-  address = "0.0.0.0:80"
-  encoding = "text" # default
-  headers = ["User-Agent", "X-My-Custom-Header"] # no default
+  type = "http" # required
+  address = "0.0.0.0:80" # required
+  encoding = "text" # optional, default
+  headers = ["User-Agent", "X-My-Custom-Header"] # optional, no default
 ```
 
 </TabItem>
@@ -58,18 +58,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "http"
-  address = "0.0.0.0:80"
-  encoding = "text" # default
-  headers = ["User-Agent", "X-My-Custom-Header"] # no default
+  type = "http" # required
+  address = "0.0.0.0:80" # required
+  encoding = "text" # optional, default
+  headers = ["User-Agent", "X-My-Custom-Header"] # optional, no default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = false # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
 ```
 
 </TabItem>
@@ -110,13 +110,13 @@ The address to listen for connections on
 <Field
   common={true}
   defaultValue={"text"}
-  enumValues={{"text":"Newline-delimited text","ndjson":"Newline-delimited JSON objects","json":"Array of JSON objects"}}
+  enumValues={{"text":"Newline-delimited text, with each line forming a message.","ndjson":"Newline-delimited JSON objects, where each line must contain a JSON object.","json":"Array of JSON objects, which must be a JSON array containing JSON objects."}}
   examples={["text","ndjson","json"]}
   groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -124,7 +124,7 @@ The address to listen for connections on
 
 ### encoding
 
-The expected encoding of received data. `text` indicates newline-delimited text, with each line forming a message. `ndjson` indicates newline-delimited JSON, where each line must contain a json object. `json` indicates a JSON payload, which must be a JSON array containing JSON objects. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+The expected encoding of received data. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
 
 
 </Field>

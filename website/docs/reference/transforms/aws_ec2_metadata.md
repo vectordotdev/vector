@@ -30,12 +30,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "aws_ec2_metadata"
-  inputs = ["my-source-id"]
-  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
-  host = "http://169.254.169.254" # default
-  namespace = "" # default
-  refresh_interval_secs = 10 # default
+  type = "aws_ec2_metadata" # required
+  inputs = ["my-source-id"] # required
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
+  host = "http://169.254.169.254" # optional, default
+  namespace = "" # optional, default
+  refresh_interval_secs = 10 # optional, default
 ```
 
 ## Requirements

@@ -27,20 +27,48 @@ The Vector `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  type = "prometheus"
-  inputs = ["my-source-id"]
-  address = "0.0.0.0:9598"
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
-  flush_period_secs = 60 # default, seconds
-  namespace = "service"
-  healthcheck = true # default
+  type = "prometheus" # required
+  inputs = ["my-source-id"] # required
+  address = "0.0.0.0:9598" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  type = "prometheus" # required
+  inputs = ["my-source-id"] # required
+  address = "0.0.0.0:9598" # required
+  namespace = "service" # required
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
+  flush_period_secs = 60 # optional, default, seconds
+  healthcheck = true # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 ## Requirements
 
@@ -86,7 +114,7 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
   enumValues={null}
   examples={[[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]]}
@@ -94,7 +122,7 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
   name={"buckets"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
@@ -109,7 +137,7 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
@@ -117,7 +145,7 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
   name={"flush_period_secs"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -186,14 +214,10 @@ The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="histograms"
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="histograms">
 

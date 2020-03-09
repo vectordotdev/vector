@@ -44,8 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "logplex"
-  address = "0.0.0.0:8088"
+  type = "logplex" # required
+  address = "0.0.0.0:8088" # required
 ```
 
 </TabItem>
@@ -56,16 +56,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "logplex"
-  address = "0.0.0.0:8088"
+  type = "logplex" # required
+  address = "0.0.0.0:8088" # required
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = false # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
 ```
 
 </TabItem>

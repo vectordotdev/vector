@@ -75,7 +75,6 @@ description = "The basic authentication user name."
 [sinks.elasticsearch.options.doc_type]
 type = "string"
 default = "_doc"
-required = true
 description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
 
 [sinks.elasticsearch.options.headers]
@@ -105,7 +104,6 @@ examples = [
   "application-{{ application_id }}-%Y-%m-%d",
   "vector-%Y-%m-%d",
 ]
-required = true
 templateable = true
 description = "Index name to write events to."
 

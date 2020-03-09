@@ -45,10 +45,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "gcp_stackdriver_logging"
-  inputs = ["my-source-id"]
-  credentials_path = "/path/to/credentials.json"
-  healthcheck = true # default
+  type = "gcp_stackdriver_logging" # required
+  inputs = ["my-source-id"] # required
+  credentials_path = "/path/to/credentials.json" # required
+  healthcheck = true # optional, default
 
   # Encoding
 ```
@@ -61,51 +61,51 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "gcp_stackdriver_logging"
-  inputs = ["my-source-id"]
-  credentials_path = "/path/to/credentials.json"
-  log_id = "vector-logs"
-  project_id = "vector-123456"
-  billing_account_id = "012345-6789AB-CDEF01" # no default
-  folder_id = "My Folder" # no default
-  healthcheck = true # default
-  organization_id = "622418129737" # no default
+  type = "gcp_stackdriver_logging" # required
+  inputs = ["my-source-id"] # required
+  credentials_path = "/path/to/credentials.json" # required
+  log_id = "vector-logs" # required
+  project_id = "vector-123456" # required
+  billing_account_id = "012345-6789AB-CDEF01" # optional, no default
+  folder_id = "My Folder" # optional, no default
+  healthcheck = true # optional, default
+  organization_id = "622418129737" # optional, no default
 
   # Batch
-  batch.max_size = 5242880 # default, bytes
-  batch.timeout_secs = 1 # default, seconds
+  batch.max_size = 5242880 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 5 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 1000 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 60 # default, seconds
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 1000 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 
   # Resource
-  resource.type = "global"
+  resource.type = "global" # required
   resource.projectId = "vector-123456"
   resource.zone = "Twilight"
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = true # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = true # optional, default
 ```
 
 </TabItem>
@@ -151,7 +151,7 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -174,7 +174,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -249,7 +249,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -295,7 +295,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

@@ -31,7 +31,7 @@ class Templates
             end
           else
             value = field.default || field.examples.first
-            tags = field_tags(field, enum: false, example: false, optionality: false, short: true, type: false)
+            tags = field_tags(field, enum: false, example: false, optionality: true, short: true, type: false)
             writer.kv(field.name, value, path: key_path, tags: tags)
           end
         end

@@ -24,18 +24,45 @@ The Vector `concat` transform accepts and [outputs `log` events](#output) allowi
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  type = "concat"
-  inputs = ["my-source-id"]
-  items = ["first[..3]", "second[-5..]", "third[3..6]"]
-  joiner = " " # default
-  target = "root_field_name"
+  type = "concat" # required
+  inputs = ["my-source-id"] # required
+  items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
+  target = "root_field_name" # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "concat" # required
+  inputs = ["my-source-id"] # required
+  items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
+  target = "root_field_name" # required
+  joiner = " " # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -70,7 +97,7 @@ A list of substring definitons in the format of source_field[start..end]. For bo
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={" "}
   enumValues={null}
   examples={[" ",",","_","+"]}
@@ -78,7 +105,7 @@ A list of substring definitons in the format of source_field[start..end]. For bo
   name={"joiner"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

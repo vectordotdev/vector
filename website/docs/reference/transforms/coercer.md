@@ -42,8 +42,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "coercer"
-  inputs = ["my-source-id"]
+  type = "coercer" # required
+  inputs = ["my-source-id"] # required
 
   # Types
   types.status = "int"
@@ -61,9 +61,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "coercer"
-  inputs = ["my-source-id"]
-  drop_unspecified = false # default
+  type = "coercer" # required
+  inputs = ["my-source-id"] # required
+  drop_unspecified = false # optional, default
 
   # Types
   types.status = "int"

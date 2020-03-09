@@ -31,12 +31,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "split"
-  inputs = ["my-source-id"]
-  drop_field = true # default
-  field = "message" # default
-  field_names = ["timestamp", "level", "message", "parent.child"]
-  separator = "[whitespace]" # default
+  type = "split" # required
+  inputs = ["my-source-id"] # required
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  separator = "[whitespace]" # optional, default
 
   # Types
   types.status = "int"
@@ -64,7 +64,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -87,7 +87,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -133,7 +133,7 @@ The field names assigned to the resulting tokens, in order. See [Field Notation 
   name={"separator"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[string]"}
   unit={null}

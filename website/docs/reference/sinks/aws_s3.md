@@ -45,29 +45,26 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "aws_s3"
-  inputs = ["my-source-id"]
-  bucket = "my-bucket"
-  compression = "gzip"
-  region = "us-east-1" # required when endpoint = ""
-  healthcheck = true # default
+  type = "aws_s3" # required
+  inputs = ["my-source-id"] # required
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  region = "us-east-1" # required, required when endpoint = ""
+  healthcheck = true # optional, default
 
   # Naming
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F/" # optional, default
 
   # Batch
-  batch.max_size = 10490000 # default, bytes
-  batch.timeout_secs = 300 # default, seconds
+  batch.max_size = 10490000 # optional, default, bytes
+  batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "text" # required
 ```
 
 </TabItem>
@@ -78,62 +75,62 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "aws_s3"
-  inputs = ["my-source-id"]
-  bucket = "my-bucket"
-  compression = "gzip"
-  endpoint = "127.0.0.0:5000/path/to/service" # required when region = ""
-  region = "us-east-1" # required when endpoint = ""
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # no default
-  healthcheck = true # default
-
-  # Naming
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  type = "aws_s3" # required
+  inputs = ["my-source-id"] # required
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  region = "us-east-1" # required, required when endpoint = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  healthcheck = true # optional, default
 
   # ACL
-  acl = "private" # no default
-  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # no default
-  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # no default
-  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # no default
-  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # no default
+  acl = "private" # optional, no default
+  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
+  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
+  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
+  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
 
   # Encryption
-  server_side_encryption = "AES256" # no default
-  ssekms_key_id = "abcd1234" # no default, relevant when server_side_encryption = "aws:kms"
+  server_side_encryption = "AES256" # optional, no default
+  ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
+
+  # Naming
+  filename_append_uuid = true # optional, default
+  filename_extension = "log" # optional, default
+  filename_time_format = "%s" # optional, default
+  key_prefix = "date=%F/" # optional, default
 
   # Storage
-  storage_class = "STANDARD" # no default
+  storage_class = "STANDARD" # optional, no default
 
   # Batch
-  batch.max_size = 10490000 # default, bytes
-  batch.timeout_secs = 300 # default, seconds
+  batch.max_size = 10490000 # optional, default, bytes
+  batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.codec = "text" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Metadata
   tags.Tag1 = "Value1"
 
   # Request
-  request.in_flight_limit = 5 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 5 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 30 # default, seconds
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 30 # optional, default, seconds
 ```
 
 </TabItem>
@@ -225,7 +222,7 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -248,7 +245,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -321,7 +318,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -367,7 +364,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -575,7 +572,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -583,7 +580,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   name={"filename_append_uuid"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -598,7 +595,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"log"}
   enumValues={null}
   examples={["log"]}
@@ -606,7 +603,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
   name={"filename_extension"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -621,7 +618,7 @@ The filename extension to use in the object name.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"%s"}
   enumValues={null}
   examples={["%s"]}
@@ -629,7 +626,7 @@ The filename extension to use in the object name.
   name={"filename_time_format"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

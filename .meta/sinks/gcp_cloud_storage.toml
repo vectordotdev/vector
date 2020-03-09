@@ -103,21 +103,18 @@ description = "A prefix to apply to all object key names. This should be used to
 type = "string"
 category = "Object Names"
 default = "%s"
-required = true
 description = "The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported."
 
 [sinks.gcp_cloud_storage.options.filename_append_uuid]
 type = "bool"
 category = "Object Names"
 default = true
-required = true
 description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 
 [sinks.gcp_cloud_storage.options.filename_extension]
 type = "string"
 category = "Object Names"
 default = "log"
-required = true
 description = "The filename extension to use in the object name."
 
 <%= render("_partials/_encoding.toml",
