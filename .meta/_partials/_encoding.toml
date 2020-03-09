@@ -1,18 +1,18 @@
+<%- default ||= nil %>
 [<%= namespace %>.encoding]
 type = "table"
-common = true
-required = <%= (default != false).to_toml %>
+common = <%= (encodings.any?).to_toml %>
+required = <%= (encodings.any? && default.nil?).to_toml %>
 description = """\
 Configures the encoding specific sink behavior.\
 """
 
-<%- if encodings.length > 1 && default != "default" -%>
+<%- if encodings.any? -%>
   [<%= namespace %>.encoding.children.codec]
   type = "string"
   common = true
   <%- if default -%>
   default = <%= default.to_toml %>
-  required = false
   <%- else -%>
   required = true
   <%- end -%>
@@ -21,10 +21,9 @@ Configures the encoding specific sink behavior.\
   """
 
   [<%= namespace %>.encoding.children.codec.enum]
-  <%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
   <%- if encodings.include?("json") -%>json = "Each event is encoded into JSON and the payload is represented as a JSON array."<%- end -%>
   <%- if encodings.include?("ndjson") -%>ndjson = "Each event is encoded into JSON and the payload is new line delimited."<%- end -%>
-  <%- if encodings.include?("default") -%>default = "Each event is encoded according to the default for this sink."<%- end -%>
+  <%- if encodings.include?("text") -%>text = "Each event is encoded into text via the `message` key and the payload is new line delimited."<%- end -%>
 <%- end -%>
 
 [<%= namespace %>.encoding.children.only_fields]

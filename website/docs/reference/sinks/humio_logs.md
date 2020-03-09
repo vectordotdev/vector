@@ -51,6 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # optional, default
 
   # Encoding
+  encoding.codec = "json" # optional, default
 ```
 
 </TabItem>
@@ -78,6 +79,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   buffer.when_full = "block" # optional, default
 
   # Encoding
+  encoding.codec = "json" # optional, default
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -305,7 +307,7 @@ The behavior when the buffer becomes full.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
@@ -316,6 +318,29 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 <Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={"json"}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+</Field>
 
 
 <Field

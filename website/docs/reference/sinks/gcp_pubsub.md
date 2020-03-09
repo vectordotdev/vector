@@ -44,13 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # General
   type = "gcp_pubsub" # required
   inputs = ["my-source-id"] # required
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
-
-  # Encoding
 ```
 
 </TabItem>
@@ -353,7 +350,7 @@ The filename for a Google Cloud service account credentials JSON file used to au
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -361,7 +358,7 @@ The filename for a Google Cloud service account credentials JSON file used to au
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

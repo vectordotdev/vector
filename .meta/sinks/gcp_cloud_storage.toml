@@ -119,8 +119,7 @@ description = "The filename extension to use in the object name."
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.gcp_cloud_storage.options",
-  encodings: ["ndjson", "text"],
-  default: false,
+  encodings: ["ndjson", "text"]
 ) %>
 
 [sinks.gcp_cloud_storage.options.compression]

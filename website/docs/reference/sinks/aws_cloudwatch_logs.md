@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # optional, default
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "json" # required
 ```
 
 </TabItem>
@@ -88,7 +88,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "json" # required
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -385,7 +385,7 @@ Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not a
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -401,8 +401,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["text","json"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

@@ -44,13 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # General
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
   token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
-
-  # Encoding
 ```
 
 </TabItem>
@@ -299,7 +296,7 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -307,7 +304,7 @@ The behavior when the buffer becomes full.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

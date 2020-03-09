@@ -76,8 +76,7 @@ gzip = "The payload will be compressed in [Gzip][urls.gzip] format before being 
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.http.options",
-  encodings: ["json", "ndjson", "text"],
-  default: false,
+  encodings: ["json", "ndjson", "text"]
 ) %>
 
 [sinks.http.options.headers]

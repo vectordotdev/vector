@@ -40,7 +40,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   target = "stdout" # optional, default
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "json" # required
 ```
 
 ## Options
@@ -61,7 +61,7 @@ import Field from '@site/src/components/Field';
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -77,8 +77,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["text","json"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

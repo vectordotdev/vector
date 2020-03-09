@@ -78,6 +78,5 @@ description = "The default app that will be set for events that do not contain a
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.logdna.options",
-  encodings: ["default"],
-  default: "default"
+  encodings: []
 ) %>

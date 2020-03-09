@@ -53,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "json" # required
 ```
 
 </TabItem>
@@ -82,7 +82,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "json" # required
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -317,7 +317,7 @@ The behavior when the buffer becomes full.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -333,8 +333,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["text","json"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

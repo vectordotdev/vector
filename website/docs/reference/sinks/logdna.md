@@ -44,14 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # General
   type = "logdna" # required
   inputs = ["my-source-id"] # required
   api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
   hostname = "my-local-machine" # required
   healthcheck = true # optional, default
-
-  # Encoding
 ```
 
 </TabItem>
@@ -349,7 +346,7 @@ The default app that will be set for events that do not contain a `file` or `app
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -357,7 +354,7 @@ The default app that will be set for events that do not contain a `file` or `app
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

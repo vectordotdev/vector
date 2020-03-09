@@ -54,8 +54,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # requests
   compression = "none" # optional, default
-
-  # Encoding
 ```
 
 </TabItem>
@@ -471,7 +469,7 @@ The database that contains the stable that data will be inserted into.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -479,7 +477,7 @@ The database that contains the stable that data will be inserted into.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

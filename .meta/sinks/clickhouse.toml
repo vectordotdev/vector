@@ -100,6 +100,5 @@ description = "The database that contains the stable that data will be inserted 
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.clickhouse.options",
-  encodings: ["default"],
-  default: "default",
+  encodings: [],
 ) %>

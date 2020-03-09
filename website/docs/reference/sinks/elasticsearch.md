@@ -44,14 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # General
   type = "elasticsearch" # required
   inputs = ["my-source-id"] # required
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
   index = "vector-%F" # optional, default
-
-  # Encoding
 ```
 
 </TabItem>
@@ -437,7 +434,7 @@ The [`doc_type`](#doc_type) for your index data. This is only relevant for Elast
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -445,7 +442,7 @@ The [`doc_type`](#doc_type) for your index data. This is only relevant for Elast
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}

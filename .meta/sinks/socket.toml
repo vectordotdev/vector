@@ -22,7 +22,6 @@ write_to_description = "a socket, such as a TCP or Unix domain socket"
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.socket.options",
   encodings: ["json", "text"],
-  default: false,
   groups: ["tcp", "unix"]
 ) %>
 

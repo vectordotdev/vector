@@ -64,7 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "ndjson" # required
 ```
 
 </TabItem>
@@ -115,7 +115,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "text" # required
+  encoding.codec = "ndjson" # required
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
@@ -438,7 +438,7 @@ The compression mechanism to use.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -454,8 +454,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
-  examples={["text","ndjson"]}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

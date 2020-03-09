@@ -55,8 +55,7 @@ description = "The S3 bucket name. Do not include a leading `s3://` or a trailin
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.aws_s3.options",
-  encodings: ["ndjson", "text"],
-  default: false
+  encodings: ["ndjson", "text"]
 ) %>
 
 [sinks.aws_s3.options.filename_append_uuid]

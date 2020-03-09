@@ -2400,9 +2400,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -2697,9 +2697,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -2915,9 +2915,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -3280,9 +3280,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "ndjson"
-    codec = "text"
+    # * enum: "ndjson" or "text"
     codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -3753,9 +3753,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -4275,9 +4275,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "ndjson"
-    codec = "text"
+    # * enum: "ndjson" or "text"
     codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -4499,9 +4499,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "ndjson"
-    codec = "text"
+    # * enum: "ndjson" or "text"
     codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -5389,10 +5389,10 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text", "json", and "ndjson"
-    codec = "text"
+    # * enum: "json", "ndjson", and "text"
     codec = "json"
     codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -5651,6 +5651,14 @@ end
   #
 
   [sinks.humio_logs.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * must be: "json" (if supplied)
+    codec = "json"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
@@ -6079,9 +6087,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -6551,9 +6559,9 @@ end
     # * optional
     # * default: "json"
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -6833,6 +6841,14 @@ end
   #
 
   [sinks.new_relic_logs.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * must be: "json" (if supplied)
+    codec = "json"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
@@ -7280,9 +7296,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -7493,9 +7509,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
-    codec = "text"
+    # * enum: "json" or "text"
     codec = "json"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #

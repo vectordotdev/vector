@@ -53,6 +53,5 @@ description = "The token that will be used to write to Sematext."
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.sematext_logs.options",
-  encodings: ["default"],
-  default: "default"
+  encodings: []
 ) %>

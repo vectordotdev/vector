@@ -64,7 +64,7 @@ class Metadata
           Dir.glob("#{meta_dir}/**/[^_]*.toml").collect do |file|
             begin
               Template.render(file)
-            rescue e
+            rescue Exception => e
               error!(
                 <<~EOF
                 The follow metadata file failed to load:

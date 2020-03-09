@@ -14,8 +14,7 @@ write_to_description = "a file"
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.file.options",
-  encodings: ["text", "ndjson"],
-  default: false
+  encodings: ["text", "ndjson"]
 ) %>
 
 [sinks.file.options.path]
