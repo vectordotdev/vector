@@ -1,7 +1,7 @@
 use super::*;
 use crate::runtime::Runtime;
 use futures::future::poll_fn;
-use futures_test::task::{noop_context, panic_context};
+use futures_test::task::{new_count_waker, noop_context, panic_context};
 use std::time::{Duration, Instant};
 
 #[test]
@@ -50,5 +50,43 @@ fn it_returns_expired_values() {
 
         let fut = poll_fn(move |cx| map.poll_expired(cx));
         assert_eq!(fut.await.unwrap().0, "val".to_owned());
+    });
+}
+
+#[test]
+fn wakes_on_insert_when_empty() {
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on_std(async {
+        let mut map = ExpiringHashMap::<String, String>::new();
+
+        let (waker, count) = new_count_waker();
+        let mut cx = Context::from_waker(&waker);
+        assert!(map.poll_expired(&mut cx).is_pending());
+
+        assert_eq!(count, 0);
+
+        map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
+
+        assert_eq!(count, 1);
+    });
+}
+
+#[test]
+fn does_not_wake_on_insert_when_non_empty() {
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on_std(async {
+        let mut map = ExpiringHashMap::<String, String>::new();
+
+        map.insert("key1".to_owned(), "val".to_owned(), Duration::from_secs(1));
+
+        let (waker, count) = new_count_waker();
+        let mut cx = Context::from_waker(&waker);
+        assert!(map.poll_expired(&mut cx).is_pending());
+
+        assert_eq!(count, 0);
+
+        map.insert("key2".to_owned(), "val".to_owned(), Duration::from_secs(1));
+
+        assert_eq!(count, 0);
     });
 }
