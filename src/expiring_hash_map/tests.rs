@@ -12,6 +12,20 @@ fn poll_does_not_return_ready_with_empty_map() {
 }
 
 #[test]
+fn poll_does_not_return_ready_with_empty_map_after_it_was_non_empty() {
+    let mut rt = Runtime::new().unwrap();
+    rt.block_on_std(async {
+        let mut map = ExpiringHashMap::<String, String>::new();
+
+        map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
+        map.remove("key");
+
+        let mut cx = noop_context();
+        assert!(map.poll_expired(&mut cx).is_pending());
+    });
+}
+
+#[test]
 fn it_does_not_call_waker_if_polled_and_ready() {
     let mut rt = Runtime::new().unwrap();
     rt.block_on_std(async {
