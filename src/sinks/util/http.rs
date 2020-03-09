@@ -11,6 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use http::header::HeaderValue;
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
@@ -19,7 +20,6 @@ use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
 use tower_hyper::client::Client;
-use tracing::field;
 use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type Response = hyper::Response<Bytes>;
@@ -62,7 +62,7 @@ where
     ) -> Self {
         let sink = Arc::new(sink);
         let sink1 = sink.clone();
-        let svc = HttpService::new2(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
+        let svc = HttpService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
         let service_sink = request_settings.batch_sink(HttpRetryLogic, svc, cx.acker());
         let inner = BatchSink::from_settings(service_sink, batch, batch_settings);
@@ -106,35 +106,20 @@ pub struct HttpService<B = Vec<u8>> {
         Request<Vec<u8>>,
     >,
     request_builder: Arc<dyn Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send>,
-}
-
-impl HttpService<Vec<u8>> {
-    pub fn builder(resolver: Resolver) -> HttpServiceBuilder {
-        HttpServiceBuilder::new(resolver)
-    }
-
-    pub fn new<F>(resolver: Resolver, request_builder: F) -> Self
-    where
-        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-    {
-        Self::builder(resolver).build(request_builder)
-    }
+    version: HeaderValue,
 }
 
 impl<B> HttpService<B> {
-    pub fn new2<F>(
+    pub fn new(
         resolver: Resolver,
-        tls_settings: Option<TlsSettings>,
-        request_builder: F,
-    ) -> HttpService<B>
-    where
-        F: Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-    {
+        tls_settings: impl Into<Option<TlsSettings>>,
+        request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    ) -> HttpService<B> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
         let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = tls_settings {
+        if let Some(settings) = tls_settings.into() {
             tls.use_tls_settings(settings);
         }
 
@@ -146,59 +131,14 @@ impl<B> HttpService<B> {
             .build(https);
 
         let inner = Client::with_client(client).instrument(info_span!("http"));
+
+        let version = crate::get_version();
+
         HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
+            version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
         }
-    }
-}
-
-/// A builder for `HttpService`s
-#[derive(Debug)]
-pub struct HttpServiceBuilder {
-    resolver: Resolver,
-    tls_settings: Option<TlsSettings>,
-}
-
-impl HttpServiceBuilder {
-    fn new(resolver: Resolver) -> Self {
-        Self {
-            resolver,
-            tls_settings: None,
-        }
-    }
-
-    /// Build the configured `HttpService`
-    pub fn build<F>(self, request_builder: F) -> HttpService<Vec<u8>>
-    where
-        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-    {
-        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
-        http.enforce_http(false);
-
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = self.tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
-        let https = HttpsConnector::from((http, tls));
-        let client = hyper::Client::builder()
-            .executor(DefaultExecutor::current())
-            .build(https);
-
-        let inner = Client::with_client(client).instrument(info_span!("http"));
-        HttpService {
-            inner,
-            request_builder: Arc::new(Box::new(request_builder)),
-        }
-    }
-
-    /// Set the standard TLS settings
-    pub fn tls_settings(mut self, settings: TlsSettings) -> Self {
-        self.tls_settings = Some(settings);
-        self
     }
 }
 
@@ -233,9 +173,13 @@ impl<B> Service<B> for HttpService<B> {
     }
 
     fn call(&mut self, body: B) -> Self::Future {
-        let request = (self.request_builder)(body);
+        let mut request = (self.request_builder)(body);
 
-        debug!(message = "sending request.");
+        request
+            .headers_mut()
+            .insert("User-Agent", self.version.clone());
+
+        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
 
         let fut = self
             .inner
@@ -243,8 +187,8 @@ impl<B> Service<B> for HttpService<B> {
             .inspect(|res| {
                 debug!(
                     message = "response.",
-                    status = &field::display(res.status()),
-                    version = &field::debug(res.version()),
+                    status = ?res.status(),
+                    version = ?res.version(),
                 )
             })
             .and_then(|r| {
@@ -342,7 +286,7 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpService::new(resolver, move |body| {
+        let mut service = HttpService::new(resolver, None, move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());

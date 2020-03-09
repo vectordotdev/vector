@@ -177,7 +177,8 @@ impl InfluxDBSvc {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;
-        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
+
+        let build_request = move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
@@ -185,7 +186,9 @@ impl InfluxDBSvc {
             builder.header("Content-Type", "text/plain");
             builder.header("Authorization", format!("Token {}", token));
             builder.body(body).unwrap()
-        });
+        };
+
+        let http_service = HttpService::new(cx.resolver(), None, build_request);
 
         let influxdb_http_service = InfluxDBSvc {
             config,

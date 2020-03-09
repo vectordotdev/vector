@@ -89,27 +89,27 @@ fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super:
     let uri = encode_uri(&host, &database, &table)?;
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service = HttpService::builder(cx.resolver())
-        .tls_settings(tls_settings)
-        .build(move |body: Vec<u8>| {
-            let mut builder = hyper::Request::builder();
-            builder.method(Method::POST);
-            builder.uri(uri.clone());
+    let build_request = move |body: Vec<u8>| {
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri.clone());
 
-            builder.header("Content-Type", "application/x-ndjson");
+        builder.header("Content-Type", "application/x-ndjson");
 
-            if gzip {
-                builder.header("Content-Encoding", "gzip");
-            }
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
 
-            let mut request = builder.body(body).unwrap();
+        let mut request = builder.body(body).unwrap();
 
-            if let Some(auth) = &auth {
-                auth.apply(&mut request);
-            }
+        if let Some(auth) = &auth {
+            auth.apply(&mut request);
+        }
 
-            request
-        });
+        request
+    };
+
+    let http_service = HttpService::new(cx.resolver(), tls_settings, build_request);
 
     let sink = request
         .batch_sink(

@@ -222,51 +222,52 @@ fn es(
         gzip = false;
     }
 
-    let http_service = HttpService::builder(cx.resolver())
-        .tls_settings(common.tls_settings.clone())
-        .build(move |body: Vec<u8>| {
-            let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
+    let tls_settings = common.tls_settings.clone();
+    let build_request = move |body: Vec<u8>| {
+        let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 
-            match common.credentials {
-                None => {
-                    builder.header("Content-Type", "application/x-ndjson");
-                    if gzip {
-                        builder.header("Content-Encoding", "gzip");
-                    }
-
-                    for (header, value) in &headers {
-                        builder.header(&header[..], &value[..]);
-                    }
-
-                    if let Some(ref auth) = common.authorization {
-                        builder.header("Authorization", &auth[..]);
-                    }
-
-                    builder.body(body).unwrap()
+        match common.credentials {
+            None => {
+                builder.header("Content-Type", "application/x-ndjson");
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
                 }
-                Some(ref credentials) => {
-                    let mut request = signed_request("POST", &uri);
 
-                    request.add_header("Content-Type", "application/x-ndjson");
+                for (header, value) in &headers {
+                    builder.header(&header[..], &value[..]);
+                }
 
-                    for (header, value) in &headers {
-                        request.add_header(header, value);
-                    }
+                if let Some(ref auth) = common.authorization {
+                    builder.header("Authorization", &auth[..]);
+                }
 
-                    request.set_payload(Some(body));
+                builder.body(body).unwrap()
+            }
+            Some(ref credentials) => {
+                let mut request = signed_request("POST", &uri);
 
-                    finish_signer(&mut request, &credentials, &mut builder);
+                request.add_header("Content-Type", "application/x-ndjson");
 
-                    // The SignedRequest ends up owning the body, so we have
-                    // to play games here
-                    let body = request.payload.take().unwrap();
-                    match body {
-                        SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
-                        _ => unreachable!(),
-                    }
+                for (header, value) in &headers {
+                    request.add_header(header, value);
+                }
+
+                request.set_payload(Some(body));
+
+                finish_signer(&mut request, &credentials, &mut builder);
+
+                // The SignedRequest ends up owning the body, so we have
+                // to play games here
+                let body = request.payload.take().unwrap();
+                match body {
+                    SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                    _ => unreachable!(),
                 }
             }
-        });
+        }
+    };
+
+    let http_service = HttpService::new(cx.resolver(), tls_settings, build_request);
 
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())

@@ -127,14 +127,16 @@ impl DatadogSvc {
             .parse::<Uri>()
             .context(super::UriParseError)?;
 
-        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
+        let build_request = move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
 
             builder.header("Content-Type", "application/json");
             builder.body(body).unwrap()
-        });
+        };
+
+        let http_service = HttpService::new(cx.resolver(), None, build_request);
 
         let datadog_http_service = DatadogSvc {
             config,

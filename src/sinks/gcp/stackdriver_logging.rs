@@ -135,21 +135,21 @@ impl StackdriverConfig {
             .expect("Unexpected encoded wrapper format")
             + SPLICE_OFFSET;
 
-        let http_service = HttpService::builder(cx.resolver())
-            .tls_settings(tls_settings)
-            .build(move |mut logs: Vec<u8>| {
-                logs.pop(); // Strip the trailing comma
+        let build_request = move |mut logs: Vec<u8>| {
+            logs.pop(); // Strip the trailing comma
 
-                let mut body = wrapper.clone().into_bytes();
-                body.splice(wrapper_splice..wrapper_splice, logs);
+            let mut body = wrapper.clone().into_bytes();
+            body.splice(wrapper_splice..wrapper_splice, logs);
 
-                let mut request = make_request(body);
-                if let Some(creds) = creds.as_ref() {
-                    creds.apply(&mut request);
-                }
+            let mut request = make_request(body);
+            if let Some(creds) = creds.as_ref() {
+                creds.apply(&mut request);
+            }
 
-                request
-            });
+            request
+        };
+
+        let http_service = HttpService::new(cx.resolver(), tls_settings, build_request);
 
         let sink = request
             .batch_sink(HttpRetryLogic, http_service, cx.acker())
