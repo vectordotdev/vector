@@ -192,7 +192,11 @@ impl ShutdownCoordinator {
             );
         };
         if success {
-            shutdown_force_trigger.disable();
+            // TODO Shouldn't need to cancel here, we should be able to call
+            // `shutdown_force_trigger.disable()` instead.  We can't yet though because
+            // some topology tests rely on notifying this trigger to mask failures of the
+            // underlying 'source_task'.
+            shutdown_force_trigger.cancel();
         } else {
             shutdown_force_trigger.cancel();
         }
