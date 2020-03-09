@@ -1,7 +1,8 @@
+name: pr-checklist
 on: [pull_request]
 
 jobs:
-  checklist_job:
+  checklist:
     runs-on: ubuntu-latest
     name: Checklist job
     steps:
