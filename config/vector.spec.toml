@@ -585,6 +585,7 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
+    "socket.send.buffer.bytes" = "100"
 
   #
   # TLS
@@ -5959,8 +5960,9 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # A comma delimited list of host and port pairs that the Kafka client should
-  # contact to bootstrap its cluster metadata.
+  # A comma-separated list of host and port pairs that are the addresses of the
+  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+  # initially to bootstrap itself.
   #
   # * required
   # * type: string
@@ -5979,6 +5981,18 @@ end
   # * required
   # * type: string
   topic = "topic-1234"
+
+  # Compression codec to use for compressing message sets
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none", "gzip", "lz4", "snappy", and "zstd"
+  compression = "none"
+  compression = "gzip"
+  compression = "lz4"
+  compression = "snappy"
+  compression = "zstd"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -6015,6 +6029,7 @@ end
     # * no default
     # * type: string
     "client.id" = "${ENV_VAR}"
+    "fetch.error.backoff.ms" = "1000"
     "socket.send.buffer.bytes" = "100"
 
   #

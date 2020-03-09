@@ -72,6 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # Advanced
   librdkafka_options.client.id = "${ENV_VAR}"
   librdkafka_options.fetch.error.backoff.ms = "1000"
+  librdkafka_options.socket.send.buffer.bytes = "100"
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # no default
@@ -238,7 +239,7 @@ The log field name to use for the topic key. If unspecified, the key would not b
 
 ### librdkafka_options
 
-Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced options. See [the [`librdkafka`](#librdkafka) documentation][urls.lib_rdkafka_config] for details.
 
 
 <Fields filters={false}>
@@ -248,7 +249,7 @@ Advanced consumer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"}]}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}

@@ -50,6 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   key_field = "user_id"
   topic = "topic-1234"
+  compression = "none" # default
   healthcheck = true # default
 
   # Encoding
@@ -69,12 +70,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   key_field = "user_id"
   topic = "topic-1234"
+  compression = "none" # default
   healthcheck = true # default
   message_timeout_ms = 300000 # default
   socket_timeout_ms = 60000 # default
 
   # Advanced
   librdkafka_options.client.id = "${ENV_VAR}"
+  librdkafka_options.fetch.error.backoff.ms = "1000"
   librdkafka_options.socket.send.buffer.bytes = "100"
 
   # Buffer
@@ -137,7 +140,7 @@ import Field from '@site/src/components/Field';
 
 ### bootstrap_servers
 
-A comma delimited list of host and port pairs that the Kafka client should contact to bootstrap its cluster metadata.
+A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
 
 
 </Field>
@@ -258,6 +261,29 @@ The behavior when the buffer becomes full.
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
+  examples={["none","gzip","lz4","snappy","zstd"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### compression
+
+Compression codec to use for compressing message sets
+
 
 </Field>
 
@@ -444,7 +470,7 @@ The log field name to use for the topic key. If unspecified, the key will be ran
 
 ### librdkafka_options
 
-Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_config] for details.
+Advanced options. See [the [`librdkafka`](#librdkafka) documentation][urls.lib_rdkafka_config] for details.
 
 
 <Fields filters={false}>
@@ -454,7 +480,7 @@ Advanced producer options. See [`librdkafka` documentation][urls.lib_rdkafka_con
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"socket.send.buffer.bytes":"100"}]}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"librdkafka_options"}
