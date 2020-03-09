@@ -73,11 +73,11 @@ changed via the
 
 </Alert>
 
-<%= fields(metadata.log_fields_list, heading_depth: 3) %>
+<%= fields(metadata.data_model.log.schema_list, heading_depth: 3) %>
 
 ## Components
 
-<Jump to="[[[pages.components]]]?log=true">View all log compatible components</Jump>
+<Jump to="[[[pages.components]]]?event-types[]=log">View all log compatible components</Jump>
 
 ## How It Works
 

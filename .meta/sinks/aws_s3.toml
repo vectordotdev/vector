@@ -18,9 +18,20 @@ write_to_description = "[Amazon Web Service's S3 service][urls.aws_s3] via the [
 
 <%= render("_partials/_component_options.toml", type: "sink", name: "aws_s3") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_s3.options", common: true, max_events: nil, max_size: 10490000, timeout_secs: 300) %>
+<%= render(
+  "_partials/_batch_options.toml",
+  namespace: "sinks.aws_s3.options",
+  common: true,
+  max_events: nil,
+  max_size: 10490000,
+  timeout_secs: 300
+) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.aws_s3.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.aws_s3.options",
+  common: true
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -50,14 +61,14 @@ description = "The S3 bucket name. Do not include a leading `s3://` or a trailin
 
 [sinks.aws_s3.options.filename_append_uuid]
 type = "bool"
-category = "Object Names"
+category = "Naming"
 default = true
 required = true
 description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 
 [sinks.aws_s3.options.filename_extension]
 type = "string"
-category = "Object Names"
+category = "Naming"
 default = "log"
 required = true
 description = "The filename extension to use in the object name."
@@ -74,14 +85,14 @@ none = "No compression"
 
 [sinks.aws_s3.options.filename_time_format]
 type = "string"
-category = "Object Names"
+category = "Naming"
 default = "%s"
 required = true
 description = "The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported."
 
 [sinks.aws_s3.options.key_prefix]
 type = "string"
-category = "Object Names"
+category = "Naming"
 common = true
 default = "date=%F/"
 examples = [
@@ -96,7 +107,7 @@ description = "A prefix to apply to all object key names. This should be used to
 
 [sinks.aws_s3.options.acl]
 type = "string"
-category = "Object Attributes"
+category = "ACL"
 common = false
 required = false
 description = "Canned ACL to apply to the created objects. For more information, see [Canned ACL][urls.aws_s3_canned_acl]."
@@ -111,7 +122,7 @@ log-delivery-write = "The LogDelivery group gets WRITE and READ_ACP permissions 
 
 [sinks.aws_s3.options.grant_full_control]
 type = "string"
-category = "Object Attributes"
+category = "ACL"
 common = false
 examples = ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 required = false
@@ -119,7 +130,7 @@ description = "Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, an
 
 [sinks.aws_s3.options.grant_read]
 type = "string"
-category = "Object Attributes"
+category = "ACL"
 common = false
 examples = ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 required = false
@@ -127,7 +138,7 @@ description = "Allows the named [grantee][urls.aws_s3_grantee] to read the creat
 
 [sinks.aws_s3.options.grant_read_acp]
 type = "string"
-category = "Object Attributes"
+category = "ACL"
 common = false
 examples = ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 required = false
@@ -135,7 +146,7 @@ description = "Allows the named [grantee][urls.aws_s3_grantee] to read the creat
 
 [sinks.aws_s3.options.grant_write_acp]
 type = "string"
-category = "Object Attributes"
+category = "ACL"
 common = false
 examples = ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 required = false
@@ -143,10 +154,9 @@ description = "Allows the named [grantee][urls.aws_s3_grantee] to write the crea
 
 [sinks.aws_s3.options.server_side_encryption]
 type = "string"
-category = "Object Attributes"
+category = "Encryption"
 common = false
 required = false
-examples = [ "AES256", "aws:kms" ]
 description = "The server-side encryption algorithm used when storing these objects."
 
 [sinks.aws_s3.options.server_side_encryption.enum]
@@ -155,9 +165,10 @@ AES256 = "256-bit Advanced Encryption Standard"
 
 [sinks.aws_s3.options.ssekms_key_id]
 type = "string"
-category = "Object Attributes"
+category = "Encryption"
 common = false
 examples = ["abcd1234"]
+relevant_when = {server_side_encryption = "aws:kms"}
 required = false
 description = """\
 If `server_side_encryption` has the value `"aws.kms"`, this specifies \
@@ -169,7 +180,7 @@ protect the data.\
 
 [sinks.aws_s3.options.storage_class]
 type = "string"
-category = "Object Attributes"
+category = "Storage"
 common = false
 required = false
 description = "The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details."
@@ -185,7 +196,7 @@ DEEP_ARCHIVE = "Use for archiving data that rarely needs to be accessed."
 
 [sinks.aws_s3.options.tags]
 type = "table"
-category = "Object Attributes"
+category = "Metadata"
 common = false
 required = false
 description = "The tag-set for the object."

@@ -2,6 +2,7 @@
 component_title: "Field Filter"
 description: "The Vector `field_filter` transform accepts and outputs `log` events allowing you to filter events by a log field's value."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
 min_version: null
 service_name: "Field Filter"
@@ -29,10 +30,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "field_filter" # must be: "field_filter"
-  inputs = ["my-source-id"] # example
-  field = "file" # example
-  value = "/var/log/nginx.log" # example
+  type = "field_filter"
+  inputs = ["my-source-id"]
+  field = "application_id"
+  value = "/var/log/nginx.log"
 ```
 
 ## Options
@@ -48,7 +49,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["file"]}
+  examples={["application_id","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -61,7 +62,7 @@ import Field from '@site/src/components/Field';
 
 ### field
 
-The target log field to compare against the [`value`](#value).
+The target log field to compare against the [`value`](#value). See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -113,7 +114,28 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_field_filter_transform_id]
+  # ...
+  field = "application_id"
+  field = "parent.child"
+  field = "array[0]"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.issue_479]: https://github.com/timberio/vector/issues/479

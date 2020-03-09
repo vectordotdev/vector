@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
 min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,26 +44,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "kafka" # must be: "kafka"
-  inputs = ["my-source-id"] # example
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
-  key_field = "user_id" # example
-  topic = "topic-1234" # example
-
-  # OPTIONAL - General
-  compression = "none" # default, enum
+  # General
+  type = "kafka"
+  inputs = ["my-source-id"]
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  key_field = "user_id"
+  topic = "topic-1234"
+  compression = "none" # default
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
 ```
 
 </TabItem>
@@ -72,52 +64,40 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "kafka" # must be: "kafka"
-  inputs = ["my-source-id"] # example
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
-  key_field = "user_id" # example
-  topic = "topic-1234" # example
-
-  # OPTIONAL - General
-  compression = "none" # default, enum
+  # General
+  type = "kafka"
+  inputs = ["my-source-id"]
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  key_field = "user_id"
+  topic = "topic-1234"
+  compression = "none" # default
   healthcheck = true # default
   message_timeout_ms = 300000 # default
   socket_timeout_ms = 60000 # default
 
-  # OPTIONAL - Advanced
-  [sinks.my_sink_id.librdkafka_options]
-    "client.id" = "${ENV_VAR}" # example
-    "fetch.error.backoff.ms" = "1000" # example
-    "socket.send.buffer.bytes" = "100" # example
+  # Advanced
+  librdkafka_options.client.id = "${ENV_VAR}"
+  librdkafka_options.fetch.error.backoff.ms = "1000"
+  librdkafka_options.socket.send.buffer.bytes = "100"
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Buffer
+  buffer.type = "memory" # default
+  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.max_size = 104900000 # bytes, required when type = "disk"
+  buffer.when_full = "block" # default
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
-
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
 ```
 
 </TabItem>
@@ -212,7 +192,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -334,7 +314,7 @@ Configures the encoding specific sink behavior.
   common={true}
   defaultValue={null}
   enumValues={{"text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["json","text"]}
+  examples={["text","json"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
@@ -594,7 +574,7 @@ Configures the TLS options for connections from this sink.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
@@ -640,7 +620,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -686,7 +666,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}

@@ -2,6 +2,7 @@
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events allowing you to remove one or more log fields."
 event_types: ["log"]
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_fields%22
 min_version: null
 service_name: "Remove Fields"
@@ -29,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_fields" # must be: "remove_fields"
-  inputs = ["my-source-id"] # example
-  fields = ["field1", "field2"] # example
+  type = "remove_fields"
+  inputs = ["my-source-id"]
+  fields = ["field1", "field2", "parent.child"]
 ```
 
 ## Options
@@ -47,7 +48,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["field1","field2"]]}
+  examples={[["field1","field2","parent.child"]]}
   groups={[]}
   name={"fields"}
   path={null}
@@ -60,7 +61,7 @@ import Field from '@site/src/components/Field';
 
 ### fields
 
-The log field names to drop.
+The log field names to drop. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -79,6 +80,25 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`fields`](#fields) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_remove_fields_transform_id]
+  # ...
+  fields = ["field1", "field2", "parent.child"]
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/

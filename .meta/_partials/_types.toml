@@ -1,11 +1,14 @@
 [<%= namespace %>.options.types]
 type = "table"
 common = <%= common %>
-description = "Key/Value pairs representing mapped log field types."
+description = """\
+Key/value pairs representing mapped log field names and types. This is used to \
+coerce log fields into their proper types.\
+"""
 
 [<%= namespace %>.options.types.children."`[field-name]`"]
 type = "string"
-common = <%= common %>
+common = true
 examples = [
 {status = "int"},
 {duration = "float"},

@@ -2,6 +2,7 @@
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
 min_version: null
 service_name: "Swimlanes"
@@ -23,28 +24,58 @@ The Vector `swimlanes` transform accepts and [outputs `log` events](#output) all
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "swimlanes" # must be: "swimlanes"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "swimlanes"
+  inputs = ["my-source-id"]
 
-  # REQUIRED - Lanes
-  [transforms.my_transform_id.lanes.`<swimlane_id>`]
-    # REQUIRED
-    type = "check_fields" # example
-
-    # OPTIONAL
-    "message.contains" = "foo"
-    "message.eq" = "this is the content to match against"
-    "host.exists" = true
-    "method.neq" = "POST"
-    "environment.prefix" = "staging-"
+  # Lanes
+  [transforms.my_transform_id.lanes.`[swimlane-id]`]
+    type = "check_fields" # default
+    message.eq = "this is the content to match against"
+    message.contains = "foo"
+    environment.prefix = "staging-"
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  # General
+  type = "swimlanes"
+  inputs = ["my-source-id"]
+
+  # Lanes
+  [transforms.my_transform_id.lanes.`[swimlane-id]`]
+    type = "check_fields" # default
+    message.eq = "this is the content to match against"
+    host.exists = true
+    method.neq = "POST"
+    message.contains = "foo"
+    environment.prefix = "staging-"
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -83,7 +114,7 @@ A table of swimlane identifiers to logical conditions representing the filter of
   enumValues={null}
   examples={[]}
   groups={[]}
-  name={"`<swimlane_id>`"}
+  name={"`[swimlane-id]`"}
   path={"lanes"}
   relevantWhen={null}
   required={true}
@@ -92,7 +123,7 @@ A table of swimlane identifiers to logical conditions representing the filter of
   unit={null}
   >
 
-#### `<swimlane_id>`
+#### `[swimlane-id]`
 
 The identifier of a swimlane.
 
@@ -101,22 +132,22 @@ The identifier of a swimlane.
 
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"message.contains":"foo"}]}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
+  examples={["check_fields","is_log","is_metric"]}
   groups={[]}
-  name={"`<field_name>`.contains"}
-  path={"lanes.`<swimlane_id>`"}
-  relevantWhen={{"type":"check_fields"}}
-  required={false}
+  name={"type"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={null}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   >
 
-##### `<field_name>`.contains
+##### type
 
-Checks whether a string field contains a string argument.
+The type of the condition to execute.
 
 
 </Field>
@@ -128,8 +159,8 @@ Checks whether a string field contains a string argument.
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"}]}
   groups={[]}
-  name={"`<field_name>`.eq"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field-name]`.eq"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -137,7 +168,7 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-##### `<field_name>`.eq
+##### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
 
@@ -146,13 +177,13 @@ Check whether a fields contents exactly matches the value specified.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"host.exists":true}]}
   groups={[]}
-  name={"`<field_name>`.exists"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field-name]`.exists"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -160,7 +191,7 @@ Check whether a fields contents exactly matches the value specified.
   unit={null}
   >
 
-##### `<field_name>`.exists
+##### `[field-name]`.exists
 
 Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
@@ -169,13 +200,13 @@ Check whether a field exists or does not exist, depending on the provided valueb
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"method.neq":"POST"}]}
   groups={[]}
-  name={"`<field_name>`.neq"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field-name]`.neq"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -183,7 +214,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   unit={null}
   >
 
-##### `<field_name>`.neq
+##### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
 
@@ -195,10 +226,10 @@ Check whether a fields contents does not match the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"message.contains":"foo"}]}
   groups={[]}
-  name={"`<field_name>`.prefix"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field_name]`.contains"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -206,9 +237,9 @@ Check whether a fields contents does not match the value specified.
   unit={null}
   >
 
-##### `<field_name>`.prefix
+##### `[field_name]`.contains
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field contains a string argument.
 
 
 </Field>
@@ -218,20 +249,20 @@ Checks whether a string field has a string argument prefix.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["check_fields","is_log","is_metric"]}
+  examples={[{"environment.prefix":"staging-"}]}
   groups={[]}
-  name={"type"}
-  path={"lanes.`<swimlane_id>`"}
-  relevantWhen={null}
-  required={true}
+  name={"`[field_name]`.prefix"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   >
 
-##### type
+##### `[field_name]`.prefix
 
-The type of the condition to execute.
+Checks whether a string field has a string argument prefix.
 
 
 </Field>
@@ -255,14 +286,10 @@ The `swimlanes` transform accepts and [outputs `log` events](#output) allowing y
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="ifelse"
   values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="ifelse">
 

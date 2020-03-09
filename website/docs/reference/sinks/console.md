@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`."
 event_types: ["log","metric"]
+function_category: "test"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,23 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "console" # must be: "console"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL - General
-  target = "stdout" # default, enum
+  # General
+  type = "console"
+  inputs = ["my-source-id"]
+  target = "stdout" # default
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
 ```
 
 </TabItem>
@@ -69,23 +61,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "console" # must be: "console"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL - General
-  target = "stdout" # default, enum
+  # General
+  type = "console"
+  inputs = ["my-source-id"]
+  target = "stdout" # default
   healthcheck = true # default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 ```
 
 </TabItem>
@@ -126,7 +112,7 @@ Configures the encoding specific sink behavior.
   common={true}
   defaultValue={null}
   enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["json","text"]}
+  examples={["text","json"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

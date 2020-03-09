@@ -2,6 +2,7 @@
 component_title: "Remove Tags"
 description: "The Vector `remove_tags` transform accepts and outputs `metric` events allowing you to remove one or more metric tags."
 event_types: ["metric"]
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
 min_version: null
 service_name: "Remove Tags"
@@ -29,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_tags" # must be: "remove_tags"
-  inputs = ["my-source-id"] # example
-  tags = ["tag1", "tag2"] # example
+  type = "remove_tags"
+  inputs = ["my-source-id"]
+  tags = ["tag1", "tag2"]
 ```
 
 ## Options

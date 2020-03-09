@@ -21,8 +21,9 @@ event.\
 
 [transforms.add_fields.options.fields.children."`[field-name]`"]
 type = "*"
-required = true
+field_path_notation = true
 templatable = true
+required = true
 examples = [
   {"string_field" = "string value"},
   {"env_var_field" = "${ENV_VAR}"},
@@ -30,7 +31,7 @@ examples = [
   {"float_field" = 1.2},
   {"bool_field" = true},
   {"timestamp_field" = 1979-05-27T00:32:00.999999-07:00},
-  {parent.child = "child_value"},
+  {"parent.child_field" = "child_value"},
   {"list_field" = ["first", "second", "third"]},
 ]
 description = """\
@@ -52,16 +53,15 @@ Given the following configuration:
   type = "add_fields"
   inputs = [...]
 
-  [transforms.my_transform.fields]
-    field1 = "string value"
-    field2 = 1
-    field3 = 2.0
-    field4 = true
-    field5 = 2019-05-27T07:32:00Z
-    field6 = ["item 1", "item 2"]
-    field7.nested = "nested value",
-    field8 = "#{HOSTNAME}"
-    field9 = "{{field1}} {{field2}}"
+  fields.field1 = "string value"
+  fields.field2 = 1
+  fields.field3 = 2.0
+  fields.field4 = true
+  fields.field5 = 2019-05-27T07:32:00Z
+  fields.field6 = ["item 1", "item 2"]
+  fields.field7.nested = "nested value",
+  fields.field8 = "#{HOSTNAME}"
+  fields.field9 = "{{field1}} {{field2}}"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

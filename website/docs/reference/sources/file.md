@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,20 +44,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  include = ["/var/log/nginx/*.log"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "file"
   glob_minimum_cooldown = 1000 # default, milliseconds
+  include = ["/var/log/nginx/*.log"]
   start_at_beginning = false # default
-  ignore_older = 86400 # example, no default, seconds
+  ignore_older = 86400 # no default, seconds
 
-  # OPTIONAL - Context
+  # Context
   file_key = "file" # default
   host_key = "host" # default
 
-  # OPTIONAL - Priority
+  # Priority
   oldest_first = false # default
 ```
 
@@ -67,38 +66,34 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  include = ["/var/log/nginx/*.log"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "file"
   glob_minimum_cooldown = 1000 # default, milliseconds
+  include = ["/var/log/nginx/*.log"]
   start_at_beginning = false # default
-  data_dir = "/var/lib/vector" # example, no default
-  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
-  ignore_older = 86400 # example, no default, seconds
+  data_dir = "/var/lib/vector" # no default
+  exclude = ["/var/log/nginx/*.[0-9]*.log"] # no default
+  ignore_older = 86400 # no default, seconds
   max_line_bytes = 102400 # default, bytes
 
-  # OPTIONAL - Context
+  # Context
   file_key = "file" # default
   host_key = "host" # default
 
-  # OPTIONAL - Priority
+  # Priority
   max_read_bytes = 2048 # default, bytes
   oldest_first = false # default
 
-  # OPTIONAL - Fingerprinting
-  [sources.my_source_id.fingerprinting]
-    fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
-    ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
-    strategy = "checksum" # default, enum
+  # Fingerprinting
+  fingerprinting.fingerprint_bytes = 256 # default, bytes, required when strategy = "checksum"
+  fingerprinting.ignored_header_bytes = 0 # default, bytes, required when strategy = "checksum"
+  fingerprinting.strategy = "checksum" # default
 
-  # OPTIONAL - Multiline
-  [sources.my_source_id.multiline]
-    condition_pattern = "^[\\s]+" # example
-    mode = "continue_through" # example, enum
-    start_pattern = "^[^\\s]" # example
-    timeout_ms = 1000 # example, milliseconds
+  # Multiline
+  multiline.condition_pattern = "^[\\s]+"
+  multiline.mode = "continue_through"
+  multiline.start_pattern = "^[^\\s]"
+  multiline.timeout_ms = 1000 # milliseconds
 ```
 
 </TabItem>

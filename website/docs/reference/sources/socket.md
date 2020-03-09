@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events."
 event_types: ["log"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+socket%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,16 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
-  mode = "tcp" # example, enum
-  path = "/path/to/socket" # example, relevant when mode = "unix"
+  # General
+  type = "socket"
+  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
+  mode = "tcp"
+  path = "/path/to/socket" # required when mode = "unix"
+  shutdown_timeout_secs = 30 # default, seconds, required when mode = "tcp"
 
-  # OPTIONAL - General
-  shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
-
-  # OPTIONAL - Context
+  # Context
   host_key = "host" # default
 ```
 
@@ -63,27 +62,24 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  address = "0.0.0.0:9000" # example, relevant when mode = "tcp" or mode = "udp"
-  mode = "tcp" # example, enum
-  path = "/path/to/socket" # example, relevant when mode = "unix"
-
-  # OPTIONAL - General
-  shutdown_timeout_secs = 30 # default, seconds, relevant when mode = "tcp"
+  # General
+  type = "socket"
+  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
+  mode = "tcp"
+  path = "/path/to/socket" # required when mode = "unix"
+  shutdown_timeout_secs = 30 # default, seconds, required when mode = "tcp"
   max_length = 102400 # default, bytes
 
-  # OPTIONAL - Context
+  # Context
   host_key = "host" # default
 
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default, relevant when mode = "tcp"
-    enabled = false # default, relevant when mode = "tcp"
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default, relevant when mode = "tcp"
-    key_path = "/path/to/host_certificate.key" # example, no default, relevant when mode = "tcp"
-    verify_certificate = false # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default, relevant when mode = "tcp"
+  tls.enabled = false # default, relevant when mode = "tcp"
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default, relevant when mode = "tcp"
+  tls.key_path = "/path/to/host_certificate.key" # no default, relevant when mode = "tcp"
+  tls.verify_certificate = false # default
 ```
 
 </TabItem>

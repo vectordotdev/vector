@@ -2,6 +2,7 @@
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
 min_version: null
 service_name: "Grok Parser"
@@ -29,22 +30,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "grok_parser" # must be: "grok_parser"
-  inputs = ["my-source-id"] # example
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # example
-
-  # OPTIONAL - General
+  # General
+  type = "grok_parser"
+  inputs = ["my-source-id"]
   drop_field = true # default
   field = "message" # default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 ## Options
@@ -83,7 +81,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -96,7 +94,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
 
 ### field
 
-The log field to execute the [`pattern`](#pattern) against. Must be a `string` value.
+The log field to execute the [`pattern`](#pattern) against. Must be a `string` value. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -142,7 +140,7 @@ The [Grok pattern][urls.grok_patterns]
 
 ### types
 
-Key/Value pairs representing mapped log field types.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types.
 
 <Fields filters={false}>
 
@@ -199,6 +197,26 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_grok_parser_transform_id]
+  # ...
+  field = "message"
+  field = "parent.child"
+  field = "array[0]"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 ### Performance
 
 Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
@@ -210,6 +228,7 @@ performance issues.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [pages.index#performance]: /#performance
 [urls.grok]: http://grokdebug.herokuapp.com/

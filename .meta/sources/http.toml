@@ -21,7 +21,6 @@ description = """The address to listen for connections on"""
 type = "string"
 common = true
 default = "text"
-examples = ["text","ndjson","json"]
 required = true
 description = """The expected encoding of received data. `text` indicates newline-delimited text, with each line forming a message. `ndjson` indicates newline-delimited JSON, where each line must contain a json object. `json` indicates a JSON payload, which must be a JSON array containing JSON objects. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields."""
 

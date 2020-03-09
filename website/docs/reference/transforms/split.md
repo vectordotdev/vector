@@ -2,6 +2,7 @@
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22
 min_version: null
 service_name: "Split"
@@ -29,23 +30,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "split" # must be: "split"
-  inputs = ["my-source-id"] # example
-  field_names = ["timestamp", "level", "message"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "split"
+  inputs = ["my-source-id"]
   drop_field = true # default
   field = "message" # default
+  field_names = ["timestamp", "level", "message", "parent.child"]
   separator = "[whitespace]" # default
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 ## Options
@@ -84,7 +82,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -97,7 +95,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 ### field
 
-The field to apply the split on.
+The field to apply the split on. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -107,7 +105,7 @@ The field to apply the split on.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["timestamp","level","message"]]}
+  examples={[["timestamp","level","message","parent.child"]]}
   groups={[]}
   name={"field_names"}
   path={null}
@@ -120,7 +118,7 @@ The field to apply the split on.
 
 ### field_names
 
-The field names assigned to the resulting tokens, in order.
+The field names assigned to the resulting tokens, in order. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -166,7 +164,7 @@ The separator to split the field on. If no separator is given, it will split on 
 
 ### types
 
-Key/Value pairs representing mapped log field types.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types.
 
 <Fields filters={false}>
 
@@ -224,9 +222,8 @@ And the following configuration:
   separator = ","
   fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 
-  [transforms.<transform-id>.types]
-    status = "int"
-    bytes = "int"
+  types.status = "int"
+  types.bytes = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
@@ -259,8 +256,28 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) and [`field_names`](#field_names) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_split_transform_id]
+  # ...
+  field = "message"
+  field = "parent.child"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.unicode_whitespace]: https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace

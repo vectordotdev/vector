@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,41 +44,29 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "http" # must be: "http"
-  inputs = ["my-source-id"] # example
-  uri = "https://10.22.212.22:9000/endpoint" # example
-
-  # OPTIONAL - General
+  # General
+  type = "http"
+  inputs = ["my-source-id"]
+  uri = "https://10.22.212.22:9000/endpoint"
+  compression = "none" # default
   healthcheck = true # default
 
-  # OPTIONAL - requests
-  compression = "none" # default, enum
+  # Batch
+  batch.max_size = 1049000 # default, bytes
+  batch.timeout_secs = 1 # default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
-    timeout_secs = 1 # default, seconds
+  # Buffer
+  buffer.type = "memory" # default
+  buffer.max_events = 500 # default, events, required when type = "memory"
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
+  # Encoding
+  encoding.codec = "text"
 
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 10 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 1000 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
+  # Request
+  request.in_flight_limit = 10 # default, requests
+  request.rate_limit_duration_secs = 1 # default, seconds
+  request.rate_limit_num = 1000 # default
+  request.timeout_secs = 30 # default, seconds
 ```
 
 </TabItem>
@@ -87,71 +76,54 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "http" # must be: "http"
-  inputs = ["my-source-id"] # example
-  uri = "https://10.22.212.22:9000/endpoint" # example
-
-  # OPTIONAL - General
+  # General
+  type = "http"
+  inputs = ["my-source-id"]
+  uri = "https://10.22.212.22:9000/endpoint"
+  compression = "none" # default
   healthcheck = true # default
-  healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
+  healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
 
-  # OPTIONAL - requests
-  compression = "none" # default, enum
+  # Auth
+  auth.strategy = "basic"
+  auth.password = "${PASSWORD_ENV_VAR}" # required when strategy = "basic"
+  auth.user = "${USERNAME_ENV_VAR}" # required when strategy = "basic"
 
-  # OPTIONAL - Auth
-  [sinks.my_sink_id.auth]
-    strategy = "basic" # must be: "basic"
-    password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
+  # Batch
+  batch.max_size = 1049000 # default, bytes
+  batch.timeout_secs = 1 # default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
-    timeout_secs = 1 # default, seconds
+  # Buffer
+  buffer.type = "memory" # default
+  buffer.max_events = 500 # default, events, required when type = "memory"
+  buffer.max_size = 104900000 # bytes, required when type = "disk"
+  buffer.when_full = "block" # default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Encoding
+  encoding.codec = "text"
+  encoding.except_fields = ["timestamp", "message", "host"] # no default
+  encoding.only_fields = ["timestamp", "message", "host"] # no default
+  encoding.timestamp_format = "rfc3339" # default
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Headers
+  headers.Authorization = "${TOKEN_ENV_VAR}"
+  headers.X-Powered-By = "Vector"
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
+  # Request
+  request.in_flight_limit = 10 # default, requests
+  request.rate_limit_duration_secs = 1 # default, seconds
+  request.rate_limit_num = 1000 # default
+  request.retry_attempts = -1 # default
+  request.retry_initial_backoff_secs = 1 # default, seconds
+  request.retry_max_duration_secs = 10 # default, seconds
+  request.timeout_secs = 30 # default, seconds
 
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
-
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}" # example
-    X-Powered-By = "Vector" # example
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 10 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 1000 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
-
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.verify_certificate = true # default
 ```
 
 </TabItem>
@@ -336,7 +308,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -381,7 +353,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -503,7 +475,7 @@ Configures the encoding specific sink behavior.
   common={true}
   defaultValue={null}
   enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
-  examples={["json","ndjson","text"]}
+  examples={["text","json","ndjson"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
@@ -784,7 +756,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
@@ -807,7 +779,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -830,7 +802,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={10}
   enumValues={null}
   examples={[10]}
@@ -926,7 +898,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -972,7 +944,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}

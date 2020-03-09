@@ -12,7 +12,8 @@ requirements = {}
 
 [transforms.concat.options.target]
 type = "string"
-examples = ["dest_field_name"]
+examples = ["root_field_name", "parent.child", "array[0]"]
+field_path_notation = true
 required = true
 description = """\
 The name for the new label.\

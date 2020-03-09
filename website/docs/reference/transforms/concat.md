@@ -2,6 +2,7 @@
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22
 min_version: null
 service_name: "Concat"
@@ -29,14 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "concat" # must be: "concat"
-  inputs = ["my-source-id"] # example
-  items = ["first[..3]", "second[-5..]", "third[3..6]"] # example
-  target = "dest_field_name" # example
-
-  # OPTIONAL
+  type = "concat"
+  inputs = ["my-source-id"]
+  items = ["first[..3]", "second[-5..]", "third[3..6]"]
   joiner = " " # default
+  target = "root_field_name"
 ```
 
 ## Options
@@ -98,7 +96,7 @@ The string that is used to join all items.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["dest_field_name"]}
+  examples={["root_field_name","parent.child","array[0]"]}
   groups={[]}
   name={"target"}
   path={null}
@@ -111,7 +109,7 @@ The string that is used to join all items.
 
 ### target
 
-The name for the new label.
+The name for the new label. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -169,5 +167,26 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`target`](#target) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_concat_transform_id]
+  # ...
+  target = "root_field_name"
+  target = "parent.child"
+  target = "array[0]"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/

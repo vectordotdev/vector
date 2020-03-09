@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
 event_types: ["metric"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+prometheus%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -33,9 +34,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "prometheus" # must be: "prometheus"
-  hosts = ["http://localhost:9090"] # example
-  scrape_interval_secs = 1 # example
+  type = "prometheus"
+  hosts = ["http://localhost:9090"]
+  scrape_interval_secs = 1
 ```
 
 ## Options
