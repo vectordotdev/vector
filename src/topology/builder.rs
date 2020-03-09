@@ -18,7 +18,7 @@ pub struct Pieces {
     pub tasks: HashMap<String, Task>,
     pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
-    pub shutdown_coordinator: Option<ShutdownCoordinator>,
+    pub shutdown_coordinator: ShutdownCoordinator,
 }
 
 pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
@@ -96,7 +96,7 @@ pub fn build_pieces(
     let mut tasks = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
-    let mut shutdown_coordinator = Some(ShutdownCoordinator::new());
+    let mut shutdown_coordinator = ShutdownCoordinator::new();
 
     let mut errors = vec![];
     let mut warnings = vec![];
@@ -117,8 +117,7 @@ pub fn build_pieces(
 
         let typetag = source.source_type();
 
-        let (shutdown_signal, force_shutdown_tripwire) =
-            shutdown_coordinator.as_mut().unwrap().register_source(name);
+        let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source.build(&name, &config.global, shutdown_signal, tx) {
             Err(error) => {

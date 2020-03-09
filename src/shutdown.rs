@@ -102,6 +102,24 @@ impl ShutdownCoordinator {
         (shutdown_signal, force_shutdown_tripwire)
     }
 
+    /// Takes ownership of all internal state for the given source from another ShutdownCoordinator.
+    pub fn takeover_source(&mut self, name: &str, other: &mut Self) {
+        self.shutdown_begun_triggers.insert(
+            name.to_string(),
+            other.shutdown_begun_triggers.remove(name).unwrap(),
+        );
+
+        self.shutdown_force_triggers.insert(
+            name.to_string(),
+            other.shutdown_force_triggers.remove(name).unwrap(),
+        );
+
+        self.shutdown_complete_tripwires.insert(
+            name.to_string(),
+            other.shutdown_complete_tripwires.remove(name).unwrap(),
+        );
+    }
+
     pub fn shutdown_source_begin(&mut self, name: &str) {
         self.shutdown_begun_triggers.remove(name).unwrap().cancel();
     }

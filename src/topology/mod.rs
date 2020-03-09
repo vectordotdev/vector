@@ -56,7 +56,7 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_coordinator: pieces.shutdown_coordinator.take().unwrap(),
+        shutdown_coordinator: ShutdownCoordinator::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -372,6 +372,9 @@ impl RunningTopology {
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
         }
+
+        self.shutdown_coordinator
+            .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task.instrument(span), self.abort_tx.clone());
