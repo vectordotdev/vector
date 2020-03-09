@@ -4120,8 +4120,7 @@ dependencies = [
 [[package]]
 name = "tower-hyper"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cff60538bc14baa9cc84fbe4c040d498163daf23bc9846a9aef0e2e40dcc1d51"
+source = "git+https://github.com/tower-rs/tower-hyper#0dd2cf213820799f5820108350ff0779385bfe8d"
 dependencies = [
  "futures 0.1.29",
  "http",
@@ -4728,6 +4727,7 @@ dependencies = [
  "syslog_loose",
  "tempfile",
  "tokio",
+ "tokio-buf",
  "tokio-codec",
  "tokio-retry",
  "tokio-signal",

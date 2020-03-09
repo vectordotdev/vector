@@ -1,15 +1,21 @@
 #![cfg(feature = "rusoto_core")]
-use crate::dns::Resolver;
+use crate::{dns::Resolver, sinks::util::http::HttpService};
 use futures01::{
     future::{Future, FutureResult},
-    Poll,
+    Async, Poll, Stream,
 };
+use http::{
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Method, Request, Response,
+};
+use hyper::body::Payload;
 use hyper::client::connect::HttpConnector;
-use hyper_openssl::{
-    openssl::ssl::{SslConnector, SslMethod},
-    HttpsConnector,
+use hyper_openssl::HttpsConnector;
+use rusoto_core::{
+    request::{DispatchSignedRequest, HttpDispatchError, HttpResponse},
+    signature::{SignedRequest, SignedRequestPayload},
+    ByteStream, CredentialsError, Region,
 };
-use rusoto_core::{CredentialsError, HttpClient, Region};
 use rusoto_credential::{
     AutoRefreshingProvider, AutoRefreshingProviderFuture, AwsCredentials,
     DefaultCredentialsProvider, DefaultCredentialsProviderFuture, ProvideAwsCredentials,
@@ -17,8 +23,12 @@ use rusoto_credential::{
 };
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use snafu::{ResultExt, Snafu};
+use std::{io, time::Duration};
+use tower::Service;
 
-pub type Client = HttpClient<HttpsConnector<HttpConnector<Resolver>>>;
+// pub type Client = HttpClient<HttpService<RusotoBody>>;
+pub type Client =
+    HttpClient<tower_hyper::Client<HttpsConnector<HttpConnector<Resolver>>, RusotoBody>>;
 
 #[derive(Debug, Snafu)]
 enum RusotoError {
@@ -94,11 +104,207 @@ impl Future for AwsCredentialsProviderFuture {
 }
 
 pub fn client(resolver: Resolver) -> crate::Result<Client> {
-    let mut http = HttpConnector::new_with_resolver(resolver);
-    http.enforce_http(false);
+    // let mut http = HttpConnector::new_with_resolver(resolver);
+    // http.enforce_http(false);
 
-    let ssl = SslConnector::builder(SslMethod::tls())?;
-    let https = HttpsConnector::with_connector(http, ssl)?;
+    // let ssl = SslConnector::builder(SslMethod::tls())?;
+    // let https = HttpsConnector::with_connector(http, ssl)?;
 
-    Ok(HttpClient::from_connector(https))
+    // Ok(HttpClient::from_connector(https))
+    let client = crate::sinks::util::http::https_client(resolver, Default::default())?;
+    // let client = tower_hyper::Client::from_client(client);
+    // HttpClient { client }
+    todo!()
+}
+
+#[derive(Debug, Clone)]
+pub struct HttpClient<T> {
+    client: T,
+}
+
+#[derive(Debug)]
+pub struct RusotoBody {
+    inner: Option<SignedRequestPayload>,
+}
+
+struct BodyStream {
+    body: hyper::Body,
+}
+
+impl<T> HttpClient<T> {
+    pub fn new(client: T) -> Self {
+        HttpClient { client }
+    }
+}
+
+impl<T> DispatchSignedRequest for HttpClient<T>
+where
+    T: Service<Request<RusotoBody>, Response = Response<hyper::Body>, Error = hyper::Error>
+        + Clone
+        + Send
+        + 'static,
+    T::Future: Send + 'static,
+{
+    type Future = Box<dyn Future<Item = HttpResponse, Error = HttpDispatchError> + Send + 'static>;
+
+    fn dispatch(&self, request: SignedRequest, timeout: Option<Duration>) -> Self::Future {
+        assert!(timeout.is_none(), "timeout is not supported at this level");
+
+        let method = match request.method().as_ref() {
+            "POST" => Method::POST,
+            "PUT" => Method::PUT,
+            "DELETE" => Method::DELETE,
+            "GET" => Method::GET,
+            "HEAD" => Method::HEAD,
+            v => unimplemented!("method type: {:?}", v),
+        };
+
+        let mut headers = HeaderMap::new();
+        for h in request.headers().iter() {
+            let header_name = match h.0.parse::<HeaderName>() {
+                Ok(name) => name,
+                Err(err) => unimplemented!(),
+            };
+            for v in h.1.iter() {
+                let header_value = match HeaderValue::from_bytes(v) {
+                    Ok(value) => value,
+                    Err(err) => unimplemented!(),
+                };
+                headers.append(&header_name, header_value);
+            }
+        }
+
+        let mut uri = format!(
+            "{}://{}{}",
+            request.scheme(),
+            request.hostname(),
+            request.canonical_path()
+        );
+
+        if !request.canonical_query_string().is_empty() {
+            uri += &format!("?{}", request.canonical_query_string());
+        }
+
+        let mut request = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(RusotoBody::from(request.payload))
+            .map_err(|e| format!("RequestBuildingError: {}", e))
+            .unwrap();
+
+        *request.headers_mut() = headers;
+
+        let request = {
+            let mut client = self.client.clone();
+            client.call(request)
+        };
+
+        let fut = request
+            .and_then(|response| {
+                let status = response.status();
+                let headers = response
+                    .headers()
+                    .iter()
+                    .map(|(h, v)| {
+                        let value_string = v.to_str().unwrap().to_owned();
+                        (h.clone(), value_string)
+                    })
+                    .collect();
+                let body = response.into_body();
+                let body = BodyStream { body };
+
+                Ok(HttpResponse {
+                    status,
+                    headers,
+                    body: ByteStream::new(body),
+                })
+            })
+            .map_err(|e| HttpDispatchError::new(format!("DispatchError: {}", e)));
+
+        Box::new(fut)
+    }
+}
+
+impl Payload for RusotoBody {
+    type Data = io::Cursor<Vec<u8>>;
+    type Error = io::Error;
+
+    fn poll_data(&mut self) -> Poll<Option<Self::Data>, Self::Error> {
+        match &mut self.inner {
+            Some(SignedRequestPayload::Buffer(buf)) => {
+                if !buf.is_empty() {
+                    let buf = buf.split_off(0);
+                    Ok(Async::Ready(Some(io::Cursor::new(
+                        buf.into_iter().collect(),
+                    ))))
+                } else {
+                    Ok(Async::Ready(None))
+                }
+            }
+            Some(SignedRequestPayload::Stream(stream)) => match stream.poll()? {
+                Async::Ready(Some(buffer)) => Ok(Async::Ready(Some(io::Cursor::new(
+                    buffer.into_iter().collect(),
+                )))),
+                Async::Ready(None) => Ok(Async::Ready(None)),
+                Async::NotReady => Ok(Async::NotReady),
+            },
+            None => Ok(Async::Ready(None)),
+        }
+    }
+
+    fn poll_trailers(&mut self) -> Poll<Option<HeaderMap>, Self::Error> {
+        Ok(Async::Ready(None))
+    }
+}
+
+impl tokio_buf::BufStream for RusotoBody {
+    type Item = io::Cursor<Vec<u8>>;
+    type Error = io::Error;
+
+    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        match &mut self.inner {
+            Some(SignedRequestPayload::Buffer(buf)) => {
+                if !buf.is_empty() {
+                    let buf = buf.split_off(0);
+                    Ok(Async::Ready(Some(io::Cursor::new(
+                        buf.into_iter().collect(),
+                    ))))
+                } else {
+                    Ok(Async::Ready(None))
+                }
+            }
+            Some(SignedRequestPayload::Stream(stream)) => match stream.poll()? {
+                Async::Ready(Some(buffer)) => Ok(Async::Ready(Some(io::Cursor::new(
+                    buffer.into_iter().collect(),
+                )))),
+                Async::Ready(None) => Ok(Async::Ready(None)),
+                Async::NotReady => Ok(Async::NotReady),
+            },
+            None => Ok(Async::Ready(None)),
+        }
+    }
+}
+
+impl From<Option<SignedRequestPayload>> for RusotoBody {
+    fn from(inner: Option<SignedRequestPayload>) -> Self {
+        RusotoBody { inner }
+    }
+}
+
+impl Stream for BodyStream {
+    type Item = bytes::Bytes;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        match self
+            .body
+            .poll_data()
+            // We have to hardcode this error since rusoto wants the error to be `io::Error`
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("hyper error: {}", e)))?
+        {
+            Async::Ready(Some(buf)) => Ok(Async::Ready(Some(buf.into_bytes()))),
+            Async::Ready(None) => Ok(Async::Ready(None)),
+            Async::NotReady => Ok(Async::NotReady),
+        }
+    }
 }
