@@ -58,9 +58,9 @@ impl SourceConfig for LogplexConfig {
 
 fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
     //deal with headers
-    let msg_count = match usize::from_str( get_header(&header_map, "Logplex-Msg-Count")? ) {
+    let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
         Ok(v) => v,
-        Err(e) => return Err( header_error_message("Logplex-Msg-Count", &e.to_string()) )
+        Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
     };
     let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
@@ -75,7 +75,14 @@ fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, E
         } else {
             error!(message = "Parsed event count does not match message count header", event_count = events.len(), %msg_count);
         }
-        return Err( header_error_message("Logplex-Msg-Count", &format!("Parsed event count does not match message count header: {} vs {}",events.len(), msg_count)) )
+        return Err(header_error_message(
+            "Logplex-Msg-Count",
+            &format!(
+                "Parsed event count does not match message count header: {} vs {}",
+                events.len(),
+                msg_count
+            ),
+        ));
     }
 
     Ok(events)
@@ -83,14 +90,19 @@ fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, E
 
 fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, ErrorMessage> {
     if let Some(header_value) = header_map.get(name) {
-        header_value.to_str().map_err(|e| header_error_message(name, &e.to_string()))
+        header_value
+            .to_str()
+            .map_err(|e| header_error_message(name, &e.to_string()))
     } else {
-        Err( header_error_message(name, "Header does not exist") )
+        Err(header_error_message(name, "Header does not exist"))
     }
 }
 
 fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Invalid request header {:?}: {:?}",name,msg))
+    ErrorMessage::new(
+        StatusCode::BAD_REQUEST,
+        format!("Invalid request header {:?}: {:?}", name, msg),
+    )
 }
 
 fn body_to_events(body: FullBody) -> Vec<Event> {
