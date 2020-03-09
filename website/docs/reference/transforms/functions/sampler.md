@@ -19,7 +19,7 @@ The Vector `sampler` transform accepts and outputs [`log`][docs.data-model.log] 
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/sampler.md.erb
+     website/docs/reference/transforms/functions/sampler.md.erb
 -->
 
 ## Configuration

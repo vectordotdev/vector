@@ -390,7 +390,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `transforms-add_fields` | Enables building of [`add_fields` transform][docs.transforms.functions.add_fields].  |
 | `transforms-add_tags` | Enables building of [`add_tags` transform][docs.transforms.functions.add_tags].  |
 | `transforms-ansi_stripper` | Enables building of [`ansi_stripper` transform][docs.transforms.functions.ansi_stripper].  |
-| `transforms-aws_ec2_metadata` | Enables building of [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].  |
+| `transforms-aws_ec2_metadata` | Enables building of [`aws_ec2_metadata` transform][docs.transforms.functions.aws_ec2_metadata].  |
 | `transforms-coercer` | Enables building of [`coercer` transform][docs.transforms.functions.coercer].  |
 | `transforms-concat` | Enables building of [`concat` transform][docs.transforms.functions.concat].  |
 | `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.functions.field_filter].  |
@@ -487,28 +487,28 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.sources.stdin]: /docs/reference/sources/stdin/
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.sources.vector]: /docs/reference/sources/vector/
-[docs.transforms.functions.add_fields]: /docs/reference/transforms/add_fields/
-[docs.transforms.functions.add_tags]: /docs/reference/transforms/add_tags/
-[docs.transforms.functions.ansi_stripper]: /docs/reference/transforms/ansi_stripper/
-[docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/
-[docs.transforms.functions.coercer]: /docs/reference/transforms/coercer/
-[docs.transforms.functions.concat]: /docs/reference/transforms/concat/
-[docs.transforms.functions.field_filter]: /docs/reference/transforms/field_filter/
-[docs.transforms.functions.geoip]: /docs/reference/transforms/geoip/
-[docs.transforms.functions.grok_parser]: /docs/reference/transforms/grok_parser/
-[docs.transforms.functions.json_parser]: /docs/reference/transforms/json_parser/
-[docs.transforms.functions.log_to_metric]: /docs/reference/transforms/log_to_metric/
-[docs.transforms.functions.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
-[docs.transforms.runtimes.lua]: /docs/reference/transforms/lua/
-[docs.transforms.functions.merge]: /docs/reference/transforms/merge/
-[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
-[docs.transforms.functions.remove_fields]: /docs/reference/transforms/remove_fields/
-[docs.transforms.functions.remove_tags]: /docs/reference/transforms/remove_tags/
-[docs.transforms.functions.rename_fields]: /docs/reference/transforms/rename_fields/
-[docs.transforms.functions.sampler]: /docs/reference/transforms/sampler/
-[docs.transforms.functions.split]: /docs/reference/transforms/split/
-[docs.transforms.functions.swimlanes]: /docs/reference/transforms/swimlanes/
-[docs.transforms.functions.tokenizer]: /docs/reference/transforms/tokenizer/
+[docs.transforms.functions.add_fields]: /docs/reference/transforms/functions/add_fields/
+[docs.transforms.functions.add_tags]: /docs/reference/transforms/functions/add_tags/
+[docs.transforms.functions.ansi_stripper]: /docs/reference/transforms/functions/ansi_stripper/
+[docs.transforms.functions.aws_ec2_metadata]: /docs/reference/transforms/functions/aws_ec2_metadata/
+[docs.transforms.functions.coercer]: /docs/reference/transforms/functions/coercer/
+[docs.transforms.functions.concat]: /docs/reference/transforms/functions/concat/
+[docs.transforms.functions.field_filter]: /docs/reference/transforms/functions/field_filter/
+[docs.transforms.functions.geoip]: /docs/reference/transforms/functions/geoip/
+[docs.transforms.functions.grok_parser]: /docs/reference/transforms/functions/grok_parser/
+[docs.transforms.functions.json_parser]: /docs/reference/transforms/functions/json_parser/
+[docs.transforms.functions.log_to_metric]: /docs/reference/transforms/functions/log_to_metric/
+[docs.transforms.functions.logfmt_parser]: /docs/reference/transforms/functions/logfmt_parser/
+[docs.transforms.functions.merge]: /docs/reference/transforms/functions/merge/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/functions/regex_parser/
+[docs.transforms.functions.remove_fields]: /docs/reference/transforms/functions/remove_fields/
+[docs.transforms.functions.remove_tags]: /docs/reference/transforms/functions/remove_tags/
+[docs.transforms.functions.rename_fields]: /docs/reference/transforms/functions/rename_fields/
+[docs.transforms.functions.sampler]: /docs/reference/transforms/functions/sampler/
+[docs.transforms.functions.split]: /docs/reference/transforms/functions/split/
+[docs.transforms.functions.swimlanes]: /docs/reference/transforms/functions/swimlanes/
+[docs.transforms.functions.tokenizer]: /docs/reference/transforms/functions/tokenizer/
+[docs.transforms.runtimes.lua]: /docs/reference/transforms/runtimes/lua/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka

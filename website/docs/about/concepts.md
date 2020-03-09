@@ -48,7 +48,7 @@ Vector. This might involve parsing, filtering, sampling, or aggregating. You can
 have any number of transforms in your pipeline and how they are composed is up
 to you.
 
-<Jump to="/docs/reference/transforms/">View all transforms</Jump>
+<Jump to="[[[docs.transforms.functions.]]">View all transforms</Jump>
 
 ### Sinks
 

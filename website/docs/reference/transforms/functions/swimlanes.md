@@ -19,7 +19,7 @@ The Vector `swimlanes` transform accepts and [outputs `log` events](#output) all
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/swimlanes.md.erb
+     website/docs/reference/transforms/functions/swimlanes.md.erb
 -->
 
 ## Configuration

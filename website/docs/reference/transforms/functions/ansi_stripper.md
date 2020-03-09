@@ -19,7 +19,7 @@ The Vector `ansi_stripper` transform accepts and outputs [`log`][docs.data-model
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/ansi_stripper.md.erb
+     website/docs/reference/transforms/functions/ansi_stripper.md.erb
 -->
 
 ## Configuration

@@ -19,7 +19,7 @@ The Vector `log_to_metric` transform accepts [`log`][docs.data-model.log] events
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/log_to_metric.md.erb
+     website/docs/reference/transforms/functions/log_to_metric.md.erb
 -->
 
 ## Configuration

@@ -220,7 +220,7 @@ to UTC from the local time.
 
 ### Dot Notation
 
-Some components, such as [`rename_fields` transform][docs.reference.transforms.rename_fields],
+Some components, such as [`rename_fields` transform][docs.transforms.functions.rename_fields],
 accept name of a field as an option. In order to specify a nested field to them, use the
 dot notation which can be described by an example:
 
@@ -295,9 +295,9 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
-[docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.sources]: /docs/reference/sources/
-[docs.transforms.functions.coercer]: /docs/reference/transforms/coercer/
+[docs.transforms.functions.coercer]: /docs/reference/transforms/functions/coercer/
+[docs.transforms.functions.rename_fields]: /docs/reference/transforms/functions/rename_fields/
 [urls.ieee_754]: https://en.wikipedia.org/wiki/IEEE_754
 [urls.issue_551]: https://github.com/timberio/vector/issues/551
 [urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html

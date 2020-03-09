@@ -19,7 +19,7 @@ The Vector `split` transform accepts and [outputs `log` events](#output) allowin
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/split.md.erb
+     website/docs/reference/transforms/functions/split.md.erb
 -->
 
 ## Configuration

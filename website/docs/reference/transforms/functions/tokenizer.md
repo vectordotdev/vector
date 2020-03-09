@@ -19,7 +19,7 @@ The Vector `tokenizer` transform accepts and outputs [`log`][docs.data-model.log
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/tokenizer.md.erb
+     website/docs/reference/transforms/functions/tokenizer.md.erb
 -->
 
 ## Configuration

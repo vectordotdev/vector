@@ -19,7 +19,7 @@ The Vector `lua` transform accepts and outputs [`log`][docs.data-model.log] even
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/lua.md.erb
+     website/docs/reference/transforms/runtimes/lua.md.erb
 -->
 
 ## Configuration

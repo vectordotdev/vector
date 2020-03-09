@@ -43,7 +43,7 @@ class Templates
 
     links =
       components.select(&:common?)[0..limit].collect do |component|
-        component_link(component)
+        "[#{component.name}][#{component_short_link(component)}]"
       end
 
     num_leftover = components.size - links.size
@@ -71,11 +71,11 @@ class Templates
     render("#{partials_path}/_component_header.md", binding).strip
   end
 
-  def component_link(component)
+  def component_short_link(component)
     if component.respond_to?(:sub_type)
-      "[#{component.name}][docs.#{component.type.pluralize}.#{component.sub_type.pluralize}.#{component.name}]"
+      "docs.#{component.type.pluralize}.#{component.sub_type.pluralize}.#{component.name}"
     else
-      "[#{component.name}][docs.#{component.type.pluralize}.#{component.name}]"
+      "docs.#{component.type.pluralize}.#{component.name}"
     end
   end
 

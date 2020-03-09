@@ -19,7 +19,7 @@ The Vector [`geoip`](#geoip) transform accepts and [outputs `log` events](#outpu
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/geoip.md.erb
+     website/docs/reference/transforms/functions/geoip.md.erb
 -->
 
 ## Configuration

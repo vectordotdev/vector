@@ -19,7 +19,7 @@ The Vector `coercer` transform accepts and [outputs `log` events](#output) allow
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/coercer.md.erb
+     website/docs/reference/transforms/functions/coercer.md.erb
 -->
 
 ## Configuration

@@ -149,6 +149,6 @@ option = "{{ parent.child }}"
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sinks.aws_s3#key_prefix]: /docs/reference/sinks/aws_s3/#key_prefix
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
-[docs.transforms.runtimes.lua]: /docs/reference/transforms/lua/
+[docs.transforms.runtimes.lua]: /docs/reference/transforms/runtimes/lua/
 [urls.issue_1692]: https://github.com/timberio/vector/issues/1692
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

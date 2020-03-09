@@ -307,5 +307,5 @@ misfits trying to recruit you as their hacker.
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
 [docs.sources.socket]: /docs/reference/sources/socket/
-[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/functions/regex_parser/
 [docs.transforms]: /docs/reference/transforms/

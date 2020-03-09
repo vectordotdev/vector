@@ -19,7 +19,7 @@ The Vector `concat` transform accepts and [outputs `log` events](#output) allowi
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/concat.md.erb
+     website/docs/reference/transforms/functions/concat.md.erb
 -->
 
 ## Configuration

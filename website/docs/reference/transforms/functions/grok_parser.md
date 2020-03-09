@@ -19,7 +19,7 @@ The Vector `grok_parser` transform accepts and outputs [`log`][docs.data-model.l
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/grok_parser.md.erb
+     website/docs/reference/transforms/functions/grok_parser.md.erb
 -->
 
 ## Configuration
@@ -229,7 +229,7 @@ performance issues.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
-[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/functions/regex_parser/
 [pages.index#performance]: /#performance
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/

@@ -19,7 +19,7 @@ The Vector [`merge`](#merge) transform accepts and [outputs `log` events](#outpu
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/merge.md.erb
+     website/docs/reference/transforms/functions/merge.md.erb
 -->
 
 ## Configuration

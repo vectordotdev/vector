@@ -7,7 +7,7 @@ tags: ["type: announcement", "domain: transforms", "transform: ec2_metadata"]
 ---
 
 Are your events the laughing-stock of the data warehouse? Then enrich them with
-our brand spanking new [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].
+our brand spanking new [`aws_ec2_metadata` transform][docs.transforms.functions.aws_ec2_metadata].
 
 <!--truncate-->
 
@@ -29,11 +29,11 @@ don't want all enrichments added then whitelist them with the `fields` option:
   ]
 ```
 
-For more guidance get on the [reference page][docs.transforms.aws_ec2_metadata].
+For more guidance get on the [reference page][docs.transforms.functions.aws_ec2_metadata].
 
 ## Why?
 
 Data is better when it's thicc 👌
 
 
-[docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/
+[docs.transforms.functions.aws_ec2_metadata]: /docs/reference/transforms/functions/aws_ec2_metadata/

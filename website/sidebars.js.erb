@@ -121,7 +121,7 @@ module.exports = {
           items: [
             <%= metadata.links.fetch_id("docs.transforms").to_json %>,
             <% metadata.transforms_list.each do |t| %>
-              <%= metadata.links.fetch_id("docs.transforms.#{t.name}").to_json %>,
+              <%= metadata.links.fetch_id("docs.transforms.#{t.sub_type.to_s.pluralize}.#{t.name}").to_json %>,
             <% end %>
           ]
         },

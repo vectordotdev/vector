@@ -151,49 +151,49 @@ module.exports = {
           items: [
             "reference/transforms",
             
-              "reference/transforms/add_fields",
+              "reference/transforms/functions/add_fields",
             
-              "reference/transforms/add_tags",
+              "reference/transforms/functions/add_tags",
             
-              "reference/transforms/ansi_stripper",
+              "reference/transforms/functions/ansi_stripper",
             
-              "reference/transforms/aws_ec2_metadata",
+              "reference/transforms/functions/aws_ec2_metadata",
             
-              "reference/transforms/coercer",
+              "reference/transforms/functions/coercer",
             
-              "reference/transforms/concat",
+              "reference/transforms/functions/concat",
             
-              "reference/transforms/field_filter",
+              "reference/transforms/functions/field_filter",
             
-              "reference/transforms/geoip",
+              "reference/transforms/functions/geoip",
             
-              "reference/transforms/grok_parser",
+              "reference/transforms/functions/grok_parser",
             
-              "reference/transforms/json_parser",
+              "reference/transforms/functions/json_parser",
             
-              "reference/transforms/log_to_metric",
+              "reference/transforms/functions/log_to_metric",
             
-              "reference/transforms/logfmt_parser",
+              "reference/transforms/functions/logfmt_parser",
             
-              "reference/transforms/lua",
+              "reference/transforms/runtimes/lua",
             
-              "reference/transforms/merge",
+              "reference/transforms/functions/merge",
             
-              "reference/transforms/regex_parser",
+              "reference/transforms/functions/regex_parser",
             
-              "reference/transforms/remove_fields",
+              "reference/transforms/functions/remove_fields",
             
-              "reference/transforms/remove_tags",
+              "reference/transforms/functions/remove_tags",
             
-              "reference/transforms/rename_fields",
+              "reference/transforms/functions/rename_fields",
             
-              "reference/transforms/sampler",
+              "reference/transforms/functions/sampler",
             
-              "reference/transforms/split",
+              "reference/transforms/functions/split",
             
-              "reference/transforms/swimlanes",
+              "reference/transforms/functions/swimlanes",
             
-              "reference/transforms/tokenizer",
+              "reference/transforms/functions/tokenizer",
             
           ]
         },

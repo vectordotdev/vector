@@ -19,7 +19,7 @@ The Vector `aws_ec2_metadata` transform accepts and [outputs `log` events](#outp
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/aws_ec2_metadata.md.erb
+     website/docs/reference/transforms/functions/aws_ec2_metadata.md.erb
 -->
 
 ## Configuration

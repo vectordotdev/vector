@@ -19,7 +19,7 @@ The Vector `add_tags` transform accepts and outputs [`metric`][docs.data-model.m
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/add_tags.md.erb
+     website/docs/reference/transforms/functions/add_tags.md.erb
 -->
 
 ## Configuration

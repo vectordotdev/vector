@@ -305,7 +305,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | Name  | Description |
 |:------|:------------|
 <% metadata.components.each do |component| -%>
-| `<%= component.type.pluralize %>-<%= component.name %>` | Enables building of [`<%= component.name %>` <%= component.type %>][docs.<%= component.type.pluralize %>.<%= component.name %>]. <%
+| `<%= component.type.pluralize %>-<%= component.name %>` | Enables building of [`<%= component.name %>` <%= component.type %>][<%= component_short_link(component) %>]. <%
 if component.name == "kafka" then
 -%> Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled. <%
 elsif component.name == "docker" then

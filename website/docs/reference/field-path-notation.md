@@ -88,4 +88,4 @@ field\.with\.dots
 The above name will be treated literally.
 
 
-[docs.transforms.functions.rename_fields]: /docs/reference/transforms/rename_fields/
+[docs.transforms.functions.rename_fields]: /docs/reference/transforms/functions/rename_fields/

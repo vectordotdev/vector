@@ -19,7 +19,7 @@ The Vector `remove_fields` transform accepts and outputs [`log`][docs.data-model
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/remove_fields.md.erb
+     website/docs/reference/transforms/functions/remove_fields.md.erb
 -->
 
 ## Configuration

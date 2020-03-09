@@ -19,7 +19,7 @@ The Vector `rename_fields` transform accepts and [outputs `log` events](#output)
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/rename_fields.md.erb
+     website/docs/reference/transforms/functions/rename_fields.md.erb
 -->
 
 ## Configuration

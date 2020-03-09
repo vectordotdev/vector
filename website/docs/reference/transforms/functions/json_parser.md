@@ -19,7 +19,7 @@ The Vector `json_parser` transform accepts and [outputs `log` events](#output) a
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/json_parser.md.erb
+     website/docs/reference/transforms/functions/json_parser.md.erb
 -->
 
 ## Configuration

@@ -19,7 +19,7 @@ The Vector `remove_tags` transform accepts and outputs [`metric`][docs.data-mode
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/remove_tags.md.erb
+     website/docs/reference/transforms/functions/remove_tags.md.erb
 -->
 
 ## Configuration

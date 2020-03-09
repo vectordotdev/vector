@@ -19,7 +19,7 @@ The Vector `logfmt_parser` transform accepts and outputs [`log`][docs.data-model
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/logfmt_parser.md.erb
+     website/docs/reference/transforms/functions/logfmt_parser.md.erb
 -->
 
 ## Configuration

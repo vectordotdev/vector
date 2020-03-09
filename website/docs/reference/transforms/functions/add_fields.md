@@ -19,7 +19,7 @@ The Vector `add_fields` transform accepts and [outputs `log` events](#output) al
 
      To make changes please edit the template located at:
 
-     website/docs/reference/transforms/add_fields.md.erb
+     website/docs/reference/transforms/functions/add_fields.md.erb
 -->
 
 ## Configuration
@@ -253,7 +253,7 @@ will drop that field from the output.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.configuration#types]: /docs/setup/configuration/#types
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.transforms.runtimes.lua]: /docs/reference/transforms/lua/
-[docs.transforms.functions.remove_fields]: /docs/reference/transforms/remove_fields/
+[docs.transforms.functions.remove_fields]: /docs/reference/transforms/functions/remove_fields/
+[docs.transforms.runtimes.lua]: /docs/reference/transforms/runtimes/lua/
 [urls.toml_array]: https://github.com/toml-lang/toml#array
 [urls.toml_table]: https://github.com/toml-lang/toml#table
