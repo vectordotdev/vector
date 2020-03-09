@@ -13,16 +13,18 @@ use bytes::Bytes;
 use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::header::HeaderValue;
 use http::{Request, StatusCode};
+use hyper::body::{Body, Payload};
 use hyper::client::HttpConnector;
+use hyper::Client;
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
-use tower_hyper::client::Client;
-use tracing_tower::{InstrumentableService, InstrumentedService};
+use tracing::Span;
+use tracing_futures::Instrument;
 
-pub type Response = hyper::Response<Bytes>;
+pub type Response = http::Response<Bytes>;
 pub type Error = hyper::Error;
 pub type HttpsClient = hyper::Client<HttpsConnector<HttpConnector<Resolver>>>;
 
@@ -101,22 +103,19 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct HttpBatchService<B = Vec<u8>> {
-    inner: InstrumentedService<
-        Client<HttpsConnector<HttpConnector<Resolver>>, Vec<u8>>,
-        Request<Vec<u8>>,
-    >,
-    request_builder: Arc<dyn Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send>,
+// TODO: add manual debug impl
+pub struct HttpClient<B = Body> {
+    client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
+    span: Span,
     version: HeaderValue,
 }
 
-impl<B> HttpBatchService<B> {
-    pub fn new(
-        resolver: Resolver,
-        tls_settings: impl Into<Option<TlsSettings>>,
-        request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-    ) -> HttpBatchService<B> {
+impl<B> HttpClient<B>
+where
+    B: Payload + Send + 'static,
+    B::Data: Send,
+{
+    pub fn new(resolver: Resolver, tls_settings: impl Into<Option<TlsSettings>>) -> HttpClient<B> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
@@ -132,14 +131,83 @@ impl<B> HttpBatchService<B> {
             .executor(DefaultExecutor::current())
             .build(https);
 
-        let inner = Client::with_client(client).instrument(info_span!("http"));
-
         let version = crate::get_version();
+
+        let span = tracing::info_span!("http");
+
+        HttpClient {
+            client,
+            span,
+            version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
+        }
+    }
+}
+
+impl<B> Service<Request<B>> for HttpClient<B>
+where
+    B: Payload + Send + 'static,
+    B::Data: Send,
+{
+    type Response = http::Response<Body>;
+    type Error = Error;
+    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        Ok(().into())
+    }
+
+    fn call(&mut self, mut request: Request<B>) -> Self::Future {
+        let _enter = self.span.enter();
+
+        request
+            .headers_mut()
+            .insert("User-Agent", self.version.clone());
+
+        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
+
+        let fut = self
+            .client
+            .request(request)
+            .inspect(|res| {
+                debug!(
+                    message = "response.",
+                    status = ?res.status(),
+                    version = ?res.version(),
+                )
+            })
+            .instrument(self.span.clone());
+
+        Box::new(fut)
+    }
+}
+
+impl<B> Clone for HttpClient<B> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            span: self.span.clone(),
+            version: self.version.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct HttpBatchService<B = Vec<u8>> {
+    inner: HttpClient<Body>,
+    request_builder: Arc<dyn Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send>,
+}
+
+impl<B> HttpBatchService<B> {
+    pub fn new(
+        resolver: Resolver,
+        tls_settings: impl Into<Option<TlsSettings>>,
+        request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    ) -> HttpBatchService<B> {
+        let inner = HttpClient::new(resolver, tls_settings);
 
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
-            version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
         }
     }
 }
@@ -175,29 +243,12 @@ impl<B> Service<B> for HttpBatchService<B> {
     }
 
     fn call(&mut self, body: B) -> Self::Future {
-        let mut request = (self.request_builder)(body);
-
-        request
-            .headers_mut()
-            .insert("User-Agent", self.version.clone());
-
-        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
-
-        let fut = self
-            .inner
-            .call(request)
-            .inspect(|res| {
-                debug!(
-                    message = "response.",
-                    status = ?res.status(),
-                    version = ?res.version(),
-                )
-            })
-            .and_then(|r| {
-                let (parts, body) = r.into_parts();
-                body.concat2()
-                    .map(|b| hyper::Response::from_parts(parts, b.into_bytes()))
-            });
+        let request = (self.request_builder)(body).map(Body::from);
+        let fut = self.inner.call(request).and_then(|r| {
+            let (parts, body) = r.into_parts();
+            body.concat2()
+                .map(|b| hyper::Response::from_parts(parts, b.into_bytes()))
+        });
 
         Box::new(fut)
     }

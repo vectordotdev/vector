@@ -1,5 +1,5 @@
 #![cfg(feature = "rusoto_core")]
-use crate::{dns::Resolver, sinks::util::http::HttpBatchService};
+use crate::{dns::Resolver, sinks::util};
 use futures01::{
     future::{Future, FutureResult},
     Async, Poll, Stream,
@@ -27,8 +27,7 @@ use std::{io, time::Duration};
 use tower::Service;
 
 // pub type Client = HttpClient<HttpService<RusotoBody>>;
-pub type Client =
-    HttpClient<tower_hyper::Client<HttpsConnector<HttpConnector<Resolver>>, RusotoBody>>;
+pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 
 #[derive(Debug, Snafu)]
 enum RusotoError {
@@ -111,10 +110,10 @@ pub fn client(resolver: Resolver) -> crate::Result<Client> {
     // let https = HttpsConnector::with_connector(http, ssl)?;
 
     // Ok(HttpClient::from_connector(https))
-    let client = crate::sinks::util::http::https_client(resolver, Default::default())?;
+    // let client = crate::sinks::util::http::https_client(resolver, Default::default())?;
     // let client = tower_hyper::Client::from_client(client);
-    // HttpClient { client }
-    todo!()
+    let client = crate::sinks::util::http::HttpClient::new(resolver, None);
+    Ok(HttpClient { client })
 }
 
 #[derive(Debug, Clone)]
