@@ -7,56 +7,7 @@ description: Learn how to manage log schemas with Vector.
 Data comes in all shapes and sizes. Vector has an array (let's call it a vector 😎) of composable functionality for
 decoding your events in the right format, transforming them into the right shape, and passing that data on downstream.
 
-## Defining Global Field Names
-
-> TODO: Not implemented, yet!
-
-By default, Vector primarily operates on three fields: `host`, `message`, and `timestamp`.
-
-```json
-{
-  "host": "my.host.com",
-  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
-  "timestamp": "2019-11-01T21:15:47+00:00"
-}
-```
-
-It may be that your data does not follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema` section of your `config.toml`.
-
-```toml
-[log_schema]
-host_key = "instance" # default "host"
-message_key = "info" # default "message"
-timestamp_key = "datetime" # default "timestamp"
-
-# Sources, transforms, and sinks...
-```
-
-> **Gotcha:** Not all sources use the `host` field.
->
-> **Gotcha:** The timestamp and message fields are sometimes derived from the source itself. Eg for the file source `timestamp` is the exact time the event was injested, and not configurable.
-
-### Example: Custom timestamp field
-
-Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
-
-If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
-
-```toml
-# TODO: A simple config and a one-liner invocation.
-[log_schema]
-timestamp_key = "@timestamp"
-
-[sources.my_naming_confused_source]
-  type = "logplex"
-  address = "0.0.0.0:8088"
-```
-
-
-
-## Field filtering
-
-> TODO: https://github.com/timberio/vector/issues/1448 is exploring how to make this better.
+## Pipeline field filtering
 
 Sometimes it is advantageous to filter out specific fields during the pipeline. You can use a `remove_fields` transform transform to do this.
 
@@ -145,6 +96,25 @@ Feb 05 16:15:27.945  INFO vector: Shutting down.
 
 Don't know where events are coming from? You can use the `geoip` transform an `ipv4` field and get a grip on that!
 
+## Sink field filtering
+
+While it's often reasonable to remove this kind of data at the pipeline level, we identified use cases that involve using values in sinks from these fields in sink configuration.
+
+### Per host kafka topics
+
+Lets take a look at what that might look like:
+
+```toml
+[sinks.output]
+  inputs = ["demo"]
+  type = "kafka"
+
+  # Put events in the host specific topic.
+  topic = "{{host}}"
+  encoding.except_fields = ["host"]
+  # ...
+```
+
 ## Moving and Concatenating Fields
 
 > TODO: This doesn't work, yet! See [#750](https://github.com/timberio/vector/issues/750)
@@ -179,6 +149,7 @@ inputs = ["rename_timestamp"]
 fields = ["timestamp"]
 ```
 
+
 ### Example: Mooshing together name fields
 
 Let's pretend one of your teammates falsely assumed folks always have first and last names, so we have a `first_name`
@@ -201,6 +172,51 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
 
 What if you had to do this in reverse? Try using the [`regex`](/docs/reference/transforms/regex_parser/) or
 [`split`](/docs/reference/transforms/split/) transforms.
+
+
+## Defining Global Field Names
+
+By default, Vector primarily operates on three fields: `host`, `message`, and `timestamp`.
+
+```json
+{
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "timestamp": "2019-11-01T21:15:47+00:00"
+}
+```
+
+It may be that your data does not follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema` section of your `config.toml`.
+
+```toml
+[log_schema]
+host_key = "instance" # default "host"
+message_key = "info" # default "message"
+timestamp_key = "datetime" # default "timestamp"
+
+# Sources, transforms, and sinks...
+```
+
+> **Gotcha:** Not all sources use the `host` field.
+
+We find this feature is useful when used with simple configs! As your number of components grows, your needs will change and you'll likely need to configure this at a more fine grained level.
+
+### Example: Custom timestamp field
+
+Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
+
+If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
+
+```toml
+# TODO: A simple config and a one-liner invocation.
+[log_schema]
+timestamp_key = "@timestamp"
+
+[sources.my_naming_confused_source]
+  type = "logplex"
+  address = "0.0.0.0:8088"
+```
+
 
 ## Coercing Data Types
 
