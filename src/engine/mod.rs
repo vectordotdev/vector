@@ -57,7 +57,7 @@ fn compile(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<()> {
     let mut bindings = lucet_wasi::bindings();
     bindings.extend(&Bindings::from_str(include_str!("hostcall/bindings.json"))?)?;
     Ok(Lucetc::new(input)
-        .with_bindings(lucet_wasi::bindings())
+        .with_bindings(bindings)
         .shared_object_file(output)?)
 }
 
