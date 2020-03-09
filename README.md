@@ -67,7 +67,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 #### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [16 more...][docs.transforms]
+* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.functions.json_parser], [log_to_metric][docs.transforms.functions.log_to_metric], [logfmt_parser][docs.transforms.functions.logfmt_parser], [lua][docs.transforms.runtimes.lua], [regex_parser][docs.transforms.functions.regex_parser], [sampler][docs.transforms.functions.sampler], and [16 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [21 more...][docs.sinks]
 
 #### Administration
@@ -131,15 +131,15 @@ To learn more about our correctness tests, please see the [Vector test harness][
 #### Control Flow
 
 * **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
-* **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
+* **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.functions.swimlanes] allow for complex control-flow logic.
 * **Dynamic partitioning** - Create [dynamic partitions on the fly][docs.sinks.aws_s3#partitioning] with Vector's [templating syntax][docs.reference.templating].
 
 #### Data Processing
 
-* **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
-* **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
+* **Programmable transforms** - [Lua][docs.transforms.runtimes.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
+* **Rich parsing** - [Regex][docs.transforms.functions.regex_parser], [Grok][docs.transforms.functions.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
 * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
-* **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
+* **Metrics derivation** - [Derive logs from metrics][docs.transforms.functions.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
 
 #### Operations
@@ -248,14 +248,14 @@ Or use your own [preferred method][docs.installation].
 [docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
 [docs.sources]: https://vector.dev/docs/reference/sources/
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
-[docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
-[docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
-[docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
-[docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
-[docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
-[docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
-[docs.transforms.sampler]: https://vector.dev/docs/reference/transforms/sampler/
-[docs.transforms.swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes/
+[docs.transforms.functions.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
+[docs.transforms.functions.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
+[docs.transforms.functions.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
+[docs.transforms.functions.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
+[docs.transforms.runtimes.lua]: https://vector.dev/docs/reference/transforms/lua/
+[docs.transforms.functions.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
+[docs.transforms.functions.sampler]: https://vector.dev/docs/reference/transforms/sampler/
+[docs.transforms.functions.swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes/
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [docs.updating]: https://vector.dev/docs/administration/updating/
 [docs.validating]: https://vector.dev/docs/administration/validating/

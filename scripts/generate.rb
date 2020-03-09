@@ -1,3 +1,4 @@
+
 #!/usr/bin/env ruby
 
 # generate.rb
@@ -197,14 +198,18 @@ end
 # Create missing component templates
 #
 
-metadata.components.each do |component|
-  template_path = "#{REFERENCE_ROOT}/#{component.type.pluralize}/#{component.name}.md.erb"
+# metadata.components.each do |component|
+#   template_path = "#{REFERENCE_ROOT}/#{component.type.pluralize}/#{component.name}.md.erb"
 
-  if !File.exists?(template_path)
-    contents = templates.component_default(component)
-    File.open(template_path, 'w+') { |file| file.write(contents) }
-  end
-end
+#   if !File.exists?(template_path)
+#     contents = templates.component_default(component)
+#     File.open(template_path, 'w+') { |file| file.write(contents) }
+#   end
+# end
+
+#
+# Create missing .md files
+#
 
 erb_paths =
   Dir.glob("#{ROOT_DIR}/**/*.erb", File::FNM_DOTMATCH).
@@ -212,9 +217,6 @@ erb_paths =
   filter { |path| !path.start_with?("#{ROOT_DIR}/scripts") }.
   filter { |path| !path.start_with?("#{ROOT_DIR}/distribution/nix") }
 
-#
-# Create missing .md files
-#
 
 erb_paths.each do |erb_path|
   md_path = erb_path.gsub(/\.erb$/, "")

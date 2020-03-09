@@ -185,7 +185,7 @@ Learn more about how [`log` events][docs.data-model.log] are structured.
 
 The `add_fields` transform is designed for simple key additions. If you need
 more complex transforming then we recommend using a more versatile transform
-like the [`lua` transform][docs.transforms.lua].
+like the [`lua` transform][docs.transforms.runtimes.lua].
 
 ### Environment Variables
 
@@ -226,7 +226,7 @@ Learn more about how [`log` events][docs.data-model.log] are structured.
 
 ### Removing Fields
 
-See the [`remove_fields` transform][docs.transforms.remove_fields].
+See the [`remove_fields` transform][docs.transforms.functions.remove_fields].
 
 ### Types
 
@@ -253,7 +253,7 @@ will drop that field from the output.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.configuration#types]: /docs/setup/configuration/#types
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.transforms.lua]: /docs/reference/transforms/lua/
-[docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
+[docs.transforms.runtimes.lua]: /docs/reference/transforms/lua/
+[docs.transforms.functions.remove_fields]: /docs/reference/transforms/remove_fields/
 [urls.toml_array]: https://github.com/toml-lang/toml#array
 [urls.toml_table]: https://github.com/toml-lang/toml#table

@@ -897,7 +897,7 @@ this might not be sufficient since random distribution does not preserve order.
 To override this, you can supply the [`partition_key_field`](#partition_key_field) option. This option
 represents a field on your event to use for the partition key value instead.
 This is useful if you have a field already on your event, and it also pairs
-nicely with the [`add_fields` transform][docs.transforms.add_fields].
+nicely with the [`add_fields` transform][docs.transforms.functions.add_fields].
 
 #### Missing keys or blank values
 
@@ -955,7 +955,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[docs.transforms.add_fields]: /docs/reference/transforms/add_fields/
+[docs.transforms.functions.add_fields]: /docs/reference/transforms/add_fields/
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html

@@ -7,7 +7,8 @@ class Transform < Component
   attr_reader :allow_you_to_description,
     :input_types,
     :output,
-    :output_types
+    :output_types,
+    :sub_type
 
   def initialize(hash)
     super(hash)
@@ -18,6 +19,7 @@ class Transform < Component
     @input_types = hash.fetch("input_types")
     @output = OpenStruct.new
     @output_types = hash.fetch("output_types")
+    @sub_type = hash.fetch("sub_type")
 
     # checks
 

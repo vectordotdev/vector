@@ -440,6 +440,7 @@
         "common",
         "function_category",
         "requirements",
+        "sub_type",
         "title"
       ],
       "properties": {
@@ -502,6 +503,14 @@
         "requirements": {
           "$ref": "#/definitions/requirements",
           "description": "Component requirements"
+        },
+        "sub_type": {
+          "type": "string",
+          "description": "The type of transform. Sub-type since `type` is used to describe the component type (source, transform, or sink).",
+          "enum": [
+            "function",
+            "runtime"
+          ]
         },
         "title": {
           "type": "string",

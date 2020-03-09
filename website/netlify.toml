@@ -98,8 +98,20 @@
   status = 301
   force = true
 
-  [[redirects]]
+[[redirects]]
   from = "/releases/"
   to = "/releases/latest/download/"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/docs/reference/transforms/lua/"
+  to = "/docs/reference/transforms/runtimes/lua/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/reference/transforms/*/"
+  to = "/docs/reference/transforms/functions/:splat"
+  status = 301
   force = true

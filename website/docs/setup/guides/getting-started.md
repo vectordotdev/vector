@@ -78,7 +78,7 @@ different?
 Vector makes it easy to mutate events into a more (or less) structured format
 with [transforms][docs.transforms]. Let's parse our logs into a structured
 format by capturing named regular expression groups with a
-[`regex_parser` transform][docs.transforms.regex_parser].
+[`regex_parser` transform][docs.transforms.functions.regex_parser].
 
 A config can have any number of transforms and it's entirely up to you how they
 are chained together. Similar to sinks, a transform requires you to specify
@@ -307,5 +307,5 @@ misfits trying to recruit you as their hacker.
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
 [docs.sources.socket]: /docs/reference/sources/socket/
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms]: /docs/reference/transforms/

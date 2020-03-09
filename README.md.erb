@@ -109,15 +109,15 @@ To learn more about our correctness tests, please see the [Vector test harness][
 #### Control Flow
 
 * **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
-* **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
+* **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.functions.swimlanes] allow for complex control-flow logic.
 * **Dynamic partitioning** - Create [dynamic partitions on the fly][docs.sinks.aws_s3#partitioning] with Vector's [templating syntax][docs.reference.templating].
 
 #### Data Processing
 
-* **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
-* **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
+* **Programmable transforms** - [Lua][docs.transforms.runtimes.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
+* **Rich parsing** - [Regex][docs.transforms.functions.regex_parser], [Grok][docs.transforms.functions.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
 * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
-* **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
+* **Metrics derivation** - [Derive logs from metrics][docs.transforms.functions.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
 
 #### Operations

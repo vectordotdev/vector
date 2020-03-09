@@ -7,6 +7,7 @@ function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
 requirements = {}
+sub_type = "function"
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "json_parser") %>
 

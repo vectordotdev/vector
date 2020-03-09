@@ -636,7 +636,7 @@ Vector insulates you from these diviations.
 If parsing fails, Vector will include the entire Syslog line in the [`message`](#message)
 key. If you find this happening often, we recommend using the
 [`socket` source][docs.sources.socket] combined with the
-[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
+[`regex_parser` transform][docs.transforms.functions.regex_parser] to implement your own
 ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
 requesting support for your specific format.
 
@@ -644,7 +644,7 @@ requesting support for your specific format.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.sources.socket]: /docs/reference/sources/socket/
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
 [urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

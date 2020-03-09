@@ -114,7 +114,7 @@ option = "{{ parent.child[0] }}"
 
 Vector currently does not support fallback values. [Issue 1692][urls.issue_1692]
 is open to add this functionality. In the interim, you can use the
-[`lua` transform][docs.transforms.lua] to set a default value:
+[`lua` transform][docs.transforms.runtimes.lua] to set a default value:
 
 ```toml
 [transforms.set_defaults]
@@ -149,6 +149,6 @@ option = "{{ parent.child }}"
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sinks.aws_s3#key_prefix]: /docs/reference/sinks/aws_s3/#key_prefix
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
-[docs.transforms.lua]: /docs/reference/transforms/lua/
+[docs.transforms.runtimes.lua]: /docs/reference/transforms/lua/
 [urls.issue_1692]: https://github.com/timberio/vector/issues/1692
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

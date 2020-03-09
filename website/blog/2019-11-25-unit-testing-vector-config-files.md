@@ -18,7 +18,7 @@ mission-critical production pipelines that are collaborated on.
 ## Example
 
 Let's look at a basic example that uses the [`regex_parser`
-transform][docs.transforms.regex_parser] to parse log lines:
+transform][docs.transforms.functions.regex_parser] to parse log lines:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
@@ -98,5 +98,5 @@ works well for everyone. Please let us know what you think either in our
 [docs.reference.tests]: /docs/reference/tests/
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sources.file]: /docs/reference/sources/file/
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms]: /docs/reference/transforms/

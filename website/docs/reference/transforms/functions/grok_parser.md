@@ -219,17 +219,17 @@ You can learn more about Vector's field notation in the
 
 ### Performance
 
-Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
+Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.functions.regex_parser].
 We plan to add a [performance test][pages.index#performance] for this in the future.
 While this is still plenty fast for most use cases we recommend using the
-[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
+[`regex_parser` transform][docs.transforms.functions.regex_parser] if you are experiencing
 performance issues.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
-[docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
+[docs.transforms.functions.regex_parser]: /docs/reference/transforms/regex_parser/
 [pages.index#performance]: /#performance
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/

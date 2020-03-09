@@ -251,7 +251,7 @@ There are cases where Vector interacts with formats that do not have a formal
 timestamp defintion, such as JSON. In these cases, Vector will ingest the
 timestamp in it's primitive form (string or integer). You can then coerce the
 field into a [`timestamp`](#timestamp) using the
-[`coercer` transform][docs.transforms.coercer]. If you are parsing this data
+[`coercer` transform][docs.transforms.functions.coercer]. If you are parsing this data
 out of a string, all Vector parser transforms include a `types` option,
 allowing you to extract and coerce in one step.
 
@@ -297,7 +297,7 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
 [docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.sources]: /docs/reference/sources/
-[docs.transforms.coercer]: /docs/reference/transforms/coercer/
+[docs.transforms.functions.coercer]: /docs/reference/transforms/coercer/
 [urls.ieee_754]: https://en.wikipedia.org/wiki/IEEE_754
 [urls.issue_551]: https://github.com/timberio/vector/issues/551
 [urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html
