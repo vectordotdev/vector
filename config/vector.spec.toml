@@ -1253,7 +1253,7 @@ dns_servers = ["0.0.0.0:53"]
     float_field = 1.2
     bool_field = true
     timestamp_field = 1979-05-27T00:32:00Z
-    "parent.child_field" = "child_value"
+    parent = {child_field = "child_value"}
     list_field = ["first", "second", "third"]
 
 # Accepts and outputs `metric` events allowing you to add one or more metric tags.
@@ -1407,6 +1407,7 @@ dns_servers = ["0.0.0.0:53"]
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
@@ -1584,6 +1585,7 @@ dns_servers = ["0.0.0.0:53"]
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to parse a log field value as JSON.
 [transforms.json_parser]
@@ -1771,6 +1773,7 @@ dns_servers = ["0.0.0.0:53"]
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
@@ -1921,6 +1924,7 @@ end
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to remove one or more log fields.
 [transforms.remove_fields]
@@ -1996,7 +2000,7 @@ end
     # * required
     # * type: *
     old_field_name = "new_field_name"
-    "parent.old_child_name" = "parent.new_child_name"
+    parent = {old_child_name = "parent.new_child_name"}
 
 # Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
@@ -2100,6 +2104,7 @@ end
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
 [transforms.swimlanes]
@@ -2238,6 +2243,7 @@ end
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 
 # ------------------------------------------------------------------------------

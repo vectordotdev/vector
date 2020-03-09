@@ -74,7 +74,7 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"old_field_name":"new_field_name"},{"parent.old_child_name":"parent.new_child_name"}]}
+  examples={[{"old_field_name":"new_field_name"},{"parent":{"old_child_name":"parent.new_child_name"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"fields"}

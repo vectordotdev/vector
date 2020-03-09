@@ -66,9 +66,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # Conditions
     conditions.type = "check_fields" # optional, default
-    conditions.message.eq = "this is the content to match against" # example
-    conditions.message.contains = "foo" # example
-    conditions.environment.prefix = "staging-" # example
+    conditions."message.eq" = "this is the content to match against" # example
+    conditions."message.contains" = "foo" # example
+    conditions."environment.prefix" = "staging-" # example
 ```
 
 </TabItem>
@@ -117,11 +117,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
     # Conditions
     conditions.type = "check_fields" # optional, default
-    conditions.message.eq = "this is the content to match against" # example
-    conditions.host.exists = true # example
-    conditions.method.neq = "POST" # example
-    conditions.message.contains = "foo" # example
-    conditions.environment.prefix = "staging-" # example
+    conditions."message.eq" = "this is the content to match against" # example
+    conditions."host.exists" = true # example
+    conditions."method.neq" = "POST" # example
+    conditions."message.contains" = "foo" # example
+    conditions."environment.prefix" = "staging-" # example
 ```
 
 </TabItem>

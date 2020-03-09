@@ -70,9 +70,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   socket_timeout_ms = 60000 # optional, default, milliseconds
 
   # Advanced
-  librdkafka_options.client.id = "${ENV_VAR}" # example
-  librdkafka_options.fetch.error.backoff.ms = "1000" # example
-  librdkafka_options.socket.send.buffer.bytes = "100" # example
+  librdkafka_options."client.id" = "${ENV_VAR}" # example
+  librdkafka_options."fetch.error.backoff.ms" = "1000" # example
+  librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default

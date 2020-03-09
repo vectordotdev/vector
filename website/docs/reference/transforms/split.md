@@ -44,6 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.success = "bool" # example
   types.timestamp = "timestamp|%F" # example
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 ## Options
@@ -173,7 +174,7 @@ Key/value pairs representing mapped log field names and types. This is used to c
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"types"}
