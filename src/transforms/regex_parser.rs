@@ -12,26 +12,16 @@ use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
     pub field: Option<Atom>,
+    #[derivative(Default(value = "false"))]
     pub drop_field: bool,
     pub drop_failed: bool,
     pub types: HashMap<Atom, String>,
-}
-
-impl Default for RegexParserConfig {
-    fn default() -> Self {
-        RegexParserConfig {
-            regex: String::default(),
-            field: None,
-            drop_field: true,
-            drop_failed: false,
-            types: HashMap::default(),
-        }
-    }
 }
 
 inventory::submit! {
