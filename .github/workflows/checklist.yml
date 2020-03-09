@@ -4,7 +4,7 @@ on: [pull_request]
 jobs:
   checklist:
     runs-on: ubuntu-latest
-    name: Checklist job
+    name: checklist
     steps:
       - name: Checkout
         uses: actions/checkout@v1
