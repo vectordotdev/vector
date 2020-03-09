@@ -49,6 +49,6 @@ fn it_returns_expired_values() {
         map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
 
         let fut = poll_fn(move |cx| map.poll_expired(cx));
-        assert!(fut.await.is_ok());
+        assert_eq!(fut.await.unwrap().0, "val".to_owned());
     });
 }
