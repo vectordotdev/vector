@@ -90,8 +90,9 @@ function Footer() {
                   <ul className="footer__items">
                     {linkItem.items.map((item, key) =>
                       item.html ? (
-                        <div
+                        <li
                           key={key}
+                          className="footer__item"
                           dangerouslySetInnerHTML={{
                             __html: item.html,
                           }}
@@ -125,7 +126,11 @@ function Footer() {
                 )}
               </div>
             )}
-            {copyright}
+            {copyright}<br />
+            <small>
+              <a href="https://github.com/timberio/vector/security/policy">Security Policy</a>&nbsp;&bull;&nbsp;
+              <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
+            </small>
           </div>
         )}
       </div>

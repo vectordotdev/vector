@@ -2,14 +2,15 @@ use crate::{
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
     sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, HttpRetryLogic, HttpService},
-        tls::{TlsOptions, TlsSettings},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -33,7 +34,8 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
-    pub encoding: Encoding,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -50,7 +52,7 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
@@ -60,7 +62,7 @@ pub enum Encoding {
 }
 
 fn default_host_field() -> Atom {
-    event::HOST.clone()
+    event::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -187,31 +189,33 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
         .collect::<LogEvent>();
 
     json!({
-        "fields": fields.unflatten(),
-        "event": event.unflatten(),
+        "fields": fields,
+        "event": event,
         "time": timestamp
     })
 }
 
 fn encode_event(
     host_field: &Atom,
-    event: Event,
+    mut event: Event,
     indexed_fields: &[Atom],
-    encoding: &Encoding,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<Vec<u8>> {
+    encoding.apply_rules(&mut event);
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
-    let timestamp = if let Some(Value::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
-        ts.timestamp()
-    } else {
-        chrono::Utc::now().timestamp()
-    };
+    let timestamp =
+        if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key()) {
+            ts.timestamp()
+        } else {
+            chrono::Utc::now().timestamp()
+        };
 
-    let mut body = match encoding {
+    let mut body = match encoding.codec {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
-            "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
+            "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
     };
@@ -231,13 +235,13 @@ mod tests {
     use super::*;
     use crate::event::{self, Event};
     use serde::Deserialize;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[derive(Deserialize, Debug)]
     struct HecEvent {
         time: i64,
-        event: HashMap<String, String>,
-        fields: HashMap<String, String>,
+        event: BTreeMap<String, String>,
+        fields: BTreeMap<String, String>,
     }
 
     #[test]
@@ -246,7 +250,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let bytes = encode_event(&host, event, &vec![], &Encoding::Json).unwrap();
+        let bytes = encode_event(&host, event, &vec![], &Encoding::Json.into()).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
@@ -255,10 +259,12 @@ mod tests {
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
-            event[&event::MESSAGE.to_string()],
+            event[&event::log_schema().message_key().to_string()],
             "hello world".to_string()
         );
-        assert!(event.get(&event::TIMESTAMP.to_string()).is_none());
+        assert!(event
+            .get(&event::log_schema().timestamp_key().to_string())
+            .is_none());
     }
 
     #[test]
@@ -283,7 +289,7 @@ mod integration_tests {
         topology::config::SinkContext,
         Event,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use http::StatusCode;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
@@ -542,13 +548,16 @@ mod integration_tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config(encoding: Encoding, indexed_fields: Vec<Atom>) -> super::HecSinkConfig {
+    fn config(
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
+        indexed_fields: Vec<Atom>,
+    ) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
-            encoding,
+            encoding: encoding.into(),
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,

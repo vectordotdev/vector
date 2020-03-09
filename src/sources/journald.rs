@@ -4,7 +4,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
-use futures::{future, sync::mpsc, Future, Sink};
+use futures01::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -153,10 +153,10 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(event::MESSAGE.clone(), message);
+        log.insert(event::log_schema().message_key().clone(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(event::HOST.clone(), host);
+        log.insert(event::log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log.get(&TIMESTAMP) {
@@ -166,7 +166,10 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(event::TIMESTAMP.clone(), Value::Timestamp(timestamp));
+                log.insert(
+                    event::log_schema().timestamp_key().clone(),
+                    Value::Timestamp(timestamp),
+                );
             }
         }
     }
@@ -409,7 +412,7 @@ mod checkpointer_tests {
 mod tests {
     use super::*;
     use crate::test_util::{block_on, runtime, shutdown_on_idle};
-    use futures::stream::Stream;
+    use futures01::stream::Stream;
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
     use std::time::Duration;
@@ -459,7 +462,7 @@ mod tests {
     }
 
     fn run_journal(units: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
@@ -489,11 +492,11 @@ mod tests {
         let received = run_journal(&[], None);
         assert_eq!(received.len(), 2);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE],
+            received[0].as_log()[&event::log_schema().message_key()],
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[1].as_log()[&event::MESSAGE],
+            received[1].as_log()[&event::log_schema().message_key()],
             Value::Bytes("unit message".into())
         );
     }
@@ -503,7 +506,7 @@ mod tests {
         let received = run_journal(&["unit.service"], None);
         assert_eq!(received.len(), 1);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE],
+            received[0].as_log()[&event::log_schema().message_key()],
             Value::Bytes("unit message".into())
         );
     }
@@ -513,7 +516,7 @@ mod tests {
         let received = run_journal(&[], Some("1"));
         assert_eq!(received.len(), 1);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE],
+            received[0].as_log()[&event::log_schema().message_key()],
             Value::Bytes("unit message".into())
         );
     }

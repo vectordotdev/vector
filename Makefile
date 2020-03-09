@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
-export USE_DOCKER ?= true
+export USE_CONTAINER ?= docker
 
 
 help:
@@ -28,7 +28,7 @@ build: ## Build the project
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors (only default features)
-	@scripts/run.sh checker cargo check --all --all-targets
+	@scripts/run.sh checker cargo check --all --all-targets --features docker,kubernetes
 
 check-fmt: ## Checks code formatting correctness
 	@scripts/run.sh checker scripts/check-style.sh
@@ -45,6 +45,9 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 
 check-blog: ## Checks that all blog articles are signed by their authors
 	@scripts/run.sh checker scripts/check-blog-signatures.rb
+
+check-component-features: ## Checks that all component are behind corresponding features
+	@scripts/run.sh checker-component-features scripts/check-component-features.sh
 
 export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta
@@ -72,8 +75,12 @@ sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
 test: ## Spins up Docker resources and runs _every_ test
-	@docker-compose up -d
+	@cargo test --all --features docker --no-run
+	@docker-compose up -d test-runtime-deps
 	@cargo test --all --features docker -- --test-threads 4
+
+test-behavior: ## Runs behavioral tests
+	@cargo run -- test tests/behavior/**/*.toml
 
 clean: ## Remove build artifacts
 	@cargo clean

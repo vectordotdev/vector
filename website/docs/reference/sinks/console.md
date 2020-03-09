@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`."
 event_types: ["log","metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Console"
 sidebar_label: "console|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
 status: "prod-ready"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,18 +43,29 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
+  # REQUIRED - General
   type = "console" # must be: "console"
   inputs = ["my-source-id"] # example
 
-  # OPTIONAL
+  # OPTIONAL - General
   target = "stdout" # default, enum
+  healthcheck = true # default
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -67,12 +77,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
   target = "stdout" # default, enum
   healthcheck = true # default
 
-  # OPTIONAL - requests
-  encoding = "json" # example, no default, enum
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -85,22 +101,45 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","text"]}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"string"}
+  type={"table"}
   unit={null}
   >
 
 ### encoding
 
-The encoding format used to serialize the events before outputting.
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
 
 
 </Field>
@@ -108,9 +147,84 @@ The encoding format used to serialize the events before outputting.
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -133,6 +247,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
+  groups={[]}
   name={"target"}
   path={null}
   relevantWhen={null}

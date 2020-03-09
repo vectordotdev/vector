@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Datadog Metrics"
 sidebar_label: "datadog_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
 status: "beta"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -47,24 +46,25 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # REQUIRED
   type = "datadog_metrics" # must be: "datadog_metrics"
   inputs = ["my-source-id"] # example
-  api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
+  api_key = "${DATADOG_API_KEY_ENV_VAR}" # example
   namespace = "service" # example
 
   # OPTIONAL
+  healthcheck = true # default
   host = "https://api.datadoghq.com" # default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # REQUIRED - General
   type = "datadog_metrics" # must be: "datadog_metrics"
   inputs = ["my-source-id"] # example
-  api_key = "3111111111111111aaaaaaaaaaaaaaaa" # example
+  api_key = "${DATADOG_API_KEY_ENV_VAR}" # example
   namespace = "service" # example
 
   # OPTIONAL - General
@@ -73,22 +73,21 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
-    max_events = 20 # default, bytes
+    max_events = 20 # default, events
     timeout_secs = 1 # default, seconds
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default
+    in_flight_limit = 5 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 5 # default
-    retry_attempts = 5 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 60 # default, seconds
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -104,7 +103,8 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["3111111111111111aaaaaaaaaaaaaaaa"]}
+  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
   name={"api_key"}
   path={null}
   relevantWhen={null}
@@ -127,6 +127,7 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -144,36 +145,38 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={20}
   enumValues={null}
   examples={[20]}
+  groups={[]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
-  unit={"bytes"}
+  unit={"events"}
   >
 
 #### max_events
 
-The maximum size of a batch before it is flushed.
+The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -193,10 +196,11 @@ The maximum age of a batch before it is flushed.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -219,6 +223,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={"https://api.datadoghq.com"}
   enumValues={null}
   examples={["https://api.datadoghq.com","https://api.datadoghq.eu"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -241,6 +246,7 @@ Datadog endpoint to send metrics to.
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}
@@ -263,6 +269,7 @@ A prefix that will be added to all metric names.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -284,13 +291,14 @@ Configures the sink request behavior.
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -306,6 +314,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -317,7 +326,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -328,6 +337,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -339,7 +349,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -347,9 +357,10 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={-1}
   enumValues={null}
-  examples={[5]}
+  examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -372,6 +383,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -394,6 +406,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -405,7 +418,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -416,6 +429,7 @@ The maximum amount of time to wait between retries.
   defaultValue={60}
   enumValues={null}
   examples={[60]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}

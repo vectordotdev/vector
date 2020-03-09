@@ -3,12 +3,15 @@ mod file;
 use self::file::File;
 use crate::{
     event::Event,
-    sinks::util::SinkExt,
+    sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        SinkExt,
+    },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext},
+    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Instant};
 use tokio::timer::Delay;
@@ -18,7 +21,12 @@ use tokio::timer::Delay;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    pub encoding: Encoding,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<FileSinkConfig>("file")
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -54,7 +62,7 @@ impl SinkConfig for FileSinkConfig {
 #[derive(Debug, Default)]
 pub struct PartitionedFileSink {
     path: Template,
-    encoding: Encoding,
+    encoding: EncodingConfigWithDefault<Encoding>,
     idle_timeout_secs: u64,
     partitions: HashMap<Bytes, File>,
     last_accessed: HashMap<Bytes, Instant>,
@@ -191,7 +199,7 @@ mod tests {
             temp_file,
         },
     };
-    use futures::stream;
+    use futures01::stream;
 
     #[test]
     fn single_partition() {
@@ -200,7 +208,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text,
+            encoding: Encoding::Text.into(),
         };
 
         let sink = PartitionedFileSink::new(&config);
@@ -226,7 +234,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().into(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text,
+            encoding: Encoding::Text.into(),
         };
 
         let sink = PartitionedFileSink::new(&config);
@@ -264,35 +272,35 @@ mod tests {
         ];
 
         assert_eq!(
-            input[0].as_log()[&event::MESSAGE],
+            input[0].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[0][0])
         );
         assert_eq!(
-            input[1].as_log()[&event::MESSAGE],
+            input[1].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[1][0])
         );
         assert_eq!(
-            input[2].as_log()[&event::MESSAGE],
+            input[2].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[0][1])
         );
         assert_eq!(
-            input[3].as_log()[&event::MESSAGE],
+            input[3].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[3][0])
         );
         assert_eq!(
-            input[4].as_log()[&event::MESSAGE],
+            input[4].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[2][0])
         );
         assert_eq!(
-            input[5].as_log()[&event::MESSAGE],
+            input[5].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[2][1])
         );
         assert_eq!(
-            input[6].as_log()[&event::MESSAGE],
+            input[6].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[4][0])
         );
         assert_eq!(
-            input[7].as_log()[&event::MESSAGE],
+            input[7].as_log()[&event::log_schema().message_key()],
             From::<&str>::from(&output[5][0])
         );
     }

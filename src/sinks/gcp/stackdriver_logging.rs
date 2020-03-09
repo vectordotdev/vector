@@ -1,22 +1,32 @@
-use super::{GcpAuthConfig, GcpCredentials, Scope};
+use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::{Event, Unflatten},
+    event::{Event, LogEvent},
     sinks::{
         util::{
+            encoding::{
+                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
+            },
             http::{https_client, HttpRetryLogic, HttpService},
-            tls::{TlsOptions, TlsSettings},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, RouterSink,
+        Healthcheck, RouterSink,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{stream::iter_ok, Future, Sink};
+use futures01::{stream::iter_ok, Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::collections::HashMap;
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Resource not found"))]
+    NotFound,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +39,8 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -36,6 +48,14 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -102,7 +122,7 @@ impl StackdriverConfig {
     ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
-
+        let encoding = self.encoding.clone();
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let creds = creds.clone();
 
@@ -134,7 +154,7 @@ impl StackdriverConfig {
         let sink = request
             .batch_sink(HttpRetryLogic, http_service, cx.acker())
             .batched_with_min(Buffer::new(false), &batch)
-            .with_flat_map(|event| iter_ok(Some(encode_event(event))));
+            .with_flat_map(move |event| iter_ok(Some(encode_event(event, &encoding))));
 
         Ok(Box::new(sink))
     }
@@ -152,19 +172,14 @@ impl StackdriverConfig {
 
         let client = https_client(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
         let creds = creds.clone();
-        let healthcheck = client
-            .request(request)
-            .map_err(|err| err.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => {
-                    // If there are credentials configured, the
-                    // generated token needs to be periodically
-                    // regenerated.
-                    creds.map(|creds| creds.spawn_regenerate_token());
-                    Ok(())
-                }
-                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-            });
+        let healthcheck =
+            client
+                .request(request)
+                .map_err(Into::into)
+                .and_then(healthcheck_response(
+                    creds,
+                    HealthcheckError::NotFound.into(),
+                ));
 
         Ok(Box::new(healthcheck))
     }
@@ -200,9 +215,10 @@ fn make_request<T>(body: T) -> Request<T> {
     builder.body(body).unwrap()
 }
 
-fn encode_event(event: Event) -> Vec<u8> {
+fn encode_event(mut event: Event, encoding: &EncodingConfigWithDefault<Encoding>) -> Vec<u8> {
+    encoding.apply_rules(&mut event);
     let entry = LogEntry {
-        json_payload: event.into_log().unflatten(),
+        json_payload: event.into_log(),
     };
     let mut json = serde_json::to_vec(&entry).unwrap();
     json.push(b',');
@@ -225,7 +241,7 @@ struct WriteRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LogEntry {
-    json_payload: Unflatten,
+    json_payload: LogEvent,
 }
 
 #[derive(Serialize)]
@@ -261,7 +277,7 @@ mod tests {
     #[test]
     fn encode_valid1() {
         let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let body = encode_event(log.into());
+        let body = encode_event(log.into(), &Encoding::Default.into());
         let body = String::from_utf8_lossy(&body);
         assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}},");
     }
@@ -270,8 +286,8 @@ mod tests {
     fn encode_valid2() {
         let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
         let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
-        let mut event = encode_event(log1.into());
-        event.extend(encode_event(log2.into()));
+        let mut event = encode_event(log1.into(), &Encoding::Default.into());
+        event.extend(encode_event(log2.into(), &Encoding::Default.into()));
         let body = String::from_utf8_lossy(&event);
         assert_eq!(
             body,

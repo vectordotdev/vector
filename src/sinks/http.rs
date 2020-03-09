@@ -2,13 +2,14 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{https_client, Auth, BatchedHttpSink, HttpSink},
-        tls::{TlsOptions, TlsSettings},
-        Batch, BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
+    tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, Future};
+use futures01::{future, Future};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -33,7 +34,7 @@ enum BuildError {
     },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
@@ -42,12 +43,28 @@ pub struct HttpSinkConfig {
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     pub compression: Option<Compression>,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+#[cfg(test)]
+fn default_config(e: Encoding) -> HttpSinkConfig {
+    HttpSinkConfig {
+        uri: Default::default(),
+        method: Default::default(),
+        healthcheck_uri: Default::default(),
+        auth: Default::default(),
+        headers: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        encoding: e.into(),
+        request: Default::default(),
+        tls: Default::default(),
+    }
 }
 
 lazy_static! {
@@ -68,18 +85,16 @@ pub enum HttpMethod {
     Put,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Ndjson,
     Json,
 }
 
 inventory::submit! {
-    SinkDescription::new::<HttpSinkConfig>("http")
+    SinkDescription::new_without_default::<HttpSinkConfig>("http")
 }
 
 #[typetag::serde(name = "http")]
@@ -129,15 +144,16 @@ impl SinkConfig for HttpSinkConfig {
 }
 
 impl HttpSink for HttpSinkConfig {
-    type Input = <Buffer as Batch>::Input;
-    type Output = <Buffer as Batch>::Output;
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
-        let body = match &self.encoding {
+        let body = match &self.encoding.codec {
             Encoding::Text => {
-                if let Some(v) = event.get(&event::MESSAGE) {
+                if let Some(v) = event.get(&event::log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b
@@ -151,7 +167,7 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Ndjson => {
-                let mut b = serde_json::to_vec(&event.unflatten())
+                let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                     .ok()?;
                 b.push(b'\n');
@@ -159,7 +175,7 @@ impl HttpSink for HttpSinkConfig {
             }
 
             Encoding::Json => {
-                let mut b = serde_json::to_vec(&event.unflatten())
+                let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
                     .ok()?;
                 b.push(b',');
@@ -183,7 +199,7 @@ impl HttpSink for HttpSinkConfig {
         let uri: Uri = self.uri.clone().into();
         builder.uri(uri);
 
-        match self.encoding {
+        match self.encoding.codec {
             Encoding::Text => builder.header("Content-Type", "text/plain"),
             Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
             Encoding::Json => {
@@ -281,7 +297,7 @@ mod tests {
         topology::config::SinkContext,
     };
     use bytes::Buf;
-    use futures::{sync::mpsc, Future, Sink, Stream};
+    use futures01::{sync::mpsc, Future, Sink, Stream};
     use headers::{Authorization, HeaderMapExt};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
@@ -290,10 +306,10 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let encoding = Encoding::Text;
+        let encoding = EncodingConfig::from(Encoding::Text);
         let event = Event::from("hello world");
 
-        let mut config = HttpSinkConfig::default();
+        let mut config = default_config(Encoding::Text);
         config.encoding = encoding.clone();
         let bytes = config.encode_event(event).unwrap();
 
@@ -302,10 +318,10 @@ mod tests {
 
     #[test]
     fn http_encode_event_json() {
-        let encoding = Encoding::Ndjson;
+        let encoding = EncodingConfig::from(Encoding::Ndjson);
         let event = Event::from("hello world");
 
-        let mut config = HttpSinkConfig::default();
+        let mut config = default_config(Encoding::Json);
         config.encoding = encoding.clone();
         let bytes = config.encode_event(event).unwrap();
 

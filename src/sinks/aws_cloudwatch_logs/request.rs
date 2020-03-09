@@ -1,5 +1,5 @@
 use super::CloudwatchError;
-use futures::{sync::oneshot, try_ready, Async, Future, Poll};
+use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{RusotoError, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,

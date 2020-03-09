@@ -1,0 +1,57 @@
+[transforms.foo]
+  inputs = ["ignored"]
+  type = "swimlanes"
+  [transforms.foo.lanes.first]
+    "message.eq" = "test swimlane 1"
+  [transforms.foo.lanes.second]
+    "message.eq" = "test swimlane 2"
+  [transforms.foo.lanes.third]
+    type = "is_log"
+
+[transforms.bar]
+  inputs = ["foo.first"]
+  type = "add_fields"
+  [transforms.bar.fields]
+    new_field = "new field added"
+
+[[tests]]
+  name = "swimlanes test 1"
+  no_outputs_from = [ "foo.second" ]
+
+  [[tests.inputs]]
+    insert_at = "foo"
+    value = "test swimlane 1"
+
+  [[tests.outputs]]
+    extract_from = "foo.first"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test swimlane 1"
+
+  [[tests.outputs]]
+    extract_from = "bar"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test swimlane 1"
+      "new_field.equals" = "new field added"
+
+  [[tests.outputs]]
+    extract_from = "foo.third"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test swimlane 1"
+
+[[tests]]
+  name = "swimlanes test 2"
+  no_outputs_from = [ "foo.first", "bar" ]
+
+  [[tests.inputs]]
+    insert_at = "foo"
+    value = "test swimlane 2"
+
+  [[tests.outputs]]
+    extract_from = "foo.second"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test swimlane 2"
+
+  [[tests.outputs]]
+    extract_from = "foo.third"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test swimlane 2"

@@ -1,17 +1,24 @@
 [transforms.json_parser]
 title = "JSON Parser"
 allow_you_to_description = "parse a log field value as JSON"
+beta = false
 common = true
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "json_parser") %>
 
 [transforms.json_parser.options.drop_field]
 type = "bool"
 common = true
 default = true
 required = true
-description = "If the specified `field` should be dropped (removed) after parsing."
+description = """\
+If the specified `field` should be dropped (removed) after parsing. If \
+parsing fails, the field will not be removed, irrespective of this setting.\
+"""
 
 [transforms.json_parser.options.drop_invalid]
 type = "bool"

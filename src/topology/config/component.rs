@@ -8,7 +8,7 @@ use toml::Value;
 pub enum ExampleError {
     #[snafu(display("unable to create an example for this component"))]
     MissingExample,
-    #[snafu(display("component type '{}' does not exist", type_str))]
+    #[snafu(display("type '{}' does not exist", type_str))]
     DoesNotExist { type_str: String },
 }
 

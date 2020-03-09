@@ -5,10 +5,10 @@ use crate::{
     sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, sink::Sink, Future, Poll};
+use futures01::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use tower::{Service, ServiceBuilder};
 
@@ -104,7 +104,7 @@ impl StatsdSvc {
     }
 }
 
-fn encode_tags(tags: &HashMap<String, String>) -> String {
+fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     let mut parts: Vec<_> = tags
         .iter()
         .map(|(name, value)| {
@@ -215,20 +215,20 @@ mod test {
     use crate::{
         buffers::Acker,
         event::{metric::MetricKind, metric::MetricValue, Metric},
-        sources::statsd::parser::parse,
         test_util::{collect_n, runtime},
         Event,
     };
     use bytes::Bytes;
-    use futures::{stream, stream::Stream, sync::mpsc, Sink};
-    use std::str::from_utf8;
+    use futures01::{stream, stream::Stream, sync::mpsc, Sink};
     use tokio::{
         self,
         codec::BytesCodec,
         net::{UdpFramed, UdpSocket},
     };
+    #[cfg(feature = "sources-statsd")]
+    use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),
@@ -246,6 +246,7 @@ mod test {
         );
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_counter() {
         let metric1 = Metric {
@@ -261,6 +262,7 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_gauge() {
         let metric1 = Metric {
@@ -276,6 +278,7 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_distribution() {
         let metric1 = Metric {
@@ -294,6 +297,7 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_set() {
         let metric1 = Metric {

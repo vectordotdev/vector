@@ -1,8 +1,8 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    sinks::util::tcp::{TcpSinkConfig, TlsConfig},
-    sinks::util::Encoding,
+    sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding},
+    tls::TlsConfig,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,11 @@ inventory::submit! {
 }
 
 impl SocketSinkConfig {
-    pub fn make_tcp_config(address: String, encoding: Encoding, tls: Option<TlsConfig>) -> Self {
+    pub fn make_tcp_config(
+        address: String,
+        encoding: EncodingConfig<Encoding>,
+        tls: Option<TlsConfig>,
+    ) -> Self {
         TcpSinkConfig {
             address,
             encoding,
@@ -38,7 +42,7 @@ impl SocketSinkConfig {
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        TcpSinkConfig::new(address).into()
+        TcpSinkConfig::new(address, EncodingConfig::from(Encoding::Text)).into()
     }
 }
 

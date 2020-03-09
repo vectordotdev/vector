@@ -1,19 +1,20 @@
 use super::{
-    retries::RetryLogic,
+    retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    tls::{TlsConnectorExt, TlsSettings},
     Batch, BatchSettings, BatchSink,
 };
-use crate::dns::Resolver;
-use crate::event::Event;
-use crate::topology::config::SinkContext;
+use crate::{
+    dns::Resolver,
+    event::Event,
+    tls::{tls_connector_builder, TlsSettings},
+    topology::config::SinkContext,
+};
 use bytes::Bytes;
-use futures::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -23,6 +24,7 @@ use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type Response = hyper::Response<Bytes>;
 pub type Error = hyper::Error;
+pub type HttpsClient = hyper::Client<HttpsConnector<HttpConnector<Resolver>>>;
 
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
@@ -128,17 +130,7 @@ impl<B> HttpService<B> {
     where
         F: Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new_with_resolver(resolver.clone());
-        http.enforce_http(false);
-
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
-        let https = HttpsConnector::from((http, tls));
+        let https = connector(resolver, tls_settings).unwrap();
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -171,17 +163,7 @@ impl HttpServiceBuilder {
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
-        http.enforce_http(false);
-
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = self.tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
-        let https = HttpsConnector::from((http, tls));
+        let https = connector(self.resolver, self.tls_settings).unwrap();
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -202,25 +184,19 @@ impl HttpServiceBuilder {
 
 pub fn connector(
     resolver: Resolver,
-    tls_settings: TlsSettings,
+    tls_settings: Option<TlsSettings>,
 ) -> crate::Result<HttpsConnector<HttpConnector<Resolver>>> {
     let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
-    let mut tls = native_tls::TlsConnector::builder();
-
-    tls.use_tls_settings(tls_settings);
-
-    let https = HttpsConnector::from((http, tls.build()?));
+    let tls = tls_connector_builder(tls_settings)?;
+    let https = HttpsConnector::with_connector(http, tls)?;
 
     Ok(https)
 }
 
-pub fn https_client(
-    resolver: Resolver,
-    tls: TlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector<Resolver>>>> {
-    let https = connector(resolver, tls)?;
+pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<HttpsClient> {
+    let https = connector(resolver, Some(tls))?;
     Ok(hyper::Client::builder().build(https))
 }
 
@@ -269,16 +245,19 @@ impl RetryLogic for HttpRetryLogic {
         error.is_connect() || error.is_closed()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> Option<Cow<str>> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => Some("Too many requests".into()),
-            StatusCode::NOT_IMPLEMENTED => None,
-            _ if status.is_server_error() => {
-                Some(format!("{}: {}", status, String::from_utf8_lossy(response.body())).into())
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ => None,
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
+            ),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("response status: {}", status)),
         }
     }
 }
@@ -304,7 +283,7 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::{Future, Sink, Stream};
+    use futures01::{Future, Sink, Stream};
     use http::Method;
     use hyper::service::service_fn;
     use hyper::{Body, Response, Server, Uri};
@@ -319,10 +298,14 @@ mod test {
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
 
-        assert!(logic.should_retry_response(&response_429).is_some());
-        assert!(logic.should_retry_response(&response_500).is_some());
-        assert!(logic.should_retry_response(&response_400).is_none());
-        assert!(logic.should_retry_response(&response_501).is_none());
+        assert!(logic.should_retry_response(&response_429).is_retryable());
+        assert!(logic.should_retry_response(&response_500).is_retryable());
+        assert!(logic
+            .should_retry_response(&response_400)
+            .is_not_retryable());
+        assert!(logic
+            .should_retry_response(&response_501)
+            .is_not_retryable());
     }
 
     #[test]
@@ -345,7 +328,7 @@ mod test {
 
         let req = service.call(request);
 
-        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (tx, rx) = futures01::sync::mpsc::channel(10);
 
         let new_service = move || {
             let tx = tx.clone();
@@ -360,7 +343,7 @@ mod test {
                     let string = String::from_utf8(v).map_err(|_| "Wasn't UTF-8".to_string());
                     tx.send(string).map_err(|_| "Send error".to_string())
                 }).and_then(|_| {
-                    futures::future::ok(Response::new(Body::from("")))
+                    futures01::future::ok(Response::new(Body::from("")))
                 }))
             })
         };

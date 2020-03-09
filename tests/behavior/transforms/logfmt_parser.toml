@@ -1,0 +1,43 @@
+[transforms.logfmt_parser_simple]
+  inputs = []
+  type = "logfmt_parser"
+  [transforms.logfmt_parser_simple.types]
+    code = "int"
+    flag = "bool"
+    number = "float"
+    rest = "string"
+[[tests]]
+  name = "logfmt_parser_simple"
+  [tests.input]
+    insert_at = "logfmt_parser_simple"
+    type = "raw"
+    value = "code=1234 flag=yes number=42.3 rest=word"
+  [[tests.outputs]]
+    extract_from = "logfmt_parser_simple"
+    [[tests.outputs.conditions]]
+      "code.equals" = 1234
+      "flag.equals" = true
+      "number.equals" = 42.3
+      "rest.equals" = "word"
+
+[transforms.logfmt_parser_nested]
+  inputs = []
+  type = "logfmt_parser"
+  [transforms.logfmt_parser_nested.types]
+    "nested.code" = "int"
+    "nested.flag" = "bool"
+    "nested.number" = "float"
+    "nested.rest" = "string"
+[[tests]]
+  name = "logfmt_parser_nested"
+  [tests.input]
+    insert_at = "logfmt_parser_nested"
+    type = "raw"
+    value = "nested.code=1234 nested.flag=yes nested.number=42.3 nested.rest=word"
+  [[tests.outputs]]
+    extract_from = "logfmt_parser_nested"
+    [[tests.outputs.conditions]]
+      "nested.code.equals" = 1234
+      "nested.flag.equals" = true
+      "nested.number.equals" = 42.3
+      "nested.rest.equals" = "word"

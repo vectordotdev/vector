@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
 event_types: ["log"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
@@ -28,11 +31,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,35 +43,43 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "splunk_hec" # must be: "splunk_hec"
-  inputs = ["my-source-id"] # example
-  host = "my-splunk-host.com" # example
-  token = "${TOKEN_ENV_VAR}" # example
-
-  # OPTIONAL
-  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sinks.my_sink_id]
   # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"] # example
-  host = "my-splunk-host.com" # example
+  host = "http://my-splunk-host.com" # example
   token = "${TOKEN_ENV_VAR}" # example
 
   # OPTIONAL - General
   healthcheck = true # default
   indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 
-  # OPTIONAL - requests
-  encoding = "ndjson" # example, no default, enum
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
+```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  # REQUIRED - General
+  type = "splunk_hec" # must be: "splunk_hec"
+  inputs = ["my-source-id"] # example
+  host = "http://my-splunk-host.com" # example
+  token = "${TOKEN_ENV_VAR}" # example
+
+  # OPTIONAL - General
+  healthcheck = true # default
+  indexed_fields = ["field1", "field2"] # example, no default, relevant when encoding = "json"
 
   # OPTIONAL - Batch
   [sinks.my_sink_id.batch]
@@ -81,17 +88,30 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum
     max_events = 500 # default, events, relevant when type = "memory"
-    max_size = 104900000 # example, no default, bytes, relevant when type = "disk"
     when_full = "block" # default, enum
+
+    # REQUIRED
+    max_size = 104900000 # example, bytes, relevant when type = "disk"
+
+  # OPTIONAL - Encoding
+  [sinks.my_sink_id.encoding]
+    # REQUIRED
+    codec = "json" # example, enum
+
+    # OPTIONAL
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
+    timestamp_format = "rfc3339" # default, enum
 
   # OPTIONAL - Request
   [sinks.my_sink_id.request]
-    in_flight_limit = 10 # default
+    in_flight_limit = 10 # default, requests
     rate_limit_duration_secs = 1 # default, seconds
     rate_limit_num = 10 # default
-    retry_attempts = 5 # default
+    retry_attempts = -1 # default
     retry_initial_backoff_secs = 1 # default, seconds
     retry_max_duration_secs = 10 # default, seconds
     timeout_secs = 60 # default, seconds
@@ -100,14 +120,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
   [sinks.my_sink_id.tls]
     ca_path = "/path/to/certificate_authority.crt" # example, no default
     crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "PassWord1" # example, no default
+    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
-    verify_hostname = true # default
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -124,6 +142,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -141,14 +160,15 @@ Configures the sink batching behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -156,21 +176,22 @@ Configures the sink batching behavior.
 
 #### max_size
 
-The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
+The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batches](#buffers--batches) for more info.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -194,6 +215,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -205,20 +227,21 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 ### buffer
 
-Configures the sink buffer behavior.
+Configures the sink specific buffer behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -233,14 +256,15 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -255,14 +279,15 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly.","disk":"Stores the sink's buffer on disk. This is less performance (~3x),  but durable. Data will not be lost between restarts."}}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -270,7 +295,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
 
 #### type
 
-The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+The buffer's type and storage mechanism.
 
 
 </Field>
@@ -281,6 +306,7 @@ The buffer's type / location. `disk` buffers are persistent and will be retained
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -304,22 +330,45 @@ The behavior when the buffer becomes full.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
-  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["ndjson","text"]}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"string"}
+  type={"table"}
   unit={null}
   >
 
 ### encoding
 
-The encoding format used to serialize the events before outputting.
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
 
 
 </Field>
@@ -327,9 +376,84 @@ The encoding format used to serialize the events before outputting.
 
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -351,7 +475,8 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["my-splunk-host.com"]}
+  examples={["http://my-splunk-host.com"]}
+  groups={[]}
   name={"host"}
   path={null}
   relevantWhen={null}
@@ -374,6 +499,7 @@ Your Splunk HEC host. See [Setup](#setup) for more info.
   defaultValue={null}
   enumValues={null}
   examples={[["field1","field2"]]}
+  groups={[]}
   name={"indexed_fields"}
   path={null}
   relevantWhen={{"encoding":"json"}}
@@ -396,6 +522,7 @@ Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -417,13 +544,14 @@ Configures the sink request behavior.
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"requests"}
   >
 
 #### in_flight_limit
@@ -439,6 +567,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -450,7 +579,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 #### rate_limit_duration_secs
 
-The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Limits](#rate-limits) for more info.
+The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) option. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -461,6 +590,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -472,7 +602,7 @@ The window used for the [`rate_limit_num`](#rate_limit_num) option See [Rate Lim
 
 #### rate_limit_num
 
-The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) window. See [Rate Limits](#rate-limits) for more info.
+The maximum number of requests allowed within the [`rate_limit_duration_secs`](#rate_limit_duration_secs) time window. See [Rate Limits](#rate-limits) for more info.
 
 
 </Field>
@@ -480,9 +610,10 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 <Field
   common={false}
-  defaultValue={5}
+  defaultValue={-1}
   enumValues={null}
-  examples={[5]}
+  examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -505,6 +636,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -527,6 +659,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -538,7 +671,7 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 #### retry_max_duration_secs
 
-The maximum amount of time to wait between retries.
+The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
@@ -549,6 +682,7 @@ The maximum amount of time to wait between retries.
   defaultValue={60}
   enumValues={null}
   examples={[60]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -576,6 +710,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -597,6 +732,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -619,6 +755,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -640,7 +777,8 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["PassWord1"]}
+  examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -652,7 +790,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) above is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
@@ -663,6 +801,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -685,6 +824,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -702,28 +842,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 </Field>
 
 
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"verify_hostname"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### verify_hostname
-
-If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-
-
-</Field>
-
-
 </Fields>
 
 </Field>
@@ -734,6 +852,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
   defaultValue={null}
   enumValues={null}
   examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
   name={"token"}
   path={null}
   relevantWhen={null}

@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
-    event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    event::{Event, Value},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -27,7 +26,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -47,8 +46,17 @@ impl TransformConfig for LuaConfig {
     }
 }
 
+// Lua's garbage collector sometimes seems to be not executed automatically on high event rates,
+// which leads to leak-like RAM consumption pattern. This constant sets the number of invocations of
+// the Lua transform after which GC would be called, thus ensuring that the RAM usage is not too high.
+//
+// This constant is larger than 1 because calling GC is an expensive operation, so doing it
+// after each transform would have significant footprint on the performance.
+const GC_INTERVAL: usize = 16;
+
 pub struct Lua {
     lua: rlua::Lua,
+    invocations_after_gc: usize,
 }
 
 impl Lua {
@@ -77,20 +85,28 @@ impl Lua {
         })
         .context(InvalidLua)?;
 
-        Ok(Self { lua })
+        Ok(Self {
+            lua,
+            invocations_after_gc: 0,
+        })
     }
 
-    fn process(&self, event: Event) -> Result<Option<Event>, rlua::Error> {
-        self.lua.context(|ctx| {
+    fn process(&mut self, event: Event) -> Result<Option<Event>, rlua::Error> {
+        let result = self.lua.context(|ctx| {
             let globals = ctx.globals();
 
             globals.set("event", event)?;
 
             let func = ctx.named_registry_value::<_, rlua::Function<'_>>("vector_func")?;
             func.call(())?;
-
             globals.get::<_, Option<Event>>("event")
-        })
+        });
+        self.invocations_after_gc += 1;
+        if self.invocations_after_gc % GC_INTERVAL == 0 {
+            self.lua.gc_collect()?;
+            self.invocations_after_gc = 0;
+        }
+        result
     }
 }
 
@@ -110,11 +126,32 @@ impl rlua::UserData for Event {
     fn add_methods<'lua, M: rlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_meta_method_mut(
             rlua::MetaMethod::NewIndex,
-            |_ctx, this, (key, value): (String, Option<rlua::String<'lua>>)| {
-                if let Some(string) = value {
-                    this.as_mut_log().insert(key, string.as_bytes());
-                } else {
-                    this.as_mut_log().remove(&key.into());
+            |_ctx, this, (key, value): (String, Option<rlua::Value<'lua>>)| {
+                match value {
+                    Some(rlua::Value::String(string)) => {
+                        this.as_mut_log().insert(key, string.as_bytes());
+                    }
+                    Some(rlua::Value::Integer(integer)) => {
+                        this.as_mut_log().insert(key, Value::Integer(integer));
+                    }
+                    Some(rlua::Value::Number(number)) => {
+                        this.as_mut_log().insert(key, Value::Float(number));
+                    }
+                    Some(rlua::Value::Boolean(boolean)) => {
+                        this.as_mut_log().insert(key, Value::Boolean(boolean));
+                    }
+                    Some(rlua::Value::Nil) | None => {
+                        this.as_mut_log().remove(&key.into());
+                    }
+                    _ => {
+                        info!(
+                            message =
+                                "Could not set field to Lua value of invalid type, dropping field",
+                            field = key.as_str(),
+                            rate_limit_secs = 30
+                        );
+                        this.as_mut_log().remove(&key.into());
+                    }
                 }
 
                 Ok(())
@@ -164,7 +201,10 @@ fn format_error(error: &rlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::{format_error, Lua};
-    use crate::{event::Event, transforms::Transform};
+    use crate::{
+        event::{Event, Value},
+        transforms::Transform,
+    };
 
     #[test]
     fn lua_add_field() {
@@ -256,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn lua_numeric_value() {
+    fn lua_integer_value() {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3
@@ -266,12 +306,40 @@ mod tests {
         .unwrap();
 
         let event = transform.transform(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()[&"number".into()], "3".into());
+        assert_eq!(event.as_log()[&"number".into()], Value::Integer(3));
+    }
+
+    #[test]
+    fn lua_numeric_value() {
+        let mut transform = Lua::new(
+            r#"
+              event["number"] = 3.14159
+            "#,
+            vec![],
+        )
+        .unwrap();
+
+        let event = transform.transform(Event::new_empty_log()).unwrap();
+        assert_eq!(event.as_log()[&"number".into()], Value::Float(3.14159));
+    }
+
+    #[test]
+    fn lua_boolean_value() {
+        let mut transform = Lua::new(
+            r#"
+              event["bool"] = true
+            "#,
+            vec![],
+        )
+        .unwrap();
+
+        let event = transform.transform(Event::new_empty_log()).unwrap();
+        assert_eq!(event.as_log()[&"bool".into()], Value::Boolean(true));
     }
 
     #[test]
     fn lua_non_coercible_value() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event["junk"] = {"asdf"}
             "#,
@@ -279,14 +347,13 @@ mod tests {
         )
         .unwrap();
 
-        let err = transform.process(Event::new_empty_log()).unwrap_err();
-        let err = format_error(&err);
-        assert!(err.contains("error converting Lua table to String"), err);
+        let event = transform.transform(Event::new_empty_log()).unwrap();
+        assert_eq!(event.as_log().get(&"junk".into()), None);
     }
 
     #[test]
     fn lua_non_string_key_write() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event[false] = "hello"
             "#,
@@ -301,7 +368,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_read() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               print(event[false])
             "#,
@@ -316,7 +383,7 @@ mod tests {
 
     #[test]
     fn lua_script_error() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               error("this is an error")
             "#,

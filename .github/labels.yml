@@ -46,6 +46,9 @@
 - name: "domain: sources"
   description: Anything sources related
   color: 212f3e
+- name: "domain: templating"
+  description: Anything templating related
+  color: 212f3e
 - name: "domain: testing"
   description: Anything testing related
   color: 212f3e
@@ -104,8 +107,11 @@
 - name: "needs: outside help"
   description: Needs help outside of the Vector core team
   color: feca57
+- name: "needs: rfc"
+  description: Needs an RFC process before work can begin
+  color: feca57
 - name: "needs: spec"
-  description: Needs a specification before work can begin
+  description: Needs a light specification before work can begin
   color: feca57
 
 - name: "platform: docker"
@@ -122,6 +128,9 @@
   color: ff9ff3
 - name: "platform: macos"
   description: Anything MacOS related
+  color: ff9ff3
+- name: "platform: nixos"
+  description: Anything NixOS related
   color: ff9ff3
 - name: "platform: raspbian"
   description: Anything Raspbian related
@@ -141,6 +150,9 @@
 - name: "platform: homebrew"
   description: Anything Homebrew related
   color: ff9ff3
+- name: "platform: nix"
+  description: Anything Nix related
+  color: ff9ff3
 - name: "platform: rpm"
   description: Anything RPM related
   color: ff9ff3
@@ -148,11 +160,39 @@
   description: Anything MSI related
   color: ff9ff3
 
+- name: "provider: aws"
+  description: Anything AWS related
+  color: ff9f43
+- name: "provider: datadog"
+  description: Anything Datadog related
+  color: ff9f43
+- name: "provider: elastic"
+  description: Anything Elastic related
+  color: ff9f43
+- name: "provider: google"
+  description: Anything Google related
+  color: ff9f43
+- name: "provider: influxdata"
+  description: Anything InfluxData related
+  color: ff9f43
+- name: "provider: confluent"
+  description: Anything Confluent related
+  color: ff9f43
+- name: "provider: new relic"
+  description: Anything New Relic related
+  color: ff9f43
+- name: "provider: splunk"
+  description: Anything Splunk related
+  color: ff9f43
+
 - name: "source: docker"
   description: Anything `docker` source realted
   color: ff9ff3
 - name: "source: file"
   description: Anything `file` source realted
+  color: ff9ff3
+- name: "source: http"
+  description: Anything `http` source realted
   color: ff9ff3
 - name: "source: journald"
   description: Anything `journald` source realted
@@ -224,6 +264,9 @@
 - name: "transform: lua"
   description: Anything `lua` transform related
   color: 54a0ff
+- name: "transform: merge"
+  description: Anything `merge` transform related
+  color: 54a0ff
 - name: "transform: regex_parser"
   description: Anything `regex_parser` transform related
   color: 54a0ff
@@ -233,11 +276,17 @@
 - name: "transform: remove_tags"
   description: Anything `remove_tags` transform related
   color: 54a0ff
+- name: "transform: rename_fields"
+  description: Anything `rename_fields` transform related
+  color: 54a0ff
 - name: "transform: sampler"
   description: Anything `sampler` transform related
   color: 54a0ff
 - name: "transform: split"
   description: Anything `split` transform related
+  color: 54a0ff
+- name: "transform: swimlanes"
+  description: Anything `swimlanes` transform related
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
@@ -276,6 +325,9 @@
 - name: "sink: file"
   description: Anything `file` sink related
   color: 4ddbfb
+- name: "sink: gcp_cloud_storage"
+  description: Anything `gcp_cloud_storage` sink related
+  color: 4ddbfb
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
@@ -285,8 +337,20 @@
 - name: "sink: http"
   description: Anything `http` sink related
   color: 4ddbfb
+- name: "sink: humio_logs"
+  description: Anything `humio_logs` sink related
+  color: 4ddbfb
+- name: "sink: influxdb_metrics"
+  description: Anything `influxdb_metrics` sink related
+  color: 4ddbfb
 - name: "sink: kafka"
   description: Anything `kafka` sink related
+  color: 4ddbfb
+- name: "sink: logdna"
+  description: Anything `logdna` sink related
+  color: 4ddbfb
+- name: "sink: loki"
+  description: Anything `loki` sink related
   color: 4ddbfb
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related
@@ -294,8 +358,8 @@
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb
-- name: "sink: sematext"
-  description: Anything `sematext` sink related
+- name: "sink: sematext_logs"
+  description: Anything `sematext_logs` sink related
   color: 4ddbfb
 - name: "sink: socket"
   description: Anything `socket` sink related

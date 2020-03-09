@@ -1,9 +1,12 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
 event_types: ["metric"]
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Statsd"
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/statsd.rs
 status: "beta"
@@ -23,21 +26,6 @@ The Vector `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -51,28 +39,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL
   address = "127.0.0.1:8125" # default
-```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
-[sinks.my_sink_id]
-  # REQUIRED
-  type = "statsd" # must be: "statsd"
-  inputs = ["my-source-id"] # example
-  namespace = "service" # example
-
-  # OPTIONAL
-  address = "127.0.0.1:8125" # default
   healthcheck = true # default
 ```
-
-</TabItem>
-
-</Tabs>
 
 ## Options
 
@@ -88,6 +56,7 @@ import Field from '@site/src/components/Field';
   defaultValue={"127.0.0.1:8125"}
   enumValues={null}
   examples={["127.0.0.1:8125"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -106,10 +75,11 @@ The UDP socket address to send stats to.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -132,6 +102,7 @@ Enables/disables the sink healthcheck upon start.
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}

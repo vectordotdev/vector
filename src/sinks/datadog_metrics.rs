@@ -7,15 +7,15 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use http::{uri::InvalidUri, Method, StatusCode, Uri};
 use hyper;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use tower::Service;
 
 #[derive(Debug, Snafu)]
@@ -194,7 +194,7 @@ impl Service<Vec<Metric>> for DatadogSvc {
     }
 }
 
-fn encode_tags(tags: HashMap<String, String>) -> Vec<String> {
+fn encode_tags(tags: BTreeMap<String, String>) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter()
         .map(|(name, value)| format!("{}:{}", name, value))
@@ -386,7 +386,7 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> HashMap<String, String> {
+    fn tags() -> BTreeMap<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),

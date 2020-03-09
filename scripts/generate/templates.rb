@@ -38,7 +38,7 @@ class Templates
     @metadata = metadata
   end
 
-  def common_component_links(type, limit = 6)
+  def common_component_links(type, limit = 5)
     components = metadata.send("#{type.to_s.pluralize}_list")
 
     links =
@@ -67,10 +67,6 @@ class Templates
     send("#{component.type}_description", component)
   end
 
-  def component_guides(component)
-
-  end
-
   def component_header(component)
     render("#{partials_path}/_component_header.md", binding).strip
   end
@@ -79,6 +75,10 @@ class Templates
     examples = output.examples
     fields = output.fields ? output.fields.to_h.values.sort : []
     render("#{partials_path}/_component_output.md", binding).strip
+  end
+
+  def component_requirements(component)
+    render("#{partials_path}/_component_requirements.md", binding).strip
   end
 
   def component_sections(component)
@@ -93,13 +93,9 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, common: false, path: nil, titles: true)
+  def config_example(options, array: false, skip_path: false, common: false, path: nil, titles: true)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
-    end
-
-    if common
-      options = options.select(&:common?)
     end
 
     options = options.sort_by(&:config_file_sort_token)
@@ -156,6 +152,12 @@ class Templates
     end
   end
 
+  def event_types(types)
+    types.collect do |type|
+      "`#{type}`"
+    end
+  end
+
   def event_type_links(types)
     types.collect do |type|
       "[`#{type}`][docs.data-model.#{type}]"
@@ -182,8 +184,8 @@ class Templates
     hash = {}
 
     fields.each do |field|
-      if field.fields_list.any?
-        hash[field.name] = fields_hash(field.fields_list)
+      if field.children?
+        hash[field.name] = fields_hash(field.children_list)
       else
         example = field.examples.first
 
@@ -216,7 +218,7 @@ class Templates
     description = option.description.strip
 
     if option.templateable?
-      description << " This option supports dynamic values via [Vector's template syntax][docs.configuration#field-interpolation]."
+      description << " This option supports dynamic values via [Vector's template syntax][docs.reference.templating]."
     end
 
     if option.relevant_when
@@ -300,12 +302,12 @@ class Templates
     options.collect { |option| "`#{option.name}`" }
   end
 
-  def options(options, filters: true, heading_depth: 1, level: 1, path: nil)
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
+  def outputs_link(component)
+    if component.output.to_h.any?
+      "[outputs #{event_types(component.output_types).to_sentence} events](#output)"
+    else
+      "outputs #{event_type_links(component.output_types).to_sentence} events"
     end
-
-    render("#{partials_path}/_options.md", binding).strip
   end
 
   def partial?(template_path)
@@ -399,13 +401,19 @@ class Templates
 
   def source_description(source)
     strip <<~EOF
-    Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.
+    Ingests data through #{source.through_description} and #{outputs_link(source)}.
     EOF
   end
 
-  def subpages
-    dirname = File.basename(@_template_path).split(".").first
-    dir = @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+  def subpages(link_name = nil)
+    dir =
+      if link_name
+        docs_dir = metadata.links.fetch(link_name).gsub(/\/$/, "")
+        "#{WEBSITE_ROOT}#{docs_dir}"
+      else
+        dirname = File.basename(@_template_path).split(".").first
+        @_template_path.split("/")[0..-2].join("/") + "/#{dirname}"
+      end
 
     Dir.glob("#{dir}/*.md").
       to_a.
@@ -430,9 +438,19 @@ class Templates
   end
 
   def transform_description(transform)
-    strip <<~EOF
-    Accepts #{event_type_links(transform.input_types).to_sentence} events and allows you to #{transform.allow_you_to_description}.
-    EOF
+    if transform.input_types == transform.output_types
+      strip <<~EOF
+      Accepts and #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      EOF
+    else
+      strip <<~EOF
+      Accepts #{event_type_links(transform.input_types).to_sentence} events but #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.
+      EOF
+    end
+  end
+
+  def vector_summary
+    render("#{partials_path}/_vector_summary.md", binding).strip
   end
 
   def write_verb_link(sink)

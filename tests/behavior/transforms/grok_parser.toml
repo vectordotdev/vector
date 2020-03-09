@@ -1,0 +1,31 @@
+[transforms.grok_parser_simple]
+  inputs = []
+  type = "grok_parser"
+  pattern = "%{HTTPDATE:timestamp} %{GREEDYDATA:message}"
+[[tests]]
+  name = "grok_parser_simple"
+  [tests.input]
+    insert_at = "grok_parser_simple"
+    type = "raw"
+    value = "12/Dec/2015:18:32:56 +0100 hello"
+  [[tests.outputs]]
+    extract_from = "grok_parser_simple"
+    [[tests.outputs.conditions]]
+      "timestamp.equals" = "12/Dec/2015:18:32:56 +0100"
+      "message.equals" = "hello"
+
+[transforms.grok_parser_nested]
+  inputs = []
+  type = "grok_parser"
+  pattern = "%{HTTPDATE:nested.timestamp} %{GREEDYDATA:doubly.nested.message}"
+[[tests]]
+  name = "grok_parser_nested"
+  [tests.input]
+    insert_at = "grok_parser_nested"
+    type = "raw"
+    value = "12/Dec/2015:18:32:56 +0100 hello"
+  [[tests.outputs]]
+    extract_from = "grok_parser_nested"
+    [[tests.outputs.conditions]]
+      "nested.timestamp.equals" = "12/Dec/2015:18:32:56 +0100"
+      "doubly.nested.message.equals" = "hello"

@@ -288,25 +288,42 @@ export default function cloudify() {
     }
   }
 
-  var ANIMATION_TIMER = null;
+  var ANIMATION_INTERVAL = null;
+  var ANIMATION_TIMEOUT = null;
+
+  function animate() {
+    // Timeout since after a period of time the animation effectively stops.
+    // This helps with performance.
+    if (ANIMATION_TIMEOUT != null) clearTimeout(ANIMATION_TIMEOUT);
+    ANIMATION_TIMEOUT = setTimeout(function() {
+      stopAnimation();
+    }, 4000);
+
+    startAnimation();
+  }
 
   function startAnimation() {
-    if (ANIMATION_TIMER != null) return;
-    ANIMATION_TIMER = setInterval(function() {
+    if (ANIMATION_INTERVAL != null) return;
+    ANIMATION_INTERVAL = setInterval(function() {
       applyHomeForces();
       applyEdgeForces();
       redraw();
-    }, 1000 / 40)
+    }, 1000 / 30);
   }
 
-  setTimeout(function() {
-    startAnimation();
-  }, 300)
+  function stopAnimation() {
+    if (ANIMATION_INTERVAL == null) return;
+    clearInterval(ANIMATION_INTERVAL);
+    ANIMATION_INTERVAL = null;
+  }
+
+  animate();
 
   // ----------------------------------------
   // MOUSE MOVEMENTS
 
   $("#component-canvas").on('mousemove', function(e) {
+    animate();
 
     var offset = $("#component-canvas").offset();
     var mouse = new Vector(

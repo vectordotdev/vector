@@ -1,7 +1,7 @@
 #![cfg(feature = "leveldb")]
 
 use crate::event::{proto, Event};
-use futures::{
+use futures01::{
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,
 };

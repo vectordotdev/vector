@@ -5,7 +5,10 @@ common = false
 delivery_guarantee = "at_least_once"
 function_category = "receive"
 output_types = ["log"]
+requirements = {}
 through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol]"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "splunk_hec") %>
 
 [sources.splunk_hec.options.address]
 type = "string"
@@ -74,3 +77,5 @@ then the value of the `time` field will be used. If the \
 [Splunk HEC raw endpoint][urls.splunk_hec_raw_endpoint] is used, then the \
 current time the event was received will be used.\
 """
+
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.splunk_hec.options", relevant: "") %>
