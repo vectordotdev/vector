@@ -14,7 +14,7 @@ examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
 required = true
 description = """\
 Represents the log message. Change this field name via the \
-[global `message_key` option][docs.reference.global-options#message-key] or the \
+[global `message_key` option][docs.reference.global-options#message_key] or the \
 source-level `message_key` option for relevant sources.
 """
 
@@ -25,7 +25,7 @@ required = true
 description = """\
 A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this \
 field name via the \
-[global `timestamp_key` option][docs.reference.global-options#message-key] or \
+[global `timestamp_key` option][docs.reference.global-options#message_key] or \
 the source-level `timestamp_key` option for relevant sources.
 """
 

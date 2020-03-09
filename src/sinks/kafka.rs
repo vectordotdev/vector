@@ -3,7 +3,10 @@ use crate::{
     event::{self, Event},
     kafka::{KafkaCompression, KafkaTlsConfig},
     serde::to_string,
-    sinks::util::MetadataFuture,
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+        MetadataFuture,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
@@ -33,7 +36,7 @@ pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Encoding,
+    encoding: EncodingConfigWithDefault<Encoding>,
     compression: Option<KafkaCompression>,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
@@ -64,7 +67,7 @@ pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
     acker: Acker,
@@ -123,7 +126,7 @@ impl KafkaSink {
             producer,
             topic: config.topic,
             key_field: config.key_field,
-            encoding: config.encoding,
+            encoding: config.encoding.into(),
             in_flight: FuturesUnordered::new(),
             acker,
             seq_head: 0,
@@ -140,7 +143,7 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let (key, body) = encode_event(&item, &self.key_field, &self.encoding);
+        let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
         let record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
@@ -226,17 +229,18 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 }
 
 fn encode_event(
-    event: &Event,
+    mut event: Event,
     key_field: &Option<Atom>,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
+    encoding.apply_rules(&mut event);
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
 
-    let body = match encoding {
+    let body = match encoding.codec {
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
@@ -258,7 +262,11 @@ mod tests {
     fn kafka_encode_event_text() {
         let key = "";
         let message = "hello world".to_string();
-        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &Encoding::Text);
+        let (key_bytes, bytes) = encode_event(
+            message.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Text),
+        );
 
         assert_eq!(&key_bytes[..], key.as_bytes());
         assert_eq!(&bytes[..], message.as_bytes());
@@ -271,7 +279,11 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         event.as_mut_log().insert("foo", "bar");
 
-        let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
+        let (key, bytes) = encode_event(
+            event,
+            &Some("key".into()),
+            &EncodingConfig::from(Encoding::Json),
+        );
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
@@ -352,8 +364,9 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
             topic: topic.clone(),
-            encoding: Encoding::Text,
             compression,
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            key_field: None,
             tls,
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,

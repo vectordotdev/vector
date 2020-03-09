@@ -30,7 +30,7 @@ write_to_description = "[Loki][urls.loki]"
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.loki.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.loki.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>
 
 [sinks.loki.options.endpoint]
 type = "string"
@@ -38,17 +38,11 @@ required = true
 examples = ["http://localhost:3100", "http://127.0.0.1:8080"]
 description = "The endpoint used to ship logs to."
 
-[sinks.loki.options.encoding]
-type = "string"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.loki.options.encoding.enum]
-json = "Each event is encoded into JSON"
-text = "Each event is encoded into text via the `message` key."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.loki.options",
+  encodings: ["json", "text"],
+  default: "json"
+) %>
 
 [sinks.loki.options.tenant_id]
 type = "string"

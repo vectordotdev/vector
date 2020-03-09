@@ -17,7 +17,10 @@ use crate::{
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::{BatchBytesConfig, TowerRequestConfig, UriSerde},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        BatchBytesConfig, TowerRequestConfig, UriSerde,
+    },
     template::Template,
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -34,7 +37,7 @@ type Labels = Vec<(String, String)>;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<String>,
     labels: HashMap<String, Template>,
@@ -55,7 +58,7 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Derivative)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 enum Encoding {
@@ -107,6 +110,7 @@ impl HttpSink for LokiConfig {
     type Output = Vec<(Labels, (i64, String))>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -137,7 +141,7 @@ impl HttpSink for LokiConfig {
                 .remove(&event::log_schema().timestamp_key());
         }
 
-        let event = match &self.encoding {
+        let event = match &self.encoding.codec {
             Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
 

@@ -71,3 +71,9 @@ required = false
 examples = ["vector", "myapp"]
 default = "vector"
 description = "The default app that will be set for events that do not contain a `file` or `app` field."
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.logdna.options",
+  encodings: ["default"],
+  default: "default"
+) %>

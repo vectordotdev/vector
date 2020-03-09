@@ -1,5 +1,8 @@
 use super::Encoding;
-use crate::event::{self, Event};
+use crate::{
+    event::{self, Event},
+    sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+};
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures01::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -17,7 +20,7 @@ const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
 pub struct File {
     state: State,
-    encoding: Encoding,
+    encoding: EncodingConfigWithDefault<Encoding>,
     buffer: BytesMut,
     codec: BytesDelimitedCodec,
 }
@@ -29,7 +32,7 @@ enum State {
 }
 
 impl File {
-    pub fn new(path: Bytes, encoding: Encoding) -> Self {
+    pub fn new(path: Bytes, encoding: EncodingConfigWithDefault<Encoding>) -> Self {
         let path = BytesPath::new(path);
         let parent = path.as_ref().parent().map(|p| p.to_path_buf());
 
@@ -58,10 +61,11 @@ impl File {
         }
     }
 
-    fn encode_event(&self, event: Event) -> Bytes {
+    fn encode_event(&self, mut event: Event) -> Bytes {
+        self.encoding.apply_rules(&mut event);
         let log = event.into_log();
 
-        match self.encoding {
+        match self.encoding.codec {
             Encoding::Ndjson => serde_json::to_vec(&log)
                 .map(Bytes::from)
                 .expect("Unable to encode event as JSON."),
@@ -216,7 +220,11 @@ mod tests {
     fn encode_text() {
         let path = temp_file();
         let (input, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path);
+        let output = test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path,
+        );
 
         for (input, output) in input.into_iter().zip(output) {
             assert_eq!(input, output);
@@ -227,7 +235,11 @@ mod tests {
     fn encode_json() {
         let path = temp_file();
         let (input, events) = random_nested_events_with_stream(4, 3, 3, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, path);
+        let output = test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Ndjson),
+            path,
+        );
 
         for (input, output) in input.into_iter().zip(output) {
             let input = serde_json::to_string(input.as_log()).unwrap();
@@ -240,10 +252,18 @@ mod tests {
         let path = temp_file();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
-        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+        test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path.clone(),
+        );
 
         let (mut input2, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path);
+        let output = test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path,
+        );
 
         let mut input = vec![];
         input.append(&mut input1);
@@ -261,10 +281,18 @@ mod tests {
         let path = temp_file();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
-        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+        test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path.clone(),
+        );
 
         let (mut input2, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+        let output = test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path.clone(),
+        );
 
         let mut input = vec![];
         input.append(&mut input1);
@@ -285,11 +313,19 @@ mod tests {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
-        test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+        test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path.clone(),
+        );
 
         // Reopen the file to add more content to it
         let (mut input2, events) = random_lines_with_stream(100, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Text, path.clone());
+        let output = test_unpartitioned_with_encoding(
+            events,
+            EncodingConfigWithDefault::from(Encoding::Text),
+            path.clone(),
+        );
 
         let mut input = vec![];
         input.append(&mut input1);
@@ -304,7 +340,7 @@ mod tests {
 
     fn test_unpartitioned_with_encoding<S>(
         events: S,
-        encoding: Encoding,
+        encoding: EncodingConfigWithDefault<Encoding>,
         path: PathBuf,
     ) -> Vec<String>
     where

@@ -14,18 +14,11 @@ write_to_description = "a socket, such as a TCP or Unix domain socket"
 
 <%= render("_partials/_buffer_options.toml", namespace: "sinks.socket.options") %>
 
-[sinks.socket.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.socket.options.encoding.enum]
-json = "Each event is encoded into JSON."
-text = "Each event is encoded into text via the `message` key."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.socket.options",
+  encodings: ["json", "text"],
+  default: false
+) %>
 
 [sinks.socket.options.mode]
 type = "string"
@@ -54,5 +47,5 @@ relevant_when = {mode = "unix"}
 description = """The unix socket path. This should be the absolute path.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.socket.options", can_enable: true, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.socket.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: true) %>
 

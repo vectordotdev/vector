@@ -2,6 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
     sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, HttpRetryLogic, HttpService},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -33,7 +34,8 @@ pub struct HecSinkConfig {
     pub host_field: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
-    pub encoding: Encoding,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -50,7 +52,7 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
@@ -195,10 +197,11 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
 
 fn encode_event(
     host_field: &Atom,
-    event: Event,
+    mut event: Event,
     indexed_fields: &[Atom],
-    encoding: &Encoding,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<Vec<u8>> {
+    encoding.apply_rules(&mut event);
     let mut event = event.into_log();
 
     let host = event.get(&host_field).cloned();
@@ -209,7 +212,7 @@ fn encode_event(
             chrono::Utc::now().timestamp()
         };
 
-    let mut body = match encoding {
+    let mut body = match encoding.codec {
         Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
         Encoding::Text => json!({
             "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
@@ -247,7 +250,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let bytes = encode_event(&host, event, &vec![], &Encoding::Json).unwrap();
+        let bytes = encode_event(&host, event, &vec![], &Encoding::Json.into()).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
@@ -545,13 +548,16 @@ mod integration_tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config(encoding: Encoding, indexed_fields: Vec<Atom>) -> super::HecSinkConfig {
+    fn config(
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
+        indexed_fields: Vec<Atom>,
+    ) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
-            encoding,
+            encoding: encoding.into(),
             batch: BatchBytesConfig {
                 max_size: Some(1),
                 timeout_secs: None,

@@ -4,6 +4,7 @@ use crate::{
     serde::to_string,
     sinks::{
         util::{
+            encoding::{EncodingConfig, EncodingConfiguration},
             http::{https_client, HttpsClient},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
@@ -49,7 +50,7 @@ enum GcsError {
     BucketNotFound { bucket: String },
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
     bucket: String,
@@ -60,7 +61,7 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -69,6 +70,26 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     auth: GcpAuthConfig,
     tls: Option<TlsOptions>,
+}
+
+#[cfg(test)]
+fn default_config(e: Encoding) -> GcsSinkConfig {
+    GcsSinkConfig {
+        bucket: Default::default(),
+        acl: Default::default(),
+        storage_class: Default::default(),
+        metadata: Default::default(),
+        key_prefix: Default::default(),
+        filename_time_format: Default::default(),
+        filename_append_uuid: Default::default(),
+        filename_extension: Default::default(),
+        encoding: e.into(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        auth: Default::default(),
+        tls: Default::default(),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -103,11 +124,9 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 enum Encoding {
-    #[derivative(Default)]
     Text,
     Ndjson,
 }
@@ -146,7 +165,7 @@ impl Compression {
 }
 
 inventory::submit! {
-    SinkDescription::new::<GcsSinkConfig>(NAME)
+    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
 }
 
 #[typetag::serde(name = "gcp_cloud_storage")]
@@ -356,7 +375,7 @@ impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
         let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
-        let content_type = HeaderValue::from_str(config.encoding.content_type()).unwrap();
+        let content_type = HeaderValue::from_str(config.encoding.codec.content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
@@ -401,10 +420,11 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     key_prefix: &Template,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -415,16 +435,15 @@ fn encode_event(
             );
         })
         .ok()?;
-
     let log = event.into_log();
-    let bytes = match encoding {
+    let bytes = match encoding.codec {
         Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        &Encoding::Text => {
+        Encoding::Text => {
             let mut bytes = log
                 .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
@@ -475,8 +494,12 @@ mod tests {
     fn gcs_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes =
-            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
+        let bytes = encode_event(
+            message.clone().into(),
+            &batch_time_format,
+            &Encoding::Text.into(),
+        )
+        .unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -490,7 +513,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
@@ -513,7 +536,7 @@ mod tests {
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
             compression: compression,
-            ..Default::default()
+            ..default_config(Encoding::Ndjson)
         })
         .expect("Could not create request settings")
     }

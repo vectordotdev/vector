@@ -58,6 +58,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
     timestamp_format = "rfc3339" # default, enum
 ```
 
@@ -104,6 +106,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # OPTIONAL - Encoding
   [sinks.my_sink_id.encoding]
+    except_fields = ["timestamp", "message", "host"] # example, no default
+    only_fields = ["timestamp", "message", "host"] # example, no default
     timestamp_format = "rfc3339" # default, enum
 
   # OPTIONAL - Request
@@ -123,7 +127,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
     key_path = "/path/to/host_certificate.key" # example, no default
     verify_certificate = true # default
-    verify_hostname = true # default
 ```
 
 </TabItem>
@@ -500,13 +503,59 @@ The database that contains the stable that data will be inserted into.
 
 ### encoding
 
-Customize how events are encoded.
+Configures the encoding specific sink behavior.
 
 <Fields filters={false}>
 
 
 <Field
-  common={true}
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
   defaultValue={"rfc3339"}
   enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
   examples={["rfc3339","unix"]}
@@ -522,7 +571,7 @@ Customize how events are encoded.
 
 #### timestamp_format
 
-How to format event timestamps. Formats such as unix can be parsed as a Clickhouse DateTime, however, this loses precision as DateTimes are defined in seconds.
+How to format event timestamps.
 
 
 </Field>
@@ -922,29 +971,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"verify_hostname"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### verify_hostname
-
-If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 
 </Field>

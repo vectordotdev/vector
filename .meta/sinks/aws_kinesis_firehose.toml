@@ -35,18 +35,11 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
   timeout_secs: 30
 ) %>
 
-[sinks.aws_kinesis_firehose.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.aws_kinesis_firehose.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.aws_kinesis_firehose.options",
+  encodings: ["json", "text"],
+  default: false,
+) %>
 
 [sinks.aws_kinesis_firehose.options.stream_name]
 type = "string"

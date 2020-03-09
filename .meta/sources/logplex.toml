@@ -18,3 +18,5 @@ required = true
 description = """\
 The address to accept connections on. The address _must_ include a port.\
 """
+
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.logplex.options", relevant: "") %>

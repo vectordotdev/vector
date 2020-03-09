@@ -69,6 +69,7 @@ scopes:
   # sources
   - docker source
   - file source
+  - http source
   - journald source
   - kafka source
   - logplex source

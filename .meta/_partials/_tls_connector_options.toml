@@ -44,7 +44,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless \
 `key_path` is set.\
 """
 
-<%- if can_verify -%>
+<%- if can_verify_certificate -%>
 [<%= namespace %>.tls.children.verify_certificate]
 type = "bool"
 default = true
@@ -53,7 +53,9 @@ If `true` (the default), Vector will validate the TLS certificate of the \
 remote host. Do NOT set this to `false` unless you understand the risks of not \
 verifying the remote certificate.\
 """
+<%- end -%>
 
+<%- if can_verify_hostname -%>
 [<%= namespace %>.tls.children.verify_hostname]
 type = "bool"
 default = true

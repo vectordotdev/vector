@@ -14,14 +14,13 @@ Require TLS for incoming connections. \
 If this is set, an identity certificate is also required.\
 """
 
-# This is not yet supported
-#[<%= namespace %>.tls.children.ca_path]
-#type = "string"
-#examples = ["/path/to/certificate_authority.crt"]
-#description = """\
-#Absolute path to an additional CA certificate file, in DER or PEM format \
-#(X.509).\
-#"""
+[<%= namespace %>.tls.children.ca_path]
+type = "string"
+examples = ["/path/to/certificate_authority.crt"]
+description = """\
+Absolute path to an additional CA certificate file, in DER or PEM format \
+(X.509).\
+"""
 
 [<%= namespace %>.tls.children.crt_path]
 type = "string"
@@ -55,19 +54,11 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless \
 `key_path` is set.\
 """
 
-# These are not yet supported
-#[<%= namespace %>.tls.children.verify_certificate]
-#type = "bool"
-#default = true
-#description = """\
-#If `true` (the default), Vector will validate the TLS certificate of the \
-#connecting host.\
-#"""
-
-#[<%= namespace %>.tls.children.verify_hostname]
-#type = "bool"
-#default = true
-#description = """\
-#If `true` (the default), Vector will validate the configured connecting host
-#name against the remote host's TLS certificate.\
-#"""
+[<%= namespace %>.tls.children.verify_certificate]
+type = "bool"
+default = false
+description = """\
+If `true`, Vector will require a TLS certificate from the connecting host \
+and terminate the connection if it is not valid. \
+If `false` (the default), Vector will ignore the presence of a client certificate.\
+"""

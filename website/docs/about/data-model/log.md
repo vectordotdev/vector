@@ -64,7 +64,9 @@ import TabItem from '@theme/TabItem';
   "host": "my.host.com",
   "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
   "timestamp": "2019-11-01T21:15:47+00:00",
-  "parent.child": "child_value" // nested fields are delimited with a `.` char
+  "parent": {
+    "child": "child_value"
+  }
 }
 ```
 
@@ -130,7 +132,7 @@ Represents the originating host of the log. This is automatically set within sel
 
 ### message
 
-Represents the log message. Change this field name via the [global `message_key` option][docs.reference.global-options#message-key] or the source-level `message_key` option for relevant sources.
+Represents the log message. Change this field name via the [global `message_key` option][docs.reference.global-options#message_key] or the source-level `message_key` option for relevant sources.
  See [Changing The Default Schema](#changing-the-default-schema) for more info.
 
 
@@ -154,7 +156,7 @@ Represents the log message. Change this field name via the [global `message_key`
 
 ### timestamp
 
-A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this field name via the [global `timestamp_key` option][docs.reference.global-options#message-key] or the source-level `timestamp_key` option for relevant sources.
+A normalized [Rust DateTime struct][urls.rust_date_time] in UTC. Change this field name via the [global `timestamp_key` option][docs.reference.global-options#message_key] or the source-level `timestamp_key` option for relevant sources.
  See [Changing The Default Schema](#changing-the-default-schema) and [Timestamp Coercion](#timestamp-coercion) for more info.
 
 
@@ -216,6 +218,25 @@ If Vector receives a timestamp that does not contain timezone information
 Vector assumes the timestamp is in local time, and will convert the timestamp
 to UTC from the local time.
 
+### Dot Notation
+
+Some components, such as [`rename_fields` transform][docs.reference.transforms.rename_fields],
+accept name of a field as an option. In order to specify a nested field to them, use the
+dot notation which can be described by an example:
+
+```
+parent_field.child_field
+```
+
+The dot notation also supports accessing array fields using by placing the index between
+`[` and `]` after the array field name, for example
+
+```
+array[0]
+```
+
+The indexes start from 0, missing value are auto-filled by [null values](#null-values).
+
 <Alert type="warning">
 
 It is important that the host system contain time zone data files to properly
@@ -238,7 +259,7 @@ allowing you to extract and coerce in one step.
 
 #### Strings
 
-Strings are UTF8 compatible and are only bounded by the available system
+Strings are UTF-8 compatible and are only bounded by the available system
 memory.
 
 #### Ints
@@ -247,7 +268,7 @@ Integers are signed integers up to 64 bits.
 
 #### Floats
 
-Floats are signed floats up to 64 bits.
+Floats are 64-bit [IEEE 754][urls.ieee_754] floats.
 
 #### Booleans
 
@@ -260,13 +281,23 @@ stored as UTC.
 
 #### Null Values
 
- For compatibility with JSON log events, Vector also supports `null` values.
+For compatibility with JSON log events, Vector also supports `null` values.
+
+#### Maps
+
+Maps are associative arrays mapping string fields to values of any type.
+
+#### Arrays
+
+Array fields are sequences of values of any type.
 
 
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
-[docs.reference.global-options#message-key]: /docs/reference/global-options/#message-key
+[docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
+[docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
+[urls.ieee_754]: https://en.wikipedia.org/wiki/IEEE_754
 [urls.issue_551]: https://github.com/timberio/vector/issues/551
 [urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html

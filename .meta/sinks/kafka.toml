@@ -32,19 +32,11 @@ lz4 = "High speed [LZ4 compression](https://lz4.github.io/lz4/)"
 snappy = "High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression."
 zstd = "[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."
 
-[sinks.kafka.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.kafka.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
-
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.kafka.options",
+  encodings: ["json", "text"],
+  default: false
+) %>
 
 [sinks.kafka.options.key_field]
 type = "string"
@@ -57,7 +49,7 @@ randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify: false) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
 
 [sinks.kafka.options.topic]
 type = "string"

@@ -6,14 +6,14 @@ use super::{
 use crate::{
     dns::Resolver,
     event::Event,
-    tls::{TlsConnectorExt, TlsSettings},
+    tls::{tls_connector_builder, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
 use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -130,17 +130,7 @@ impl<B> HttpService<B> {
     where
         F: Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new_with_resolver(resolver.clone());
-        http.enforce_http(false);
-
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
-        let https = HttpsConnector::from((http, tls));
+        let https = connector(resolver, tls_settings).unwrap();
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -173,17 +163,7 @@ impl HttpServiceBuilder {
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let mut http = HttpConnector::new_with_resolver(self.resolver.clone());
-        http.enforce_http(false);
-
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = self.tls_settings {
-            tls.use_tls_settings(settings);
-        }
-
-        let tls = tls.build().expect("TLS initialization failed");
-
-        let https = HttpsConnector::from((http, tls));
+        let https = connector(self.resolver, self.tls_settings).unwrap();
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
@@ -204,22 +184,19 @@ impl HttpServiceBuilder {
 
 pub fn connector(
     resolver: Resolver,
-    tls_settings: TlsSettings,
+    tls_settings: Option<TlsSettings>,
 ) -> crate::Result<HttpsConnector<HttpConnector<Resolver>>> {
     let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
-    let mut tls = native_tls::TlsConnector::builder();
-
-    tls.use_tls_settings(tls_settings);
-
-    let https = HttpsConnector::from((http, tls.build()?));
+    let tls = tls_connector_builder(tls_settings)?;
+    let https = HttpsConnector::with_connector(http, tls)?;
 
     Ok(https)
 }
 
 pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<HttpsClient> {
-    let https = connector(resolver, tls)?;
+    let https = connector(resolver, Some(tls))?;
     Ok(hyper::Client::builder().build(https))
 }
 
