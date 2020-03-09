@@ -32,7 +32,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [transforms.my_transform_id]
   type = "field_filter"
   inputs = ["my-source-id"]
-  field = "file"
+  field = "application_id"
   value = "/var/log/nginx.log"
 ```
 
@@ -49,7 +49,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["file"]}
+  examples={["application_id","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -125,7 +125,9 @@ enabling access to root-level, nested, and array field values. For example:
 ```toml
 [transforms.my_field_filter_transform_id]
   # ...
-  field = "file"
+  field = "application_id"
+  field = "parent.child"
+  field = "array[0]"
   # ...
 ```
 

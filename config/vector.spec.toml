@@ -1312,6 +1312,8 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
 # Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
@@ -1444,7 +1446,9 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  target = "dest_field_name"
+  target = "root_field_name"
+  target = "parent.child"
+  target = "array[0]"
 
 # Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
@@ -1466,7 +1470,9 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  field = "file"
+  field = "application_id"
+  field = "parent.child"
+  field = "array[0]"
 
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
@@ -1506,6 +1512,8 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   source = "ip_address"
   source = "x-forwarded-for"
+  source = "parent.child"
+  source = "array[0]"
 
   # The default field to insert the resulting GeoIP data into. See output for
   # more info.
@@ -1514,6 +1522,7 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "geoip"
   # * type: string
   target = "geoip"
+  target = "parent.child"
 
 # Accepts and outputs `log` events allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
@@ -1549,6 +1558,8 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
   # The Grok pattern
   #
@@ -1613,6 +1624,8 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
   # If `target_field` is set and the log contains a field of the same name as the
   # target, it will only be overwritten if this is set to `true`.
@@ -1630,7 +1643,8 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: string
-  target_field = "target"
+  target_field = "root_field"
+  target_field = "parent.child"
 
 # Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
@@ -1673,6 +1687,7 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     field = "duration"
+    field = "parent.child"
 
     # If `true` the metric will be incremented by the `field` value. If `false` the
     # metric will be incremented by 1 regardless of the `field` value.
@@ -1736,6 +1751,8 @@ dns_servers = ["0.0.0.0:53"]
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
   #
   # Types
@@ -1823,6 +1840,7 @@ end
   # * default: ["message"]
   # * type: [string]
   merge_fields = ["message"]
+  merge_fields = ["message", "parent.child"]
 
   # The field that indicates that the event is partial. A consequent stream of
   # partial events along with the first non-partial event will be merged together.
@@ -1831,6 +1849,7 @@ end
   # * default: "_partial"
   # * type: string
   partial_event_marker_field = "_partial"
+  partial_event_marker_field = "parent.child"
 
   # An ordered list of fields to distinguish streams by. Each stream has a
   # separate partial event merging state. Should be used to prevent events from
@@ -1840,7 +1859,8 @@ end
   # * optional
   # * default: []
   # * type: [string]
-  stream_discriminant_fields = []
+  stream_discriminant_fields = ["host"]
+  stream_discriminant_fields = ["host", "parent.child"]
 
 # Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
@@ -1876,6 +1896,7 @@ end
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
 
   # The Regular Expression to apply. Do not include the leading or trailing `/`.
   #
@@ -1922,7 +1943,7 @@ end
   #
   # * required
   # * type: [string]
-  fields = ["field1", "field2"]
+  fields = ["field1", "field2", "parent.child"]
 
 # Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
@@ -2045,12 +2066,13 @@ end
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
 
   # The field names assigned to the resulting tokens, in order.
   #
   # * required
   # * type: [string]
-  field_names = ["timestamp", "level", "message"]
+  field_names = ["timestamp", "level", "message", "parent.child"]
 
   # The separator to split the field on. If no separator is given, it will split
   # on all whitespace. 'Whitespace' is defined according to the terms of the
@@ -2191,12 +2213,13 @@ end
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
 
   # The log field names assigned to the resulting tokens, in order.
   #
   # * required
   # * type: [string]
-  field_names = ["timestamp", "level", "message"]
+  field_names = ["timestamp", "level", "message", "parent.child"]
 
   #
   # Types

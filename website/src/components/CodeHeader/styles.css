@@ -7,7 +7,7 @@
   padding: 2px 8px;
 }
 
-.code-header + pre {
+.code-header + div[class^='mdxCodeBlock_'] pre {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }

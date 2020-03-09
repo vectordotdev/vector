@@ -81,7 +81,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -209,6 +209,8 @@ enabling access to root-level, nested, and array field values. For example:
 [transforms.my_grok_parser_transform_id]
   # ...
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
   # ...
 ```
 

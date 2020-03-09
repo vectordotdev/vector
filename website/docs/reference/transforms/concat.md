@@ -34,7 +34,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"]
   items = ["first[..3]", "second[-5..]", "third[3..6]"]
   joiner = " " # default
-  target = "dest_field_name"
+  target = "root_field_name"
 ```
 
 ## Options
@@ -96,7 +96,7 @@ The string that is used to join all items.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["dest_field_name"]}
+  examples={["root_field_name","parent.child","array[0]"]}
   groups={[]}
   name={"target"}
   path={null}
@@ -178,7 +178,9 @@ enabling access to root-level, nested, and array field values. For example:
 ```toml
 [transforms.my_concat_transform_id]
   # ...
-  target = "dest_field_name"
+  target = "root_field_name"
+  target = "parent.child"
+  target = "array[0]"
   # ...
 ```
 

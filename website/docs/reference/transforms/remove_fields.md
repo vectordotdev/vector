@@ -32,7 +32,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [transforms.my_transform_id]
   type = "remove_fields"
   inputs = ["my-source-id"]
-  fields = ["field1", "field2"]
+  fields = ["field1", "field2", "parent.child"]
 ```
 
 ## Options
@@ -48,7 +48,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["field1","field2"]]}
+  examples={[["field1","field2","parent.child"]]}
   groups={[]}
   name={"fields"}
   path={null}
@@ -91,7 +91,7 @@ enabling access to root-level, nested, and array field values. For example:
 ```toml
 [transforms.my_remove_fields_transform_id]
   # ...
-  fields = ["field1", "field2"]
+  fields = ["field1", "field2", "parent.child"]
   # ...
 ```
 

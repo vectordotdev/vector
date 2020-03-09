@@ -17,6 +17,7 @@ requirements = {}
 type = "string"
 common = true
 default = "message"
+examples = ["message", "parent.child"]
 field_notation = true
 required = true
 description = "The log field to tokenize."
@@ -24,7 +25,7 @@ description = "The log field to tokenize."
 [transforms.tokenizer.options.field_names]
 type = "[string]"
 common = true
-examples = [["timestamp", "level", "message"]]
+examples = [["timestamp", "level", "message", "parent.child"]]
 field_notation = true
 required = true
 description = "The log field names assigned to the resulting tokens, in order."

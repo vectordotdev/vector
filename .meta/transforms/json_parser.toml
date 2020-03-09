@@ -34,6 +34,7 @@ event will be kept and passed through.\
 type = "string"
 common = true
 default = "message"
+examples = ["message", "parent.child", "array[0]"]
 field_notation = true
 required = true
 description = """\
@@ -50,7 +51,7 @@ as the target, it will only be overwritten if this is set to `true`.\
 
 [transforms.json_parser.options.target_field]
 type = "string"
-examples = ["target"]
+examples = ["root_field", "parent.child"]
 field_notation = true
 description = """\
 If this setting is present, the parsed JSON will be inserted into the \

@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   drop_invalid = true
   field = "message" # default
   overwrite_target = false # default
-  target_field = "target" # no default
+  target_field = "root_field" # no default
 ```
 
 </TabItem>
@@ -126,7 +126,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -172,7 +172,7 @@ If [`target_field`](#target_field) is set and the log contains a field of the sa
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["target"]}
+  examples={["root_field","parent.child"]}
   groups={[]}
   name={"target_field"}
   path={null}
@@ -315,6 +315,8 @@ enabling access to root-level, nested, and array field values. For example:
 [transforms.my_json_parser_transform_id]
   # ...
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
   # ...
 ```
 

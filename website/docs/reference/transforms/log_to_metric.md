@@ -76,7 +76,7 @@ A table of key/value pairs representing the keys to be added to the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["duration"]}
+  examples={["duration","parent.child"]}
   groups={[]}
   name={"field"}
   path={"metrics"}

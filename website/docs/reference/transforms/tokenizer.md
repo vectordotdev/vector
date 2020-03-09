@@ -35,7 +35,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"]
   drop_field = true # default
   field = "message" # default
-  field_names = ["timestamp", "level", "message"]
+  field_names = ["timestamp", "level", "message", "parent.child"]
 
   # Types
   types.status = "int"
@@ -81,7 +81,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -104,7 +104,7 @@ The log field to tokenize. See [Field Notation Syntax](#field-notation-syntax) f
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[["timestamp","level","message"]]}
+  examples={[["timestamp","level","message","parent.child"]]}
   groups={[]}
   name={"field_names"}
   path={null}
@@ -244,6 +244,7 @@ enabling access to root-level, nested, and array field values. For example:
 [transforms.my_tokenizer_transform_id]
   # ...
   field = "message"
+  field = "parent.child"
   # ...
 ```
 

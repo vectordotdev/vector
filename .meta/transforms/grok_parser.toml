@@ -23,6 +23,7 @@ If `true` will drop the specified `field` after parsing.\
 type = "string"
 common = true
 default = "message"
+examples = ["message", "parent.child", "array[0]"]
 field_notation = true
 required = true
 description = """\

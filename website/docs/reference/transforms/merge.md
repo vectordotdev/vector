@@ -50,7 +50,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={["message"]}
   enumValues={null}
-  examples={[["message"]]}
+  examples={[["message"],["message","parent.child"]]}
   groups={[]}
   name={"merge_fields"}
   path={null}
@@ -73,7 +73,7 @@ Fields to merge. The values of these fields will be merged into the first partia
   common={true}
   defaultValue={"_partial"}
   enumValues={null}
-  examples={["_partial"]}
+  examples={["_partial","parent.child"]}
   groups={[]}
   name={"partial_event_marker_field"}
   path={null}
@@ -96,7 +96,7 @@ The field that indicates that the event is partial. A consequent stream of parti
   common={true}
   defaultValue={[]}
   enumValues={null}
-  examples={[[]]}
+  examples={[["host"],["host","parent.child"]]}
   groups={[]}
   name={"stream_discriminant_fields"}
   path={null}
@@ -285,6 +285,7 @@ enabling access to root-level, nested, and array field values. For example:
 [transforms.my_merge_transform_id]
   # ...
   merge_fields = ["message"]
+  merge_fields = ["message", "parent.child"]
   # ...
 ```
 

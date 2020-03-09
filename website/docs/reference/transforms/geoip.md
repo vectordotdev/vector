@@ -74,7 +74,7 @@ Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["ip_address","x-forwarded-for"]}
+  examples={["ip_address","x-forwarded-for","parent.child","array[0]"]}
   groups={[]}
   name={"source"}
   path={null}
@@ -97,7 +97,7 @@ The field name that contains the IP address. This field should contain a valid I
   common={true}
   defaultValue={"geoip"}
   enumValues={null}
-  examples={["geoip"]}
+  examples={["geoip","parent.child"]}
   groups={[]}
   name={"target"}
   path={null}
@@ -356,6 +356,8 @@ enabling access to root-level, nested, and array field values. For example:
   # ...
   source = "ip_address"
   source = "x-forwarded-for"
+  source = "parent.child"
+  source = "array[0]"
   # ...
 ```
 
