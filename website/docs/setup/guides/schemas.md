@@ -269,6 +269,7 @@ output format
   type = "console"
   inputs = ["source0"]
   target = "stdout"
+  encoding = "json"
 ```
 
 You can also use a transform like [`json_parser`](/docs/reference/transforms/json_parser/),
