@@ -9,6 +9,9 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tokio02::time::{delay_queue, DelayQueue, Error};
 
+#[cfg(test)]
+mod tests;
+
 pub type ExpiredItem<K, V> = (V, delay_queue::Expired<K>);
 
 pub struct ExpiringHashMap<K, V> {
