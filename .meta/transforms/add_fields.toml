@@ -21,8 +21,9 @@ event.\
 
 [transforms.add_fields.options.fields.children."`[field-name]`"]
 type = "*"
-required = true
+field_notation = true
 templatable = true
+required = true
 examples = [
   {"string_field" = "string value"},
   {"env_var_field" = "${ENV_VAR}"},

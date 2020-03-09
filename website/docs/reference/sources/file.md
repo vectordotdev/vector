@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]

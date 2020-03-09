@@ -2,6 +2,7 @@
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
 min_version: null
 service_name: "Regex Parser"
@@ -93,7 +94,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 ### field
 
-The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
+The log field to parse. See [Failed Parsing](#failed-parsing) and [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -241,6 +242,24 @@ A failure includes any event that does not successfully parse against the
 provided [`regex`](#regex). This includes bad values as well as events missing the
 specified [`field`](#field).
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_regex_parser_transform_id]
+  # ...
+  field = "message"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 ### Performance
 
 The `regex_parser` source has been involved in the following performance tests:
@@ -301,6 +320,7 @@ documentation][urls.regex_grouping_and_flags].
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.reference.field-notation]: /docs/reference/field-notation/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags

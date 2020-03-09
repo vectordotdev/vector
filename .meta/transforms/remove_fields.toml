@@ -14,5 +14,6 @@ requirements = {}
 type = "[string]"
 common = true
 examples = [["field1", "field2"]]
+field_notation = true
 required = true
 description = "The log field names to drop."

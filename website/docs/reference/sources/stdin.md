@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
 event_types: ["log"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+stdin%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]

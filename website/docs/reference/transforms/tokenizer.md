@@ -2,6 +2,7 @@
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tokenizer%22
 min_version: null
 service_name: "Tokenizer"
@@ -93,7 +94,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 ### field
 
-The log field to tokenize.
+The log field to tokenize. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -116,7 +117,7 @@ The log field to tokenize.
 
 ### field_names
 
-The log field names assigned to the resulting tokens, in order.
+The log field names assigned to the resulting tokens, in order. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -231,6 +232,24 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) and [`field_names`](#field_names) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_tokenizer_transform_id]
+  # ...
+  field = "message"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 ### Special Characters
 
 In order to extract raw values and remove wrapping characters, we must treat
@@ -243,4 +262,5 @@ certain characters as special. These characters will be discarded:
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-notation]: /docs/reference/field-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

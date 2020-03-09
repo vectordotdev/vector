@@ -2,6 +2,7 @@
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
+function_category: "sanitize"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
 min_version: null
 service_name: "ANSI Stripper"
@@ -60,7 +61,7 @@ import Field from '@site/src/components/Field';
 
 ### field
 
-The target field to strip ANSI escape sequences from.
+The target field to strip ANSI escape sequences from. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -80,6 +81,25 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_ansi_stripper_transform_id]
+  # ...
+  field = "message"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-notation]: /docs/reference/field-notation/

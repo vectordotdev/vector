@@ -17,6 +17,7 @@ requirements = {}
 type = "string"
 common = true
 default = "message"
+field_notation = true
 required = true
 description = "The log field to tokenize."
 
@@ -24,6 +25,7 @@ description = "The log field to tokenize."
 type = "[string]"
 common = true
 examples = [["timestamp", "level", "message"]]
+field_notation = true
 required = true
 description = "The log field names assigned to the resulting tokens, in order."
 

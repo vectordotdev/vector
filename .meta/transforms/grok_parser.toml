@@ -23,6 +23,7 @@ If `true` will drop the specified `field` after parsing.\
 type = "string"
 common = true
 default = "message"
+field_notation = true
 required = true
 description = """\
 The log field to execute the `pattern` against. Must be a `string` value.\

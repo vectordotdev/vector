@@ -1,4 +1,8 @@
 module.exports = {
+  "event_types": [
+    "log",
+    "metric"
+  ],
   "installation": {
     "containers": [
       {

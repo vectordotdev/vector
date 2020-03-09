@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
 min_version: "1.0"
 operating_systems: ["Linux","MacOS","Windows"]

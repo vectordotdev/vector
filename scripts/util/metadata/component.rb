@@ -4,10 +4,6 @@ require_relative "field"
 require_relative "requirements"
 
 class Component
-  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
-  EVENT_TYPES = ["log", "metric"].freeze
-  OPERATING_SYSTEMS = ["Linux", "MacOS", "Windows"].freeze
-
   include Comparable
 
   attr_reader :beta,
@@ -87,17 +83,20 @@ class Component
   end
 
   def event_types
-    types = []
+    @event_types ||=
+      begin
+        types = []
 
-    if respond_to?(:input_types)
-      types += input_types
-    end
+        if respond_to?(:input_types)
+          types += input_types
+        end
 
-    if respond_to?(:output_types)
-      types += output_types
-    end
+        if respond_to?(:output_types)
+          types += output_types
+        end
 
-    types.uniq
+        types.uniq
+      end
   end
 
   def field_notation_options
@@ -226,6 +225,7 @@ class Component
     #{option_examples.join}
     EOF
   end
+
   def transform?
     type == "transform"
   end

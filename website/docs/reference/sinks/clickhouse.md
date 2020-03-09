@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
 min_version: "1.1.54378"
 operating_systems: ["Linux","MacOS","Windows"]

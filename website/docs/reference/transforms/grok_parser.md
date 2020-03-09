@@ -2,6 +2,7 @@
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
 min_version: null
 service_name: "Grok Parser"
@@ -93,7 +94,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
 
 ### field
 
-The log field to execute the [`pattern`](#pattern) against. Must be a `string` value.
+The log field to execute the [`pattern`](#pattern) against. Must be a `string` value. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -196,6 +197,24 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_grok_parser_transform_id]
+  # ...
+  field = "message"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 ### Performance
 
 Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
@@ -207,6 +226,7 @@ performance issues.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-notation]: /docs/reference/field-notation/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [pages.index#performance]: /#performance
 [urls.grok]: http://grokdebug.herokuapp.com/

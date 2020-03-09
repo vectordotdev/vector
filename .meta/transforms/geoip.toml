@@ -25,6 +25,7 @@ are not supported.
 type = "string"
 common = true
 examples =  ["ip_address", "x-forwarded-for"]
+field_notation = true
 required = true
 description = """\
 The field name that contains the IP address. This field should contain a valid \
@@ -35,6 +36,7 @@ IPv4 or IPv6 address.\
 type = "string"
 common = true
 default = "geoip"
+field_notation = true
 required = true
 description = """\
 The default field to insert the resulting GeoIP data into. See \

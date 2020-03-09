@@ -23,6 +23,7 @@ description = "If the specified `field` should be dropped (removed) after parsin
 type = "string"
 common = true
 default = "message"
+field_notation = true
 required = true
 description = "The log field to parse."
 

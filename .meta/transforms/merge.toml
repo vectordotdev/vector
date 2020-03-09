@@ -14,6 +14,7 @@ requirements = {}
 type = "[string]"
 common = true
 default = ["message"]
+field_notation = true
 description = """\
 Fields to merge. The values of these fields will be merged into the \
 first partial event. Fields not specified here will be ignored. \
@@ -27,6 +28,7 @@ merged in, producing the resulting merged event.\
 type = "string"
 common = true
 default = "_partial"
+field_notation = true
 description = """\
 The field that indicates that the event is partial. A consequent stream \
 of partial events along with the first non-partial event will be merged \
@@ -37,6 +39,7 @@ together.\
 type = "[string]"
 common = true
 default = []
+field_notation = true
 description = """\
 An ordered list of fields to distinguish streams by. Each stream has a \
 separate partial event merging state. Should be used to prevent events \

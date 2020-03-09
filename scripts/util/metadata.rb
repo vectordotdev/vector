@@ -4,6 +4,7 @@ require "ostruct"
 require "toml-rb"
 
 require_relative "metadata/batching_sink"
+require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
 require_relative "metadata/links"
@@ -124,12 +125,11 @@ class Metadata
   end
 
   attr_reader :blog_posts,
+    :data_model,
     :domains,
     :env_vars,
     :installation,
     :links,
-    :log_fields,
-    :metric_fields,
     :options,
     :tests,
     :posts,
@@ -140,9 +140,8 @@ class Metadata
     :transforms
 
   def initialize(hash, docs_root, pages_root)
+    @data_model = DataModel.new(hash.fetch("data_model"))
     @installation = OpenStruct.new()
-    @log_fields = hash.fetch("log_fields").to_struct_with_name(Field)
-    @metric_fields = hash.fetch("metric_fields").to_struct_with_name(Field)
     @options = hash.fetch("options").to_struct_with_name(Field)
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
@@ -274,6 +273,10 @@ class Metadata
     @env_vars_list ||= env_vars.to_h.values.sort
   end
 
+  def event_types
+    @event_types ||= data_model.types
+  end
+
   def latest_patch_releases
     version = Version.new("#{latest_version.major}.#{latest_version.minor}.0")
 
@@ -288,14 +291,6 @@ class Metadata
 
   def latest_version
     @latest_version ||= latest_release.version
-  end
-
-  def log_fields_list
-    @log_fields_list ||= log_fields.to_h.values.sort
-  end
-
-  def metric_fields_list
-    @metric_fields_list ||= metric_fields.to_h.values.sort
   end
 
   def newer_releases(release)
@@ -374,6 +369,7 @@ class Metadata
 
   def to_h
     {
+      event_types: event_types,
       installation: installation.deep_to_h,
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,

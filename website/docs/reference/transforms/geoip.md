@@ -2,6 +2,7 @@
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
+function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
 min_version: null
 service_name: "GeoIP"
@@ -86,7 +87,7 @@ Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City
 
 ### source
 
-The field name that contains the IP address. This field should contain a valid IPv4 or IPv6 address.
+The field name that contains the IP address. This field should contain a valid IPv4 or IPv6 address. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -109,7 +110,7 @@ The field name that contains the IP address. This field should contain a valid I
 
 ### target
 
-The default field to insert the resulting GeoIP data into. See [output](#output) for more info.
+The default field to insert the resulting GeoIP data into. See [output](#output) for more info. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -342,8 +343,28 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`source`](#source) and [`target`](#target) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_geoip_transform_id]
+  # ...
+  source = "ip_address"
+  source = "x-forwarded-for"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.reference.field-notation]: /docs/reference/field-notation/
 [urls.iana_time_zone_format]: https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones
 [urls.iana_time_zones]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [urls.iso3166-2]: https://en.wikipedia.org/wiki/ISO_3166-2

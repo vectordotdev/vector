@@ -2,6 +2,7 @@
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events allowing you to add one or more metric tags."
 event_types: ["metric"]
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
 min_version: null
 service_name: "Add Tags"

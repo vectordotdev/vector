@@ -63,7 +63,6 @@ description = "The basic authentication user name."
 
 [sinks.http.options.compression]
 type = "string"
-category = "Requesting"
 common = true
 default = "none"
 description = """\

@@ -2,6 +2,7 @@
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
 min_version: null
 service_name: "Logfmt Parser"
@@ -92,7 +93,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 ### field
 
-The log field to parse.
+The log field to parse. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -161,7 +162,26 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_logfmt_parser_transform_id]
+  # ...
+  field = "message"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-notation]: /docs/reference/field-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

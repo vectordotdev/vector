@@ -1,4 +1,4 @@
-[log_fields.host]
+[data_model.log.schema.host]
 type = "string"
 examples = ["my.host.com"]
 description = """\
@@ -8,7 +8,7 @@ name via the [global `host_key` option][docs.reference.global-options#host_key] 
 or the source-level `host_key` option for relevant sources.\
 """
 
-[log_fields.message]
+[data_model.log.schema.message]
 type = "string"
 examples = ["<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"]
 required = true
@@ -18,7 +18,7 @@ Represents the log message. Change this field name via the \
 source-level `message_key` option for relevant sources.
 """
 
-[log_fields.timestamp]
+[data_model.log.schema.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
@@ -29,7 +29,7 @@ field name via the \
 the source-level `timestamp_key` option for relevant sources.
 """
 
-[log_fields."`[custom-key]`"]
+[data_model.log.schema."`[custom-key]`"]
 type = "*"
 examples = [
   {my-key = "my-value"},

@@ -2,6 +2,7 @@
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
 event_types: ["log"]
+function_category: "merge"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+merge%22
 min_version: null
 service_name: "Merge"
@@ -62,7 +63,7 @@ import Field from '@site/src/components/Field';
 
 ### merge_fields
 
-Fields to merge. The values of these fields will be merged into the first partial event. Fields not specified here will be ignored. Merging process takes the first partial event and the base, then it merges in the fields from each successive partial event, until a non-partial event arrives. Finally, the non-partial event fields are merged in, producing the resulting merged event.
+Fields to merge. The values of these fields will be merged into the first partial event. Fields not specified here will be ignored. Merging process takes the first partial event and the base, then it merges in the fields from each successive partial event, until a non-partial event arrives. Finally, the non-partial event fields are merged in, producing the resulting merged event. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -85,7 +86,7 @@ Fields to merge. The values of these fields will be merged into the first partia
 
 ### partial_event_marker_field
 
-The field that indicates that the event is partial. A consequent stream of partial events along with the first non-partial event will be merged together.
+The field that indicates that the event is partial. A consequent stream of partial events along with the first non-partial event will be merged together. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -108,7 +109,7 @@ The field that indicates that the event is partial. A consequent stream of parti
 
 ### stream_discriminant_fields
 
-An ordered list of fields to distinguish streams by. Each stream has a separate partial event merging state. Should be used to prevent events from unrelated sources from mixing together, as this affects partial event processing.
+An ordered list of fields to distinguish streams by. Each stream has a separate partial event merging state. Should be used to prevent events from unrelated sources from mixing together, as this affects partial event processing. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -272,6 +273,24 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`merge_fields`](#merge_fields), [`partial_event_marker_field`](#partial_event_marker_field), and [`stream_discriminant_fields`](#stream_discriminant_fields) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_merge_transform_id]
+  # ...
+  merge_fields = ["message"]
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 ### When to use this transform
 
 Where possible, Vector will handle event merging at the source level. For
@@ -287,5 +306,6 @@ If you're using this transform for a common use case, please consider
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-notation]: /docs/reference/field-notation/
 [docs.sources.file]: /docs/reference/sources/file/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature

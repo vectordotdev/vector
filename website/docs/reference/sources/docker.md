@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
 min_version: "1.24"
 operating_systems: ["Linux","MacOS","Windows"]

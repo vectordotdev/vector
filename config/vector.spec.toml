@@ -5244,6 +5244,16 @@ end
   # * type: string
   uri = "https://10.22.212.22:9000/endpoint"
 
+  # The compression strategy used to compress the encoded event data before
+  # outputting.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -5258,20 +5268,6 @@ end
   # * no default
   # * type: string
   healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  #
-  # Requesting
-  #
-
-  # The compression strategy used to compress the encoded event data before
-  # outputting.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
 
   #
   # Auth

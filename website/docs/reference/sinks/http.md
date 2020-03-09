@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -47,10 +48,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "http"
   inputs = ["my-source-id"]
   uri = "https://10.22.212.22:9000/endpoint"
-  healthcheck = true # default
-
-  # Requesting
   compression = "none" # default
+  healthcheck = true # default
 
   # Batch
   batch.max_size = 1049000 # default, bytes
@@ -81,11 +80,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "http"
   inputs = ["my-source-id"]
   uri = "https://10.22.212.22:9000/endpoint"
+  compression = "none" # default
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
-
-  # Requesting
-  compression = "none" # default
 
   # Auth
   auth.strategy = "basic"

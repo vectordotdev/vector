@@ -13,6 +13,7 @@ requirements = {}
 [transforms.concat.options.target]
 type = "string"
 examples = ["dest_field_name"]
+field_notation = true
 required = true
 description = """\
 The name for the new label.\

@@ -34,6 +34,7 @@ event will be kept and passed through.\
 type = "string"
 common = true
 default = "message"
+field_notation = true
 required = true
 description = """\
 The log field to decode as JSON. Must be a `string` value type.\
@@ -50,6 +51,7 @@ as the target, it will only be overwritten if this is set to `true`.\
 [transforms.json_parser.options.target_field]
 type = "string"
 examples = ["target"]
+field_notation = true
 description = """\
 If this setting is present, the parsed JSON will be inserted into the \
 log as a sub-object with this name. \

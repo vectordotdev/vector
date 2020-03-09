@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`."
 event_types: ["log","metric"]
+function_category: "test"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]

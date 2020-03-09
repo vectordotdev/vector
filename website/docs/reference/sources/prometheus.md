@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
 event_types: ["metric"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+prometheus%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]

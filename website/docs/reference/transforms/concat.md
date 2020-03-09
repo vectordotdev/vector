@@ -2,6 +2,7 @@
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22
 min_version: null
 service_name: "Concat"
@@ -108,7 +109,7 @@ The string that is used to join all items.
 
 ### target
 
-The name for the new label.
+The name for the new label. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -166,5 +167,24 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`target`](#target) options
+support [Vector's field notiation syntax][docs.reference.field-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_concat_transform_id]
+  # ...
+  target = "dest_field_name"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.reference.field-notation]: /docs/reference/field-notation/
