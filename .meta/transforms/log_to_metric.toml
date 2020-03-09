@@ -35,7 +35,7 @@ set = "A [set metric type][docs.data-model.metric#set]."
 type = "string"
 common = true
 examples = ["duration", "parent.child"]
-field_notation = true
+field_path_notation = true
 required = true
 description = "The log field to use as the metric."
 

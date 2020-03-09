@@ -24,7 +24,7 @@ type = "string"
 common = true
 default = "message"
 examples = ["message", "parent.child"]
-field_notation = true
+field_path_notation = true
 required = true
 description = "The log field to parse."
 

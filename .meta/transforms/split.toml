@@ -18,7 +18,7 @@ type = "string"
 common = true
 default = "message"
 examples = ["message", "parent.child"]
-field_notation = true
+field_path_notation = true
 required = true
 description = "The field to apply the split on."
 
@@ -26,7 +26,7 @@ description = "The field to apply the split on."
 type = "[string]"
 common = true
 examples = [["timestamp", "level", "message", "parent.child"]]
-field_notation = true
+field_path_notation = true
 required = true
 description = "The field names assigned to the resulting tokens, in order."
 

@@ -1,9 +1,14 @@
+---
+title: Field Path Notation
+description: "Vector's field path notation allows you to reference field values with a simple string syntax."
+---
+
 # Field Notation
 
 Throughout Vector's configuration you'll notice that certain options take field
-names as values, such as the
+paths as values, such as the
 [`rename_fields` transform][docs.transforms.rename_fields]. In order to
-referene nested, or array, values you can use Vector's field notation.
+referenxe nested, or array, values you can use Vector's field path notation.
 This notation is not anything special, it simply uses `.` and `[..]` to access
 nested and array values, respectively.
 
@@ -12,7 +17,7 @@ nested and array values, respectively.
 
      To make changes please edit the template located at:
 
-     website/docs/reference/field-notation.md.erb
+     website/docs/reference/field-path-notation.md.erb
 -->
 
 ## Example

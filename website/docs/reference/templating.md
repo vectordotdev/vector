@@ -59,15 +59,15 @@ log data.
 ### Event Fields
 
 Individual [`log` event][docs.data-model.log] fields can be access with the
-`{{<field-notation>}}` syntax:
+`{{<field-path-notation>}}` syntax:
 
 ```toml
-option = "{{ field_notation }}"
+option = "{{ field_path_notation }}"
 ```
 
-Vector's [field notation][docs.reference.field-notation] is simple. It uses
+Vector's [field notation][docs.reference.field-path-notation] is simple. It uses
 `.` to target nested fields and `[<index>]` to target array values. Learn more
-in the [field notation docs][docs.reference.field-notation].
+in the [field notation docs][docs.reference.field-path-notation].
 
 ### Strptime Specifiers
 
@@ -104,7 +104,7 @@ Each value above will be treated _literally_.
 ### Array Values
 
 Array values can be accessed using Vector's
-[field notation syntax][docs.reference.field-notation]:
+[field notation syntax][docs.reference.field-path-notation]:
 
 ```
 option = "{{ parent.child[0] }}"
@@ -136,7 +136,7 @@ will not error, drop the event, or log anything.
 ### Nested Fields
 
 Nested fields can be accessed using Vector's
-[field notation syntax][docs.reference.field-notation]:
+[field notation syntax][docs.reference.field-path-notation]:
 
 ```
 option = "{{ parent.child }}"
@@ -146,7 +146,7 @@ option = "{{ parent.child }}"
 [docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.global-options#timestamp_key]: /docs/reference/global-options/#timestamp_key
-[docs.reference.field-notation]: /docs/reference/field-notation/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sinks.aws_s3#key_prefix]: /docs/reference/sinks/aws_s3/#key_prefix
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
 [docs.transforms.lua]: /docs/reference/transforms/lua/

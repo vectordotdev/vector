@@ -85,12 +85,12 @@ The `address` option determines the address and port the data is made available
 on. You'll need to configure your networking so that the configured port is
 accessible by the downstream service doing the scraping.
 <%- end -%>
-<%- if component.field_notation_options.any? -%>
+<%- if component.field_path_notation_options.any? -%>
 
 ### Field Notation Syntax
 
-The <%= option_names(component.field_notation_options).to_sentence %> options
-support [Vector's field notiation syntax][docs.reference.field-notation],
+The <%= option_names(component.field_path_notation_options).to_sentence %> options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -98,7 +98,7 @@ enabling access to root-level, nested, and array field values. For example:
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
-  <%- option = component.field_notation_options.fetch(0) -%>
+  <%- option = component.field_path_notation_options.fetch(0) -%>
   <%- option.examples.each do |example| -%>
   <%= option.name %> = <%= example.to_toml %>
   <%- end -%>
@@ -106,7 +106,7 @@ enabling access to root-level, nested, and array field values. For example:
 ```
 
 You can learn more about Vector's field notation in the
-[field notation reference][docs.reference.field-notation].
+[field notation reference][docs.reference.field-path-notation].
 <%- end -%>
 <%- if component.sink? && component.service_provider?("Google") -%>
 

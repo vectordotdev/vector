@@ -21,7 +21,7 @@ event.\
 
 [transforms.add_fields.options.fields.children."`[field-name]`"]
 type = "*"
-field_notation = true
+field_path_notation = true
 templatable = true
 required = true
 examples = [

@@ -346,7 +346,7 @@ section.
 ### Field Notation Syntax
 
 The [`source`](#source) and [`target`](#target) options
-support [Vector's field notiation syntax][docs.reference.field-notation],
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -362,11 +362,11 @@ enabling access to root-level, nested, and array field values. For example:
 ```
 
 You can learn more about Vector's field notation in the
-[field notation reference][docs.reference.field-notation].
+[field notation reference][docs.reference.field-path-notation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.reference.field-notation]: /docs/reference/field-notation/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.iana_time_zone_format]: https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones
 [urls.iana_time_zones]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [urls.iso3166-2]: https://en.wikipedia.org/wiki/ISO_3166-2

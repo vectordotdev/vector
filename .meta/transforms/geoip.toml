@@ -25,7 +25,7 @@ are not supported.
 type = "string"
 common = true
 examples =  ["ip_address", "x-forwarded-for", "parent.child", "array[0]"]
-field_notation = true
+field_path_notation = true
 required = true
 description = """\
 The field name that contains the IP address. This field should contain a valid \
@@ -37,7 +37,7 @@ type = "string"
 common = true
 default = "geoip"
 examples = ["geoip", "parent.child"]
-field_notation = true
+field_path_notation = true
 required = true
 description = """\
 The default field to insert the resulting GeoIP data into. See \

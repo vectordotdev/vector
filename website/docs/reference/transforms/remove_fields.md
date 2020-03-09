@@ -83,7 +83,7 @@ section.
 ### Field Notation Syntax
 
 The [`fields`](#fields) options
-support [Vector's field notiation syntax][docs.reference.field-notation],
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -96,9 +96,9 @@ enabling access to root-level, nested, and array field values. For example:
 ```
 
 You can learn more about Vector's field notation in the
-[field notation reference][docs.reference.field-notation].
+[field notation reference][docs.reference.field-path-notation].
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.reference.field-notation]: /docs/reference/field-notation/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/

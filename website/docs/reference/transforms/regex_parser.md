@@ -245,7 +245,7 @@ specified [`field`](#field).
 ### Field Notation Syntax
 
 The [`field`](#field) options
-support [Vector's field notiation syntax][docs.reference.field-notation],
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -259,7 +259,7 @@ enabling access to root-level, nested, and array field values. For example:
 ```
 
 You can learn more about Vector's field notation in the
-[field notation reference][docs.reference.field-notation].
+[field notation reference][docs.reference.field-path-notation].
 
 ### Performance
 
@@ -321,7 +321,7 @@ documentation][urls.regex_grouping_and_flags].
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[docs.reference.field-notation]: /docs/reference/field-notation/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags

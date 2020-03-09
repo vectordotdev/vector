@@ -94,7 +94,7 @@
           "type": "array",
           "description": "An array of example values used for documentation purposes."
         },
-        "field_notation": {
+        "field_path_notation": {
           "type": "boolean",
           "description": "Does this option support the field notation syntax?"
         },

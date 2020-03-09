@@ -12,7 +12,7 @@ class Field
     :description,
     :enum,
     :examples,
-    :field_notation,
+    :field_path_notation,
     :groups,
     :partition_key,
     :relevant_when,
@@ -30,7 +30,7 @@ class Field
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @examples = hash["examples"] || []
-    @field_notation = hash["field_notation"] == true
+    @field_path_notation = hash["field_path_notation"] == true
     @groups = hash["groups"] || []
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
@@ -189,8 +189,8 @@ class Field
     self.<=>(other) == 0
   end
 
-  def field_notation?
-    @field_notation == true
+  def field_path_notation?
+    @field_path_notation == true
   end
 
   def get_relevant_sections(sections)

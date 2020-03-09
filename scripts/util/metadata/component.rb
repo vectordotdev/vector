@@ -99,8 +99,8 @@ class Component
       end
   end
 
-  def field_notation_options
-    options_list.select(&:field_notation?)
+  def field_path_notation_options
+    options_list.select(&:field_path_notation?)
   end
 
   def only_service_provider?(provider_name)

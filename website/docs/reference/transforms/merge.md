@@ -276,7 +276,7 @@ section.
 ### Field Notation Syntax
 
 The [`merge_fields`](#merge_fields), [`partial_event_marker_field`](#partial_event_marker_field), and [`stream_discriminant_fields`](#stream_discriminant_fields) options
-support [Vector's field notiation syntax][docs.reference.field-notation],
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
 <CodeHeader fileName="vector.toml" />
@@ -290,7 +290,7 @@ enabling access to root-level, nested, and array field values. For example:
 ```
 
 You can learn more about Vector's field notation in the
-[field notation reference][docs.reference.field-notation].
+[field notation reference][docs.reference.field-path-notation].
 
 ### When to use this transform
 
@@ -307,6 +307,6 @@ If you're using this transform for a common use case, please consider
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.reference.field-notation]: /docs/reference/field-notation/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sources.file]: /docs/reference/sources/file/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature

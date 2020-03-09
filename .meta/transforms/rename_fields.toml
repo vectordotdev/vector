@@ -21,7 +21,7 @@ event.\
 
 [transforms.rename_fields.options.fields.children."`[field-name]`"]
 type = "*"
-field_notation = true
+field_path_notation = true
 required = true
 examples = [
   {"old_field_name" = "new_field_name"},

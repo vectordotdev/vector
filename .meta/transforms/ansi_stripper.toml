@@ -15,6 +15,6 @@ type = "string"
 common = true
 default = "message"
 examples = ["message", "parent.child", "array[0]"]
-field_notation = true
+field_path_notation = true
 required = true
 description = "The target field to strip ANSI escape sequences from."
