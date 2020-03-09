@@ -43,36 +43,36 @@ where
         self.map.insert(key, (value, delay));
     }
 
-    pub fn get<Q: ?Sized>(&self, k: &Q) -> Option<&V>
+    pub fn get<Q>(&self, k: &Q) -> Option<&V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
     {
         self.map.get(k).map(|&(ref v, _)| v)
     }
 
-    pub fn get_mut<Q: ?Sized>(&mut self, k: &Q) -> Option<&mut V>
+    pub fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
     {
         self.map.get_mut(k).map(|&mut (ref mut v, _)| v)
     }
 
-    pub fn reset_at<Q: ?Sized>(&mut self, k: &Q, when: Instant) -> Option<&mut V>
+    pub fn reset_at<Q>(&mut self, k: &Q, when: Instant) -> Option<&mut V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
     {
         let (value, delay_queue_key) = self.map.get_mut(k)?;
         self.expiration_queue.reset_at(delay_queue_key, when.into());
         Some(value)
     }
 
-    pub fn remove<Q: ?Sized>(&mut self, k: &Q) -> Option<(V, delay_queue::Expired<K>)>
+    pub fn remove<Q>(&mut self, k: &Q) -> Option<(V, delay_queue::Expired<K>)>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
     {
         let (value, expiration_queue_key) = self.map.remove(k)?;
         let expired = self.expiration_queue.remove(&expiration_queue_key);
