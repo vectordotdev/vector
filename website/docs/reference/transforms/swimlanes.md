@@ -39,9 +39,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
     type = "check_fields" # example
 
     # OPTIONAL
+    "message.contains" = "foo"
     "message.eq" = "this is the content to match against"
     "host.exists" = true
     "method.neq" = "POST"
+    "environment.prefix" = "staging-"
 ```
 
 ## Options
@@ -95,6 +97,29 @@ A table of swimlane identifiers to logical conditions representing the filter of
 The identifier of a swimlane.
 
 <Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.contains":"foo"}]}
+  groups={[]}
+  name={"`<field_name>`.contains"}
+  path={"lanes.`<swimlane_id>`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `<field_name>`.contains
+
+Checks whether a string field contains a string argument.
+
+
+</Field>
 
 
 <Field
@@ -161,6 +186,29 @@ Check whether a field exists or does not exist, depending on the provided valueb
 ##### `<field_name>`.neq
 
 Check whether a fields contents does not match the value specified.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.prefix":"staging-"}]}
+  groups={[]}
+  name={"`<field_name>`.prefix"}
+  path={"lanes.`<swimlane_id>`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `<field_name>`.prefix
+
+Checks whether a string field has a string argument prefix.
 
 
 </Field>

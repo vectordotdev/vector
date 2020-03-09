@@ -96,9 +96,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
 
       # OPTIONAL
+      "message.contains" = "foo"
       "message.eq" = "this is the content to match against"
       "host.exists" = true
       "method.neq" = "POST"
+      "environment.prefix" = "staging-"
 ```
 
 </TabItem>
@@ -158,9 +160,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
       type = "check_fields" # example
 
       # OPTIONAL
+      "message.contains" = "foo"
       "message.eq" = "this is the content to match against"
       "host.exists" = true
       "method.neq" = "POST"
+      "environment.prefix" = "staging-"
 ```
 
 </TabItem>
@@ -633,6 +637,29 @@ A table that defines a collection of conditions to check against the output of a
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={[{"message.contains":"foo"}]}
+  groups={[]}
+  name={"`<field_name>`.contains"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `<field_name>`.contains
+
+Checks whether a string field contains a string argument.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={[{"message.eq":"this is the content to match against"}]}
   groups={[]}
   name={"`<field_name>`.eq"}
@@ -693,6 +720,29 @@ Check whether a field exists or does not exist, depending on the provided valueb
 ##### `<field_name>`.neq
 
 Check whether a fields contents does not match the value specified.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.prefix":"staging-"}]}
+  groups={[]}
+  name={"`<field_name>`.prefix"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `<field_name>`.prefix
+
+Checks whether a string field has a string argument prefix.
 
 
 </Field>

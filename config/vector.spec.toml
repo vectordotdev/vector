@@ -2113,6 +2113,14 @@ end
       type = "is_log"
       type = "is_metric"
 
+      # Checks whether a string field contains a string argument.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.contains" = "foo"
+
       # Check whether a fields contents exactly matches the value specified.
       #
       # * optional
@@ -2137,6 +2145,14 @@ end
       # * type: string
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
+
+      # Checks whether a string field has a string argument prefix.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "environment.prefix" = "staging-"
 
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
