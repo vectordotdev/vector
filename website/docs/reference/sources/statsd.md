@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
 event_types: ["metric"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -32,8 +33,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "statsd" # must be: "statsd"
-  address = "127.0.0.1:8126" # example
+  type = "statsd"
+  address = "127.0.0.1:8126"
 ```
 
 ## Options

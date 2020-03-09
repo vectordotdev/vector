@@ -2,6 +2,7 @@
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events allowing you to add one or more log fields."
 event_types: ["log"]
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
 min_version: null
 service_name: "Add Fields"
@@ -29,20 +30,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "add_fields" # must be: "add_fields"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "add_fields"
+  inputs = ["my-source-id"]
 
-  # REQUIRED - Fields
-  [transforms.my_transform_id.fields]
-    string_field = "string value" # example
-    env_var_field = "${ENV_VAR}" # example
-    int_field = 1 # example
-    float_field = 1.2 # example
-    bool_field = true # example
-    timestamp_field = 1979-05-27T00:32:00Z # example
-    parent = {child = "child_value"} # example
-    list_field = ["first", "second", "third"] # example
+  # Fields
+  fields.string_field = "string value"
+  fields.env_var_field = "${ENV_VAR}"
+  fields.int_field = 1
+  fields.float_field = 1.2
+  fields.bool_field = true
+  fields.timestamp_field = 1979-05-27T00:32:00Z
+  fields.parent.child_field = "child_value"
+  fields.list_field = ["first", "second", "third"]
 ```
 
 ## Options
@@ -80,7 +80,7 @@ A table of key/value pairs representing the keys to be added to the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"string_field":"string value"},{"env_var_field":"${ENV_VAR}"},{"int_field":1},{"float_field":1.2},{"bool_field":true},{"timestamp_field":"1979-05-27 00:32:00 -0700"},{"parent":{"child":"child_value"}},{"list_field":["first","second","third"]}]}
+  examples={[{"string_field":"string value"},{"env_var_field":"${ENV_VAR}"},{"int_field":1},{"float_field":1.2},{"bool_field":true},{"timestamp_field":"1979-05-27 00:32:00 -0700"},{"parent.child_field":"child_value"},{"list_field":["first","second","third"]}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"fields"}
@@ -121,16 +121,15 @@ Given the following configuration:
   type = "add_fields"
   inputs = [...]
 
-  [transforms.my_transform.fields]
-    field1 = "string value"
-    field2 = 1
-    field3 = 2.0
-    field4 = true
-    field5 = 2019-05-27T07:32:00Z
-    field6 = ["item 1", "item 2"]
-    field7.nested = "nested value",
-    field8 = "#{HOSTNAME}"
-    field9 = "{{field1}} {{field2}}"
+  fields.field1 = "string value"
+  fields.field2 = 1
+  fields.field3 = 2.0
+  fields.field4 = true
+  fields.field5 = 2019-05-27T07:32:00Z
+  fields.field6 = ["item 1", "item 2"]
+  fields.field7.nested = "nested value",
+  fields.field8 = "#{HOSTNAME}"
+  fields.field9 = "{{field1}} {{field2}}"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

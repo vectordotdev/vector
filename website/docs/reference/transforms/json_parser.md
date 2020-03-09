@@ -2,6 +2,7 @@
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
 min_version: null
 service_name: "JSON Parser"
@@ -40,13 +41,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "json_parser" # must be: "json_parser"
-  inputs = ["my-source-id"] # example
-  drop_invalid = true # example
-
-  # OPTIONAL
+  type = "json_parser"
+  inputs = ["my-source-id"]
   drop_field = true # default
+  drop_invalid = true
   field = "message" # default
 ```
 
@@ -57,16 +55,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "json_parser" # must be: "json_parser"
-  inputs = ["my-source-id"] # example
-  drop_invalid = true # example
-
-  # OPTIONAL
+  type = "json_parser"
+  inputs = ["my-source-id"]
   drop_field = true # default
+  drop_invalid = true
   field = "message" # default
   overwrite_target = false # default
-  target_field = "target" # example, no default
+  target_field = "root_field" # no default
 ```
 
 </TabItem>
@@ -131,7 +126,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -144,7 +139,7 @@ If `true` events with invalid JSON will be dropped, otherwise the event will be 
 
 ### field
 
-The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+The log field to decode as JSON. Must be a `string` value type. See [Field Notation Syntax](#field-notation-syntax) and [Invalid JSON](#invalid-json) for more info.
 
 
 </Field>
@@ -177,7 +172,7 @@ If [`target_field`](#target_field) is set and the log contains a field of the sa
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["target"]}
+  examples={["root_field","parent.child"]}
   groups={[]}
   name={"target_field"}
   path={null}
@@ -190,7 +185,7 @@ If [`target_field`](#target_field) is set and the log contains a field of the sa
 
 ### target_field
 
-If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error.
+If this setting is present, the parsed JSON will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -308,6 +303,26 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) and [`target_field`](#target_field) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_json_parser_transform_id]
+  # ...
+  field = "message"
+  field = "parent.child"
+  field = "array[0]"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 ### Invalid JSON
 
 If the value for the specified [`field`](#field) is not valid JSON you can control keep or discard the event with the [`drop_invalid`](#drop_invalid) option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
@@ -342,5 +357,6 @@ Parsing the `"message"` field would result the following structure:
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [pages.index#correctness]: /#correctness
 [urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

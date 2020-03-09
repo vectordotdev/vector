@@ -15,7 +15,11 @@ write_to_description = "[Google Cloud Platform's Stackdriver Logging service][ur
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.gcp_stackdriver_logging.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.gcp_stackdriver_logging.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",

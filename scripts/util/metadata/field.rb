@@ -10,26 +10,27 @@ class Field
     :children,
     :default,
     :description,
-    :display,
     :enum,
     :examples,
+    :field_path_notation,
     :groups,
     :partition_key,
     :relevant_when,
     :required,
     :sort,
     :templateable,
+    :toml_display,
     :type,
     :unit
 
   def initialize(hash)
     @children = (hash["children"] || {}).to_struct_with_name(self.class)
-    @common = hash["common"] == true
+    @common = hash["common"]
     @default = hash["default"]
     @description = hash.fetch("description")
-    @display = hash["display"]
     @enum = hash["enum"]
     @examples = hash["examples"] || []
+    @field_path_notation = hash["field_path_notation"] == true
     @groups = hash["groups"] || []
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
@@ -37,18 +38,37 @@ class Field
     @required = hash["required"] == true
     @sort = hash["sort"]
     @templateable = hash["templateable"] == true
+    @toml_display = hash["toml_display"]
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    @category = hash["category"] || ((@children.to_h.values.empty? || inline?) ? "General" : @name.humanize)
+    @category = hash["category"] || ((@children.to_h.values.empty?) ? "General" : @name.humanize)
+
+    # Requirements
+
+    if @name.include?("`<")
+      raise ArgumentError.new("#{@name}.name must be in the format of \"`[..]`\" instead of \"<...>\"")
+    end
 
     if @required == true && !@defualt.nil?
-      raise ArgumentError.new("#{self.class.name}#required must be false if there is a default for field #{@name}")
+      raise ArgumentError.new("#{@name}.required must be false if there is a default")
+    end
+
+    if wildcard? && !object?
+      if !@examples.any? { |example| example.is_a?(Hash) }
+        raise "#{@name}#examples must be a hash with name/value keys when the name is \"*\""
+      end
+    end
+
+    if @examples.any? && !@enum.nil? && !wildcard?
+      raise ArgumentError.new("#{@name}.examples must not be supplied if enum is supplied")
     end
 
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
-      raise ArgumentError.new("#{self.class.name}#relevant_when must be a hash of conditions")
+      raise ArgumentError.new("#{@name}.relevant_when must be a hash of conditions")
     end
+
+    # Examples
 
     if @examples.empty?
       if !@enum.nil?
@@ -73,14 +93,8 @@ class Field
 
     # Requirements
 
-    if @examples.empty? && @children.empty? && !object? && !array_of_objects?
-      raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
-    end
-
-    if wildcard?
-      if !@examples.any? { |example| example.is_a?(Hash) }
-        raise "#{self.class.name}#examples must be a hash with name/value keys when the name is \"*\""
-      end
+    if @examples.empty? && !wildcard? && @children.empty? && !object? && !array_of_objects?
+      raise "#{@name}#examples is required if a #default is not specified"
     end
   end
 
@@ -104,6 +118,10 @@ class Field
     end
   end
 
+  def array?
+    type.start_with?("[")
+  end
+
   def array_of_objects?
     OBJECT_TYPES.any? do |object_type|
       type == "[#{object_type}]"
@@ -123,7 +141,7 @@ class Field
   end
 
   def common?
-    @common == true || required?
+    @common == true || (@common.nil? && required?)
   end
 
   def common_children
@@ -171,6 +189,10 @@ class Field
     self.<=>(other) == 0
   end
 
+  def field_path_notation?
+    @field_path_notation == true
+  end
+
   def get_relevant_sections(sections)
     sections.select do |section|
       section.referenced_options.include?(name) ||
@@ -188,10 +210,6 @@ class Field
     "#{default} #{unit}"
   end
 
-  def inline?
-    display == "inline"
-  end
-
   def object?
     OBJECT_TYPES.include?(type)
   end
@@ -202,6 +220,10 @@ class Field
 
   def partition_key?
     partition_key == true
+  end
+
+  def relevant_when?
+    !relevant_when.nil?
   end
 
   def relevant_when_kvs
@@ -235,7 +257,6 @@ class Field
       children: children,
       default: default,
       description: description,
-      display: display,
       enum: enum,
       examples: examples,
       partition_key: partition_key,

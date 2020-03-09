@@ -179,7 +179,6 @@ Condition regex pattern to look for. Exact behavior is configured via `mode`.\
 [sources.file.options.multiline.children.mode]
 type = "string"
 category = "Multiline"
-examples = ["continue_through", "continue_past", "halt_before", "halt_with"]
 required = true
 sort = 2
 description = """\

@@ -21,8 +21,8 @@ event.\
 
 [transforms.log_to_metric.options.metrics.children.type]
 type = "string"
-required = true
 common = true
+required = true
 description = "The metric type."
 
 [transforms.log_to_metric.options.metrics.children.type.enum]
@@ -33,16 +33,17 @@ set = "A [set metric type][docs.data-model.metric#set]."
 
 [transforms.log_to_metric.options.metrics.children.field]
 type = "string"
-examples = ["duration"]
-required = true
 common = true
+examples = ["duration", "parent.child"]
+field_path_notation = true
+required = true
 description = "The log field to use as the metric."
 
 [transforms.log_to_metric.options.metrics.children.increment_by_value]
 type = "bool"
 default = false
-required = true
 relevant_when = {type = "counter"}
+required = true
 description = """\
 If `true` the metric will be incremented by the `field` value. If `false` \
 the metric will be incremented by 1 regardless of the `field` value.\
@@ -50,9 +51,9 @@ the metric will be incremented by 1 regardless of the `field` value.\
 
 [transforms.log_to_metric.options.metrics.children.name]
 type = "string"
+common = true
 examples = ["duration_total"]
 required = true
-common = true
 description = """\
 The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
@@ -60,19 +61,18 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 
 [transforms.log_to_metric.options.metrics.children.tags]
 type = "table"
-display = "inline"
 common = true
 description = "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 
 [transforms.log_to_metric.options.metrics.children.tags.children."`[tag-name]`"]
 type = "string"
+common = true
 examples = [
   {"host" = "${HOSTNAME}"},
   {"region" = "us-east-1"},
   {"status" = "{{status}}"},
 ]
 required = true
-common = true
 description = """\
 Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environment \
 variables and field interpolation is allowed.\

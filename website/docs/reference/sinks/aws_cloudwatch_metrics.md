@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,13 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"] # example
-  namespace = "service" # example
-  region = "us-east-1" # example, relevant when host = ""
-
-  # OPTIONAL
+  type = "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"]
+  namespace = "service"
+  region = "us-east-1" # required when endpoint = ""
   healthcheck = true # default
 ```
 
@@ -60,21 +58,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"] # example
-  namespace = "service" # example
-  region = "us-east-1" # example, relevant when host = ""
-
-  # OPTIONAL - General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
+  # General
+  type = "aws_cloudwatch_metrics"
+  inputs = ["my-source-id"]
+  endpoint = "127.0.0.0:5000/path/to/service" # required when region = ""
+  namespace = "service"
+  region = "us-east-1" # required when endpoint = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # no default
   healthcheck = true # default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
+  # Batch
+  batch.max_events = 20 # default, events
+  batch.timeout_secs = 1 # default, seconds
 ```
 
 </TabItem>
@@ -194,7 +189,7 @@ The maximum age of a batch before it is flushed.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -262,7 +257,7 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   groups={[]}
   name={"region"}
   path={null}
-  relevantWhen={{"host":""}}
+  relevantWhen={{"endpoint":""}}
   required={true}
   templateable={false}
   type={"string"}

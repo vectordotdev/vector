@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
 event_types: ["log"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+stdin%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,10 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "stdin" # must be: "stdin"
+  # General
+  type = "stdin"
 
-  # OPTIONAL - Context
+  # Context
   host_key = "host" # default
 ```
 
@@ -57,14 +58,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "stdin" # must be: "stdin"
-
-  # OPTIONAL - Context
-  host_key = "host" # default
-
-  # OPTIONAL - General
+  # General
+  type = "stdin"
   max_length = 102400 # default, bytes
+
+  # Context
+  host_key = "host" # default
 ```
 
 </TabItem>

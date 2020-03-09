@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
 min_version: null
 operating_systems: ["Linux"]
@@ -43,10 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "journald" # must be: "journald"
-
-  # OPTIONAL
+  type = "journald"
   current_boot_only = true # default
   units = [] # default
 ```
@@ -58,13 +56,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "journald" # must be: "journald"
-
-  # OPTIONAL
+  type = "journald"
   batch_size = 16 # default
   current_boot_only = true # default
-  data_dir = "/var/lib/vector" # example, no default
+  data_dir = "/var/lib/vector" # no default
   journalctl_path = "journalctl" # default
   units = [] # default
 ```

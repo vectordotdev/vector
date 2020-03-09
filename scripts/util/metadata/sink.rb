@@ -24,10 +24,6 @@ class Sink < Component
     @service_limits_short_link = hash["service_limits_short_link"]
     @write_to_description = hash.fetch("write_to_description")
 
-    if (invalid_types = @input_types - EVENT_TYPES) != []
-      raise("#{self.class.name}#input_types contains invalid values: #{invalid_types.inspect}")
-    end
-
     if @write_to_description.strip[-1] == "."
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end

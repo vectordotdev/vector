@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
 event_types: ["log"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+splunk_hec%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,12 +44,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "splunk_hec" # must be: "splunk_hec"
-
-  # OPTIONAL
+  type = "splunk_hec"
   address = "0.0.0.0:8088" # default
-  token = "A94A8FE5CCB19BA61C4C08" # example, no default
+  token = "A94A8FE5CCB19BA61C4C08" # no default
 ```
 
 </TabItem>
@@ -58,21 +56,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "splunk_hec" # must be: "splunk_hec"
-
-  # OPTIONAL - General
+  # General
+  type = "splunk_hec"
   address = "0.0.0.0:8088" # default
-  token = "A94A8FE5CCB19BA61C4C08" # example, no default
+  token = "A94A8FE5CCB19BA61C4C08" # no default
 
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = false # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.verify_certificate = false # default
 ```
 
 </TabItem>

@@ -193,7 +193,7 @@ In addition to the defined fields, a log event can have any number of additional
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/components/?log=true">View all log compatible components</Jump>
+<Jump to="/components/?event-types[]=log">View all log compatible components</Jump>
 
 ## How It Works
 

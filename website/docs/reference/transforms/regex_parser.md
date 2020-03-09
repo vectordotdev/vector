@@ -2,6 +2,7 @@
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
 min_version: null
 service_name: "Regex Parser"
@@ -29,22 +30,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "regex_parser" # must be: "regex_parser"
-  inputs = ["my-source-id"] # example
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
-
-  # OPTIONAL - General
+  # General
+  type = "regex_parser"
+  inputs = ["my-source-id"]
   drop_field = true # default
   field = "message" # default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int"
+  types.duration = "float"
+  types.success = "bool"
+  types.timestamp = "timestamp|%F"
+  types.timestamp = "timestamp|%a %b %e %T %Y"
 ```
 
 ## Options
@@ -83,7 +81,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child"]}
   groups={[]}
   name={"field"}
   path={null}
@@ -96,7 +94,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 ### field
 
-The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
+The log field to parse. See [Failed Parsing](#failed-parsing) and [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -142,7 +140,7 @@ The Regular Expression to apply. Do not include the leading or trailing `/`. See
 
 ### types
 
-Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-syntax) for more info.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types. See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
 
@@ -244,6 +242,25 @@ A failure includes any event that does not successfully parse against the
 provided [`regex`](#regex). This includes bad values as well as events missing the
 specified [`field`](#field).
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_regex_parser_transform_id]
+  # ...
+  field = "message"
+  field = "parent.child"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 ### Performance
 
 The `regex_parser` source has been involved in the following performance tests:
@@ -304,6 +321,7 @@ documentation][urls.regex_grouping_and_flags].
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags

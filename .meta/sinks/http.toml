@@ -14,7 +14,11 @@ write_to_description = "a generic HTTP endpoint"
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.http.options", common: true, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.http.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.http.options",
+  common: true
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -59,7 +63,6 @@ description = "The basic authentication user name."
 
 [sinks.http.options.compression]
 type = "string"
-category = "requests"
 common = true
 default = "none"
 description = """\

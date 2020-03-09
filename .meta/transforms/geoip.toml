@@ -24,7 +24,8 @@ are not supported.
 [transforms.geoip.options.source]
 type = "string"
 common = true
-examples =  ["ip_address", "x-forwarded-for"]
+examples =  ["ip_address", "x-forwarded-for", "parent.child", "array[0]"]
+field_path_notation = true
 required = true
 description = """\
 The field name that contains the IP address. This field should contain a valid \
@@ -35,6 +36,8 @@ IPv4 or IPv6 address.\
 type = "string"
 common = true
 default = "geoip"
+examples = ["geoip", "parent.child"]
+field_path_notation = true
 required = true
 description = """\
 The default field to insert the resulting GeoIP data into. See \

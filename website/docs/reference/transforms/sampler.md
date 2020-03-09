@@ -2,6 +2,7 @@
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
 min_version: null
 service_name: "Sampler"
@@ -29,13 +30,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "sampler" # must be: "sampler"
-  inputs = ["my-source-id"] # example
-  rate = 10 # example
-
-  # OPTIONAL
-  pass_list = ["[error]", "field2"] # example, no default
+  type = "sampler"
+  inputs = ["my-source-id"]
+  rate = 10
+  pass_list = ["[error]", "field2"] # no default
 ```
 
 ## Options

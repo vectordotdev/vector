@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka 0.9 or later and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
 min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,14 +44,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "kafka" # must be: "kafka"
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
-  group_id = "consumer-group-name" # example
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
-
-  # OPTIONAL
-  key_field = "user_id" # example, no default
+  type = "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  group_id = "consumer-group-name"
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
+  key_field = "user_id" # no default
 ```
 
 </TabItem>
@@ -60,31 +58,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "kafka" # must be: "kafka"
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # example
-  group_id = "consumer-group-name" # example
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # example
-
-  # OPTIONAL - General
+  # General
+  type = "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  group_id = "consumer-group-name"
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
   auto_offset_reset = "largest" # default
   fetch_wait_max_ms = 100 # default, milliseconds
-  key_field = "user_id" # example, no default
+  key_field = "user_id" # no default
   session_timeout_ms = 10000 # default, milliseconds
   socket_timeout_ms = 60000 # default, milliseconds
 
-  # OPTIONAL - Advanced
-  [sources.my_source_id.librdkafka_options]
-    "client.id" = "${ENV_VAR}" # example
-    "fetch.error.backoff.ms" = "1000" # example
+  # Advanced
+  librdkafka_options.client.id = "${ENV_VAR}"
+  librdkafka_options.fetch.error.backoff.ms = "1000"
 
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # no default
+  tls.crt_path = "/path/to/host_certificate.crt" # no default
+  tls.enabled = false # default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
+  tls.key_path = "/path/to/host_certificate.key" # no default
 ```
 
 </TabItem>
@@ -350,7 +344,7 @@ Configures the TLS options for connections from this sink.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
@@ -396,7 +390,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
@@ -442,7 +436,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}

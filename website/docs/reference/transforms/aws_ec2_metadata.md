@@ -2,6 +2,7 @@
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
+function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
 min_version: null
 service_name: "AWS EC2 Metadata"
@@ -29,11 +30,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
+  type = "aws_ec2_metadata"
+  inputs = ["my-source-id"]
   fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
   host = "http://169.254.169.254" # default
   namespace = "" # default

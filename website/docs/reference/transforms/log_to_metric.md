@@ -2,6 +2,7 @@
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
+function_category: "convert"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
 min_version: null
 service_name: "Log to Metric"
@@ -75,7 +76,7 @@ A table of key/value pairs representing the keys to be added to the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["duration"]}
+  examples={["duration","parent.child"]}
   groups={[]}
   name={"field"}
   path={"metrics"}

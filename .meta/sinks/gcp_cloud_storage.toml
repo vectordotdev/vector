@@ -15,7 +15,11 @@ write_to_description = "[Google Cloud Platform's Cloud Storage service](https://
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_cloud_storage.options", common: false, max_events: nil, max_size: 10485760, timeout_secs: 300) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.gcp_cloud_storage.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.gcp_cloud_storage.options",
+  common: true
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
