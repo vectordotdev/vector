@@ -7,13 +7,60 @@ description: Learn how to manage log schemas with Vector.
 Data comes in all shapes and sizes. Vector has an array (let's call it a vector 😎) of composable functionality for
 decoding your events in the right format, transforming them into the right shape, and passing that data on downstream.
 
+
+## Defining Global Field Names
+
+By default, Vector primarily operates on three fields: `host`, `message`, and `timestamp`.
+
+```json
+{
+  "host": "my.host.com",
+  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+  "timestamp": "2019-11-01T21:15:47+00:00"
+}
+```
+
+It may be that your data does not follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema` section of your `config.toml`.
+
+```toml
+[log_schema]
+host_key = "instance" # default "host"
+message_key = "info" # default "message"
+timestamp_key = "datetime" # default "timestamp"
+
+# Sources, transforms, and sinks...
+```
+
+> **Gotcha:** Not all sources use the `host` field.
+
+We find this feature is useful when used with simple configs! As your number of components grows, your needs will change and you'll likely need to configure this at a more fine grained level.
+
+
+### Example: Custom timestamp field
+
+Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
+
+If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
+
+```toml
+[log_schema]
+  timestamp_key = "@timestamp"
+
+[sources.my_naming_confused_source]
+  type = "logplex"
+  address = "0.0.0.0:8088"
+```
+
+
 ## Pipeline field filtering
 
-Sometimes it is advantageous to filter out specific fields during the pipeline. You can use a `remove_fields` transform transform to do this.
+Sometimes it is advantageous to filter out specific fields during the pipeline. You can use a `remove_fields` transform
+transform to do this.
 
 Commonly you'll want to do this near either the source or sink of your pipeline. Some example use cases:
 
-* Dropping `email`, `passport_number`, or other personally identifiable information from logs before distributing them to third party services.
+* Dropping `email`, `passport_number`, or other personally identifiable information from logs before distributing them
+  to third party services.
 * Filtering data for compliance with the GDPR or other regional laws. (eg EU to US dataflows)
 * Reducing the volume of data on a particular endpoint.
 
@@ -25,6 +72,7 @@ type = "remove_fields"
 inputs = ["my-source-id"]
 fields = ["email", "passport_number"]
 ```
+
 
 ### Example: Filtering data for GDPR compliance
 
@@ -96,11 +144,19 @@ Feb 05 16:15:27.945  INFO vector: Shutting down.
 
 Don't know where events are coming from? You can use the `geoip` transform an `ipv4` field and get a grip on that!
 
+
 ## Sink field filtering
 
-While it's often reasonable to remove this kind of data at the pipeline level, we identified use cases that involve using values in sinks from these fields in sink configuration.
+While it's often reasonable to remove this kind of data at the pipeline level, we identified use cases that involve
+using values in sinks from these fields in sink configuration.
 
-### Per host kafka topics
+The applications for this include some of the reasons discussed in
+["Pipeline field filtering"](#pipeline-field-filtering), but also:
+
+* Stripping off routing related fields
+* Ensuring a specific sink will only ever output specific fields (or never output certain fields)
+
+### Example: Per host kafka topics
 
 Lets take a look at what that might look like:
 
@@ -110,44 +166,35 @@ Lets take a look at what that might look like:
   type = "kafka"
 
   # Put events in the host specific topic.
-  topic = "{{host}}"
-  encoding.except_fields = ["host"]
+  topic = "{{service}}"
+  encoding.except_fields = ["service"] # Remove this field now and save some bytes
   # ...
 ```
 
+> Gotcha: Not all fields are templatable! Make sure to check the documentation and test before deploying. If you find
+> a field which you want templatable open an issue and let us know.
+
 ## Moving and Concatenating Fields
 
-> TODO: This doesn't work, yet! See [#750](https://github.com/timberio/vector/issues/750)
-
-It's fairly common for one part of your pipeline to expect a field to be named differently than another part! Above we
-talked about setting global defaults for a vector instance.  Vector has an
-[`add_field`](/docs/reference/transforms/add_fields/) transform that you can use alongside the
-[`remove_fields`](/docs/reference/transforms/remove_fields/) transform to do just that!
-
-Other times, you need to concatenate two fields together. You can use the same strategy as renaming!
-
-It's useful for when:
-
-* You have a `timestamp` that needs to be `@timestamp` for the downstream.
-* You need to adapt or reshape data to fit into possibly older or newer systems.
-* You need to concatenate `first_name` and `last_name` into a `name` field. (Suppose they didn't read
-  [Falsehoods about names](https://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)).
-
-Here's an example of that transform chain:
+It's fairly common for one part of your pipeline to expect a field to be named differently than another part! Vector can
+slide data around for you with the `rename_fields` transform.
 
 ```toml
 [transforms.rename_timestamp]
-type = "add_fields"
-inputs = ["source0"]
-[transform.rename_timestamp.fields]
-field = "@timestamp"
-value = "{{timestamp}}"
-
-[transforms.drop_old_timestamp]
-type = "remove_fields"
-inputs = ["rename_timestamp"]
-fields = ["timestamp"]
+  type = "rename_fields"
+  inputs = ["source0"]
+  fields.timestamp = "@timestamp"
 ```
+
+Other times, you need to concatenate two fields together. Vector has an
+[`add_field`](/docs/reference/transforms/add_fields/) transform that you can use alongside the
+[`remove_fields`](/docs/reference/transforms/remove_fields/) transform to do just that!
+
+It's useful for when:
+
+* You need to adapt or reshape data to fit into possibly older or newer systems.
+* You need to concatenate `first_name` and `last_name` into a `name` field. (Suppose they didn't read
+  [Falsehoods about names](https://www.kalzumeus.com/2010/06/17/falsehoods-programmers-believe-about-names/)).
 
 
 ### Example: Mooshing together name fields
@@ -156,7 +203,6 @@ Let's pretend one of your teammates falsely assumed folks always have first and 
 and a `last_name` field coming from a source, and we'd like to output a `name` field to a sink.
 
 ```toml
-# TODO: A simple config and a one-liner invocation.
 [transforms.moosh_names]
   type = "add_fields"
   inputs = ["source0"]
@@ -174,50 +220,6 @@ What if you had to do this in reverse? Try using the [`regex`](/docs/reference/t
 [`split`](/docs/reference/transforms/split/) transforms.
 
 
-## Defining Global Field Names
-
-By default, Vector primarily operates on three fields: `host`, `message`, and `timestamp`.
-
-```json
-{
-  "host": "my.host.com",
-  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
-  "timestamp": "2019-11-01T21:15:47+00:00"
-}
-```
-
-It may be that your data does not follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema` section of your `config.toml`.
-
-```toml
-[log_schema]
-host_key = "instance" # default "host"
-message_key = "info" # default "message"
-timestamp_key = "datetime" # default "timestamp"
-
-# Sources, transforms, and sinks...
-```
-
-> **Gotcha:** Not all sources use the `host` field.
-
-We find this feature is useful when used with simple configs! As your number of components grows, your needs will change and you'll likely need to configure this at a more fine grained level.
-
-### Example: Custom timestamp field
-
-Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
-
-If your vector pipeline is only consuming data from these sources, you can add the following to your `config.toml`:
-
-```toml
-# TODO: A simple config and a one-liner invocation.
-[log_schema]
-timestamp_key = "@timestamp"
-
-[sources.my_naming_confused_source]
-  type = "logplex"
-  address = "0.0.0.0:8088"
-```
-
-
 ## Coercing Data Types
 
 Occasionally services will provide you with data that is in the right shape, but the types are wrong. Perhaps a string
@@ -229,9 +231,8 @@ The [`coercer`](/docs/reference/transforms/coercer/) transform is the correct to
 [transforms.correct_source_types]
   type = "coercer"
   inputs = ["source0"]
-  [transforms.correct_source_types.types]
-    count = "int"
-    date = "timestamp|%F"
+  types.count = "int"
+  types.date = "timestamp|%F"
 ```
 
 ### Example: Coercing between date formats
@@ -245,11 +246,9 @@ To do this we'll use `timestamp| $FORMAT`. To build a `$FORMAT`, we can referenc
 friendly logs up to the great white north!
 
 ```toml
-# TODO: A simple config and a one-liner invocation.
 [transforms.format_timestamp]
   type = "coercer"
-[transforms.format_timestamp.types]
-  timestamp = "timestamp|%Y/%m/%d:%H:%M:%S %z"
+  types.timestamp = "timestamp|%Y/%m/%d:%H:%M:%S %z"
 ```
 
 ## Working with data formats
@@ -275,35 +274,14 @@ output format
 You can also use a transform like [`json_parser`](/docs/reference/transforms/json_parser/),
 [`grok_parser`](/docs/reference/transforms/grok_parser/) or [`protobuf_parser`]() to parse out data in a given field.
 
-### Example: Decoding a protobuf
-
-Let's pretend we have a source of protobufs which we need to parse and work with later in the pipeline.
-
-> **Tip:** Verify your `.proto` can parse a sourced message with
-> `protoc --decode MyType /proto/message.proto < message.bin`
-
-```toml
-# TODO: A simple config and a one-liner invocation.
-[transforms.parse]
-  inputs = ["application"]
-  type = "protobuf_parser"
-  field = "message"
-  definition = "./proto/message.pb"
-  decode_as = "MyType"
-```
-
-> **Gotcha:** We are currently not able to support **encoding** to custom protobufs due to limitations of our dynamic
-> protobuf library. We opened #TODO and are working with the library maintainer to add this feature.
-
-To explore this concept, try using Vector as a `protobuf` to `json` converter!
-
 ## Using a Schema
+
+> https://github.com/timberio/vector/issues/165
 
 Instead of writing a custom filter or whitelist, you can reuse existing JSON schemas to validate or coerce data. Using
 the `json_parser` transform, specify an optional schema, and optionally specify coercion/filtering preferences.
 
 ```toml
-# TODO The rests
 [transforms.parse]
   inputs = ["application"]
   type = "json_parser"
@@ -327,7 +305,6 @@ specified schema, optionally coercing the types of conforming fields if needed.
 ### Example: AWS Glue
 
 ```toml
-# TODO: A simple config and a one-liner invocation.
 [transforms.parse]
   inputs = ["application"]
   type = "aws_glue"
