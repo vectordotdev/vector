@@ -186,7 +186,7 @@ impl FileSink {
                     return;
                 }
             };
-            self.files.insert_at(path.clone(), (file, next_deadline));
+            self.files.insert_at(path.clone(), file, next_deadline);
             self.files.get_mut(&path).unwrap()
         };
 

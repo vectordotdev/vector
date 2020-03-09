@@ -29,18 +29,16 @@ where
         }
     }
 
-    pub fn insert(&mut self, key: K, value_with_ttl: (V, Duration)) {
-        let (value, ttl) = value_with_ttl;
-        let delay = self.expiration_queue.insert(key.clone(), ttl);
-        self.map.insert(key, (value, delay));
+    pub fn insert(&mut self, key: K, value: V, ttl: Duration) {
+        let delay_queue_key = self.expiration_queue.insert(key.clone(), ttl);
+        self.map.insert(key, (value, delay_queue_key));
     }
 
-    pub fn insert_at(&mut self, key: K, value_with_deadline: (V, Instant)) {
-        let (value, deadline) = value_with_deadline;
-        let delay = self
+    pub fn insert_at(&mut self, key: K, value: V, deadline: Instant) {
+        let delay_queue_key = self
             .expiration_queue
             .insert_at(key.clone(), deadline.into());
-        self.map.insert(key, (value, delay));
+        self.map.insert(key, (value, delay_queue_key));
     }
 
     pub fn get<Q>(&self, k: &Q) -> Option<&V>
