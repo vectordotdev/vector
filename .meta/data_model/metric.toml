@@ -170,7 +170,7 @@ type = "[double]"
 examples = [[0.1, 0.5, 0.75, 1.0]]
 required = true
 description = """\
-The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.\
+The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.\
 """
 
 [data_model.metric.schema.type.children.aggregated_summary.children.values]

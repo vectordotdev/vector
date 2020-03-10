@@ -467,7 +467,7 @@ The total number of values contained within the summary.
 
 ##### quantiles
 
-The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
+The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
 
 
 </Field>
