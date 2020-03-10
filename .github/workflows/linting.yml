@@ -1,4 +1,4 @@
-name: ci
+name: linting
 on:
   push:
     branches:
@@ -8,7 +8,7 @@ jobs:
   cargo-deny:
     runs-on: ubuntu-latest
     steps:
-    - name: markdownlint-cli
+    - name: markdown
       uses: nosborn/github-action-markdown-cli@v1.1.1
       with:
         files: .
