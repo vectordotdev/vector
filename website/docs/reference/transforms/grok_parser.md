@@ -185,6 +185,13 @@ Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
 maintained patterns when possible since they can be improved over time by
 the community.
 
+### Complex Processing
+
+If you encounter limitations with the `grok_parser`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Debugging
 
 We recommend the [Grok debugger][urls.grok_debugger] for Grok testing.
@@ -237,3 +244,4 @@ performance issues.
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [urls.rust_grok_library]: https://github.com/daschl/grok
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

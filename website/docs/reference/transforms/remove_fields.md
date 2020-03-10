@@ -71,6 +71,13 @@ The log field names to drop. See [Field Notation Syntax](#field-notation-syntax)
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `remove_fields`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -98,7 +105,42 @@ enabling access to root-level, nested, and array field values. For example:
 You can learn more about Vector's field notation in the
 [field notation reference][docs.reference.field-path-notation].
 
+### Nested Field Removal
+
+Nested fields are removed in a _deep_ fashion. They will not remove any
+ancestor object. For example, given the following `log` event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+And the following configuration:
+
+```toml
+[transforms.remove_nested_field]
+  type = "remove_fields"
+  fields = ["parent.child2"]
+```
+
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

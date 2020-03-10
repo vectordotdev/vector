@@ -436,6 +436,13 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `aws_ec2_metadata`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -464,3 +471,4 @@ Learn more in the [Docker networking docs][urls.docker_networking].
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -95,6 +95,13 @@ The rate at which events will be forwarded, expressed as 1/N. For example, `rate
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `sampler`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -107,3 +114,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

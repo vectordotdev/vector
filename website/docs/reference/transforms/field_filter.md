@@ -105,6 +105,13 @@ We've opened [issue 479][urls.issue_479] for more complex filtering.
 
 
 
+### Complex Processing
+
+If you encounter limitations with the `field_filter`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -139,3 +146,4 @@ You can learn more about Vector's field notation in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.issue_479]: https://github.com/timberio/vector/issues/479
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

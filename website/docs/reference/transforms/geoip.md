@@ -158,7 +158,7 @@ More detail on the output schema is below.
 
 ### geoip
 
-The root field containing all geolocation data as sub-fields.
+The root field containing all geolocation data as sub-fields. See [Complex Processing](#complex-processing) for more info.
 
 <Fields filters={false}>
 
@@ -334,6 +334,13 @@ The timezone associated with the IP address in [IANA time zone format][urls.iana
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the [`geoip`](#geoip)
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -370,3 +377,4 @@ You can learn more about Vector's field notation in the
 [urls.iana_time_zone_format]: https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones
 [urls.iana_time_zones]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [urls.iso3166-2]: https://en.wikipedia.org/wiki/ISO_3166-2
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

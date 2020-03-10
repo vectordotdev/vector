@@ -1995,7 +1995,7 @@ end
   #
 
   [transforms.rename_fields.fields]
-    # The name of the field to move. Use `.` for adding nested fields.
+    # Old-key/New-key pair reprsenting the key to be moved.
     #
     # * required
     # * type: *

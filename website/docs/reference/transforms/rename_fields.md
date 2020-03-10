@@ -87,7 +87,8 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 #### `[field-name]`
 
-The name of the field to move. Use `.` for adding nested fields.
+Old-key/New-key pair reprsenting the key to be moved.
+
 
 
 </Field>
@@ -106,7 +107,20 @@ The `rename_fields` transform accepts and [outputs `log` events](#output) allowi
 For example:
 
 
-Given the following configuration:
+Given the following `log` event:
+
+```js
+{
+  // ...
+  "old_field": "root_value",
+  "old_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
+```
+
+And a Vector configuration like:
 
 <CodeHeader fileName="vector.toml" />
 
@@ -119,7 +133,78 @@ Given the following configuration:
   fields.old_nested.nested = "new_nested.nested",
 ```
 
+Will result in the following `log` event:
+
+```js
+{
+  // ...
+  "new_field": "root_value",
+  "new_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
+```
+
 ## How It Works
+
+### Complex Processing
+
+If you encounter limitations with the `rename_fields`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
+### Conflicts
+
+#### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="warning">
+
+Please note. Vector makes no guarantee on the order of execution. If two rename
+operations must be performed in a specific order, it is recommended to split
+them up across two separate rename transforms.
+
+</Alert>
+
+#### Nested Key Conflicts
+
+Keys are renamed in a deep fashion. They will not replace any ancestor
+objects. For example, given the following `log` event:
+
+```javascript
+{
+  "root": "value2",
+  "parent": {
+    "child1": "value1"
+  }
+}
+```
+
+And the following configuration:
+
+```toml
+[transforms.rename_nested_field]
+  type = "rename_fields"
+  fields.root = "parent.child2"
+```
+
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.
 
 ### Environment Variables
 
@@ -131,36 +216,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-
-### Key Conflicts
-
-Keys specified in this transform will replace existing keys.
-
-### Nested Fields
-
-The `rename_fields` transform will support dotted keys or [TOML
-tables][urls.toml_table]. We recommend the dotted key syntax since it is less
-verbose for this usecase:
-
-```
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    parent.child.grandchild = "other_parent.child"
-```
-
-Results in:
-
-```json
-{
-  "parent.child.grandchild": "other_parent.child"
-}
-```
-
-Learn more about how [`log` events][docs.data-model.log] are structured.
-
-
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model.log]: /docs/about/data-model/log/
-[urls.toml_table]: https://github.com/toml-lang/toml#table
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

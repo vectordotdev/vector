@@ -28,14 +28,27 @@ examples = [
   {parent.old_child_name = "parent.new_child_name"},
 ]
 description = """\
-The name of the field to move. Use `.` for adding nested fields.\
+Old-key/New-key pair reprsenting the key to be moved.
 """
 
 
 [[transforms.rename_fields.output.log.examples]]
 label = "Generic"
 body = """\
-Given the following configuration:
+Given the following `log` event:
+
+```js
+{
+  // ...
+  "old_field": "root_value",
+  "old_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
+```
+
+And a Vector configuration like:
 
 <CodeHeader fileName="vector.toml" />
 
@@ -46,5 +59,18 @@ Given the following configuration:
 
   fields.old_field = "new_field"
   fields.old_nested.nested = "new_nested.nested",
+```
+
+Will result in the following `log` event:
+
+```js
+{
+  // ...
+  "new_field": "root_value",
+  "new_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
 ```
 """
