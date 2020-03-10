@@ -3898,9 +3898,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.11"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fdd17989496f49cdc57978c96f0c9fe5e4a58a8bddc6813c449a4624f6a030b"
+checksum = "0fa5e81d6bc4e67fe889d5783bd2a128ab2e0cfa487e0be16b6a8d177b101616"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -3946,7 +3946,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "pin-project-lite",
- "tokio 0.2.11",
+ "tokio 0.2.13",
  "tokio-current-thread",
  "tokio-executor",
  "tokio-reactor",
@@ -4835,7 +4835,7 @@ dependencies = [
  "syslog_loose",
  "tempfile",
  "tokio 0.1.22",
- "tokio 0.2.11",
+ "tokio 0.2.13",
  "tokio-codec",
  "tokio-compat",
  "tokio-openssl",
