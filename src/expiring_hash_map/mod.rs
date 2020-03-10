@@ -1,9 +1,9 @@
 use futures::ready;
-use futures::stream::Stream;
 use futures::task::AtomicWaker;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
+use std::future::Future;
 use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -100,18 +100,14 @@ where
     }
 }
 
-impl<K, V> Stream for ExpiringHashMap<K, V>
+impl<K, V> Future for ExpiringHashMap<K, V>
 where
     K: Eq + Hash + Clone,
 {
-    type Item = Result<ExpiredItem<K, V>, Error>;
+    type Output = Result<ExpiredItem<K, V>, Error>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(self).poll_expired(cx).map(Some)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.expiration_queue.size_hint()
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(self).poll_expired(cx)
     }
 }
 
