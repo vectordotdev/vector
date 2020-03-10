@@ -10,6 +10,7 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes::Bytes;
+use futures::compat::Future01CompatExt;
 use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::header::HeaderValue;
 use http::{Request, StatusCode};
@@ -26,7 +27,7 @@ use tracing_futures::Instrument;
 
 pub type Response = http::Response<Bytes>;
 pub type Error = hyper::Error;
-pub type HttpsClient = hyper::Client<HttpsConnector<HttpConnector<Resolver>>>;
+pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
@@ -115,7 +116,10 @@ where
     B: Payload + Send + 'static,
     B::Data: Send,
 {
-    pub fn new(resolver: Resolver, tls_settings: impl Into<Option<TlsSettings>>) -> HttpClient<B> {
+    pub fn new(
+        resolver: Resolver,
+        tls_settings: impl Into<Option<TlsSettings>>,
+    ) -> crate::Result<HttpClient<B>> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
@@ -124,7 +128,7 @@ where
             tls.use_tls_settings(settings);
         }
 
-        let tls = tls.build().expect("TLS initialization failed");
+        let tls = tls.build()?;
 
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
@@ -135,11 +139,15 @@ where
 
         let span = tracing::info_span!("http");
 
-        HttpClient {
+        Ok(HttpClient {
             client,
             span,
             version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
-        }
+        })
+    }
+
+    pub async fn send(&mut self, request: Request<B>) -> crate::Result<http::Response<Body>> {
+        self.call(request).compat().await.map_err(Into::into)
     }
 }
 
@@ -203,34 +211,14 @@ impl<B> HttpBatchService<B> {
         tls_settings: impl Into<Option<TlsSettings>>,
         request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     ) -> HttpBatchService<B> {
-        let inner = HttpClient::new(resolver, tls_settings);
+        let inner =
+            HttpClient::new(resolver, tls_settings).expect("Unable to initialize http client");
 
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
     }
-}
-
-pub fn connector(
-    resolver: Resolver,
-    tls_settings: TlsSettings,
-) -> crate::Result<HttpsConnector<HttpConnector<Resolver>>> {
-    let mut http = HttpConnector::new_with_resolver(resolver);
-    http.enforce_http(false);
-
-    let mut tls = native_tls::TlsConnector::builder();
-
-    tls.use_tls_settings(tls_settings);
-
-    let https = HttpsConnector::from((http, tls.build()?));
-
-    Ok(https)
-}
-
-pub fn https_client(resolver: Resolver, tls: TlsSettings) -> crate::Result<HttpsClient> {
-    let https = connector(resolver, tls)?;
-    Ok(hyper::Client::builder().build(https))
 }
 
 impl<B> Service<B> for HttpBatchService<B> {

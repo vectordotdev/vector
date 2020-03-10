@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, HttpBatchService, HttpRetryLogic},
+        http::{HttpBatchService, HttpClient, HttpRetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
+use tower::Service;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -335,8 +336,8 @@ fn healthcheck(
     let request = builder.body(Body::empty())?;
 
     Ok(Box::new(
-        https_client(resolver, common.tls_settings.clone())?
-            .request(request)
+        HttpClient::new(resolver, common.tls_settings.clone())?
+            .call(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
@@ -431,7 +432,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event,
-        sinks::util::http::https_client,
+        sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},
         tls::TlsOptions,
         topology::config::{SinkConfig, SinkContext},
@@ -442,6 +443,7 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+    use tower::Service;
 
     #[test]
     fn structures_events_correctly() {
@@ -595,9 +597,10 @@ mod integration_tests {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        https_client(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush")
-            .request(request)
+        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
+            .expect("Could not build client to flush");
+        client
+            .call(request)
             .map_err(|source| source.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),

@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, HttpBatchService, HttpRetryLogic},
+        http::{HttpBatchService, HttpClient, HttpRetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, value::Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -158,10 +159,10 @@ pub fn healthcheck(
         .unwrap();
 
     let tls = TlsSettings::from_options(&config.tls)?;
-    let client = https_client(resolver, tls)?;
+    let mut client = HttpClient::new(resolver, tls)?;
 
     let healthcheck = client
-        .request(request)
+        .call(request)
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),

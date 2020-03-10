@@ -6,7 +6,7 @@ use crate::{
             encoding::{
                 skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
             },
-            http::{https_client, HttpBatchService, HttpRetryLogic},
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -170,16 +171,15 @@ impl StackdriverConfig {
             creds.apply(&mut request);
         }
 
-        let client = https_client(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
+        let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
         let creds = creds.clone();
-        let healthcheck =
-            client
-                .request(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    creds,
-                    HealthcheckError::NotFound.into(),
-                ));
+        let healthcheck = client
+            .call(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                creds,
+                HealthcheckError::NotFound.into(),
+            ));
 
         Ok(Box::new(healthcheck))
     }

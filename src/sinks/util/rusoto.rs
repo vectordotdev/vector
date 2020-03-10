@@ -28,7 +28,7 @@ use tower::Service;
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 
 pub fn client(resolver: Resolver) -> crate::Result<Client> {
-    let client = util::http::HttpClient::new(resolver, None);
+    let client = util::http::HttpClient::new(resolver, None)?;
     Ok(HttpClient { client })
 }
 

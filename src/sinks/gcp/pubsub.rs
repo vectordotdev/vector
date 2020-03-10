@@ -6,7 +6,7 @@ use crate::{
             encoding::{
                 skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
             },
-            http::{https_client, BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink, UriParseError,
@@ -20,6 +20,7 @@ use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -128,16 +129,15 @@ impl PubsubSink {
             creds.apply(&mut request);
         }
 
-        let client = https_client(cx.resolver(), tls.clone())?;
+        let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
         let creds = self.creds.clone();
-        let healthcheck =
-            client
-                .request(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    creds,
-                    HealthcheckError::TopicNotFound.into(),
-                ));
+        let healthcheck = client
+            .call(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                creds,
+                HealthcheckError::TopicNotFound.into(),
+            ));
         Ok(Box::new(healthcheck))
     }
 

@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, Auth, HttpBatchService, HttpRetryLogic, Response},
+        http::{Auth, HttpBatchService, HttpClient, HttpRetryLogic, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -17,6 +17,7 @@ use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use tower::Service;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -146,9 +147,9 @@ fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<s
     }
 
     let tls = TlsSettings::from_options(&config.tls)?;
-    let client = https_client(resolver, tls)?;
+    let mut client = HttpClient::new(resolver, tls)?;
     let healthcheck = client
-        .request(request)
+        .call(request)
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             hyper::StatusCode::OK => Ok(()),
