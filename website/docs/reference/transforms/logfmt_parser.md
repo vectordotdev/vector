@@ -2,6 +2,7 @@
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
 min_version: null
 service_name: "Logfmt Parser"
@@ -29,21 +30,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "logfmt_parser" # must be: "logfmt_parser"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "logfmt_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
 
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 ## Options
@@ -64,7 +63,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -82,12 +81,12 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child","array[0]"]}
   groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -95,7 +94,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 ### field
 
-The log field to parse.
+The log field to parse. See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -118,7 +117,7 @@ The log field to parse.
 
 ### types
 
-Key/Value pairs representing mapped log field types.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types.
 
 <Fields filters={false}>
 
@@ -127,7 +126,7 @@ Key/Value pairs representing mapped log field types.
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"types"}
@@ -155,6 +154,13 @@ A definition of log field type conversions. They key is the log field name and t
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `logfmt_parser`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -164,7 +170,29 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_logfmt_parser_transform_id]
+  # ...
+  field = "message"
+  field = "parent.child"
+  field = "array[0]"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

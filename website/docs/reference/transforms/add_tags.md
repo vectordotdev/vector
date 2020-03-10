@@ -2,6 +2,7 @@
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events allowing you to add one or more metric tags."
 event_types: ["metric"]
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22
 min_version: null
 service_name: "Add Tags"
@@ -29,14 +30,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "add_tags" # must be: "add_tags"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "add_tags" # required
+  inputs = ["my-source-id"] # required
 
-  # REQUIRED - Tags
-  [transforms.my_transform_id.tags]
-    static_tag = "my value" # example
-    env_tag = "${ENV_VAR}" # example
+  # Tags
+  tags.static_tag = "my value" # example
+  tags.env_tag = "${ENV_VAR}" # example
 ```
 
 ## Options
@@ -102,6 +102,13 @@ The name of the tag to add. Due to the nature of metric tags, the value must be 
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `add_tags`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -114,3 +121,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

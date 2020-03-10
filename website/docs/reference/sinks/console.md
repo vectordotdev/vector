@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`."
 event_types: ["log","metric"]
+function_category: "test"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -26,70 +27,20 @@ The Vector `console` sink [streams](#streaming) [`log`][docs.data-model.log] and
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "console" # must be: "console"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "console" # required
+  inputs = ["my-source-id"] # required
+  target = "stdout" # optional, default
 
-  # OPTIONAL - General
-  target = "stdout" # default, enum
-  healthcheck = true # default
-
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "json" # required
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[sinks.my_sink_id]
-  # REQUIRED - General
-  type = "console" # must be: "console"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL - General
-  target = "stdout" # default, enum
-  healthcheck = true # default
-
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "json" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
-```
-
-</TabItem>
-</Tabs>
 
 ## Options
 
@@ -109,7 +60,7 @@ import Field from '@site/src/components/Field';
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -125,7 +76,7 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["json","text"]}
   groups={[]}
   name={"codec"}
@@ -221,29 +172,6 @@ How to format event timestamps.
 
 <Field
   common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
@@ -251,7 +179,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   name={"target"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

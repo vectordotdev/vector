@@ -3,7 +3,7 @@ title = "Vector"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
-function_category = "proxy"
+function_category = "receive"
 output_types = ["log", "metric"]
 requirements = {}
 through_description = "another upstream [`vector` sink][docs.sinks.vector]"
@@ -24,7 +24,6 @@ include a port.
 [sources.vector.options.shutdown_timeout_secs]
 type = "int"
 default = 30
-required = true
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\

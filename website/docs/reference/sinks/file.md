@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,23 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
-  path = "vector-%Y-%m-%d.log" # example
+  # General
+  type = "file" # required
+  inputs = ["my-source-id"] # required
+  path = "vector-%Y-%m-%d.log" # required
+  healthcheck = true # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
-
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "text" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "ndjson" # required
 ```
 
 </TabItem>
@@ -69,24 +61,18 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  inputs = ["my-source-id"] # example
-  path = "vector-%Y-%m-%d.log" # example
+  # General
+  type = "file" # required
+  inputs = ["my-source-id"] # required
+  path = "vector-%Y-%m-%d.log" # required
+  healthcheck = true # optional, default
+  idle_timeout_secs = "30" # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
-  idle_timeout_secs = "30" # default
-
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "text" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "ndjson" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 ```
 
 </TabItem>
@@ -110,7 +96,7 @@ import Field from '@site/src/components/Field';
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -126,8 +112,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
-  examples={["text","ndjson"]}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

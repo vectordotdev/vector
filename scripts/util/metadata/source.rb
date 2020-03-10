@@ -35,15 +35,6 @@ class Source < Component
       @output.metric = Output.new(output["metric"])
     end
 
-    # delivery_guarantee
-
-    if !DELIVERY_GUARANTEES.include?(@delivery_guarantee)
-      raise(
-        "Source #delivery_guarantee must be one of: " +
-          "#{DELIVERY_GUARANTEES.inspect}, got #{@delivery_guarantee.inspect}"
-      )
-    end
-
     # through_description
 
     if @through_description.strip[-1] == "."

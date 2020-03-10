@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,36 +44,27 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_s3" # must be: "aws_s3"
-  inputs = ["my-source-id"] # example
-  bucket = "my-bucket" # example
-  compression = "gzip" # example, enum
-  region = "us-east-1" # example, relevant when host = ""
+  # General
+  type = "aws_s3" # required
+  inputs = ["my-source-id"] # required
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  region = "us-east-1" # required, required when endpoint = ""
+  healthcheck = true # optional, default
 
-  # OPTIONAL - Object Names
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  # Naming
+  key_prefix = "date=%F/" # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
+  # Batch
+  batch.max_size = 10490000 # optional, default, bytes
+  batch.timeout_secs = 300 # optional, default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 10490000 # default, bytes
-    timeout_secs = 300 # default, seconds
+  # Buffer
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "ndjson" # example, enum
-
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Encoding
+  encoding.codec = "ndjson" # required
 ```
 
 </TabItem>
@@ -82,70 +74,63 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_s3" # must be: "aws_s3"
-  inputs = ["my-source-id"] # example
-  bucket = "my-bucket" # example
-  compression = "gzip" # example, enum
-  region = "us-east-1" # example, relevant when host = ""
+  # General
+  type = "aws_s3" # required
+  inputs = ["my-source-id"] # required
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  region = "us-east-1" # required, required when endpoint = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  healthcheck = true # optional, default
 
-  # OPTIONAL - Object Names
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  # ACL
+  acl = "private" # optional, no default
+  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
+  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
+  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
+  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
 
-  # OPTIONAL - General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
-  healthcheck = true # default
+  # Encryption
+  server_side_encryption = "AES256" # optional, no default
+  ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
 
-  # OPTIONAL - Object Attributes
-  acl = "private" # example, no default, enum
-  grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
-  grant_read = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
-  grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
-  grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # example, no default
-  server_side_encryption = "AES256" # example, no default, enum
-  ssekms_key_id = "abcd1234" # example, no default
-  storage_class = "STANDARD" # example, no default, enum
-  [sinks.my_sink_id.tags]
-    Tag1 = "Value1" # example
+  # Naming
+  filename_append_uuid = true # optional, default
+  filename_extension = "log" # optional, default
+  filename_time_format = "%s" # optional, default
+  key_prefix = "date=%F/" # optional, default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 10490000 # default, bytes
-    timeout_secs = 300 # default, seconds
+  # Storage
+  storage_class = "STANDARD" # optional, no default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Batch
+  batch.max_size = 10490000 # optional, default, bytes
+  batch.timeout_secs = 300 # optional, default, seconds
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
-  # OPTIONAL - Encoding
-  [sinks.my_sink_id.encoding]
-    # REQUIRED
-    codec = "ndjson" # example, enum
+  # Encoding
+  encoding.codec = "ndjson" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
-    # OPTIONAL
-    except_fields = ["timestamp", "message", "host"] # example, no default
-    only_fields = ["timestamp", "message", "host"] # example, no default
-    timestamp_format = "rfc3339" # default, enum
+  # Metadata
+  tags.Tag1 = "Value1" # example
 
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
+  # Request
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 30 # optional, default, seconds
 ```
 
 </TabItem>
@@ -237,7 +222,7 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -260,7 +245,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -303,7 +288,7 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -333,7 +318,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -348,7 +333,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -379,7 +364,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -453,7 +438,7 @@ The compression mechanism to use.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -469,7 +454,7 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
   examples={["ndjson","text"]}
   groups={[]}
   name={"codec"}
@@ -572,7 +557,7 @@ How to format event timestamps.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -587,7 +572,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -595,7 +580,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   name={"filename_append_uuid"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -610,7 +595,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"log"}
   enumValues={null}
   examples={["log"]}
@@ -618,7 +603,7 @@ Whether or not to append a UUID v4 token to the end of the file. This ensures th
   name={"filename_extension"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -633,7 +618,7 @@ The filename extension to use in the object name.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"%s"}
   enumValues={null}
   examples={["%s"]}
@@ -641,7 +626,7 @@ The filename extension to use in the object name.
   name={"filename_time_format"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -801,7 +786,7 @@ A prefix to apply to all object key names. This should be used to partition your
   groups={[]}
   name={"region"}
   path={null}
-  relevantWhen={{"host":""}}
+  relevantWhen={{"endpoint":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -839,7 +824,7 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -862,7 +847,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -885,7 +870,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -977,7 +962,7 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -1035,7 +1020,7 @@ The server-side encryption algorithm used when storing these objects. See [Serve
   groups={[]}
   name={"ssekms_key_id"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"server_side_encryption":"aws:kms"}}
   required={false}
   templateable={false}
   type={"string"}

@@ -36,7 +36,7 @@ delayed. Generally new Vector releases are made available within a few days.
     <Alert icon={false} type="info">
 
     * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.8.1).
+      of Vector (0.8.2).
     * The `--attr` improves installation speed.
 
     </Alert>

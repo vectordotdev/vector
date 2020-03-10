@@ -2,6 +2,7 @@
 component_title: "Remove Tags"
 description: "The Vector `remove_tags` transform accepts and outputs `metric` events allowing you to remove one or more metric tags."
 event_types: ["metric"]
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
 min_version: null
 service_name: "Remove Tags"
@@ -29,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_tags" # must be: "remove_tags"
-  inputs = ["my-source-id"] # example
-  tags = ["tag1", "tag2"] # example
+  type = "remove_tags" # required
+  inputs = ["my-source-id"] # required
+  tags = ["tag1", "tag2"] # required
 ```
 
 ## Options
@@ -70,6 +71,13 @@ The tag names to drop.
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `remove_tags`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -82,3 +90,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
