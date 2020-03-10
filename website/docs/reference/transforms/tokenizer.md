@@ -224,6 +224,13 @@ A few things to note about the output:
 Both `" "` and `"-"` are considered blank values and their mapped field will
 be set to `null`.
 
+### Complex Processing
+
+If you encounter limitations with the `tokenizer`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -266,3 +273,4 @@ certain characters as special. These characters will be discarded:
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

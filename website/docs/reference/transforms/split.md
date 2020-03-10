@@ -248,6 +248,13 @@ A couple of things to notice:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `split`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -282,3 +289,4 @@ You can learn more about Vector's field notation in the
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.unicode_whitespace]: https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

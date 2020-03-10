@@ -224,6 +224,13 @@ Things to note about the output:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `regex_parser`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -330,3 +337,4 @@ documentation][urls.regex_grouping_and_flags].
 [urls.regex_tester]: https://rustexp.lpil.uk/
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

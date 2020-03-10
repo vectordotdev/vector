@@ -185,6 +185,13 @@ A log event will be output with the following structure:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `concat`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -217,3 +224,4 @@ You can learn more about Vector's field notation in the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

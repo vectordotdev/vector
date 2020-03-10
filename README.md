@@ -271,8 +271,8 @@ Or use your own [preferred method][docs.installation].
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community
-[urls.vector_enriching_transforms]: https://vector.dev/components?functions[]=enrich
-[urls.vector_parsing_transforms]: https://vector.dev/components?functions[]=parse
+[urls.vector_enriching_transforms]: https://vector.dev/components?functions%5B%5D=enrich
+[urls.vector_parsing_transforms]: https://vector.dev/components?functions%5B%5D=parse
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open

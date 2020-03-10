@@ -102,6 +102,13 @@ The name of the tag to add. Due to the nature of metric tags, the value must be 
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `add_tags`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -114,3 +121,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

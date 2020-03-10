@@ -339,6 +339,13 @@ Notice how we must define mutually exclusive conditions for each `level` value. 
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `swimlanes`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -350,3 +357,4 @@ section.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

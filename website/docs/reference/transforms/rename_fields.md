@@ -34,16 +34,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "rename_fields" # required
   inputs = ["my-source-id"] # required
 
-<<<<<<< HEAD
   # Fields
   fields.old_field_name = "new_field_name" # example
   fields.parent.old_child_name = "parent.new_child_name" # example
-=======
-  # REQUIRED - Fields
-  [transforms.my_transform_id.fields]
-    old_field_name = "new_field_name" # example
-    parent = {old_child = "parent.new_child"} # example
->>>>>>> docs(rename_fields transform): Fix examples and clarify nested behavior
 ```
 
 ## Options
@@ -81,11 +74,7 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-<<<<<<< HEAD
   examples={[{"old_field_name":"new_field_name"},{"parent":{"old_child_name":"parent.new_child_name"}}]}
-=======
-  examples={[{"old_field_name":"new_field_name"},{"parent":{"old_child":"parent.new_child"}}]}
->>>>>>> docs(rename_fields transform): Fix examples and clarify nested behavior
   groups={[]}
   name={"`[field-name]`"}
   path={"fields"}
@@ -98,7 +87,8 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 #### `[field-name]`
 
-The name of the field to move. Use `.` for nested fields.
+Old-key/New-key pair reprsenting the key to be moved.
+
 
 
 </Field>
@@ -158,6 +148,64 @@ Will result in the following `log` event:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `rename_fields`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
+### Conflicts
+
+#### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+import Alert from '@site/src/components/Alert';
+
+<Alert type="warning">
+
+Please note. Vector makes no guarantee on the order of execution. If two rename
+operations must be performed in a specific order, it is recommended to split
+them up across two separate rename transforms.
+
+</Alert>
+
+#### Nested Key Conflicts
+
+Keys are renamed in a deep fashion. They will not replace any ancestor
+objects. For example, given the following `log` event:
+
+```javascript
+{
+  "root": "value2",
+  "parent": {
+    "child1": "value1"
+  }
+}
+```
+
+And the following configuration:
+
+```toml
+[transforms.rename_nested_field]
+  type = "rename_fields"
+  fields.root = "parent.child2"
+```
+
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -168,49 +216,5 @@ You can learn more in the [Environment Variables][docs.configuration#environment
 section.
 
 
-
-### Key Conflicts
-
-Keys specified in this transform will replace existing keys _in full_. For
-example, if a target key contains an object value it will be replaced _entirely_
-by the new key's value, even if the new value is an object itself. Vector will
-_not_ perform a deep merge.
-
-import Alert from '@site/src/components/Alert';
-
-<Alert type="warning">
-
-Vector makes no guarantee on the order of execution. If two rename operations
-conflict, it is recommended to split them up across two separate rename
-transforms.
-
-</Alert>
-
-### Nested Fields
-
-The `rename_fields` transform will support dotted keys or [TOML
-tables][urls.toml_table]. We recommend the dotted key syntax since it is less
-verbose for this usecase:
-
-```
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    parent.child.grandchild = "other_parent.child.grandchild"
-```
-
-Results in:
-
-```json
-{
-  "other_parent.child.grandchild": "value"
-}
-```
-
-Learn more about how [`log` events][docs.data-model.log] are structured.
-
-
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.data-model.log]: /docs/about/data-model/log/
-[urls.toml_table]: https://github.com/toml-lang/toml#table
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -132,7 +132,8 @@ Given the following configuration:
   fields.field9 = "{{field1}} {{field2}}"
 ```
 
-A [`log` event][docs.data-model.log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following
+structure:
 
 ```javascript
 {
@@ -142,10 +143,12 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "field3": 2.0,
   "field4": true,
   "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6.0": "item1",
-  "field6.1": "item2",
-  "field7.nested": "nested value",
-  "field8": "my.hostname.com"
+  "field6": ["item1", "item2"],
+  "field7": {
+    "nested": "nested value"
+  },
+  "field8": "my.hostname.com",
+  "field9": "string value 1"
 }
 ```
 
@@ -155,37 +158,52 @@ internal [log structure][docs.data-model.log].
 
 ## How It Works
 
-### Arrays
+### Complex Processing
 
-The `add_fields` transform will support [TOML arrays][urls.toml_array]. Keep in
-mind that the values must be simple type (not tables), and each value must the
-same type. You cannot mix types:
+If you encounter limitations with the `add_fields`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
 
-```toml
-[transforms.<transform-id>]
-  # ...
+### Conflicts
 
-  [transforms.<transform-id>.fields]
-    my_array = ["first", "second", "third"]
-```
+#### Key Conflicts
 
-Results in:
+Keys specified in this transform will replace existing keys.
 
-```json
+#### Nested Key Conflicts
+
+Nested keys are added in a _deep_ fashion. They will not replace any ancestor
+objects. For example, given the following `log` event:
+
+```javascript
 {
-  "my_array.0": "first",
-  "my_array.1": "second",
-  "my_array.2": "third"
+  "parent": {
+    "child1": "value1"
+  }
 }
 ```
 
-Learn more about how [`log` events][docs.data-model.log] are structured.
+And the following configuration:
 
-### Complex Transforming
+```toml
+[transforms.add_nested_field]
+  type = "add_fields"
+  fields.parent.child2 = "value2"
+```
 
-The `add_fields` transform is designed for simple key additions. If you need
-more complex transforming then we recommend using a more versatile transform
-like the [`lua` transform][docs.transforms.lua].
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.
 
 ### Environment Variables
 
@@ -196,64 +214,15 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
-### Key Conflicts
-
-Keys specified in this transform will replace existing keys.
-
-### Nested Fields
-
-The `add_fields` transform will support dotted keys or [TOML
-tables][urls.toml_table]. We recommend the dotted key syntax since it is less
-verbose for this usecase:
-
-```toml
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    parent.child.grandchild = "my_value"
-```
-
-Results in:
-
-```json
-{
-  "parent.child.grandchild": "my_value"
-}
-```
-
-Learn more about how [`log` events][docs.data-model.log] are structured.
-
-### Removing Fields
-
-See the [`remove_fields` transform][docs.transforms.remove_fields].
-
 ### Types
 
-All supported [configuration value types][docs.configuration#types] are accepted.
-This includes primitivate types (`string`, `int`, `float`, `boolean`) and
-special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
-
-
-
-### Value Templating
-
-It is possible to use template values in the field. If an input lacks one of the keys needed for a templated field it
-will drop that field from the output.
-
-```toml
-[transforms.<transform-id>]
-  # ...
-
-  [transforms.<transform-id>.fields]
-    my_field = "{{timestamp}} {{message}}"
-```
+All supported [configuration value types][docs.configuration#types] are
+accepted. This includes primitivate types (`string`, `int`, `float`, `boolean`)
+and special types, such as [arrays](#arrays) and
+[nested fields](#nested-fields).
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.configuration#types]: /docs/setup/configuration/#types
 [docs.data-model.log]: /docs/about/data-model/log/
-[docs.transforms.lua]: /docs/reference/transforms/lua/
-[docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
-[urls.toml_array]: https://github.com/toml-lang/toml#array
-[urls.toml_table]: https://github.com/toml-lang/toml#table
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

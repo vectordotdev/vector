@@ -284,15 +284,15 @@ option.
 
 ### Chaining / Unwrapping
 
-Please see the [I/O section](#i-o) for an example of chaining and unwrapping JSON.
+Please see the [Output section](#output) for an example of chaining and
+unwrapping JSON.
 
-### Correctness
+### Complex Processing
 
-The `json_parser` source has been involved in the following correctness tests:
-
-* [`wrapped_json_correctness`][urls.wrapped_json_correctness_test]
-
-Learn more in the [Correctness][pages.index#correctness] sections.
+If you encounter limitations with the `json_parser`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
 
 ### Environment Variables
 
@@ -325,19 +325,26 @@ You can learn more about Vector's field notation in the
 
 ### Invalid JSON
 
-If the value for the specified [`field`](#field) is not valid JSON you can control keep or discard the event with the [`drop_invalid`](#drop_invalid) option. Setting it to `true` will discard the event and drop it entirely. Setting it to `false` will keep the event and pass it through. Note that passing through the event could cause problems and violate assumptions about the structure of your event.
+If the value for the specified [`field`](#field) is not valid JSON you can control keep
+or discard the event with the [`drop_invalid`](#drop_invalid) option. Setting it to `true` will
+discard the event and drop it entirely. Setting it to `false` will keep the
+event and pass it through. Note that passing through the event could cause
+problems and violate assumptions about the structure of your event.
 
-### Key Conflicts
+### Merge Conflicts
+
+#### Key conflicts
 
 Any key present in the decoded JSON will override existin keys in the event.
 
-### Nested Fields
+#### Object conflicts
 
-If the decoded JSON includes nested fields it will be _deep_ merged into the event. For example, given the following event:
+If the decoded JSON includes nested fields it will be _deep_ merged into the
+event. For example, given the following event:
 
 ```javascript
 {
-  "message": "{"parent": {"child2": "value2"}}",
+  "message": "{\"parent\": {\"child2\": \"value2\"}}",
   "parent": {
     "child1": "value1"
   }
@@ -355,8 +362,9 @@ Parsing the `"message"` field would result the following structure:
 }
 ```
 
+Notice that the `parent.child1` key was preserved.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
-[pages.index#correctness]: /#correctness
-[urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

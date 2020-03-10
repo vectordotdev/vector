@@ -64,7 +64,8 @@ Given the following configuration:
   fields.field9 = "{{field1}} {{field2}}"
 ```
 
-A [`log` event][docs.data-model.log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following
+structure:
 
 ```javascript
 {
@@ -74,10 +75,12 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "field3": 2.0,
   "field4": true,
   "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6.0": "item1",
-  "field6.1": "item2",
-  "field7.nested": "nested value",
-  "field8": "my.hostname.com"
+  "field6": ["item1", "item2"],
+  "field7": {
+    "nested": "nested value"
+  },
+  "field8": "my.hostname.com",
+  "field9": "string value 1"
 }
 ```
 

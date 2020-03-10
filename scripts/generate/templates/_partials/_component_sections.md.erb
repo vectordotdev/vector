@@ -59,7 +59,16 @@ service applies backpressure. Buffers are controlled via the
 [`buffer.*`](#buffer) options.
 <%- end -%>
 <%- end -%>
-<% if component.context_options.any? -%>
+<%- if component.transform? && component.function_category != "program" -%>
+
+### Complex Processing
+
+If you encounter limitations with the `<%= component.name %>`
+<%= component.type %> then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+<%- end -%>
+<%- if component.context_options.any? -%>
 
 ### Context
 
