@@ -46,7 +46,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Fields
-  fields.ignore = ["field1", "field2"] # optional, no default
   fields.match = ["timestamp"] # optional, default
 ```
 
@@ -154,10 +153,10 @@ Options controlling what fields to match against
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[["field1","field2"]]}
+  examples={[["field1","field2"],["parent.child_field"]]}
   groups={[]}
   name={"ignore"}
   path={"fields"}
@@ -180,7 +179,7 @@ The field names to ignore when deciding if an Event is a duplicate. Incompatible
   common={true}
   defaultValue={["timestamp"]}
   enumValues={null}
-  examples={[["field1","field2"]]}
+  examples={[["field1","field2"],["parent.child_field"]]}
   groups={[]}
   name={"match"}
   path={"fields"}
