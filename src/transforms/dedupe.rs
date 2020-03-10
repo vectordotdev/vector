@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::{
+    event,
     event::{Event, Value},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
@@ -15,6 +16,8 @@ pub enum FieldMatchConfig {
     MatchFields(Vec<Atom>),
     #[serde(rename = "ignore")]
     IgnoreFields(Vec<Atom>),
+    #[serde(skip)]
+    Default,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -23,7 +26,7 @@ pub struct CacheConfig {
     pub num_events: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
     #[serde(default = "default_field_match_config")]
@@ -36,8 +39,30 @@ fn default_cache_config() -> CacheConfig {
     CacheConfig { num_events: 5000 }
 }
 
+/// Note that the value returned by this is just a placeholder.  To get the real default you must
+/// call fill_default() on the parsed DedupeConfig instance.
 fn default_field_match_config() -> FieldMatchConfig {
-    FieldMatchConfig::MatchFields(vec!["timestamp".into()])
+    FieldMatchConfig::Default
+}
+
+impl DedupeConfig {
+    /// We cannot rely on Serde to populate the default since we want it to be based on the user's
+    /// configured log_schema, which we only know about after we've already parsed the config.
+    pub fn fill_default(&self) -> Self {
+        let fields = match &self.fields {
+            FieldMatchConfig::MatchFields(x) => FieldMatchConfig::MatchFields(x.clone()),
+            FieldMatchConfig::IgnoreFields(y) => FieldMatchConfig::IgnoreFields(y.clone()),
+            FieldMatchConfig::Default => FieldMatchConfig::MatchFields(vec![
+                event::log_schema().timestamp_key().into(),
+                event::log_schema().host_key().into(),
+                event::log_schema().message_key().into(),
+            ]),
+        };
+        Self {
+            fields,
+            cache: self.cache.clone(),
+        }
+    }
 }
 
 pub struct Dedupe {
@@ -52,7 +77,7 @@ inventory::submit! {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Dedupe::new(self.clone())))
+        Ok(Box::new(Dedupe::new(self.fill_default())))
     }
 
     fn input_type(&self) -> DataType {
@@ -149,6 +174,9 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
             }
 
             CacheEntry::Ignore(entry)
+        }
+        FieldMatchConfig::Default => {
+            panic!("Dedupe transform config contains Default FieldMatchConfig while running");
         }
     }
 }
