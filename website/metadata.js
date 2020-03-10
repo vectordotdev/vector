@@ -22494,7 +22494,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "filter",
+      "function_category": "shape",
       "id": "concat_transform",
       "name": "concat",
       "operating_systems": [

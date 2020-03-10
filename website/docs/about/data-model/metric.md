@@ -280,7 +280,7 @@ The metric timestamp, representing when the metric was created/ingested within V
 
 ### type
 
-A metric must be one of 6 types.
+The metric value. The value is an enumeration and will be comprised of different attributes depending on the value type.
 
 <Fields filters={false}>
 

@@ -40,7 +40,8 @@ Vector.\
 type = "struct"
 required = true
 description = """\
-A metric must be one of 6 types.\
+The metric value. The value is an enumeration and will be comprised of \
+different attributes depending on the value type.\
 """
 
 
