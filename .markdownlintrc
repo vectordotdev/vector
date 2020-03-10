@@ -9,7 +9,7 @@
   "MD013": { "line_length": 80 },
   "MD027": true,
   "MD028": true,
-  "MD030": true,
+  "MD030": false,
   "MD033": false,
   "MD034": true,
   "MD037": true,
