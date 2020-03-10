@@ -320,6 +320,7 @@ mod tests {
         )
         .unwrap();
 
+        // timestamp is unpredictable, don't compare it
         log.remove(&"timestamp".into());
         let log = serde_json::to_value(log.all_fields()).unwrap();
         assert_eq!(
@@ -328,6 +329,45 @@ mod tests {
                 "message": "status=1234 time=5678",
                 "prefix.status": "1234",
                 "prefix.time": "5678",
+            })
+        );
+    }
+
+    #[test]
+    fn preserves_target_field() {
+        let message = "status=1234 time=5678";
+        let log = do_transform(
+            message,
+            r"status=(?P<status>\d+) time=(?P<time>\d+)",
+            r#"target_field = "message""#,
+        )
+        .unwrap();
+
+        assert_eq!(log[&"message".into()], message.into());
+        assert_eq!(log.get(&"message.status".into()), None);
+        assert_eq!(log.get(&"message.time".into()), None);
+    }
+
+    #[test]
+    fn overwrites_target_field() {
+        let mut log = do_transform(
+            "status=1234 time=5678",
+            r"status=(?P<status>\d+) time=(?P<time>\d+)",
+            r#"
+               target_field = "message"
+               overwrite_target = true
+            "#,
+        )
+        .unwrap();
+
+        // timestamp is unpredictable, don't compare it
+        log.remove(&"timestamp".into());
+        let log = serde_json::to_value(log.all_fields()).unwrap();
+        assert_eq!(
+            log,
+            serde_json::json!({
+                "message.status": "1234",
+                "message.time": "5678",
             })
         );
     }
