@@ -436,4 +436,32 @@ mod tests {
             assert_eq!(map.get(&"key".into()).unwrap().clone(), Value::from(123));
         }
     }
+
+    #[test]
+    fn dedupe_match_null_vs_missing() {
+        let transform = make_match_transform(5, vec!["matched".into()]);
+        ignore_vs_missing(transform);
+    }
+
+    #[test]
+    fn dedupe_ignore_null_vs_missing() {
+        let transform = make_ignore_transform(5, vec![]);
+        ignore_vs_missing(transform);
+    }
+
+    /// Test an explicit null vs a field being missing are treated as different.
+    fn ignore_vs_missing(mut transform: Dedupe) {
+        let mut event1 = Event::from("message");
+        event1.as_mut_log().insert("matched", Value::Null);
+
+        let event2 = Event::from("message");
+
+        // First event should always be passed through as-is.
+        let new_event = transform.transform(event1).unwrap();
+        assert_eq!(new_event.as_log()[&"matched".into()], Value::Null);
+
+        // Second event should also get passed through as null is different than missing
+        let new_event = transform.transform(event2).unwrap();
+        assert_eq!(false, new_event.as_log().contains(&"matched".into()));
+    }
 }

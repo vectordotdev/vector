@@ -256,6 +256,12 @@ Sum(the average size of the *data* (but not including the field name) for each f
 When using `fields.ignore`:
 (Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_events`
 
+### Missing Fields
+Fields with explicit null values will always be considered different than if
+that field was omitted entirely.  For example, if you run this transform with
+`fields.match = ["a"]`, the event "{a: null, b:5}" will be considered different
+than the event "{b:5}".
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/

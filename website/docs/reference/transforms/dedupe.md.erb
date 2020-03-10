@@ -32,6 +32,12 @@
 
 <%= component_sections(component) %>
 
+### Missing Fields
+Fields with explicit null values will always be considered different than if
+that field was omitted entirely.  For example, if you run this transform with
+`fields.match = ["a"]`, the event "{a: null, b:5}" will be considered different
+than the event "{b:5}".
+
 ### Cache Behavior
 
 This transform is backed by an LRU cache of size `cache.num_events`.
