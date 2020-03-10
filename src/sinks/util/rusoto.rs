@@ -1,7 +1,8 @@
 #![cfg(feature = "rusoto_core")]
+
 use crate::{dns::Resolver, sinks::util};
 use futures01::{
-    future::{Future, FutureResult},
+    future::{self, Future, FutureResult},
     Async, Poll, Stream,
 };
 use http::{
@@ -9,8 +10,6 @@ use http::{
     Method, Request, Response,
 };
 use hyper::body::Payload;
-use hyper::client::connect::HttpConnector;
-use hyper_openssl::HttpsConnector;
 use rusoto_core::{
     request::{DispatchSignedRequest, HttpDispatchError, HttpResponse},
     signature::{SignedRequest, SignedRequestPayload},
@@ -26,8 +25,12 @@ use snafu::{ResultExt, Snafu};
 use std::{io, time::Duration};
 use tower::Service;
 
-// pub type Client = HttpClient<HttpService<RusotoBody>>;
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
+
+pub fn client(resolver: Resolver) -> crate::Result<Client> {
+    let client = util::http::HttpClient::new(resolver, None);
+    Ok(HttpClient { client })
+}
 
 #[derive(Debug, Snafu)]
 enum RusotoError {
@@ -102,20 +105,6 @@ impl Future for AwsCredentialsProviderFuture {
     }
 }
 
-pub fn client(resolver: Resolver) -> crate::Result<Client> {
-    // let mut http = HttpConnector::new_with_resolver(resolver);
-    // http.enforce_http(false);
-
-    // let ssl = SslConnector::builder(SslMethod::tls())?;
-    // let https = HttpsConnector::with_connector(http, ssl)?;
-
-    // Ok(HttpClient::from_connector(https))
-    // let client = crate::sinks::util::http::https_client(resolver, Default::default())?;
-    // let client = tower_hyper::Client::from_client(client);
-    let client = crate::sinks::util::http::HttpClient::new(resolver, None);
-    Ok(HttpClient { client })
-}
-
 #[derive(Debug, Clone)]
 pub struct HttpClient<T> {
     client: T,
@@ -146,6 +135,7 @@ where
 {
     type Future = Box<dyn Future<Item = HttpResponse, Error = HttpDispatchError> + Send + 'static>;
 
+    // Adaptation of https://docs.rs/rusoto_core/0.41.0/src/rusoto_core/request.rs.html#409-522
     fn dispatch(&self, request: SignedRequest, timeout: Option<Duration>) -> Self::Future {
         assert!(timeout.is_none(), "timeout is not supported at this level");
 
@@ -162,12 +152,22 @@ where
         for h in request.headers().iter() {
             let header_name = match h.0.parse::<HeaderName>() {
                 Ok(name) => name,
-                Err(err) => unimplemented!(),
+                Err(err) => {
+                    return Box::new(future::err(HttpDispatchError::new(format!(
+                        "ParseHeader: {}",
+                        err
+                    ))))
+                }
             };
             for v in h.1.iter() {
                 let header_value = match HeaderValue::from_bytes(v) {
                     Ok(value) => value,
-                    Err(err) => unimplemented!(),
+                    Err(err) => {
+                        return Box::new(future::err(HttpDispatchError::new(format!(
+                            "HeaderValueParse: {}",
+                            err
+                        ))))
+                    }
                 };
                 headers.append(&header_name, header_value);
             }
@@ -253,34 +253,6 @@ impl Payload for RusotoBody {
 
     fn poll_trailers(&mut self) -> Poll<Option<HeaderMap>, Self::Error> {
         Ok(Async::Ready(None))
-    }
-}
-
-impl tokio_buf::BufStream for RusotoBody {
-    type Item = io::Cursor<Vec<u8>>;
-    type Error = io::Error;
-
-    fn poll_buf(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match &mut self.inner {
-            Some(SignedRequestPayload::Buffer(buf)) => {
-                if !buf.is_empty() {
-                    let buf = buf.split_off(0);
-                    Ok(Async::Ready(Some(io::Cursor::new(
-                        buf.into_iter().collect(),
-                    ))))
-                } else {
-                    Ok(Async::Ready(None))
-                }
-            }
-            Some(SignedRequestPayload::Stream(stream)) => match stream.poll()? {
-                Async::Ready(Some(buffer)) => Ok(Async::Ready(Some(io::Cursor::new(
-                    buffer.into_iter().collect(),
-                )))),
-                Async::Ready(None) => Ok(Async::Ready(None)),
-                Async::NotReady => Ok(Async::NotReady),
-            },
-            None => Ok(Async::Ready(None)),
-        }
     }
 }
 
