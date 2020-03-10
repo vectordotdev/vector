@@ -201,6 +201,7 @@ jobs:
       - run:
           name: Start dependencies
           command: |
+            docker-compose pull
             docker-compose up -d splunk
             sleep 30 # Splunk crashes when started simultaneously with other services
             docker-compose up -d test-runtime-deps
@@ -614,7 +615,7 @@ jobs:
       - checkout
       - run:
           name: Install Homebrew
-          command: /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+          command: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
       - *install-vector
       - *test-install-script
 

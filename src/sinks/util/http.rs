@@ -6,7 +6,7 @@ use super::{
 use crate::{
     dns::Resolver,
     event::Event,
-    tls::{TlsConnectorExt, TlsSettings},
+    tls::{tls_connector_builder, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -17,7 +17,7 @@ use http::{Request, StatusCode};
 use hyper::body::{Body, Payload};
 use hyper::client::HttpConnector;
 use hyper::Client;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -123,14 +123,9 @@ where
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let mut tls = native_tls::TlsConnector::builder();
-        if let Some(settings) = tls_settings.into() {
-            tls.use_tls_settings(settings);
-        }
+        let tls = tls_connector_builder(tls_settings.into())?;
+        let https = HttpsConnector::with_connector(http, tls)?;
 
-        let tls = tls.build()?;
-
-        let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);

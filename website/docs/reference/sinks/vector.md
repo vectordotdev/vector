@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` sink streams `log` events to another downstream `vector` source."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,13 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example
-
-  # OPTIONAL
-  healthcheck = true # default
+  type = "vector" # required
+  inputs = ["my-source-id"] # required
+  address = "92.12.333.224:5000" # required
+  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -59,23 +57,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example
+  # General
+  type = "vector" # required
+  inputs = ["my-source-id"] # required
+  address = "92.12.333.224:5000" # required
+  healthcheck = true # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
-
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
-
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>
@@ -144,7 +136,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -159,7 +151,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
@@ -190,7 +182,7 @@ The maximum size of the buffer on the disk.
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

@@ -2,6 +2,7 @@
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
+function_category: "convert"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
 min_version: null
 service_name: "Log to Metric"
@@ -75,7 +76,7 @@ A table of key/value pairs representing the keys to be added to the event.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["duration"]}
+  examples={["duration","parent.child"]}
   groups={[]}
   name={"field"}
   path={"metrics"}
@@ -95,7 +96,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
@@ -103,7 +104,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   name={"increment_by_value"}
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -533,6 +534,13 @@ sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `log_to_metric`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -574,3 +582,4 @@ individual metrics for reduction in the metrics storage itself.
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

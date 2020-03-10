@@ -3,12 +3,13 @@ delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "File"
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sources/file.rs
+source_url: https://github.com/timberio/vector/blob/master/src/sources/file/
 status: "prod-ready"
 title: "File Source"
 unsupported_operating_systems: []
@@ -43,21 +44,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  include = ["/var/log/nginx/*.log"] # example
+  # General
+  type = "file" # required
+  include = ["/var/log/nginx/*.log"] # required
+  ignore_older = 86400 # optional, no default, seconds
+  start_at_beginning = false # optional, default
 
-  # OPTIONAL - General
-  glob_minimum_cooldown = 1000 # default, milliseconds
-  start_at_beginning = false # default
-  ignore_older = 86400 # example, no default, seconds
-
-  # OPTIONAL - Context
-  file_key = "file" # default
-  host_key = "host" # default
-
-  # OPTIONAL - Priority
-  oldest_first = false # default
+  # Priority
+  oldest_first = false # optional, default
 ```
 
 </TabItem>
@@ -67,38 +61,34 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "file" # must be: "file"
-  include = ["/var/log/nginx/*.log"] # example
+  # General
+  type = "file" # required
+  include = ["/var/log/nginx/*.log"] # required
+  data_dir = "/var/lib/vector" # optional, no default
+  exclude = ["/var/log/nginx/*.[0-9]*.log"] # optional, no default
+  glob_minimum_cooldown = 1000 # optional, default, milliseconds
+  ignore_older = 86400 # optional, no default, seconds
+  max_line_bytes = 102400 # optional, default, bytes
+  start_at_beginning = false # optional, default
 
-  # OPTIONAL - General
-  glob_minimum_cooldown = 1000 # default, milliseconds
-  start_at_beginning = false # default
-  data_dir = "/var/lib/vector" # example, no default
-  exclude = ["/var/log/nginx/*.[0-9]*.log"] # example, no default
-  ignore_older = 86400 # example, no default, seconds
-  max_line_bytes = 102400 # default, bytes
+  # Context
+  file_key = "file" # optional, default
+  host_key = "host" # optional, default
 
-  # OPTIONAL - Context
-  file_key = "file" # default
-  host_key = "host" # default
+  # Priority
+  max_read_bytes = 2048 # optional, default, bytes
+  oldest_first = false # optional, default
 
-  # OPTIONAL - Priority
-  max_read_bytes = 2048 # default, bytes
-  oldest_first = false # default
+  # Fingerprinting
+  fingerprinting.strategy = "checksum" # optional, default
+  fingerprinting.fingerprint_bytes = 256 # optional, default, bytes, relevant when strategy = "checksum"
+  fingerprinting.ignored_header_bytes = 0 # optional, default, bytes, relevant when strategy = "checksum"
 
-  # OPTIONAL - Fingerprinting
-  [sources.my_source_id.fingerprinting]
-    fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
-    ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
-    strategy = "checksum" # default, enum
-
-  # OPTIONAL - Multiline
-  [sources.my_source_id.multiline]
-    condition_pattern = "^[\\s]+" # example
-    mode = "continue_through" # example, enum
-    start_pattern = "^[^\\s]" # example
-    timeout_ms = 1000 # example, milliseconds
+  # Multiline
+  multiline.condition_pattern = "^[\\s]+" # required
+  multiline.mode = "continue_through" # required
+  multiline.start_pattern = "^[^\\s]" # required
+  multiline.timeout_ms = 1000 # required, milliseconds
 ```
 
 </TabItem>
@@ -160,7 +150,7 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes pre
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"file"}
   enumValues={null}
   examples={["file"]}
@@ -168,7 +158,7 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes pre
   name={"file_key"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -228,7 +218,7 @@ The strategy used to uniquely identify files. This is important for [checkpointi
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={256}
   enumValues={null}
   examples={[256]}
@@ -236,7 +226,7 @@ The strategy used to uniquely identify files. This is important for [checkpointi
   name={"fingerprint_bytes"}
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -251,7 +241,7 @@ The number of bytes read off the head of the file to generate a unique fingerpri
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={0}
   enumValues={null}
   examples={[0]}
@@ -259,7 +249,7 @@ The number of bytes read off the head of the file to generate a unique fingerpri
   name={"ignored_header_bytes"}
   path={"fingerprinting"}
   relevantWhen={{"strategy":"checksum"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -279,7 +269,7 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
@@ -287,7 +277,7 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
   name={"glob_minimum_cooldown"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
@@ -302,7 +292,7 @@ Delay between file discovery calls. This controls the interval at which Vector s
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
@@ -310,7 +300,7 @@ Delay between file discovery calls. This controls the interval at which Vector s
   name={"host_key"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -568,7 +558,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize d
   name={"start_at_beginning"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}

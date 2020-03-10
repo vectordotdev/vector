@@ -2,6 +2,7 @@ use crate::runtime::Runtime;
 use crate::Event;
 
 use futures01::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -17,7 +18,7 @@ use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::util::FutureExt;
-use tokio_tls::TlsConnector;
+use tokio_openssl::SslConnectorExt;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -77,18 +78,16 @@ pub fn send_lines_tls(
 ) -> impl Future<Item = (), Error = ()> {
     let lines = futures01::stream::iter_ok::<_, ()>(lines);
 
-    let connector: TlsConnector = native_tls::TlsConnector::builder()
-        .danger_accept_invalid_certs(true)
-        .danger_accept_invalid_hostnames(true)
-        .build()
-        .expect("Failed to build TLS connector")
-        .into();
+    let mut connector =
+        SslConnector::builder(SslMethod::tls()).expect("Failed to create TLS builder");
+    connector.set_verify(SslVerifyMode::NONE);
+    let connector = connector.build();
 
     TcpStream::connect(&addr)
         .map_err(|e| panic!("{:}", e))
         .and_then(move |socket| {
             connector
-                .connect(&host, socket)
+                .connect_async(&host, socket)
                 .map_err(|e| panic!("{:}", e))
                 .and_then(|stream| {
                     let out = FramedWrite::new(stream, LinesCodec::new())

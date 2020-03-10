@@ -13,7 +13,8 @@ requirements = {}
 [transforms.field_filter.options.field]
 type = "string"
 common = true
-examples = ["file"]
+examples = ["application_id", "parent.child", "array[0]"]
+field_path_notation = true
 required = true
 description = "The target log field to compare against the `value`."
 

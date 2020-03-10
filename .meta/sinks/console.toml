@@ -10,19 +10,23 @@ input_types = ["log", "metric"]
 requirements = {}
 write_to_description = "[standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "console") %>
+<%= render(
+  "_partials/_component_options.toml",
+  type: "sink",
+  name: "console",
+  healthcheck: false
+) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render(
+  "_partials/_encoding.toml",
   namespace: "sinks.console.options",
-  encodings: ["json", "text"],
-  default: false,
+  encodings: ["json", "text"]
 ) %>
 
 [sinks.console.options.target]
 type = "string"
 common = true
 default = "stdout"
-required = true
 description = "The [standard stream][urls.standard_streams] to write to."
 
 [sinks.console.options.target.enum]

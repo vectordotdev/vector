@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use futures01::{Future, Poll};
 use http::{Method, StatusCode, Uri};
 use hyper;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};

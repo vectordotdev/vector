@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "HTTP"
 description: "The Vector `http` source ingests data through the HTTP protocol and outputs `log` events."
 event_types: ["log"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+http%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -26,20 +27,53 @@ The Vector `http` source ingests data through the HTTP protocol and [outputs `lo
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "http" # must be: "http"
-  address = "0.0.0.0:80" # example
-
-  # OPTIONAL
-  encoding = "text" # default, enum
-  headers = ["User-Agent", "X-My-Custom-Header"] # example, no default
+  type = "http" # required
+  address = "0.0.0.0:80" # required
+  encoding = "text" # optional, default
+  headers = ["User-Agent", "X-My-Custom-Header"] # optional, no default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  # General
+  type = "http" # required
+  address = "0.0.0.0:80" # required
+  encoding = "text" # optional, default
+  headers = ["User-Agent", "X-My-Custom-Header"] # optional, no default
+
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -76,13 +110,13 @@ The address to listen for connections on
 <Field
   common={true}
   defaultValue={"text"}
-  enumValues={{"text":"Newline-delimited text","ndjson":"Newline-delimited JSON objects","json":"Array of JSON objects"}}
+  enumValues={{"text":"Newline-delimited text, with each line forming a message.","ndjson":"Newline-delimited JSON objects, where each line must contain a JSON object.","json":"Array of JSON objects, which must be a JSON array containing JSON objects."}}
   examples={["text","ndjson","json"]}
   groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -90,7 +124,7 @@ The address to listen for connections on
 
 ### encoding
 
-The expected encoding of received data. `text` indicates newline-delimited text, with each line forming a message. `ndjson` indicates newline-delimited JSON, where each line must contain a json object. `json` indicates a JSON payload, which must be a JSON array containing JSON objects. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+The expected encoding of received data. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
 
 
 </Field>
@@ -139,6 +173,29 @@ A list of HTTP headers to include in the log event. These will override any valu
 Configures the TLS options for connections from this source.
 
 <Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
+  name={"ca_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### ca_path
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+
+</Field>
 
 
 <Field
@@ -228,6 +285,29 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 #### key_path
 
 Absolute path to a certificate key file used to identify this server, in DER or PEM format (PKCS#8).
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"verify_certificate"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_certificate
+
+If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if it is not valid. If `false` (the default), Vector will ignore the presence of a client certificate.
 
 
 </Field>

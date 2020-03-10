@@ -14,7 +14,11 @@ write_to_description = "[LogDna][urls.logdna]'s HTTP Ingestion API"
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.logdna.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.logdna.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.logdna.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -74,6 +78,5 @@ description = "The default app that will be set for events that do not contain a
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.logdna.options",
-  encodings: ["default"],
-  default: "default"
+  encodings: []
 ) %>
