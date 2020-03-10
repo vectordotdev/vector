@@ -201,6 +201,7 @@ jobs:
       - run:
           name: Start dependencies
           command: |
+            docker-compose pull
             docker-compose up -d splunk
             sleep 30 # Splunk crashes when started simultaneously with other services
             docker-compose up -d test-runtime-deps
