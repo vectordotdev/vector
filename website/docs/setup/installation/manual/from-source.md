@@ -57,13 +57,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 2.  Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
     on your system.
 
-3.  Create the `vector` directory
-
-    ```bash
-    mkdir vector
-    ```
-
-4.  Download Vector's Source
+3.  Download Vector's Source
 
     <Tabs
       className="mini"
@@ -77,7 +71,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8.2 | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -93,13 +87,13 @@ The following steps should be used to compile Vector directly on Linux based sys
     </TabItem>
     </Tabs>
 
-5.  Change into the `vector` directory
+4.  Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-6.  Compile Vector
+5.  Compile Vector
 
     ```bash
     [FEATURES="<flag1>,<flag2>,..."] make build
@@ -114,7 +108,7 @@ The following steps should be used to compile Vector directly on Linux based sys
     is `x86_64-apple-darwin`, and the Vector binary will be located at
     `target/x86_64-apple-darwin/release/vector`.
 
-7.  Start Vector
+6.  Start Vector
 
     Finally, start vector:
 
