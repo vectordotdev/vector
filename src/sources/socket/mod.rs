@@ -125,23 +125,21 @@ mod test {
     use super::SocketConfig;
     use crate::event;
     use crate::runtime;
-    use crate::shutdown::ShutdownSignal;
+    use crate::shutdown::{ShutdownCoordinator, ShutdownSignal};
     use crate::test_util::{
         block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp,
     };
     use crate::tls::{TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures01::sync::mpsc;
+    use futures01::sync::{mpsc, oneshot};
     use futures01::Stream;
     #[cfg(unix)]
     use futures01::{Future, Sink};
+    use std::net::UdpSocket;
     #[cfg(unix)]
     use std::path::PathBuf;
-    use std::{
-        net::{SocketAddr, UdpSocket},
-        thread,
-        time::Duration,
-    };
+    use std::time::Instant;
+    use std::{net::SocketAddr, thread, time::Duration};
     #[cfg(unix)]
     use tokio::codec::{FramedWrite, LinesCodec};
     #[cfg(unix)]
@@ -269,6 +267,44 @@ mod test {
         );
     }
 
+    #[test]
+    fn tcp_shutdown_simple() {
+        let source_name = "tcp_shutdown_simple";
+        let (tx, rx) = mpsc::channel(2);
+        let addr = next_addr();
+
+        let mut shutdown = ShutdownCoordinator::new();
+        let (shutdown_signal, _) = shutdown.register_source(source_name);
+
+        // Start TCP Source
+        let server = SocketConfig::from(TcpConfig::new(addr.into()))
+            .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+            .unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
+        let source_handle = oneshot::spawn(server, &rt.executor());
+        wait_for_tcp(addr);
+
+        // Send data to Source.
+        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
+            .unwrap();
+
+        let event = rx.wait().next().unwrap().unwrap();
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+
+        // Now signal to the Source to shut down.
+        shutdown.shutdown_source_begin(source_name);
+        let deadline = Instant::now() + Duration::from_secs(1000);
+        let shutdown_success =
+            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        assert_eq!(true, shutdown_success);
+
+        // Ensure source actually shut down successfully.
+        rt.block_on(source_handle).unwrap();
+    }
+
     //////// UDP TESTS ////////
     fn send_lines_udp<'a>(
         addr: SocketAddr,
@@ -301,24 +337,43 @@ mod test {
         bind
     }
 
+    fn init_udp_with_shutdown(
+        sender: mpsc::Sender<event::Event>,
+        source_name: &str,
+        shutdown: &mut ShutdownCoordinator,
+    ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
+        let (shutdown_signal, _) = shutdown.register_source(source_name);
+        init_udp_inner(sender, source_name, shutdown_signal)
+    }
+
     fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, runtime::Runtime) {
+        let (addr, rt, handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
+        handle.forget();
+        return (addr, rt);
+    }
+
+    fn init_udp_inner(
+        sender: mpsc::Sender<event::Event>,
+        source_name: &str,
+        shutdown_signal: ShutdownSignal,
+    ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
         let addr = next_addr();
 
         let server = SocketConfig::from(UdpConfig::new(addr))
             .build(
-                "default",
+                source_name,
                 &GlobalOptions::default(),
-                ShutdownSignal::noop(),
+                shutdown_signal,
                 sender,
             )
             .unwrap();
-        let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(server);
+        let rt = runtime::Runtime::new().unwrap();
+        let source_handle = oneshot::spawn(server, &rt.executor());
 
         // Wait for udp to start listening
         thread::sleep(Duration::from_millis(100));
 
-        (addr, rt)
+        (addr, rt, source_handle)
     }
 
     #[test]
@@ -388,6 +443,72 @@ mod test {
             format!("{}", from).into()
         );
     }
+
+    #[test]
+    fn udp_shutdown_simple() {
+        let (tx, rx) = mpsc::channel(2);
+        let source_name = "udp_shutdown_simple";
+
+        let mut shutdown = ShutdownCoordinator::new();
+        let (address, mut rt, source_handle) =
+            init_udp_with_shutdown(tx, source_name, &mut shutdown);
+
+        send_lines_udp(address, vec!["test"]);
+        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+
+        // Now signal to the Source to shut down.
+        shutdown.shutdown_source_begin(source_name);
+        let deadline = Instant::now() + Duration::from_secs(1000);
+        let shutdown_success =
+            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        assert_eq!(true, shutdown_success);
+
+        // Ensure source actually shut down successfully.
+        rt.block_on(source_handle).unwrap();
+    }
+
+    // #[test]
+    // fn udp_shutdown_infinite_stream() {
+    //     let (tx, rx) = mpsc::channel(1000);
+    //     let source_name = "udp";
+    //
+    //     let mut shutdown = ShutdownCoordinator::new();
+    //     let (address, mut rt, source_handle) =
+    //         init_udp_with_shutdown(tx, source_name, &mut shutdown);
+    //
+    //     // Future that keeps sending lines to the UDP source forever.
+    //     // We leak this thread and let it run forever until the test binary terminates.
+    //     let pump_handle = std::thread::spawn(move || {
+    //         send_lines_udp(address, std::iter::repeat("test"));
+    //     });
+    //
+    //     // This consumes `rx` which causes the Source to error when it tries to forward its results
+    //     // into `tx` but finds the other side of the channel has been dropped.
+    //     let events = rt.block_on(collect_n(rx, 100)).ok().unwrap();
+    //     assert_eq!(100, events.len());
+    //     for event in events {
+    //         assert_eq!(
+    //             event.as_log()[&event::log_schema().message_key()],
+    //             "test".into()
+    //         );
+    //     }
+    //
+    //     shutdown.shutdown_source_begin(source_name);
+    //     let deadline = Instant::now() + Duration::from_secs(1000);
+    //     let shutdown_success =
+    //         shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+    //     assert_eq!(true, shutdown_success);
+    //
+    //     assert!(pump_handle.join().is_ok());
+    //
+    //     // Ensure that the source has actually shut down.
+    //     rt.block_on(source_handle).unwrap();
+    // }
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
