@@ -2,13 +2,33 @@
 
 This RFC proposes a new API for the `lua` transform.
 
+* [Motivation](#motivation)
+* [Prior Art](#prior-art)
+* [Guide-level Proposal](#guide-level-proposal)
+    * [Motivating Example](#motivating-example)
+    * [Possible Configs](#possible-configs)
+        * [Inline Functions](#inline-functions)
+        * [Single Source](#single-source)
+        * [Loadable Module](#loadable-module)
+* [Reference-level Proposal](#reference-level-proposal)
+    * [New Concepts](#new-concepts)
+        * [Hooks](#hooks)
+        * [Timers](#timers)
+        * [Emitting Functions](#emitting-functions)
+    * [Event Schema](#event-schema)
+    * [Data Types](#data-types)
+    * [Configuration](#configuration)
+* [Sales Pitch](#sales-pitch)
+* [Plan of Action](#plan-of-action)
+
+
 ## Motivation
 
 Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lua/) has some limitations in its API. In particular, the following features are missing:
 
 *   **Nested Fields**
 
-    Currently accessing nested fields is possible using the dot notation:
+    Currently accessing nested fields is possible using the field path notation:
 
     ```lua
     event["nested.field"] = 5
@@ -65,7 +85,7 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
 
 ## Prior Art
 
-The implementation of `lua` transform has the following design:
+The implementation of `lua` transform supports only log events. Processing of log events has the following design:
 
 * There is a `source` parameter which takes a string of code.
 * When a new event comes in, the global variable `event` is set inside the Lua context and the code from `source` is evaluated.
@@ -74,92 +94,462 @@ The implementation of `lua` transform has the following design:
 
 Events have type [`userdata`](https://www.lua.org/pil/28.1.html) with custom [metamethods](https://www.lua.org/pil/13.html), so they are views to Vector's events. Thus passing an event to Lua has zero cost, so only when fields are actually accessed the data is copied to Lua.
 
-The fields are accessed through string indexes using [Vector's dot notation](https://vector.dev/docs/about/data-model/log/#dot-notation).
+The fields are accessed through string indexes using [Vector's field path notation](https://vector.dev/docs/about/data-model/log/).
 
 ## Guide-level Proposal
 
 ### Motivating example
 
+The motivating example is a log to metric transform which produces metric events from incoming log events using the following algorithm:
+
+1. There is an internal counter which is increased on each incoming log event.
+2. The log events are discarded.
+2. Each 10 seconds the transform produces a metric event with the count of received log events.
+4. Edge cases are handled in the following way:
+   1. If there are no incoming invents, the metric event with the counter equal to 0 still has to be produced.
+   2. On Vector's shutdown the transform has to produce the final metric event with the count of received events since the last flush.
+
+This example would be used in the following to illustrate different ways to execute the transform.
+
+### Possible Configs
+
+Two versions of a config running the same Lua code are listed below, both of them implement the transform described in the motivating example.
+
+#### Inline Functions
+
+This config uses Lua functions defined as inline strings. It is easier to get started with runtime transforms.
 
 ```toml
 [transforms.lua]
   type = "lua"
   inputs = []
-  version = "2" # defaults to 1
-  source = """
-    counter = counter + 1
-    -- without calling `emit` function nothing is produced by default
+  version = "2"
+  hooks.init = """
+    function init (emit)
+      event_counter = 0
+      emit({
+        log = {
+          message = "starting up"
+        }
+      }, "auxiliary")
+    end
   """
-  [transforms.lua.hooks]
-  init = """
-    counter = 0
-    previous_timestamp = os.time()
-    emit({
-      log = {
-        message = "starting up",
-        timestamp = os.date("!*t),
-      }
-    }, "auxiliary")
+  hooks.process = """
+    function (event, emit)
+      event_counter = event_counter + 1
+    end
   """
-  shutdown = """
-    final_stats_event = {
-      log = {
-        count = counter,
-        timestamp = os.date("!*t"),
-        interval = os.time() - previous_timestamp
-      }
-    }
-    final_stats_event.log.stats.rate = final_stats_event["log"]["stats"].count / final_stats_event.log.stats.interval
-    emit(final_stats_event)
-
-    emit({
-      log = {
-        message = "shutting down",
-        timestamp = os.date("!*t"),
-      }
-    }, "auxiliary")
-  """
-  [[transforms.lua.timers]]
-  interval = 10
-  source = """
-    emit {
-      metric = {
-        name = "response_time_ms",
-        timestamp = os.date("!*t"),
-        kind = "absolute",
-        tags = {
-          host = "localhost"
-        },
-        value = {
-          type = "counter",
-          value = 24.2
+  hooks.shutdown = """
+    function shutdown (emit)
+      emit {
+        metric = {
+          name = "counter_10s",
+          counter = {
+            value = event_counter
+          }
         }
       }
-    }
+
+      emit({
+        log = {
+          message = "shutting down"
+        }
+      }, "auxiliary")
+    end
   """
-  [[transforms.lua.timers]]
-  interval = 60
-  source = """
-    event = {
-      log = {
-        message = "heartbeat",
-        timestamp = os.date("!*t),
+  [[timers]]
+  interval_seconds = 10
+  handler = """
+    function (emit)
+      emit {
+        metric = {
+          name = "counter_10s",
+          counter = {
+            value = event_counter
+          }
+        }
       }
-    }
-    emit(event, "auxiliary")
+      counter = 0
+    end
   """
 ```
 
-The code above consumes the incoming events, counts them, and then emits these stats about these counts every 10 seconds. In addition, it sends debug logs about its functioning into a separate lane called `auxiliary`.
+#### Single Source
 
-### Proposed changes
+This version of the config uses the same Lua code as the config using inline Lua functions above, but all of the functions are defined in a single `source` option:
 
-* Add `version` configuration option which would allow the users to chose between the new API described in this RFC (version 2) and the old one (version 1).
-* Hooks for initialization and shutdown called `init` and `shutdown`. They are defined as strings of Lua code in the `hooks` section of the configuration of the transform.
-* Timers which define pieces of code that are executed periodically. They are defined in array `timers`, each timer takes two configuration options: `interval` which is the interval for execution in seconds and `source` which is the code which is to be executed periodically.
-* Events are produced by the transform by calling function `emit` with the first argument being the event and the second option argument being the name of the lane where to emit the event. Outputting the events by storing them to the `event` global variable should not be supported, so its content would be ignored.
-* Support direct access to the nested fields (in both maps and arrays).
-* Add support for the timestamp type as a `userdata` object with the same visible fields as in the table returned by [`os.date`](https://www.lua.org/manual/5.3/manual.html#pdf-os.date). In addition, monkey-patch `os.date` function available inside Lua scripts to make it return the same kind of userdata instead of a table if it is called with `*t` or `!*t` as the argument. This is necessary to allow one-to-one correspondence between types in Vector and Lua.
+```toml
+[transforms.lua]
+  type = "lua"
+  inputs = []
+  version = "2"
+  source = """
+    function init (emit)
+      event_counter = 0
+      emit({
+        log = {
+          message = "starting up"
+        }
+      }, "auxiliary")
+    end
+
+    function process (event, emit)
+      event_counter = event_counter + 1
+    end
+
+    function shutdown (emit)
+      emit {
+        metric = {
+          name = "counter_10s",
+          counter = {
+            value = event_counter
+          }
+        }
+      }
+
+      emit({
+        log = {
+          message = "shutting down"
+        }
+      }, "auxiliary")
+    end
+
+    function timer_handler (emit)
+      emit {
+        metric = {
+          name = "counter_10s",
+          counter = {
+            value = event_counter
+          }
+        }
+      }
+      counter = 0
+    end
+  """
+  hooks.init = "init"
+  hooks.process = "process"
+  hooks.shutdown = "shutdown"
+  timers = [{interval_seconds = 10, handler = "timer_handler"}]
+```
+
+#### Loadable Module
+
+In this example the code from the `source` of the example above is put into a separate file:
+
+`example_transform.lua`
+```lua
+function init (emit)
+  event_counter = 0
+  emit({
+    log = {
+      message = "starting up"
+    }
+  }, "auxiliary")
+end
+
+function process (event, emit)
+  event_counter = event_counter + 1
+end
+
+function shutdown (emit)
+  emit {
+    metric = {
+      name = "counter_10s",
+      counter = {
+        value = event_counter
+      }
+    }
+  }
+
+  emit({
+    log = {
+      message = "shutting down"
+    }
+  }, "auxiliary")
+end
+
+function timer_handler (emit)
+  emit {
+    metric = {
+      name = "counter_10s",
+      counter = {
+        value = event_counter
+      }
+    }
+  }
+  counter = 0
+end
+```
+
+It reduces the size of the transform configuration:
+
+```toml
+[transforms.lua]
+  type = "lua"
+  inputs = []
+  version = "2"
+  search_dirs = ["/example/search/dir"]
+  source = "require 'example_transform.lua'"
+  hooks.init = "init"
+  hooks.process = "process"
+  hooks.shutdown = "shutdown"
+  timers = [{interval_seconds = 10, handler = "timer_handler"}]
+```
+
+## Reference-level Proposal
+
+### New Concepts
+
+In order to enable writing complex transforms, such as the one from the motivating example, a few new concepts have to be introduced.
+
+#### Hooks
+
+Hooks are user-defined functions which are called on certain events.
+
+* `init` hook is a function with signature
+    ```lua
+    function (emit)
+      -- ...
+    end
+   ```
+   which is called when the transform is created. It takes a single argument, `emit` function, which can be used to produce new events from the hook.
+
+* `shutdown` hook is a function with signature
+    ```lua
+    function (emit)
+      -- ...
+    end
+    ```
+    which is called when the transform is destroyed, for example on Vector's shutdown. After the shutdown is called, no code from the transform would be called.
+* `process` hook is a function with signature
+    ```lua
+    function (event, emit)
+      -- ...
+    end
+    ```
+    which takes two arguments, an incoming event and the `emit` function. It is called immediately when a new event comes to the transform.
+
+#### Timers
+
+Timers are user-defined functions called on predefined time interval. The specified time interval sets the minimal interval between subsequent invocations of the same timer function.
+
+The timer functions have the following signature:
+
+
+```lua
+function (emit)
+  -- ...
+end
+```
+
+The `emit` argument is an emitting function which allows the timer to produce new events.
+
+#### Emitting Functions
+
+Emitting function is a function that can be passed to a hook or timer. It has the following signature:
+
+```lua
+function (event, lane)
+  -- ...
+end
+```
+
+Here `event` is an encoded event to be produced by the transform, and `lane` is an optional parameter specifying the output lane. In order to read events produced by the transform on a certain lane, the downstream components have to use the name of the transform suffixed by `.` character and the name of the lane.
+
+**Example**
+> An emitting function is called from a transform component called `example_transform` with `lane` parameter set to `example_lane`. Then the downstream `console` sink have to be defined as the following to be able to read the emitted event:
+>    ```toml
+>    [sinks.example_console]
+>      type = "console"
+>      inputs = ["example_transform.example_lane"] # would output the event from `example_lane`
+>      encoding = "text"
+>    ```
+> Other components connected to the same transform, but with different lanes names or without lane names at all would not receive any event.
+
+### Event Schema
+
+Events passed to the transforms have [`userdata`](https://www.lua.org/pil/28.1.html) type with custom implementation of the [`__index` metamethod](https://www.lua.org/pil/13.4.1.html). This data type is used instead of [`table`](https://www.lua.org/pil/2.5.html) because it allows to avoid copying of the data which is not used.
+
+Events produced by the transforms through calling an emitting function can have either the same `userdata` type as the events passed to the transform, or be a newly created Lua tables with the same schema outlines below.
+
+Both log and metrics events are encoded using [external tagging](https://serde.rs/enum-representations.html#externally-tagged).
+
+* [Log events](https://vector.dev/docs/about/data-model/log/) could be seen as tables created using
+
+    ```lua
+    {
+      log = {
+        -- ...
+      }
+    }
+    ```
+
+    The content of the `log` field corresponds to the usual [log event](https://vector.dev/docs/about/data-model/log/#examples) structure, with possible nesting of the fields.
+
+    If a log event is created by the user inside the transform is a table, then, if default fields named according to the [global schema](https://vector.dev/docs/reference/global-options/#log_schema) are not present in such a table, then they are automatically added to the event. This rule does not apply to events having `userdata` type.
+
+    **Example 1**
+    > The global schema is configured so that `message_key` is `"message"`, `timestamp_key` is `"timestamp"`, and `host_key` is is `"instance_id"`.
+    >
+    > If a new event is created inside the user-defined Lua code as a table
+    >
+    > ```lua
+    > event = {
+    >   log = {
+    >     message = "example message",
+    >     nested = {
+    >       field = "example nested field value"
+    >     },
+    >     array = {1, 2, 3},
+    >   }
+    > }
+    > ```
+    > and then emitted through an emitting function, Vector would examine its fields and add `timestamp` containing the current timestamp and `instance_id` field with the current hostname.
+
+    **Example 2**
+    > The global schema has [default settings](https://vector.dev/docs/reference/global-options/#log_schema).
+    >
+    > A log event created by `stdin` source is passed to the `process` hook inside the transform, where it appears to have `userdata` type. The Lua code inside the transform deletes the `timestamp` field by setting it to `nil`:
+    > ```lua
+    > event.log.timestamp = nil
+    > ```
+    > And then emits the event. In that case Vector would not automatically insert the `timestamp` field.
+
+* [Metric events](https://vector.dev/docs/about/data-model/metric/) could be seen as tables created using
+
+    ```lua
+    {
+      metric = {
+        -- ...
+      }
+    }
+    ```
+
+    The content of the `metric` field matches the [metric data model](https://vector.dev/docs/about/data-model/metric). The values use [external tagging](https://serde.rs/enum-representations.html#externally-tagged) with respect to the metric type, see the examples.
+
+    In case when the metric events are created as tables in user-defined code, the following default values are assumed if they are not provided:
+
+    | Field Name  | Default Value |
+    | ----------- | ------------- |
+    | `timestamp` | Current time  |
+    | `kind`      | `absolute`    |
+    | `tags`      | empty map     |
+
+    Furthermore, for [`aggregated_histogram`](https://vector.dev/docs/about/data-model/metric/#aggregated_histogram) the `count` field inside the `value` map can be omitted.
+
+
+    **Example: `counter`**
+    > The minimal Lua code required to create a counter metric is the following:
+    >
+    > ```lua
+    > {
+    >   metric = {
+    >     name = "example_counter",
+    >     counter = {
+    >       value = 10
+    >     }
+    >   }
+    > }
+
+    **Example: `gauge`**
+    > The minimal Lua code required to create a gauge metric is the following:
+    >
+    > ```lua
+    > {
+    >   metric = {
+    >     name = "example_gauge",
+    >     gauge = {
+    >       value = 10
+    >     }
+    >   }
+    > }
+
+    **Example: `set`**
+    > The minimal Lua code required to create a set metric is the following:
+    >
+    > ```lua
+    > {
+    >   metric = {
+    >     name = "example_set",
+    >     set = {
+    >       values = {"a", "b", "c"}
+    >     }
+    >   }
+    > }
+
+    **Example: `distribution`**
+    > The minimal Lua code required to create a distribution metric is the following:
+    >
+    > ```lua
+    > {
+    >   metric = {
+    >     name = "example_distribution",
+    >     distribution = {
+    >       values = {"a", "b", "c"}
+    >     }
+    >   }
+    > }
+
+    **Example: `aggregated_histogram`**
+    > The minimal Lua code required to create an aggregated histogram metric is the following:
+    >
+    > ```lua
+    > {
+    >   metric = {
+    >     name = "example_histogram",
+    >     aggregated_histogram = {
+    >       buckets = {1.0, 2.0, 3.0},
+    >       counts = {30, 20, 10},
+    >       sum = 1000 -- total sum of all measured values, cannot be inferred from `counts` and `buckets`
+    >     }
+    >   }
+    > }
+    > Note that the field [`count`](https://vector.dev/docs/about/data-model/metric/#count) is not required because it can be inferred by Vector automatically by summing up the values from `counts`.
+
+    **Example: `aggregated_summary`**
+    > The minimal Lua code required to create an aggregated summary metric is the following:
+    >
+    > ```lua
+    > {
+    >   metric = {
+    >     name = "example_summary",
+    >     aggregated_summary = {
+    >       quantiles = {0.25, 0.5, 0.75},
+    >       values = {1.0, 2.0, 3.0},
+    >       sum = 200,
+    >       count = 100
+    >     }
+    >   }
+    > }
+
+### Data Types
+
+The mapping between Vector data types and Lua data types is the following:
+
+| Vector Type | Lua Type | Comment |
+| :----------- | :-------- | :------- |
+| [`String`](https://vector.dev/docs/about/data-model/log/#strings) | [`string`](https://www.lua.org/pil/2.4.html) ||
+| [`Integer`](https://vector.dev/docs/about/data-model/log/#ints) | [`integer`](https://docs.rs/rlua/0.17.0/rlua/type.Integer.html) ||
+| [`Float`](https://vector.dev/docs/about/data-model/log/#floats) | [`number`](https://docs.rs/rlua/0.17.0/rlua/type.Number.html) ||
+| [`Boolean`](https://vector.dev/docs/about/data-model/log/#booleans) | [`boolean`](https://www.lua.org/pil/2.2.html) ||
+| [`Timestamp`](https://vector.dev/docs/about/data-model/log/#timestamps) | [`userdata`](https://www.lua.org/pil/28.1.html) | There is no dedicated timestamp type in Lua. However, there is a standard library function [`os.date`](https://www.lua.org/manual/5.1/manual.html#pdf-os.date) which returns a table with fields `year`, `month`, `day`, `hour`, `min`, `sec`, and some others. Other standard library functions, such as [`os.time`](https://www.lua.org/manual/5.1/manual.html#pdf-os.time), support tables with these fields as arguments. Because of that, Vector timestamps passed to the transform are represented as `userdata` with the same set of accessible fields. In order to have one-to-one correspondence between Vector timestamps and Lua timestamps, `os.date` function from the standard library is patched to return not a table, but `userdata` with the same set of fields as it usually would return instead. This approach makes it possible to have both compatibility with the standard library functions and a dedicated data type for timestamps. |
+| [`Null`](https://vector.dev/docs/about/data-model/log/#null-values) | [`nil`](https://www.lua.org/pil/2.1.html) | In Lua setting a table field to `nil` means deletion of this field. Likewise, accessing non-existing field in a Lua table returns `nil` instead of producing an error. So `Null` values which initially were in the event represented as `userdata` and were not modified stay there, as `Null` values, but if one field is assigned to another field with `Null` value, than the assigned field is effectively deleted. |
+| [`Map`](https://vector.dev/docs/about/data-model/log/#maps) | [`userdata`](https://www.lua.org/pil/28.1.html) or [`table`](https://www.lua.org/pil/2.5.html) | Maps which are parts of events passed to the transform from Vector have `userdata` type. User-created maps have `table` type. Both types are converted to Vector's `Map` type when they are emitted from the transform. |
+| [`Array`](https://vector.dev/docs/about/data-model/log/#arrays) | [`sequence`](https://www.lua.org/pil/11.1.html) | Sequences in Lua are a special case of tables. Because of that fact, the indexes can in principle start from any number. However, the convention in Lua is to to start indexes from 1 instead of 0, so Vector should adhere it. |
+
+### Configuration
+
+The new configuration options are the following:
+
+| Option Name | Required | Example | Description |
+| :--------- | :--------: | :------- | :-------- |
+| `version` | yes | `2` | In order to use the proposed API, the config has to contain `version` option set to `2`. If it is not provided, Vector assumes that [API version 1](https://vector.dev/docs/reference/transforms/lua/) is used. |
+| `search_dirs` | no | `["/etc/vector/lua"]` | A list of directories where [`require`](https://www.lua.org/pil/8.1.html) function would look at if called from any part of the Lua code. |
+| `source` | no | `example_module = require("example_module")` | Lua source evaluated when the transform is created. It can call `require` function or define variables and handler functions inline. It is **not** called for each event like the [`source` parameter in version 1 of the transform](https://vector.dev/docs/reference/transforms/lua/#source) |
+| `hooks`.`init` | no | `example_function` or `function (emit) ... end` | Contains a Lua expression evaluating to `init` hook function. |
+| `hooks`.`shutdown` | no | `example_function` or `function (emit) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
+| `hooks`.`process` | yes | `example_function` or `function (event, emit) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
+| `timers` | no | `[{interval_seconds = 10, handler = "example_function"}]` or `[{interval_seconds = 10, handler = "function (emit) ... end"}]` | Contains an [array of tables](https://github.com/toml-lang/toml#user-content-array-of-tables). Each table in the array has two fields, `interval_seconds` which can take an integer number of seconds, and `handler`, which is a Lua expression evaluating to a handler function for the timer. |
 
 ## Sales Pitch
 
@@ -167,38 +557,16 @@ The proposal
 
 * gives users more power to create custom transforms;
 * supports both logs and metrics;
-* makes it possible to add complexity to the configuration of the transform gradually only when needed.
-
-## Drawbacks
-
-The only drawback is that supporting both dot notation and classical indexing makes it impossible to add escaping of dots in field names. For example, for incoming event structure like
-
-```json
-{
-  "field.first": {
-    "second": "value"
-  }
-}
-```
-
-accessing `event["field.first"]` would return `nil`.
-
-However, because of the specificity of the observability data, there seems to be no need to have both field names with dots and nested fields.
-
-## Outstanding Questions
-
-* Should timestamps be automatically inserted to created logs and metrics created as tables inside the transform is they are not present?
-* Are there better alternatives to the proposed solution for supporting of the timestamp type?
-* Could some users be surprised if the transform which doesn't call `emit` function doesn't output anything?
-* `null` might present in the events would be lost because in Lua setting a field to `nil` means deletion. Is it acceptable? If it is not, it is possible to introduce a new kind of `userdata` for representing `null` values.
+* makes it possible to add complexity to the configuration of the transform gradually when needed.
 
 ## Plan of Action
 
 - [ ] Implement support for `version` config option and split implementations for versions 1 and 2.
+- [ ] Add support for `userdata` type for timestamps.
 - [ ] Implement access to the nested structure of logs events.
-- [ ] Support creation of logs events as table inside the transform.
 - [ ] Implement metrics support.
-- [ ] Add `emit` function.
-- [ ] Add `init` and `shutdown` hooks.
-- [ ] Add timers.
-- [ ] Implement support for the timestamp type compatible with the result of execution of `os.date("!*t")`.
+- [ ] Support creation of events as table inside the transform.
+- [ ] Support emitting functions.
+- [ ] Implement hooks invocation.
+- [ ] Implement timers invocation.
+- [ ] Add behavior tests and examples to the documentation.
