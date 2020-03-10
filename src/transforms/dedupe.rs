@@ -157,6 +157,11 @@ impl Transform for Dedupe {
     fn transform(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.config.fields);
         if self.cache.put(cache_entry, true).is_some() {
+            warn!(
+                message = "Encountered duplicate event; discarding",
+                rate_limit_secs = 30
+            );
+            trace!(message = "Encountered duplicate event; discarding", ?event);
             None
         } else {
             Some(event)
