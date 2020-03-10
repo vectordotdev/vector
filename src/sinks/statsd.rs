@@ -220,6 +220,7 @@ mod test {
     };
     use bytes::Bytes;
     use futures01::{stream, stream::Stream, sync::mpsc, Sink};
+    use std::time::{Duration, Instant};
     use tokio::{
         self,
         codec::BytesCodec,
@@ -360,6 +361,12 @@ mod test {
             future::lazy(|| {
                 let socket = UdpSocket::bind(&default_address()).unwrap();
                 future::ok(socket)
+            })
+            .and_then(|socket| {
+                let deadline = Instant::now() + Duration::from_millis(100);
+                tokio::timer::Delay::new(deadline)
+                    .map(|_| socket)
+                    .map_err(drop)
             })
             .and_then(|socket| {
                 UdpFramed::new(socket, BytesCodec::new())
