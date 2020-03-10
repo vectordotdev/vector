@@ -15,6 +15,7 @@ type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
 relevant_when = {mode = ["tcp", "udp"]}
+required = true
 description = """\
 The TCP or UDP address to listen for connections on, or "systemd#N" to use \
 the Nth socket passed by systemd socket activation.\
@@ -23,7 +24,6 @@ the Nth socket passed by systemd socket activation.\
 [sources.syslog.options.host_key]
 type = "string"
 category = "Context"
-required = true
 default = "host"
 description = """\
 The key name added to each event representing the current host. This can also \
@@ -55,6 +55,7 @@ type = "string"
 common = true
 examples = ["/path/to/socket"]
 relevant_when = {mode = "unix"}
+required = true
 description = """\
 The unix socket path. *This should be absolute path.*
 """

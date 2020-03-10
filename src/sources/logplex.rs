@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Buf;
@@ -17,6 +18,7 @@ use warp::Filter;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
+    tls: Option<TlsConfig>,
 }
 
 #[typetag::serde(name = "logplex")]
@@ -66,7 +68,11 @@ impl SourceConfig for LogplexConfig {
         let routes = svc.or(ping);
 
         info!(message = "building logplex server", addr = %self.address);
-        let (_, server) = warp::serve(routes).bind_with_graceful_shutdown(self.address, tripwire);
+
+        let tls = TlsSettings::from_config(&self.tls, true)?;
+        let incoming = MaybeTlsIncoming::bind(&self.address, tls)?;
+
+        let server = warp::serve(routes).serve_incoming_with_graceful_shutdown(incoming, tripwire);
 
         Ok(Box::new(server))
     }
@@ -144,7 +150,7 @@ mod tests {
         let (sender, recv) = mpsc::channel(100);
         let address = test_util::next_addr();
         rt.spawn(
-            LogplexConfig { address }
+            LogplexConfig { address, tls: None }
                 .build("default", &GlobalOptions::default(), sender)
                 .unwrap(),
         );

@@ -59,11 +59,15 @@ log data.
 ### Event Fields
 
 Individual [`log` event][docs.data-model.log] fields can be access with the
-`{{...}}` syntax:
+`{{<field-path-notation>}}` syntax:
 
 ```toml
-option = "{{ field_name }}"
+option = "{{ field_path_notation }}"
 ```
+
+Vector's [field notation][docs.reference.field-path-notation] is simple. It uses
+`.` to target nested fields and `[<index>]` to target array values. Learn more
+in the [field notation docs][docs.reference.field-path-notation].
 
 ### Strptime Specifiers
 
@@ -78,7 +82,33 @@ The value is based off of the [`timestamp` field][docs.data-model.log#timestamp]
 and the name of this field can be changed via the
 [global `timestamp_key` option][docs.global-options#timestamp_key].
 
+### Escaping
+
+You can escape this syntax by prefixing the character with a `\`. For example,
+you can escape the event field syntax like so:
+
+```toml
+option = "\{{ field_name }}"
+```
+
+And strptime specified like so:
+
+```toml
+options = "year=\%Y/month=\%m/day=\%d/"
+```
+
+Each value above will be treated _literally_.
+
 ## How It Works
+
+### Array Values
+
+Array values can be accessed using Vector's
+[field notation syntax][docs.reference.field-path-notation]:
+
+```
+option = "{{ parent.child[0] }}"
+```
 
 ### Fallback Values
 
@@ -98,27 +128,25 @@ end
 """
 ```
 
-### Nested Fields
-
-Nested fields can be accessed using the `.` syntax:
-
-```
-option = "{{ parent.child }}"
-```
-
 ### Missing Fields
 
 If a field is missing, a blank string will be inserted in it's place. Vector
 will not error, drop the event, or log anything.
 
-### Fields That Support Templating
+### Nested Fields
 
-...
+Nested fields can be accessed using Vector's
+[field notation syntax][docs.reference.field-path-notation]:
+
+```
+option = "{{ parent.child }}"
+```
 
 
 [docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.global-options#timestamp_key]: /docs/reference/global-options/#timestamp_key
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sinks.aws_s3#key_prefix]: /docs/reference/sinks/aws_s3/#key_prefix
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
 [docs.transforms.lua]: /docs/reference/transforms/lua/

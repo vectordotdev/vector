@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Blackhole"
 description: "The Vector `blackhole` sink streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
 event_types: ["log","metric"]
+function_category: "test"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -32,13 +33,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "blackhole" # must be: "blackhole"
-  inputs = ["my-source-id"] # example
-  print_amount = 1000 # example
-
-  # OPTIONAL
-  healthcheck = true # default
+  type = "blackhole" # required
+  inputs = ["my-source-id"] # required
+  print_amount = 1000 # required
 ```
 
 ## Options
@@ -48,29 +45,6 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-
-</Field>
 
 
 <Field

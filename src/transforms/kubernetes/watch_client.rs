@@ -2,7 +2,7 @@ use crate::{dns::Resolver, sinks::util::http::https_client, tls::TlsSettings};
 use futures01::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
 use hyper::{client::HttpConnector, Body, Chunk};
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use k8s_openapi::{
     api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
     apimachinery::pkg::apis::meta::v1::WatchEvent,

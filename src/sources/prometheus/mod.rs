@@ -2,7 +2,7 @@ use crate::{topology::config::GlobalOptions, Event};
 use futures01::{sync::mpsc, Future, Sink, Stream};
 use http::Uri;
 use hyper;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};

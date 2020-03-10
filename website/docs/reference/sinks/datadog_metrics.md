@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,15 +44,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "datadog_metrics" # must be: "datadog_metrics"
-  inputs = ["my-source-id"] # example
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # example
-  namespace = "service" # example
-
-  # OPTIONAL
-  healthcheck = true # default
-  host = "https://api.datadoghq.com" # default
+  type = "datadog_metrics" # required
+  inputs = ["my-source-id"] # required
+  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
+  host = "https://api.datadoghq.com" # optional, default
 ```
 
 </TabItem>
@@ -61,30 +59,26 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "datadog_metrics" # must be: "datadog_metrics"
-  inputs = ["my-source-id"] # example
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # example
-  namespace = "service" # example
+  # General
+  type = "datadog_metrics" # required
+  inputs = ["my-source-id"] # required
+  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
+  host = "https://api.datadoghq.com" # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
-  host = "https://api.datadoghq.com" # default
+  # Batch
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
+  # Request
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
@@ -153,7 +147,7 @@ Configures the sink batching behavior.
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -176,7 +170,7 @@ The maximum size of a batch, in events, before it is flushed.
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -287,7 +281,7 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -310,7 +304,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
@@ -333,7 +327,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
@@ -425,7 +419,7 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={60}
   enumValues={null}
   examples={[60]}

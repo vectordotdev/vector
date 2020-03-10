@@ -45,11 +45,11 @@ tracing-limit = { path = "lib/tracing-limit" }
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat"] }
 tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
+tokio-codec = "0.1.0"
+tokio-openssl = "0.3.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.16"
-tokio-tls = "0.2.1"
-tokio-codec = "0.1.0"
 
 # Tracing
 tracing = "0.1.9"
@@ -97,7 +97,6 @@ bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
 hyper = "0.12.35"
 hyper-openssl = "0.7"
-hyper-tls = "0.3.2"
 native-tls = "0.2.3"
 openssl = "0.10.26"
 openssl-probe = "0.1.2"
@@ -114,7 +113,7 @@ derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.2.1"
-rdkafka = { version = "0.23.1", features = ["ssl"], optional = true }
+rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.1.5"
 seahash = { version = "3.0.6", optional = true }
 jemallocator = { version = "0.3.0", optional = true }
@@ -139,7 +138,8 @@ inventory = "0.1"
 maxminddb = { version = "0.13.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0", optional = true }
 colored = "1.9"
-warp = { version = "0.1.20", optional = true }
+# Forked version to support graceful shutdown with custom tls impl
+warp = { version = "0.1", git = "https://github.com/timberio/warp", branch = "0.1.x", default-features = false, optional = true }
 evmap = { version = "7", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
@@ -215,18 +215,20 @@ sources = [
   "sources-statsd",
   "sources-stdin",
   "sources-syslog",
+  "sources-tls",
   "sources-vector",
 ]
+sources-tls = ["sources-http", "sources-logplex", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
-sources-logplex = ["warp"]
+sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-http = ["warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-uds"]
-sources-splunk_hec = ["bytesize", "warp"]
+sources-http = ["warp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
+sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]

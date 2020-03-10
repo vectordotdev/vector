@@ -2,6 +2,7 @@
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+dedupe%22
 min_version: null
 service_name: "Dedupe events"
@@ -23,21 +24,53 @@ The Vector `dedupe` transform accepts and outputs [`log`][docs.data-model.log] e
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "dedupe" # must be: "dedupe"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "dedupe" # required
+  inputs = ["my-source-id"] # required
 
-  # REQUIRED - Fields
-  [transforms.my_transform_id.fields]
-    ignore = ["field1", "field2"] # example, no default
-    match = ["timestamp"] # default
+  # Fields
+  fields.ignore = ["field1", "field2"] # optional, no default
+  fields.match = ["timestamp"] # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  # General
+  type = "dedupe" # required
+  inputs = ["my-source-id"] # required
+
+  # Cache
+  cache.num_entries = 5000 # optional, default
+
+  # Fields
+  fields.ignore = ["field1", "field2"] # optional, no default
+  fields.match = ["timestamp"] # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -185,6 +218,13 @@ considered a duplicate of an Event already in the cache that will put that event
 back to the head of the cache and reset its place in line, making it once again
 last entry in line to be evicted.
 
+### Complex Processing
+
+If you encounter limitations with the `dedupe`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -220,3 +260,4 @@ When using `fields.ignore`:
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -3,6 +3,9 @@ use crate::{
     event::Event,
     sinks::{
         util::{
+            encoding::{
+                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
+            },
             http::{https_client, BatchedHttpSink, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -37,8 +40,18 @@ pub struct PubsubConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 inventory::submit! {
@@ -80,6 +93,7 @@ struct PubsubSink {
     api_key: Option<String>,
     creds: Option<GcpCredentials>,
     uri_base: String,
+    encoding: EncodingConfigWithDefault<Encoding>,
 }
 
 impl PubsubSink {
@@ -101,6 +115,7 @@ impl PubsubSink {
 
         Ok(Self {
             api_key: config.auth.api_key.clone(),
+            encoding: config.encoding.clone(),
             creds,
             uri_base,
         })
@@ -141,7 +156,8 @@ impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
         let json = serde_json::to_string(&event.into_log()).unwrap();

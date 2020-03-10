@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
 event_types: ["log"]
+function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22
 min_version: "1.24"
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,13 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "docker" # must be: "docker"
-
-  # OPTIONAL
-  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # example, no default
-  include_images = ["httpd", "redis"] # example, no default
-  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # example, no default
+  type = "docker" # required
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
+  include_images = ["httpd", "redis"] # optional, no default
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # optional, no default
 ```
 
 </TabItem>
@@ -59,15 +57,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "docker" # must be: "docker"
-
-  # OPTIONAL
-  auto_partial_merge = true # default
-  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # example, no default
-  include_images = ["httpd", "redis"] # example, no default
-  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # example, no default
-  partial_event_marker_field = "_partial" # default
+  type = "docker" # required
+  auto_partial_merge = true # optional, default
+  include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
+  include_images = ["httpd", "redis"] # optional, no default
+  include_labels = ["com.example.vendor=Timber Inc.", "com.example.name=Vector"] # optional, no default
+  partial_event_marker_field = "_partial" # optional, default
 ```
 
 </TabItem>
@@ -218,7 +213,7 @@ The field name to be added to events that are detected to contain an incomplete 
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
@@ -226,7 +221,7 @@ The field name to be added to events that are detected to contain an incomplete 
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -241,7 +236,7 @@ The docker host to connect to. See [Connecting To The Docker Daemon](#connecting
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -249,7 +244,7 @@ The docker host to connect to. See [Connecting To The Docker Daemon](#connecting
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}

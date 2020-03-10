@@ -2,6 +2,7 @@
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
+function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
 min_version: null
 service_name: "Swimlanes"
@@ -29,19 +30,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "swimlanes" # must be: "swimlanes"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "swimlanes" # required
+  inputs = ["my-source-id"] # required
 
-  # REQUIRED - Lanes
-  [transforms.my_transform_id.lanes.`<swimlane_id>`]
-    # REQUIRED
-    type = "check_fields" # example
-
-    # OPTIONAL
-    "message.eq" = "this is the content to match against"
-    "host.exists" = true
-    "method.neq" = "POST"
+  # Lanes
+  [transforms.my_transform_id.lanes.`[swimlane-id]`]
+    type = "check_fields" # optional, default
+    "message.eq" = "this is the content to match against" # example
+    "message.contains" = "foo" # example
+    "environment.prefix" = "staging-" # example
 ```
 
 ## Options
@@ -81,7 +79,7 @@ A table of swimlane identifiers to logical conditions representing the filter of
   enumValues={null}
   examples={[]}
   groups={[]}
-  name={"`<swimlane_id>`"}
+  name={"`[swimlane-id]`"}
   path={"lanes"}
   relevantWhen={null}
   required={true}
@@ -90,7 +88,7 @@ A table of swimlane identifiers to logical conditions representing the filter of
   unit={null}
   >
 
-#### `<swimlane_id>`
+#### `[swimlane-id]`
 
 The identifier of a swimlane.
 
@@ -99,12 +97,35 @@ The identifier of a swimlane.
 
 <Field
   common={true}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
+  examples={["check_fields","is_log","is_metric"]}
+  groups={[]}
+  name={"type"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### type
+
+The type of the condition to execute.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"}]}
   groups={[]}
-  name={"`<field_name>`.eq"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field-name]`.eq"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -112,7 +133,7 @@ The identifier of a swimlane.
   unit={null}
   >
 
-##### `<field_name>`.eq
+##### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
 
@@ -121,13 +142,13 @@ Check whether a fields contents exactly matches the value specified.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"host.exists":true}]}
   groups={[]}
-  name={"`<field_name>`.exists"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field-name]`.exists"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -135,7 +156,7 @@ Check whether a fields contents exactly matches the value specified.
   unit={null}
   >
 
-##### `<field_name>`.exists
+##### `[field-name]`.exists
 
 Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
@@ -144,13 +165,13 @@ Check whether a field exists or does not exist, depending on the provided valueb
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"method.neq":"POST"}]}
   groups={[]}
-  name={"`<field_name>`.neq"}
-  path={"lanes.`<swimlane_id>`"}
+  name={"`[field-name]`.neq"}
+  path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
   templateable={false}
@@ -158,7 +179,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   unit={null}
   >
 
-##### `<field_name>`.neq
+##### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
 
@@ -170,20 +191,43 @@ Check whether a fields contents does not match the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["check_fields","is_log","is_metric"]}
+  examples={[{"message.contains":"foo"}]}
   groups={[]}
-  name={"type"}
-  path={"lanes.`<swimlane_id>`"}
-  relevantWhen={null}
-  required={true}
+  name={"`[field_name]`.contains"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   >
 
-##### type
+##### `[field_name]`.contains
 
-The type of the condition to execute.
+Checks whether a string field contains a string argument.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.prefix":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.prefix"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.prefix
+
+Checks whether a string field has a string argument prefix.
 
 
 </Field>
@@ -295,6 +339,13 @@ Notice how we must define mutually exclusive conditions for each `level` value. 
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `swimlanes`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -306,3 +357,4 @@ section.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -280,7 +280,7 @@ The metric timestamp, representing when the metric was created/ingested within V
 
 ### type
 
-A metric must be one of 6 types.
+The metric value. The value is an enumeration and will be comprised of different attributes depending on the value type.
 
 <Fields filters={false}>
 
@@ -467,7 +467,7 @@ The total number of values contained within the summary.
 
 ##### quantiles
 
-The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
+The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
 
 
 </Field>
@@ -758,7 +758,7 @@ The list of unique values.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/components/?metric=true">View all metric compatible components</Jump>
+<Jump to="/components/?event-types[]=metric">View all metric compatible components</Jump>
 
 
 

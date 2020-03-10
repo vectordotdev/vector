@@ -19,7 +19,6 @@ description = "The maxiumum bytes size of a message before it is discarded."
 [sources.stdin.options.host_key]
 type = "string"
 category = "Context"
-required = true
 default = "host"
 description = """\
 The key name added to each event representing the current host. This can also \
