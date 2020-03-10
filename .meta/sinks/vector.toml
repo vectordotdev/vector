@@ -26,3 +26,5 @@ required = true
 description = """\
 The downstream Vector address to connect to. The address _must_ include a port.\
 """
+
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.vector.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: true) %>
