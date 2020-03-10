@@ -33,7 +33,7 @@ description = "The field names to ignore when deciding if an Event is a duplicat
 type = "table"
 description = "Options controlling how we cache recent Events for future duplicate checking."
 
-[transforms.dedupe.options.cache.children.num_entries]
+[transforms.dedupe.options.cache.children.num_events]
 type = "int"
 common = true
 examples = [5000]

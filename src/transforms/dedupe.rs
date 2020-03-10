@@ -20,7 +20,7 @@ pub enum FieldMatchConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
-    pub num_entries: usize,
+    pub num_events: usize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -33,7 +33,7 @@ pub struct DedupeConfig {
 }
 
 fn default_cache_config() -> CacheConfig {
-    CacheConfig { num_entries: 5000 }
+    CacheConfig { num_events: 5000 }
 }
 
 fn default_field_match_config() -> FieldMatchConfig {
@@ -111,7 +111,7 @@ fn type_id_for_value(val: &Value) -> TypeId {
 
 impl Dedupe {
     pub fn new(config: DedupeConfig) -> Self {
-        let num_entries = config.cache.num_entries;
+        let num_entries = config.cache.num_events;
         Self {
             config,
             cache: LruCache::new(num_entries),
@@ -177,20 +177,20 @@ mod tests {
     use std::collections::BTreeMap;
     use string_cache::DefaultAtom as Atom;
 
-    fn make_match_transform(num_entries: usize, fields: Vec<Atom>) -> Dedupe {
+    fn make_match_transform(num_events: usize, fields: Vec<Atom>) -> Dedupe {
         Dedupe::new(DedupeConfig {
-            cache: CacheConfig { num_entries },
+            cache: CacheConfig { num_events },
             fields: { FieldMatchConfig::MatchFields(fields) },
         })
     }
 
-    fn make_ignore_transform(num_entries: usize, given_fields: Vec<Atom>) -> Dedupe {
+    fn make_ignore_transform(num_events: usize, given_fields: Vec<Atom>) -> Dedupe {
         // "message" and "timestamp" are added automatically to all Events
         let mut fields = vec!["message".into(), "timestamp".into()];
         fields.extend(given_fields);
 
         Dedupe::new(DedupeConfig {
-            cache: CacheConfig { num_entries },
+            cache: CacheConfig { num_events },
             fields: { FieldMatchConfig::IgnoreFields(fields) },
         })
     }

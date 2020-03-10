@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Cache
-  cache.num_entries = 5000 # optional, default
+  cache.num_events = 5000 # optional, default
 
   # Fields
   fields.ignore = ["field1", "field2"] # optional, no default
@@ -109,7 +109,7 @@ Options controlling how we cache recent Events for future duplicate checking.
   enumValues={null}
   examples={[5000]}
   groups={[]}
-  name={"num_entries"}
+  name={"num_events"}
   path={"cache"}
   relevantWhen={null}
   required={false}
@@ -118,7 +118,7 @@ Options controlling how we cache recent Events for future duplicate checking.
   unit={null}
   >
 
-#### num_entries
+#### num_events
 
 The number of recent Events to cache and compare new incoming Events against.
 
@@ -210,9 +210,9 @@ The field names considered when deciding if an Event is a duplicate. Incompatibl
 
 ### Cache Behavior
 
-This transform is backed by an LRU cache of size `cache.num_entries`.
+This transform is backed by an LRU cache of size `cache.num_events`.
 That means that this transform will cache information in memory for the last
-`cache.num_entries` Events that it has processed.  Entries will be removed from
+`cache.num_events` Events that it has processed.  Entries will be removed from
 the cache in the order they were inserted.  If an Event is received that is
 considered a duplicate of an Event already in the cache that will put that event
 back to the head of the cache and reset its place in line, making it once again
@@ -252,10 +252,10 @@ If you want to estimate the memory requirements of this transform
 for your dataset, you can do so with these formulas:
 
 When using `fields.match`:
-Sum(the average size of the *data* (but not including the field name) for each field in `fields.match`) * `cache.num_entries`
+Sum(the average size of the *data* (but not including the field name) for each field in `fields.match`) * `cache.num_events`
 
 When using `fields.ignore`:
-(Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_entries`
+(Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_events`
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

@@ -1480,7 +1480,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * default: 5000
     # * type: int
-    num_entries = 5000
+    num_events = 5000
 
   #
   # Fields

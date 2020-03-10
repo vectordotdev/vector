@@ -34,9 +34,9 @@
 
 ### Cache Behavior
 
-This transform is backed by an LRU cache of size `cache.num_entries`.
+This transform is backed by an LRU cache of size `cache.num_events`.
 That means that this transform will cache information in memory for the last
-`cache.num_entries` Events that it has processed.  Entries will be removed from
+`cache.num_events` Events that it has processed.  Entries will be removed from
 the cache in the order they were inserted.  If an Event is received that is
 considered a duplicate of an Event already in the cache that will put that event
 back to the head of the cache and reset its place in line, making it once again
@@ -48,10 +48,10 @@ If you want to estimate the memory requirements of this transform
 for your dataset, you can do so with these formulas:
 
 When using `fields.match`:
-Sum(the average size of the *data* (but not including the field name) for each field in `fields.match`) * `cache.num_entries`
+Sum(the average size of the *data* (but not including the field name) for each field in `fields.match`) * `cache.num_events`
 
 When using `fields.ignore`:
-(Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_entries`
+(Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_events`
 
 ### Memory Usage Details
 
