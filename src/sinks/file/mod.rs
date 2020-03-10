@@ -126,13 +126,7 @@ impl FileSink {
                 }
                 result = self.files.next() => {
                     match result {
-                        None => {
-                            // Expiration queue is empty, whatever.
-                            debug!(
-                                message = "File expiration queue empty.",
-                                rate_limit_secs = 30,
-                            );
-                        }
+                        None => unreachable!("ExpiringHashMap stream should never return None"),
                         Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
