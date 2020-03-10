@@ -121,7 +121,8 @@ impl RegexParser {
 
 impl Transform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
+        let log = event.as_mut_log();
+        let value = log.get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
             if self
@@ -133,7 +134,7 @@ impl Transform for RegexParser {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: Value = value[start..end].into();
                         match conversion.convert(capture) {
-                            Ok(value) => event.as_mut_log().insert(name.clone(), value),
+                            Ok(value) => log.insert(name.clone(), value),
                             Err(error) => {
                                 debug!(
                                     message = "Could not convert types.",
@@ -146,7 +147,7 @@ impl Transform for RegexParser {
                     }
                 }
                 if self.drop_field {
-                    event.as_mut_log().remove(&self.field);
+                    log.remove(&self.field);
                 }
                 return Some(event);
             } else {
