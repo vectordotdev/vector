@@ -22,7 +22,7 @@ pub struct LogplexConfig {
     tls: Option<TlsConfig>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct LogplexSource {}
 
 impl HttpSource for LogplexSource {
@@ -43,7 +43,7 @@ impl SourceConfig for LogplexConfig {
         _: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let source = LogplexSource {};
+        let source = LogplexSource::default();
         source.run(self.address, "events", &self.tls, out)
     }
 
@@ -57,7 +57,7 @@ impl SourceConfig for LogplexConfig {
 }
 
 fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
-    //deal with headers
+    // Deal with headers
     let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
         Ok(v) => v,
         Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
@@ -66,23 +66,22 @@ fn decode_message(body: FullBody, header_map: HeaderMap) -> Result<Vec<Event>, E
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
     info!(message = "Handling logplex request", %msg_count, %frame_id, %drain_token);
 
-    //deal with body
+    // Deal with body
     let events = body_to_events(body);
 
     if events.len() != msg_count {
+        let error_msg = format!(
+            "Parsed event count does not match message count header: {} vs {}",
+            events.len(),
+            msg_count
+        );
+
         if cfg!(test) {
-            panic!("Parsed event count does not match message count header");
+            panic!(error_msg);
         } else {
-            error!(message = "Parsed event count does not match message count header", event_count = events.len(), %msg_count);
+            error!(message = error_msg.as_str());
         }
-        return Err(header_error_message(
-            "Logplex-Msg-Count",
-            &format!(
-                "Parsed event count does not match message count header: {} vs {}",
-                events.len(),
-                msg_count
-            ),
-        ));
+        return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
 
     Ok(events)
