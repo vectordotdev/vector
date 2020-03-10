@@ -4,6 +4,7 @@ use crate::topology::config::SinkContext;
 use crate::Event;
 use futures::channel::mpsc;
 use futures::compat::CompatSink;
+use futures01::sink::Sink;
 
 /// This function provides the compatiblity with our old interfaces.
 ///
@@ -23,14 +24,15 @@ use futures::compat::CompatSink;
 /// the backpressure across the system.
 pub fn sink_interface_compat() -> (NewStream, OldSink) {
     let (tx, rx) = mpsc::channel(0);
-    (rx, UnitTypeErrorSink01(CompatSink::new(tx)))
+    let tx = Box::new(CompatSink::new(tx).sink_map_err(|_| ()));
+    (rx, tx)
 }
 
 /// Implements `futures::Stream<Item = Event>`.
 pub type NewStream = mpsc::Receiver<Event>;
 
-/// Implements `futures01::Sink<SinkItem = Event>`.
-pub type OldSink = UnitTypeErrorSink01<CompatSink<mpsc::Sender<Event>, Event>>;
+/// Implements `futures01::sink::Sink<SinkItem = Event, SinkError = ()>`.
+pub type OldSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
 
 /// This function takes ownership of a new streaming sink and adapts it for the
 /// current topology.
@@ -60,24 +62,5 @@ pub fn adapt_to_topology(
             .expect("streaming sink error")
     });
 
-    Box::new(sink)
-}
-
-/// Wraps any [`futures01::Sink`] with `SinkError = ()`.
-pub struct UnitTypeErrorSink01<T: futures01::Sink>(T);
-
-impl<T: futures01::Sink> futures01::Sink for UnitTypeErrorSink01<T> {
-    type SinkItem = <T as futures01::Sink>::SinkItem;
-    type SinkError = ();
-
-    fn start_send(
-        &mut self,
-        item: Self::SinkItem,
-    ) -> futures01::StartSend<Self::SinkItem, Self::SinkError> {
-        self.0.start_send(item).map_err(|_| ())
-    }
-
-    fn poll_complete(&mut self) -> futures01::Poll<(), Self::SinkError> {
-        self.0.poll_complete().map_err(|_| ())
-    }
+    sink
 }
