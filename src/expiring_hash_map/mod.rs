@@ -1,12 +1,8 @@
-use futures::ready;
-use futures::task::AtomicWaker;
+use futures::stream::StreamExt;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
-use std::future::Future;
 use std::hash::Hash;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use tokio02::time::{delay_queue, DelayQueue, Error};
 
@@ -18,7 +14,6 @@ pub type ExpiredItem<K, V> = (V, delay_queue::Expired<K>);
 pub struct ExpiringHashMap<K, V> {
     map: HashMap<K, (V, delay_queue::Key)>,
     expiration_queue: DelayQueue<K>,
-    insert_waker: AtomicWaker,
 }
 
 impl<K, V> Unpin for ExpiringHashMap<K, V> {}
@@ -31,14 +26,12 @@ where
         Self {
             map: HashMap::new(),
             expiration_queue: DelayQueue::new(),
-            insert_waker: AtomicWaker::new(),
         }
     }
 
     pub fn insert(&mut self, key: K, value: V, ttl: Duration) {
         let delay_queue_key = self.expiration_queue.insert(key.clone(), ttl);
         self.map.insert(key, (value, delay_queue_key));
-        self.insert_waker.wake();
     }
 
     pub fn insert_at(&mut self, key: K, value: V, deadline: Instant) {
@@ -46,7 +39,6 @@ where
             .expiration_queue
             .insert_at(key.clone(), deadline.into());
         self.map.insert(key, (value, delay_queue_key));
-        self.insert_waker.wake();
     }
 
     pub fn get<Q>(&self, k: &Q) -> Option<&V>
@@ -85,29 +77,16 @@ where
         Some((value, expired))
     }
 
-    pub fn poll_expired(&mut self, cx: &mut Context<'_>) -> Poll<Result<ExpiredItem<K, V>, Error>> {
-        let key = ready!(self.expiration_queue.poll_expired(cx));
-        let key = match key {
-            None => {
-                self.insert_waker.register(cx.waker());
-                return Poll::Pending;
-            }
-            Some(Err(err)) => return Poll::Ready(Err(err)),
-            Some(Ok(key)) => key,
-        };
-        let (value, _) = self.map.remove(key.get_ref()).unwrap();
-        Poll::Ready(Ok((value, key)))
+    pub fn is_empty(&self) -> bool {
+        self.expiration_queue.is_empty()
     }
-}
 
-impl<K, V> Future for ExpiringHashMap<K, V>
-where
-    K: Eq + Hash + Clone,
-{
-    type Output = Result<ExpiredItem<K, V>, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Pin::new(self).poll_expired(cx)
+    pub async fn next_expired(&mut self) -> Option<Result<ExpiredItem<K, V>, Error>> {
+        let key = self.expiration_queue.next().await?;
+        Some(key.map(|key| {
+            let (value, _) = self.map.remove(key.get_ref()).unwrap();
+            (value, key)
+        }))
     }
 }
 

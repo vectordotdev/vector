@@ -179,7 +179,7 @@ trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
-futures-test = "0.3"
+tokio-test = "0.2"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin

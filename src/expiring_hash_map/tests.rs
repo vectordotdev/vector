@@ -1,92 +1,89 @@
 use super::*;
-use crate::runtime::Runtime;
-use futures::future::poll_fn;
-use futures_test::task::{new_count_waker, noop_context, panic_context};
-use std::time::{Duration, Instant};
+use std::task::Poll;
+use tokio02 as tokio;
+use tokio_test::{assert_pending, assert_ready, task};
+
+fn unwrap_ready<T>(poll: Poll<T>) -> T {
+    assert_ready!(&poll);
+    match poll {
+        Poll::Ready(val) => val,
+        _ => unreachable!(),
+    }
+}
 
 #[test]
-fn poll_does_not_return_ready_with_empty_map() {
+fn next_expired_is_pending_with_empty_map() {
     let mut map = ExpiringHashMap::<String, String>::new();
-    let mut cx = noop_context();
-    assert!(map.poll_expired(&mut cx).is_pending());
+    let mut fut = task::spawn(map.next_expired());
+    assert!(unwrap_ready(fut.poll()).is_none());
 }
 
-#[test]
-fn poll_does_not_return_ready_with_empty_map_after_it_was_non_empty() {
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let mut map = ExpiringHashMap::<String, String>::new();
+#[tokio::test]
+async fn next_expired_is_pending_with_a_non_empty_map() {
+    let mut map = ExpiringHashMap::<String, String>::new();
 
-        map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
-        map.remove("key");
+    map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
+    map.remove("key");
 
-        let mut cx = noop_context();
-        assert!(map.poll_expired(&mut cx).is_pending());
-    });
+    let mut fut = task::spawn(map.next_expired());
+    assert_pending!(fut.poll());
 }
 
-#[test]
-fn it_does_not_call_waker_if_polled_and_ready() {
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let mut map = ExpiringHashMap::<String, String>::new();
+#[tokio::test]
+async fn next_expired_does_not_wake_when_the_value_is_available_upfront() {
+    let mut map = ExpiringHashMap::<String, String>::new();
 
-        let a_minute_ago = Instant::now() - Duration::from_secs(60);
-        map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
+    let a_minute_ago = Instant::now() - Duration::from_secs(60);
+    map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
 
-        let mut cx = panic_context();
-        assert!(map.poll_expired(&mut cx).is_ready());
-    });
+    let mut fut = task::spawn(map.next_expired());
+    assert_eq!(unwrap_ready(fut.poll()).unwrap().unwrap().0, "val");
+    assert_eq!(fut.is_woken(), false);
 }
 
-#[test]
-fn it_returns_expired_values() {
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let mut map = ExpiringHashMap::<String, String>::new();
+// TODO: rewrite this test with tokio::time::clock when it's available.
+// For now we just wait for an actal second. We should just scroll time instead.
+// In theory, this is only possible when the runtime timer used in the
+// underlying delay queue and the means by which we fresse/adjust time are
+// working together.
+#[tokio::test]
+async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {
+    let mut map = ExpiringHashMap::<String, String>::new();
 
-        let a_minute_ago = Instant::now() + Duration::from_secs(1);
-        map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
+    let ttl = Duration::from_secs(1);
+    map.insert("key".to_owned(), "val".to_owned(), ttl);
 
-        let fut = poll_fn(move |cx| map.poll_expired(cx));
-        assert_eq!(fut.await.unwrap().0, "val".to_owned());
-    });
+    let mut fut = task::spawn(map.next_expired());
+
+    // At first, has to be pending.
+    assert_pending!(fut.poll());
+
+    // Sleep twice the ttl, to guarantee we're over the deadline.
+    assert_eq!(fut.is_woken(), false);
+    tokio::time::delay_for(ttl * 2).await;
+    assert_eq!(fut.is_woken(), true);
+
+    // Then, after deadline, has to be ready.
+    assert_eq!(
+        unwrap_ready(fut.poll()).unwrap().unwrap().0,
+        "val".to_owned()
+    );
 }
 
-#[test]
-fn wakes_on_insert_when_empty() {
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let mut map = ExpiringHashMap::<String, String>::new();
+#[tokio::test]
+async fn next_expired_api_allows_inserting_items() {
+    let mut map = ExpiringHashMap::<String, String>::new();
 
-        let (waker, count) = new_count_waker();
-        let mut cx = Context::from_waker(&waker);
-        assert!(map.poll_expired(&mut cx).is_pending());
+    // At first, has to be pending.
+    let mut fut = task::spawn(map.next_expired());
+    assert!(unwrap_ready(fut.poll()).is_none());
+    drop(fut);
 
-        assert_eq!(count, 0);
+    // Insert an item.
+    let ttl = Duration::from_secs(1000);
+    map.insert("key".to_owned(), "val".to_owned(), ttl);
 
-        map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
-
-        assert_eq!(count, 1);
-    });
-}
-
-#[test]
-fn does_not_wake_on_insert_when_non_empty() {
-    let mut rt = Runtime::new().unwrap();
-    rt.block_on_std(async {
-        let mut map = ExpiringHashMap::<String, String>::new();
-
-        map.insert("key1".to_owned(), "val".to_owned(), Duration::from_secs(1));
-
-        let (waker, count) = new_count_waker();
-        let mut cx = Context::from_waker(&waker);
-        assert!(map.poll_expired(&mut cx).is_pending());
-
-        assert_eq!(count, 0);
-
-        map.insert("key2".to_owned(), "val".to_owned(), Duration::from_secs(1));
-
-        assert_eq!(count, 0);
-    });
+    // Then, after value is inserted, has to be still pending.
+    let mut fut = task::spawn(map.next_expired());
+    assert_pending!(fut.poll());
 }

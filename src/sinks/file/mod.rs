@@ -124,9 +124,10 @@ impl FileSink {
                         Some(event) => self.process_event(event).await,
                     }
                 }
-                result = &mut self.files => {
+                result = self.files.next_expired(), if !self.files.is_empty() => {
                     match result {
-                        Ok((mut expired_file, path)) => {
+                        None => unreachable!(),
+                        Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.flush().await {
@@ -138,7 +139,7 @@ impl FileSink {
                             }
                             drop(expired_file); // ignore close error
                         }
-                        Err(error) => error!(
+                        Some(Err(error)) => error!(
                             message = "An error occured while expiring a file.",
                             %error,
                         ),
