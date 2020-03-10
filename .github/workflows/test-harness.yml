@@ -1,0 +1,121 @@
+name: Test Harness
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  test-harness:
+
+    runs-on: ubuntu-latest
+
+    # Only run if we're invoked with a new command comment on a pull request.
+    if: |
+      github.event_name == 'issue_comment' && github.event.action == 'created'
+      && github.event.issue.pull_request != null
+      && startsWith(github.event.comment.body, '/test')
+
+    steps:
+    - name: Indicate that we picked up the command with a comment reaction
+      uses: actions/github-script@0.4.0
+      with:
+        github-token: '${{secrets.GITHUB_TOKEN}}'
+        script: |
+          github.reactions.createForIssueComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            comment_id: context.payload.comment.id,
+            content: "rocket"
+          })
+
+    - name: Check user permissions
+      uses: MOZGIII/repo-permission-check-action@input-fix
+      with:
+        permission: write
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
+    # Clone vector source and build .deb
+    - name: Clone the PR branch
+      uses: actions/checkout@v2
+      with:
+        lfs: true
+        ref: 'refs/pull/${{ github.event.issue.number }}/head'
+    - name: Gather info on the cloned code
+      id: cloned
+      run: echo "::set-output name=head_rev::$(git rev-parse HEAD)"
+    # Doesn't work yet, see https://github.com/actions/cache/issues/176
+    - name: Cache deb
+      id: deb-cache
+      uses: actions/cache@v1
+      with:
+        path: target/artifacts/vector-amd64.deb
+        key: vector-test-harness-packaged-deb-${{ steps.cloned.outputs.head_rev }}
+    - name: Make deb
+      if: steps.deb-cache.outputs.cache-hit != 'true'
+      run: PASS_FEATURES=default-musl ./scripts/docker-run.sh builder-x86_64-unknown-linux-musl make build-archive package-deb
+
+    - name: Invoke test harness
+      uses: docker://timberiodev/vector-test-harness:latest
+      with:
+        args: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          git_branch=${GITHUB_REF##*/}
+          git_count=$(git rev-list --count $git_branch)
+          bash -o pipefail -xc "cd /vector-test-harness \
+          && bin/test -t tcp_to_tcp_performance -s vector -v dev-${git_branch}-${git_count}-${git_hash}"
+      env:
+        GENERATE_SSH_KEY: true
+        VECTOR_TEST_VECTOR_DEB_PATH: '${{ github.workspace }}/target/artifacts/vector-amd64.deb'
+        VECTOR_TEST_USER_ID: 'gha_${{ github.event.issue.number }}'
+        VECTOR_TEST_RESULTS_S3_BUCKET_NAME: test-results.vector.dev
+        AWS_ACCESS_KEY_ID: '${{ secrets.TEST_HARNESS_AWS_ACCESS_KEY_ID }}'
+        AWS_SECRET_ACCESS_KEY: '${{ secrets.TEST_HARNESS_AWS_SECRET_ACCESS_KEY }}'
+        AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
+    - name: Gather test harness execution results
+      uses: docker://timberiodev/vector-test-harness:latest
+      with:
+        args: |
+          bash -o pipefail -xc "cd /vector-test-harness \
+          && bin/cohort -s vector | tee \"$GITHUB_WORKSPACE/output\""
+      env:
+        GENERATE_SSH_KEY: true
+        VECTOR_TEST_RESULTS_S3_BUCKET_NAME: test-results.vector.dev
+        AWS_ACCESS_KEY_ID: '${{ secrets.TEST_HARNESS_RESULTS_AWS_ACCESS_KEY_ID }}'
+        AWS_SECRET_ACCESS_KEY: '${{ secrets.TEST_HARNESS_RESULTS_AWS_SECRET_ACCESS_KEY }}'
+        AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
+
+    - name: Post a comment with the results
+      uses: actions/github-script@0.4.0
+      with:
+        github-token: '${{secrets.GITHUB_TOKEN}}'
+        script: |
+          const fs = require('fs');
+          const { promisify } = require('util');
+          const readFileAsync = promisify(fs.readFile);
+
+          console.log(process.env);
+          console.log(context);
+
+          let output;
+          try {
+            output = await readFileAsync(`${process.env.GITHUB_WORKSPACE}/output`);
+            output = '```\n' + output + '\n```\n';
+          } catch {
+            output = "Something went wrong, see log for more details.\n"
+          }
+
+          const body =
+            `Test harness invocation requested by ${context.payload.comment.html_url} is complete!\n` +
+            '\n' +
+            output +
+            '\n' +
+            `You can check the [execution log](${context.payload.repository.html_url}/actions/runs/${process.env.GITHUB_RUN_ID}) to learn more!`;
+
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body
+          })
+      if: always()
