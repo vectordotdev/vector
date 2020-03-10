@@ -224,26 +224,17 @@ mod tests {
         Event,
     };
 
-    fn do_transform(
-        event: &str,
-        regex: &str,
-        field: Option<&str>,
-        drop_field: bool,
-        drop_failed: bool,
-        target_field: Option<&str>,
-        types: &[(&str, &str)],
-    ) -> Option<LogEvent> {
+    fn do_transform(event: &str, regex: &str, config: &str) -> Option<LogEvent> {
         let rt = crate::runtime::Runtime::single_threaded().unwrap();
         let event = Event::from(event);
-        let mut parser = RegexParserConfig {
-            regex: regex.into(),
-            field: field.map(Into::into),
-            drop_field,
-            drop_failed,
-            target_field: target_field.map(Into::into),
-            overwrite_target: false,
-            types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
-        }
+        let mut parser = toml::from_str::<RegexParserConfig>(&format!(
+            r#"
+                regex = {:?}
+                {}
+            "#,
+            regex, config
+        ))
+        .unwrap()
         .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
@@ -251,15 +242,11 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_adds_parsed_field_to_event() {
+    fn adds_parsed_field_to_event() {
         let log = do_transform(
             "status=1234 time=5678",
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            None,
-            false,
-            false,
-            None,
-            &[],
+            "",
         )
         .unwrap();
 
@@ -269,32 +256,22 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_doesnt_do_anything_if_no_match() {
-        let log = do_transform(
-            "asdf1234",
-            r"status=(?P<status>\d+)",
-            None,
-            false,
-            false,
-            None,
-            &[],
-        )
-        .unwrap();
+    fn doesnt_do_anything_if_no_match() {
+        let log = do_transform("asdf1234", r"status=(?P<status>\d+)", "").unwrap();
 
         assert_eq!(log.get(&"status".into()), None);
         assert!(log.get(&"message".into()).is_some());
     }
 
     #[test]
-    fn regex_parser_does_drop_parsed_field() {
+    fn does_drop_parsed_field() {
         let log = do_transform(
             "status=1234 time=5678",
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            Some("message"),
-            true,
-            false,
-            None,
-            &[],
+            r#"
+               field = "message"
+               drop_field = true
+            "#,
         )
         .unwrap();
 
@@ -304,15 +281,14 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_does_not_drop_same_name_parsed_field() {
+    fn does_not_drop_same_name_parsed_field() {
         let log = do_transform(
             "status=1234 message=yes",
             r"status=(?P<status>\d+) message=(?P<message>\S+)",
-            Some("message"),
-            true,
-            false,
-            None,
-            &[],
+            r#"
+               field = "message"
+               drop_field = true
+            "#,
         )
         .unwrap();
 
@@ -321,15 +297,14 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_does_not_drop_field_if_no_match() {
+    fn does_not_drop_field_if_no_match() {
         let log = do_transform(
             "asdf1234",
             r"status=(?P<message>\S+)",
-            Some("message"),
-            true,
-            false,
-            None,
-            &[],
+            r#"
+               field = "message"
+               drop_field = true
+            "#,
         )
         .unwrap();
 
@@ -337,15 +312,11 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_respects_target_field() {
+    fn respects_target_field() {
         let mut log = do_transform(
             "status=1234 time=5678",
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            None,
-            false,
-            false,
-            Some("prefix"),
-            &[],
+            r#"target_field = "prefix""#,
         )
         .unwrap();
 
@@ -362,39 +333,40 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_does_not_drop_event_if_match() {
-        let log = do_transform("asdf1234", r"asdf", None, false, true, None, &[]);
+    fn does_not_drop_event_if_match() {
+        let log = do_transform("asdf1234", r"asdf", "drop_failed = true");
         assert!(log.is_some());
     }
 
     #[test]
-    fn regex_parser_does_drop_event_if_no_match() {
-        let log = do_transform("asdf1234", r"something", None, false, true, None, &[]);
+    fn does_drop_event_if_no_match() {
+        let log = do_transform("asdf1234", r"something", "drop_failed = true");
         assert!(log.is_none());
     }
 
     #[test]
-    fn regex_parser_handles_valid_optional_capture() {
-        let log = do_transform("1234", r"(?P<status>\d+)?", None, false, false, None, &[]).unwrap();
+    fn handles_valid_optional_capture() {
+        let log = do_transform("1234", r"(?P<status>\d+)?", "").unwrap();
         assert_eq!(log[&"status".into()], "1234".into());
     }
 
     #[test]
-    fn regex_parser_handles_missing_optional_capture() {
-        let log = do_transform("none", r"(?P<status>\d+)?", None, false, false, None, &[]).unwrap();
+    fn handles_missing_optional_capture() {
+        let log = do_transform("none", r"(?P<status>\d+)?", "").unwrap();
         assert!(log.get(&"status".into()).is_none());
     }
 
     #[test]
-    fn regex_parser_coerces_fields_to_types() {
+    fn coerces_fields_to_types() {
         let log = do_transform(
             "1234 6789.01 false",
             r"(?P<status>\d+) (?P<time>[\d.]+) (?P<check>\S+)",
-            None,
-            false,
-            false,
-            None,
-            &[("status", "int"), ("time", "float"), ("check", "boolean")],
+            r#"
+            [types]
+            status = "int"
+            time = "float"
+            check = "boolean"
+            "#,
         )
         .expect("Failed to parse log");
         assert_eq!(log[&"check".into()], Value::Boolean(false));
@@ -403,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn regex_parser_truncate_utf8() {
+    fn truncate_utf8() {
         let message = "hello 😁 this is test";
         assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
     }
