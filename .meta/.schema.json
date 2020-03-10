@@ -470,6 +470,7 @@
             "filter",
             "parse",
             "program",
+            "route",
             "sanitize",
             "shape"
           ]

@@ -22825,7 +22825,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "filter",
+      "function_category": "route",
       "id": "swimlanes_transform",
       "name": "swimlanes",
       "operating_systems": [
