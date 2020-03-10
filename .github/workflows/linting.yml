@@ -1,0 +1,15 @@
+name: ci
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+jobs:
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+    - name: markdownlint-cli
+      uses: nosborn/github-action-markdown-cli@v1.1.1
+      with:
+        files: .
+        config_file: ".github/markdown-lint-rules.json"
