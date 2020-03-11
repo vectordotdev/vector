@@ -96,7 +96,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
@@ -104,7 +104,7 @@ The log field to use as the metric. See [Null Fields](#null-fields) for more inf
   name={"increment_by_value"}
   path={"metrics"}
   relevantWhen={{"type":"counter"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -534,6 +534,13 @@ sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `log_to_metric`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -575,3 +582,4 @@ individual metrics for reduction in the metrics storage itself.
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

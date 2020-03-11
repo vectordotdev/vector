@@ -24,7 +24,6 @@ the Nth socket passed by systemd socket activation.\
 [sources.syslog.options.host_key]
 type = "string"
 category = "Context"
-required = true
 default = "host"
 description = """\
 The key name added to each event representing the current host. This can also \

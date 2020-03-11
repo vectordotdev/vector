@@ -19,7 +19,6 @@ common = true
 default = "message"
 examples = ["message", "parent.child"]
 field_path_notation = true
-required = true
 description = "The field to apply the split on."
 
 [transforms.split.options.field_names]
@@ -35,7 +34,6 @@ type = "[string]"
 common = true
 default = "[whitespace]"
 examples = [","]
-required = true
 description = """\
 The separator to split the field on. If no separator is given, it will split \
 on all whitespace. 'Whitespace' is defined according to the terms of the \
@@ -46,7 +44,6 @@ on all whitespace. 'Whitespace' is defined according to the terms of the \
 type = "bool"
 common = true
 default = true
-required = true
 description = "If `true` the `field` will be dropped after parsing."
 
 <%= render("_partials/_types.toml", namespace: "transforms.split", common: true) %>

@@ -77,7 +77,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
@@ -85,7 +85,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -100,7 +100,7 @@ The docker host to connect to.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -108,7 +108,7 @@ The docker host to connect to.
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}

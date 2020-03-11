@@ -3,7 +3,7 @@ title = "Concat"
 allow_you_to_description = "concat (substrings) of other fields to a new one"
 beta = true
 common = false
-function_category = "filter"
+function_category = "shape"
 input_types = ["log"]
 output_types = ["log"]
 requirements = {}
@@ -23,7 +23,6 @@ The name for the new label.\
 type = "string"
 default = " "
 examples = [" ", ",", "_", "+"]
-required = true
 description = """\
 The string that is used to join all items.\
 """

@@ -393,6 +393,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `transforms-aws_ec2_metadata` | Enables building of [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].  |
 | `transforms-coercer` | Enables building of [`coercer` transform][docs.transforms.coercer].  |
 | `transforms-concat` | Enables building of [`concat` transform][docs.transforms.concat].  |
+| `transforms-dedupe` | Enables building of [`dedupe` transform][docs.transforms.dedupe].  |
 | `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.field_filter].  |
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
@@ -408,6 +409,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `transforms-sampler` | Enables building of [`sampler` transform][docs.transforms.sampler].  |
 | `transforms-split` | Enables building of [`split` transform][docs.transforms.split].  |
 | `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
+| `transforms-tag_cardinality_limit` | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].  |
 | `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
 | `transforms-transaction` | Enables building of [`transaction` transform][docs.transforms.transaction].  |
 | `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
@@ -494,6 +496,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [docs.transforms.concat]: /docs/reference/transforms/concat/
+[docs.transforms.dedupe]: /docs/reference/transforms/dedupe/
 [docs.transforms.field_filter]: /docs/reference/transforms/field_filter/
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
@@ -509,6 +512,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.transforms.sampler]: /docs/reference/transforms/sampler/
 [docs.transforms.split]: /docs/reference/transforms/split/
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [docs.transforms.transaction]: /docs/reference/transforms/transaction/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc

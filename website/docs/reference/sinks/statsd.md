@@ -33,11 +33,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "statsd"
-  inputs = ["my-source-id"]
-  namespace = "service"
-  address = "127.0.0.1:8125" # default
-  healthcheck = true # default
+  type = "statsd" # required
+  inputs = ["my-source-id"] # required
+  namespace = "service" # required
+  address = "127.0.0.1:8125" # optional, default
+  healthcheck = true # optional, default
 ```
 
 ## Options

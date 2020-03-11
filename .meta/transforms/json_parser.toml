@@ -14,7 +14,6 @@ requirements = {}
 type = "bool"
 common = true
 default = true
-required = true
 description = """\
 If the specified `field` should be dropped (removed) after parsing. If \
 parsing fails, the field will not be removed, irrespective of this setting.\
@@ -36,7 +35,6 @@ common = true
 default = "message"
 examples = ["message", "parent.child", "array[0]"]
 field_path_notation = true
-required = true
 description = """\
 The log field to decode as JSON. Must be a `string` value type.\
 """

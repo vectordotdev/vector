@@ -2,6 +2,7 @@
 component_title: "Transaction"
 description: "The Vector `transaction` transform accepts and outputs `log` events allowing you to reduce events of a matching transaction into a single event."
 event_types: ["log"]
+function_category: "aggregate"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+transaction%22
 min_version: null
 service_name: "Transaction"
@@ -40,22 +41,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "transaction" # must be: "transaction"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "transaction" # required
+  inputs = ["my-source-id"] # required
+  identifier_fields = [] # optional, default
 
-  # OPTIONAL - General
-  identifier_fields = [] # default
-
-  # OPTIONAL - Ends when
-  [transforms.my_transform_id.ends_when]
-    # REQUIRED
-    type = "check_fields" # example
-
-    # OPTIONAL
-    "message.eq" = "this is the content to match against"
-    "host.exists" = true
-    "method.neq" = "POST"
+  # Ends when
+  ends_when.type = "check_fields" # optional, default
+  ends_when."message.eq" = "this is the content to match against" # example
+  ends_when."message.contains" = "foo" # example
+  ends_when."environment.prefix" = "staging-" # example
 ```
 
 </TabItem>
@@ -65,28 +60,24 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "transaction" # must be: "transaction"
-  inputs = ["my-source-id"] # example
+  # General
+  type = "transaction" # required
+  inputs = ["my-source-id"] # required
+  expire_after_ms = 30000 # optional, default
+  flush_period_ms = 1000 # optional, default
+  identifier_fields = [] # optional, default
 
-  # OPTIONAL - General
-  expire_after_ms = 30000 # default
-  flush_period_ms = 1000 # default
-  identifier_fields = [] # default
+  # Ends when
+  ends_when.type = "check_fields" # optional, default
+  ends_when."message.eq" = "this is the content to match against" # example
+  ends_when."host.exists" = true # example
+  ends_when."method.neq" = "POST" # example
+  ends_when."message.contains" = "foo" # example
+  ends_when."environment.prefix" = "staging-" # example
 
-  # OPTIONAL - Ends when
-  [transforms.my_transform_id.ends_when]
-    # REQUIRED
-    type = "check_fields" # example
-
-    # OPTIONAL
-    "message.eq" = "this is the content to match against"
-    "host.exists" = true
-    "method.neq" = "POST"
-
-  # OPTIONAL - Merge strategies
-  [transforms.my_transform_id.merge_strategies]
-    `<field_name>` = "array" # example, enum
+  # Merge strategies
+  merge_strategies.duration_ms = "max" # example
+  merge_strategies.message = "discard" # example
 ```
 
 </TabItem>
@@ -125,11 +116,34 @@ A condition used to distinguish the final event of a transaction. If this condit
 
 <Field
   common={true}
+  defaultValue={"check_fields"}
+  enumValues={{"check_fields":"Allows you to check individual fields against a list of conditions.","is_log":"Returns true if the event is a log.","is_metric":"Returns true if the event is a metric."}}
+  examples={["check_fields","is_log","is_metric"]}
+  groups={[]}
+  name={"type"}
+  path={"ends_when"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### type
+
+The type of the condition to execute.
+
+
+</Field>
+
+
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"message.eq":"this is the content to match against"}]}
   groups={[]}
-  name={"`<field_name>`.eq"}
+  name={"`[field-name]`.eq"}
   path={"ends_when"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -138,7 +152,7 @@ A condition used to distinguish the final event of a transaction. If this condit
   unit={null}
   >
 
-#### `<field_name>`.eq
+#### `[field-name]`.eq
 
 Check whether a fields contents exactly matches the value specified.
 
@@ -147,12 +161,12 @@ Check whether a fields contents exactly matches the value specified.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"host.exists":true}]}
   groups={[]}
-  name={"`<field_name>`.exists"}
+  name={"`[field-name]`.exists"}
   path={"ends_when"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -161,7 +175,7 @@ Check whether a fields contents exactly matches the value specified.
   unit={null}
   >
 
-#### `<field_name>`.exists
+#### `[field-name]`.exists
 
 Check whether a field exists or does not exist, depending on the provided valuebeing `true` or `false` respectively.
 
@@ -170,12 +184,12 @@ Check whether a field exists or does not exist, depending on the provided valueb
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[{"method.neq":"POST"}]}
   groups={[]}
-  name={"`<field_name>`.neq"}
+  name={"`[field-name]`.neq"}
   path={"ends_when"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -184,7 +198,7 @@ Check whether a field exists or does not exist, depending on the provided valueb
   unit={null}
   >
 
-#### `<field_name>`.neq
+#### `[field-name]`.neq
 
 Check whether a fields contents does not match the value specified.
 
@@ -196,20 +210,43 @@ Check whether a fields contents does not match the value specified.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["check_fields","is_log","is_metric"]}
+  examples={[{"message.contains":"foo"}]}
   groups={[]}
-  name={"type"}
+  name={"`[field_name]`.contains"}
   path={"ends_when"}
-  relevantWhen={null}
-  required={true}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   >
 
-#### type
+#### `[field_name]`.contains
 
-The type of the condition to execute.
+Checks whether a string field contains a string argument.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.prefix":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.prefix"}
+  path={"ends_when"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field_name]`.prefix
+
+Checks whether a string field has a string argument prefix.
 
 
 </Field>
@@ -294,7 +331,7 @@ events from unrelated transactions from combining.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"message":"append","username":"append"}]}
+  examples={[{"message":"concat","username":"array"}]}
   groups={[]}
   name={"merge_strategies"}
   path={null}
@@ -312,7 +349,7 @@ A map of field names to custom merge strategies. For each field specified this s
 The default behavior is as follows:
 
 1. The first value of a string field is kept, subsequent values are discarded.
-2. For timestamp fields the first is kept and a new field `<field_name>_end` is
+2. For timestamp fields the first is kept and a new field `[field_name]_end` is
    added with the last received timestamp value.
 3. Numeric values are added.
 
@@ -322,10 +359,10 @@ The default behavior is as follows:
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"array":"Each value is appended to an array.","append":"Append each string value (delimited with a space).","discard":"Discard all but the first value found.","sum":"Sum all number values.","max":"The maximum of all number values.","min":"The minimum of all number values."}}
-  examples={["array","append","discard","sum","max","min"]}
+  enumValues={{"array":"Each value is appended to an array.","concat":"Concatenate each string value (delimited with a space).","discard":"Discard all but the first value found.","sum":"Sum all number values.","max":"The maximum of all number values.","min":"The minimum of all number values."}}
+  examples={[{"duration_ms":"max"},{"message":"discard"}]}
   groups={[]}
-  name={"`<field_name>`"}
+  name={"`[field_name]`"}
   path={"merge_strategies"}
   relevantWhen={null}
   required={true}
@@ -334,7 +371,7 @@ The default behavior is as follows:
   unit={null}
   >
 
-#### `<field_name>`
+#### `[field_name]`
 
 The custom merge strategy to use for a field.
 
@@ -516,6 +553,13 @@ Notice that the fields from the third event are not present as it has been ident
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `transaction`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -542,3 +586,4 @@ If you're using this transform for a common use case, please consider
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.sources.file]: /docs/reference/sources/file/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

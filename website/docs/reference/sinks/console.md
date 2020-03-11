@@ -27,17 +27,6 @@ The Vector `console` sink [streams](#streaming) [`log`][docs.data-model.log] and
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-import TabItem from '@theme/TabItem';
-
-<TabItem value="common">
-
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -45,37 +34,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "console"
-  inputs = ["my-source-id"]
-  target = "stdout" # default
-  healthcheck = true # default
+  type = "console" # required
+  inputs = ["my-source-id"] # required
+  target = "stdout" # optional, default
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "json" # required
 ```
-
-</TabItem>
-<TabItem value="advanced">
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[sinks.my_sink_id]
-  # General
-  type = "console"
-  inputs = ["my-source-id"]
-  target = "stdout" # default
-  healthcheck = true # default
-
-  # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
-```
-
-</TabItem>
-</Tabs>
 
 ## Options
 
@@ -95,7 +60,7 @@ import Field from '@site/src/components/Field';
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -111,8 +76,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["text","json"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
@@ -207,29 +172,6 @@ How to format event timestamps.
 
 <Field
   common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
   defaultValue={"stdout"}
   enumValues={{"stdout":"Output will be written to [STDOUT][urls.stdout]","stderr":"Output will be written to [STDERR][urls.stderr]"}}
   examples={["stdout","stderr"]}
@@ -237,7 +179,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   name={"target"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

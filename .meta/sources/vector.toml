@@ -24,7 +24,6 @@ include a port.
 [sources.vector.options.shutdown_timeout_secs]
 type = "int"
 default = 30
-required = true
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\

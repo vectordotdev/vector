@@ -163,6 +163,8 @@ module.exports = {
             
               "reference/transforms/concat",
             
+              "reference/transforms/dedupe",
+            
               "reference/transforms/field_filter",
             
               "reference/transforms/geoip",
@@ -192,6 +194,8 @@ module.exports = {
               "reference/transforms/split",
             
               "reference/transforms/swimlanes",
+            
+              "reference/transforms/tag_cardinality_limit",
             
               "reference/transforms/tokenizer",
             

@@ -45,13 +45,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "file"
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
-  healthcheck = true # default
+  type = "file" # required
+  inputs = ["my-source-id"] # required
+  path = "vector-%Y-%m-%d.log" # required
+  healthcheck = true # optional, default
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "ndjson" # required
 ```
 
 </TabItem>
@@ -62,17 +62,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "file"
-  inputs = ["my-source-id"]
-  path = "vector-%Y-%m-%d.log"
-  healthcheck = true # default
-  idle_timeout_secs = "30" # default
+  type = "file" # required
+  inputs = ["my-source-id"] # required
+  path = "vector-%Y-%m-%d.log" # required
+  healthcheck = true # optional, default
+  idle_timeout_secs = "30" # optional, default
 
   # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.codec = "ndjson" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 ```
 
 </TabItem>
@@ -96,7 +96,7 @@ import Field from '@site/src/components/Field';
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -112,8 +112,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the `message` key and the payload is new line delimited.","ndjson":"Each event is encoded into JSON and the payload is new line delimited."}}
-  examples={["text","ndjson"]}
+  enumValues={{"ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["ndjson","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}

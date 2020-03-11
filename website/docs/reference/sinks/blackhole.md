@@ -33,10 +33,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "blackhole"
-  inputs = ["my-source-id"]
-  print_amount = 1000
-  healthcheck = true # default
+  type = "blackhole" # required
+  inputs = ["my-source-id"] # required
+  print_amount = 1000 # required
 ```
 
 ## Options
@@ -46,29 +45,6 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
-
-
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
-
-
-</Field>
 
 
 <Field

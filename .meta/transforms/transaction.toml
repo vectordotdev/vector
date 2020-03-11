@@ -63,6 +63,10 @@ The default behavior is as follows:
 type = "string"
 required = true
 common = true
+examples = [
+  {"duration_ms" = "max"},
+  {"message" = "discard"}
+]
 description = "The custom merge strategy to use for a field."
 
 [transforms.transaction.options.merge_strategies.children."`[field_name]`".enum]

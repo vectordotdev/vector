@@ -2,7 +2,7 @@
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
-function_category: "filter"
+function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22
 min_version: null
 service_name: "Concat"
@@ -24,18 +24,45 @@ The Vector `concat` transform accepts and [outputs `log` events](#output) allowi
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
-  type = "concat"
-  inputs = ["my-source-id"]
-  items = ["first[..3]", "second[-5..]", "third[3..6]"]
-  joiner = " " # default
-  target = "root_field_name"
+  type = "concat" # required
+  inputs = ["my-source-id"] # required
+  items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
+  target = "root_field_name" # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "concat" # required
+  inputs = ["my-source-id"] # required
+  items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
+  target = "root_field_name" # required
+  joiner = " " # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -70,7 +97,7 @@ A list of substring definitons in the format of source_field[start..end]. For bo
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={" "}
   enumValues={null}
   examples={[" ",",","_","+"]}
@@ -78,7 +105,7 @@ A list of substring definitons in the format of source_field[start..end]. For bo
   name={"joiner"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -158,6 +185,13 @@ A log event will be output with the following structure:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `concat`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -190,3 +224,4 @@ You can learn more about Vector's field notation in the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

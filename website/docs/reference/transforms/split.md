@@ -31,19 +31,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "split"
-  inputs = ["my-source-id"]
-  drop_field = true # default
-  field = "message" # default
-  field_names = ["timestamp", "level", "message", "parent.child"]
-  separator = "[whitespace]" # default
+  type = "split" # required
+  inputs = ["my-source-id"] # required
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  separator = "[whitespace]" # optional, default
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 ## Options
@@ -64,7 +65,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -87,7 +88,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -133,7 +134,7 @@ The field names assigned to the resulting tokens, in order. See [Field Notation 
   name={"separator"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[string]"}
   unit={null}
@@ -173,7 +174,7 @@ Key/value pairs representing mapped log field names and types. This is used to c
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"types"}
@@ -247,6 +248,13 @@ A couple of things to notice:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `split`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -281,3 +289,4 @@ You can learn more about Vector's field notation in the
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.unicode_whitespace]: https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

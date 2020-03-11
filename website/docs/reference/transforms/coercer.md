@@ -42,15 +42,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "coercer"
-  inputs = ["my-source-id"]
+  type = "coercer" # required
+  inputs = ["my-source-id"] # required
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 </TabItem>
@@ -61,16 +62,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "coercer"
-  inputs = ["my-source-id"]
-  drop_unspecified = false # default
+  type = "coercer" # required
+  inputs = ["my-source-id"] # required
+  drop_unspecified = false # optional, default
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 </TabItem>
@@ -134,7 +136,7 @@ Key/value pairs representing mapped log field names and types. This is used to c
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"types"}
@@ -212,6 +214,13 @@ A [`log` event][docs.data-model.log] will be output with the following structure
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `coercer`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -225,3 +234,4 @@ section.
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

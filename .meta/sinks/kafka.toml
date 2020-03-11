@@ -38,8 +38,7 @@ zstd = "[Zstandard compression](https://zstd.net), developed at Facebook. Faster
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.kafka.options",
-  encodings: ["json", "text"],
-  default: false
+  encodings: ["json", "text"]
 ) %>
 
 [sinks.kafka.options.key_field]

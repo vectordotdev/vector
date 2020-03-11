@@ -19,7 +19,6 @@ common = true
 default = "message"
 examples = ["message", "parent.child"]
 field_path_notation = true
-required = true
 description = "The log field to tokenize."
 
 [transforms.tokenizer.options.field_names]
@@ -34,7 +33,6 @@ description = "The log field names assigned to the resulting tokens, in order."
 type = "bool"
 common = true
 default = true
-required = true
 description = "If `true` the `field` will be dropped after parsing."
 
 <%= render("_partials/_types.toml", namespace: "transforms.tokenizer", common: true) %>

@@ -30,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "ansi_stripper"
-  inputs = ["my-source-id"]
-  field = "message" # default
+  type = "ansi_stripper" # required
+  inputs = ["my-source-id"] # required
+  field = "message" # optional, default
 ```
 
 ## Options
@@ -53,7 +53,7 @@ import Field from '@site/src/components/Field';
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -71,6 +71,13 @@ The target field to strip ANSI escape sequences from. See [Field Notation Syntax
 
 
 ## How It Works
+
+### Complex Processing
+
+If you encounter limitations with the `ansi_stripper`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
 
 ### Environment Variables
 
@@ -105,3 +112,4 @@ You can learn more about Vector's field notation in the
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

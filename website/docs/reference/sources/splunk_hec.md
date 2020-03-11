@@ -44,9 +44,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "splunk_hec"
-  address = "0.0.0.0:8088" # default
-  token = "A94A8FE5CCB19BA61C4C08" # no default
+  type = "splunk_hec" # required
+  address = "0.0.0.0:8088" # optional, default
+  token = "A94A8FE5CCB19BA61C4C08" # optional, no default
 ```
 
 </TabItem>
@@ -57,17 +57,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "splunk_hec"
-  address = "0.0.0.0:8088" # default
-  token = "A94A8FE5CCB19BA61C4C08" # no default
+  type = "splunk_hec" # required
+  address = "0.0.0.0:8088" # optional, default
+  token = "A94A8FE5CCB19BA61C4C08" # optional, no default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = false # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
 ```
 
 </TabItem>
@@ -91,7 +91,7 @@ import Field from '@site/src/components/Field';
   name={"address"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

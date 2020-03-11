@@ -243,6 +243,9 @@
 - name: "transform: concat"
   description: Anything `concat` transform related
   color: 54a0ff
+- name: "transform: dedupe"
+  description: Anything `dedupe` transform related
+  color: 54a0ff
 - name: "transform: field_filter"
   description: Anything `field_filter` transform related
   color: 54a0ff
@@ -287,6 +290,9 @@
   color: 54a0ff
 - name: "transform: swimlanes"
   description: Anything `swimlanes` transform related
+  color: 54a0ff
+- name: "transform: tag_cardinality_limit"
+  description: Anything `tag_cardinality_limit` transform related
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related

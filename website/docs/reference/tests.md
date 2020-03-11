@@ -51,24 +51,24 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 [[tests]]
   # General
-  name = "foo test"
+  name = "foo test" # required
 
   # Inputs
   [[tests.inputs]]
-    type = "raw"
-    insert_at = "foo"
-    value = "some message contents" # required when type = "raw"
+    type = "raw" # required
+    insert_at = "foo" # required
+    value = "some message contents" # required, required when type = "raw"
 
   # Outputs
   [[tests.outputs]]
     # General
-    extract_from = "foo"
+    extract_from = "foo" # required
 
     # Conditions
-    conditions.type = "check_fields" # default
-    conditions.message.eq = "this is the content to match against"
-    conditions.message.contains = "foo"
-    conditions.environment.prefix = "staging-"
+    conditions.type = "check_fields" # optional, default
+    conditions."message.eq" = "this is the content to match against" # example
+    conditions."message.contains" = "foo" # example
+    conditions."environment.prefix" = "staging-" # example
 ```
 
 </TabItem>
@@ -83,45 +83,45 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 [[tests]]
   # General
-  name = "foo test"
-  no_outputs_from = ["foo"]
+  name = "foo test" # required
+  no_outputs_from = ["foo"] # required
 
   # Inputs
   [[tests.inputs]]
     # General
-    type = "raw"
-    insert_at = "foo"
-    value = "some message contents" # required when type = "raw"
+    type = "raw" # required
+    insert_at = "foo" # required
+    value = "some message contents" # required, required when type = "raw"
 
     # Log fields
-    log_fields.message = "some message contents"
-    log_fields.host = "myhost"
+    log_fields.message = "some message contents" # example
+    log_fields.host = "myhost" # example
 
     # Metric
     # General
-    metric.type = "counter"
-    metric.name = "duration_total"
-    metric.timestamp = "2019-11-01T21:15:47.443232Z"
-    metric.val = 10.2
-    metric.direction = "plus" # no default
-    metric.sample_rate = 1 # no default
+    metric.type = "counter" # required
+    metric.name = "duration_total" # required
+    metric.timestamp = "2019-11-01T21:15:47.443232Z" # required
+    metric.val = 10.2 # required
+    metric.direction = "plus" # optional, no default
+    metric.sample_rate = 1 # optional, no default
 
     # Tags
-    metric.tags.host = "foohost"
-    metric.tags.region = "us-east-1"
+    metric.tags.host = "foohost" # example
+    metric.tags.region = "us-east-1" # example
 
   # Outputs
   [[tests.outputs]]
     # General
-    extract_from = "foo"
+    extract_from = "foo" # required
 
     # Conditions
-    conditions.type = "check_fields" # default
-    conditions.message.eq = "this is the content to match against"
-    conditions.host.exists = true
-    conditions.method.neq = "POST"
-    conditions.message.contains = "foo"
-    conditions.environment.prefix = "staging-"
+    conditions.type = "check_fields" # optional, default
+    conditions."message.eq" = "this is the content to match against" # example
+    conditions."host.exists" = true # example
+    conditions."method.neq" = "POST" # example
+    conditions."message.contains" = "foo" # example
+    conditions."environment.prefix" = "staging-" # example
 ```
 
 </TabItem>
@@ -599,7 +599,7 @@ A table that defines a collection of conditions to check against the output of a
   name={"type"}
   path={"outputs.conditions"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

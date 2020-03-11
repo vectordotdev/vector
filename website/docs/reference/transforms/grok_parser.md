@@ -31,18 +31,19 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [transforms.my_transform_id]
   # General
-  type = "grok_parser"
-  inputs = ["my-source-id"]
-  drop_field = true # default
-  field = "message" # default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  type = "grok_parser" # required
+  inputs = ["my-source-id"] # required
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
 
   # Types
-  types.status = "int"
-  types.duration = "float"
-  types.success = "bool"
-  types.timestamp = "timestamp|%F"
-  types.timestamp = "timestamp|%a %b %e %T %Y"
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 ## Options
@@ -63,7 +64,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -86,7 +87,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -149,7 +150,7 @@ Key/value pairs representing mapped log field names and types. This is used to c
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"types"}
@@ -183,6 +184,13 @@ Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
 [listed here][urls.grok_patterns] are supported. It is recommended to use
 maintained patterns when possible since they can be improved over time by
 the community.
+
+### Complex Processing
+
+If you encounter limitations with the `grok_parser`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
 
 ### Debugging
 
@@ -236,3 +244,4 @@ performance issues.
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [urls.rust_grok_library]: https://github.com/daschl/grok
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

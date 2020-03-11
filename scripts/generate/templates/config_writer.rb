@@ -24,10 +24,27 @@ class Templates
         puts("# #{name}")
       end
 
-      def hash(hash, path: [])
-        hash.each do |key, value|
-          kv(key, value, path: path)
+      def hash(hash, path: [], tags: [])
+        if hash.length > 1
+          raise ArgumentError.new("A hash must contain only a single key and value")
         end
+
+        key = nil
+        value = nil
+
+        if hash.values.first.is_a?(Hash)
+          hash = hash.flatten
+          key = hash.keys.first
+          value = hash.values.first
+        elsif hash.keys.first.include?(".")
+          key = hash.keys.first.inspect
+          value = hash.values.first
+        else
+          key = hash.keys.first
+          value = hash.values.first
+        end
+
+        kv(key, value, path: path, tags: tags)
       end
 
       def indent(spaces)

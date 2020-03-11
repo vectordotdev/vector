@@ -31,12 +31,12 @@ import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+  defaultValue="unix"
+  values={[{"label":"unix","value":"unix"},{"label":"udp","value":"udp"},{"label":"tcp","value":"tcp"},{"label":"unix (adv)","value":"unix-adv"},{"label":"udp (adv)","value":"udp-adv"},{"label":"tcp (adv)","value":"tcp-adv"}]}>
 
 import TabItem from '@theme/TabItem';
 
-<TabItem value="common">
+<TabItem value="unix">
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
@@ -44,42 +44,96 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # General
-  type = "socket"
-  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
-  mode = "tcp"
-  path = "/path/to/socket" # required when mode = "unix"
-  shutdown_timeout_secs = 30 # default, seconds, required when mode = "tcp"
-
-  # Context
-  host_key = "host" # default
+  type = "socket" # required
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+  max_length = 102400 # optional, default, bytes
 ```
 
 </TabItem>
-<TabItem value="advanced">
+<TabItem value="udp">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  type = "socket" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  max_length = 102400 # optional, default, bytes
+```
+
+</TabItem>
+<TabItem value="tcp">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  type = "socket" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  max_length = 102400 # optional, default, bytes
+```
+
+</TabItem>
+<TabItem value="unix-adv">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
   # General
-  type = "socket"
-  address = "0.0.0.0:9000" # required when mode = "tcp" or mode = "udp"
-  mode = "tcp"
-  path = "/path/to/socket" # required when mode = "unix"
-  shutdown_timeout_secs = 30 # default, seconds, required when mode = "tcp"
-  max_length = 102400 # default, bytes
+  type = "socket" # required
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+  max_length = 102400 # optional, default, bytes
 
   # Context
-  host_key = "host" # default
+  host_key = "host" # optional, default
+```
+
+</TabItem>
+<TabItem value="udp-adv">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  # General
+  type = "socket" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  max_length = 102400 # optional, default, bytes
+
+  # Context
+  host_key = "host" # optional, default
+```
+
+</TabItem>
+<TabItem value="tcp-adv">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  # General
+  type = "socket" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  max_length = 102400 # optional, default, bytes
+  shutdown_timeout_secs = 30 # optional, default, seconds, relevant when mode = "tcp"
+
+  # Context
+  host_key = "host" # optional, default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default, relevant when mode = "tcp"
-  tls.enabled = false # default, relevant when mode = "tcp"
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default, relevant when mode = "tcp"
-  tls.key_path = "/path/to/host_certificate.key" # no default, relevant when mode = "tcp"
-  tls.verify_certificate = false # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default, relevant when mode = "tcp"
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default, relevant when mode = "tcp"
+  tls.enabled = false # optional, default, relevant when mode = "tcp"
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default, relevant when mode = "tcp"
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default, relevant when mode = "tcp"
+  tls.verify_certificate = false # optional, default, relevant when mode = "tcp"
 ```
 
 </TabItem>
@@ -99,7 +153,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9000","systemd","systemd#3"]}
-  groups={[]}
+  groups={["tcp","udp"]}
   name={"address"}
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
@@ -119,15 +173,15 @@ The address to listen for connections on, or `systemd#N` to use the Nth socket p
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"host_key"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -142,11 +196,11 @@ The key name added to each event representing the current host. This can also be
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={102400}
   enumValues={null}
   examples={[102400]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"max_length"}
   path={null}
   relevantWhen={null}
@@ -169,7 +223,7 @@ The maximum bytes size of incoming messages before they are discarded.
   defaultValue={null}
   enumValues={{"tcp":"TCP Socket.","udp":"UDP Socket.","unix":"Unix Domain Socket."}}
   examples={["tcp","udp","unix"]}
-  groups={[]}
+  groups={["tcp","udp","unix"]}
   name={"mode"}
   path={null}
   relevantWhen={null}
@@ -192,7 +246,7 @@ The type of socket to use.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/socket"]}
-  groups={[]}
+  groups={["unix"]}
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
@@ -211,15 +265,15 @@ The unix socket path. *This should be absolute path*.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
-  groups={[]}
+  groups={["tcp"]}
   name={"shutdown_timeout_secs"}
   path={null}
   relevantWhen={{"mode":"tcp"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -238,10 +292,10 @@ The timeout before a connection is forcefully closed during shutdown.
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  groups={[]}
+  groups={["tcp"]}
   name={"tls"}
   path={null}
-  relevantWhen={null}
+  relevantWhen={{"mode":"tcp"}}
   required={false}
   templateable={false}
   type={"table"}
@@ -260,10 +314,10 @@ Configures the TLS options for connections from this source.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
-  groups={[]}
+  groups={["tcp"]}
   name={"ca_path"}
   path={"tls"}
-  relevantWhen={null}
+  relevantWhen={{"mode":"tcp"}}
   required={false}
   templateable={false}
   type={"string"}
@@ -283,7 +337,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
-  groups={[]}
+  groups={["tcp"]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
@@ -306,7 +360,7 @@ Absolute path to a certificate file used to identify this server, in DER or PEM 
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
-  groups={[]}
+  groups={["tcp"]}
   name={"enabled"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
@@ -329,7 +383,7 @@ Require TLS for incoming connections. If this is set, an identity certificate is
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
-  groups={[]}
+  groups={["tcp"]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
@@ -352,7 +406,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
-  groups={[]}
+  groups={["tcp"]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={{"mode":"tcp"}}
@@ -375,10 +429,10 @@ Absolute path to a certificate key file used to identify this server, in DER or 
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
-  groups={[]}
+  groups={["tcp"]}
   name={"verify_certificate"}
   path={"tls"}
-  relevantWhen={null}
+  relevantWhen={{"mode":"tcp"}}
   required={false}
   templateable={false}
   type={"bool"}

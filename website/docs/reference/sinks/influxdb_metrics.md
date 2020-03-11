@@ -32,7 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="v2"
-  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (advanced)","value":"v2-advanced"},{"label":"v1 (advanced)","value":"v1-advanced"}]}>
+  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -45,16 +45,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics"
-  inputs = ["my-source-id"]
-  bucket = "vector-bucket"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  namespace = "service"
-  healthcheck = true # default
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  bucket = "vector-bucket" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
   # auth
-  org = "Organization"
-  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  org = "Organization" # required
+  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
 ```
 
 </TabItem>
@@ -65,90 +65,90 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics"
-  inputs = ["my-source-id"]
-  database = "vector-database"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  namespace = "service"
-  healthcheck = true # default
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  database = "vector-database" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
   # auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # no default
-  username = "todd" # no default
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  username = "todd" # optional, no default
 
   # persistence
-  consistency = "any" # no default
-  retention_policy_name = "autogen" # no default
+  consistency = "any" # optional, no default
+  retention_policy_name = "autogen" # optional, no default
 ```
 
 </TabItem>
-<TabItem value="v2-advanced">
+<TabItem value="v2-adv">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics"
-  inputs = ["my-source-id"]
-  bucket = "vector-bucket"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  namespace = "service"
-  healthcheck = true # default
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  bucket = "vector-bucket" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
   # auth
-  org = "Organization"
-  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  org = "Organization" # required
+  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
 
   # Batch
-  batch.max_events = 20 # default, events
-  batch.timeout_secs = 1 # default, seconds
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 
   # Request
-  request.in_flight_limit = 5 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 5 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 60 # default, seconds
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
-<TabItem value="v1-advanced">
+<TabItem value="v1-adv">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "influxdb_metrics"
-  inputs = ["my-source-id"]
-  database = "vector-database"
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
-  namespace = "service"
-  healthcheck = true # default
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  database = "vector-database" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
   # auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # no default
-  username = "todd" # no default
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  username = "todd" # optional, no default
 
   # persistence
-  consistency = "any" # no default
-  retention_policy_name = "autogen" # no default
+  consistency = "any" # optional, no default
+  retention_policy_name = "autogen" # optional, no default
 
   # Batch
-  batch.max_events = 20 # default, events
-  batch.timeout_secs = 1 # default, seconds
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 
   # Request
-  request.in_flight_limit = 5 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 5 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 60 # default, seconds
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
@@ -194,7 +194,7 @@ Configures the sink batching behavior.
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -217,7 +217,7 @@ The maximum size of a batch, in events, before it is flushed.
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}

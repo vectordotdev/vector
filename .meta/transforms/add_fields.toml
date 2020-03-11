@@ -25,14 +25,14 @@ field_path_notation = true
 templatable = true
 required = true
 examples = [
-  {"string_field" = "string value"},
-  {"env_var_field" = "${ENV_VAR}"},
-  {"int_field" = 1},
-  {"float_field" = 1.2},
-  {"bool_field" = true},
-  {"timestamp_field" = 1979-05-27T00:32:00.999999-07:00},
-  {"parent.child_field" = "child_value"},
-  {"list_field" = ["first", "second", "third"]},
+  {string_field = "string value"},
+  {env_var_field = "${ENV_VAR}"},
+  {int_field = 1},
+  {float_field = 1.2},
+  {bool_field = true},
+  {timestamp_field = 1979-05-27T00:32:00.999999-07:00},
+  {parent.child_field = "child_value"},
+  {list_field = ["first", "second", "third"]},
 ]
 description = """\
 The name of the field to add. Accepts all \
@@ -64,7 +64,8 @@ Given the following configuration:
   fields.field9 = "{{field1}} {{field2}}"
 ```
 
-A [`log` event][docs.data-model.log] will be output with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following
+structure:
 
 ```javascript
 {
@@ -74,10 +75,12 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "field3": 2.0,
   "field4": true,
   "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6.0": "item1",
-  "field6.1": "item2",
-  "field7.nested": "nested value",
-  "field8": "my.hostname.com"
+  "field6": ["item1", "item2"],
+  "field7": {
+    "nested": "nested value"
+  },
+  "field8": "my.hostname.com",
+  "field9": "string value 1"
 }
 ```
 

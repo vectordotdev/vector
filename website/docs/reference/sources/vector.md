@@ -44,9 +44,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "vector"
-  address = "0.0.0.0:9000"
-  shutdown_timeout_secs = 30 # default, seconds
+  type = "vector" # required
+  address = "0.0.0.0:9000" # required
 ```
 
 </TabItem>
@@ -57,17 +56,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sources.my_source_id]
   # General
-  type = "vector"
-  address = "0.0.0.0:9000"
-  shutdown_timeout_secs = 30 # default, seconds
+  type = "vector" # required
+  address = "0.0.0.0:9000" # required
+  shutdown_timeout_secs = 30 # optional, default, seconds
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
-  tls.verify_certificate = false # default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
 ```
 
 </TabItem>
@@ -107,7 +106,7 @@ The TCP address to listen for connections on, or `systemd#N to use the Nth socke
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -115,7 +114,7 @@ The TCP address to listen for connections on, or `systemd#N to use the Nth socke
   name={"shutdown_timeout_secs"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}

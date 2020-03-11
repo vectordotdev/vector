@@ -14,7 +14,8 @@ examples = [
 {duration = "float"},
 {success = "bool"},
 {timestamp = "timestamp|%F"},
-{timestamp = "timestamp|%a %b %e %T %Y"}
+{timestamp = "timestamp|%a %b %e %T %Y"},
+{parent.child = "int"}
 ]
 null = false
 description = """\

@@ -30,9 +30,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "remove_tags"
-  inputs = ["my-source-id"]
-  tags = ["tag1", "tag2"]
+  type = "remove_tags" # required
+  inputs = ["my-source-id"] # required
+  tags = ["tag1", "tag2"] # required
 ```
 
 ## Options
@@ -71,6 +71,13 @@ The tag names to drop.
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `remove_tags`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -83,3 +90,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

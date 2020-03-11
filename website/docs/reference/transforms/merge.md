@@ -30,11 +30,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  type = "merge"
-  inputs = ["my-source-id"]
-  merge_fields = ["message"] # default
-  partial_event_marker_field = "_partial" # default
-  stream_discriminant_fields = [] # default
+  type = "merge" # required
+  inputs = ["my-source-id"] # required
+  merge_fields = ["message"] # optional, default
+  partial_event_marker_field = "_partial" # optional, default
+  stream_discriminant_fields = [] # optional, default
 ```
 
 ## Options
@@ -264,6 +264,13 @@ Notice that `custom_string_field` is concatenated and `custom_int_field` overrid
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the [`merge`](#merge)
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -310,3 +317,4 @@ If you're using this transform for a common use case, please consider
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sources.file]: /docs/reference/sources/file/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

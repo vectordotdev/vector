@@ -45,12 +45,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "humio_logs"
-  inputs = ["my-source-id"]
-  token = "${TOKEN_ENV_VAR}"
-  healthcheck = true # default
+  type = "humio_logs" # required
+  inputs = ["my-source-id"] # required
+  token = "${TOKEN_ENV_VAR}" # required
+  healthcheck = true # optional, default
 
   # Encoding
+  encoding.codec = "json" # optional, default
 ```
 
 </TabItem>
@@ -61,35 +62,36 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "humio_logs"
-  inputs = ["my-source-id"]
-  token = "${TOKEN_ENV_VAR}"
-  healthcheck = true # default
-  host = "http://myhumiohost.com" # no default
+  type = "humio_logs" # required
+  inputs = ["my-source-id"] # required
+  token = "${TOKEN_ENV_VAR}" # required
+  healthcheck = true # optional, default
+  host = "http://myhumiohost.com" # optional, no default
 
   # Batch
-  batch.max_size = 1049000 # default, bytes
-  batch.timeout_secs = 1 # default, seconds
+  batch.max_size = 1049000 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.codec = "json" # optional, default
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # Request
-  request.in_flight_limit = 10 # default, requests
-  request.rate_limit_duration_secs = 1 # default, seconds
-  request.rate_limit_num = 10 # default
-  request.retry_attempts = -1 # default
-  request.retry_initial_backoff_secs = 1 # default, seconds
-  request.retry_max_duration_secs = 10 # default, seconds
-  request.timeout_secs = 60 # default, seconds
+  request.in_flight_limit = 10 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 10 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
@@ -135,7 +137,7 @@ Configures the sink batching behavior.
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -158,7 +160,7 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -208,7 +210,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -254,7 +256,7 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -305,7 +307,7 @@ The behavior when the buffer becomes full.
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"table"}
   unit={null}
@@ -316,6 +318,29 @@ The behavior when the buffer becomes full.
 Configures the encoding specific sink behavior.
 
 <Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={"json"}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
+  examples={["json"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+</Field>
 
 
 <Field

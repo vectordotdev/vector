@@ -1,4 +1,5 @@
 <%- groups ||= [] -%>
+<%- if !defined?(healthcheck) -%><%- healthcheck = type == "sink" -%><%- end -%>
 [<%= type.pluralize %>.<%= name %>.options.type]
 type = "string"
 common = true
@@ -25,7 +26,7 @@ See [configuration][docs.configuration] for more info.\
 """
 <%- end -%>
 
-<%- if type == "sink" %>
+<%- if healthcheck %>
 [<%= type.pluralize %>.<%= name %>.options.healthcheck]
 type = "bool"
 common = true

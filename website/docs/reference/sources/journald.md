@@ -44,9 +44,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "journald"
-  current_boot_only = true # default
-  units = [] # default
+  type = "journald" # required
+  current_boot_only = true # optional, default
+  units = [] # optional, default
 ```
 
 </TabItem>
@@ -56,12 +56,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  type = "journald"
-  batch_size = 16 # default
-  current_boot_only = true # default
-  data_dir = "/var/lib/vector" # no default
-  journalctl_path = "journalctl" # default
-  units = [] # default
+  type = "journald" # required
+  batch_size = 16 # optional, default
+  current_boot_only = true # optional, default
+  data_dir = "/var/lib/vector" # optional, no default
+  journalctl_path = "journalctl" # optional, default
+  units = [] # optional, default
 ```
 
 </TabItem>

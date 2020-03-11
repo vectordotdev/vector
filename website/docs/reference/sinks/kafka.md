@@ -45,16 +45,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "kafka"
-  inputs = ["my-source-id"]
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-  key_field = "user_id"
-  topic = "topic-1234"
-  compression = "none" # default
-  healthcheck = true # default
+  type = "kafka" # required
+  inputs = ["my-source-id"] # required
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
+  key_field = "user_id" # required
+  topic = "topic-1234" # required
+  compression = "none" # optional, default
+  healthcheck = true # optional, default
 
   # Encoding
-  encoding.codec = "text"
+  encoding.codec = "json" # required
 ```
 
 </TabItem>
@@ -65,39 +65,39 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "kafka"
-  inputs = ["my-source-id"]
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-  key_field = "user_id"
-  topic = "topic-1234"
-  compression = "none" # default
-  healthcheck = true # default
-  message_timeout_ms = 300000 # default
-  socket_timeout_ms = 60000 # default
+  type = "kafka" # required
+  inputs = ["my-source-id"] # required
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
+  key_field = "user_id" # required
+  topic = "topic-1234" # required
+  compression = "none" # optional, default
+  healthcheck = true # optional, default
+  message_timeout_ms = 300000 # optional, default
+  socket_timeout_ms = 60000 # optional, default
 
   # Advanced
-  librdkafka_options.client.id = "${ENV_VAR}"
-  librdkafka_options.fetch.error.backoff.ms = "1000"
-  librdkafka_options.socket.send.buffer.bytes = "100"
+  librdkafka_options."client.id" = "${ENV_VAR}" # example
+  librdkafka_options."fetch.error.backoff.ms" = "1000" # example
+  librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # Buffer
-  buffer.type = "memory" # default
-  buffer.max_events = 500 # default, events, required when type = "memory"
-  buffer.max_size = 104900000 # bytes, required when type = "disk"
-  buffer.when_full = "block" # default
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
   # Encoding
-  encoding.codec = "text"
-  encoding.except_fields = ["timestamp", "message", "host"] # no default
-  encoding.only_fields = ["timestamp", "message", "host"] # no default
-  encoding.timestamp_format = "rfc3339" # default
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
   # TLS
-  tls.ca_path = "/path/to/certificate_authority.crt" # no default
-  tls.crt_path = "/path/to/host_certificate.crt" # no default
-  tls.enabled = false # default
-  tls.key_pass = "${KEY_PASS_ENV_VAR}" # no default
-  tls.key_path = "/path/to/host_certificate.key" # no default
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
 
 </TabItem>
@@ -177,7 +177,7 @@ Configures the sink specific buffer behavior.
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -223,7 +223,7 @@ The maximum size of the buffer on the disk.
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -297,7 +297,7 @@ Compression codec to use for compressing message sets
   name={"encoding"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"table"}
   unit={null}
@@ -313,8 +313,8 @@ Configures the encoding specific sink behavior.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited.","json":"Each event is encoded into JSON and the payload is represented as a JSON array."}}
-  examples={["text","json"]}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
+  examples={["json","text"]}
   groups={[]}
   name={"codec"}
   path={"encoding"}
