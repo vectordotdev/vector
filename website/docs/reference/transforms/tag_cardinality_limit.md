@@ -24,7 +24,32 @@ The Vector `tag_cardinality_limit` transform accepts and [outputs `metric` event
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "tag_cardinality_limit" # required
+  inputs = ["my-source-id"] # required
+  mode = "exact" # required
+  limit_exceeded_action = "drop_tag" # optional, default
+  value_limit = 500 # optional, default
+```
+
+</TabItem>
+<TabItem value="advanced">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -38,6 +63,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   value_limit = 500 # optional, default
 ```
 
+</TabItem>
+</Tabs>
+
 
 ## Options
 
@@ -49,7 +77,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={5120000}
   enumValues={null}
   examples={[5120000]}

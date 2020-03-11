@@ -55,7 +55,6 @@ controlled by changing the value of `cache_size_per_tag`.\
 
 [transforms.tag_cardinality_limit.options.cache_size_per_tag]
 type = "int"
-common = true
 default = 5120000
 unit = "bytes"
 relevant_when = {mode = "probabilistic"}
