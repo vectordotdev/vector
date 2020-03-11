@@ -370,7 +370,7 @@ impl RunningTopology {
         let task = handle_errors(task.instrument(span.clone()), self.abort_tx.clone());
         let spawned = oneshot::spawn(task, &rt.executor());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
-            previous.forget();
+            previous.forget(); // todo should we really be forgetting here?
         }
 
         self.shutdown_coordinator
