@@ -81,7 +81,7 @@ pub enum MergeStrategy {
     Max,
     Min,
     Array,
-    Append,
+    Concat,
 }
 
 //------------------------------------------------------------------------------
@@ -110,17 +110,17 @@ impl TransactionValueMerger for DiscardMerger {
 //------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-struct AppendMerger {
+struct ConcatMerger {
     v: BytesMut,
 }
 
-impl AppendMerger {
+impl ConcatMerger {
     fn new(v: Bytes) -> Self {
         Self { v: v.into() }
     }
 }
 
-impl TransactionValueMerger for AppendMerger {
+impl TransactionValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Bytes(b) = v {
             self.v.extend(&[b' ']);
@@ -435,8 +435,8 @@ fn get_value_merger(
                 v.to_string_lossy()
             )),
         },
-        MergeStrategy::Append => match v {
-            Value::Bytes(b) => Ok(Box::new(AppendMerger::new(b))),
+        MergeStrategy::Concat => match v {
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b))),
             _ => Err(format!(
                 "expected string value, found: '{}'",
                 v.to_string_lossy()
@@ -755,6 +755,71 @@ identifier_fields = [ "request_id" ]
         assert_eq!(
             outputs.first().unwrap().as_log()[&"counter".into()],
             Value::from(7)
+        );
+    }
+
+    #[test]
+    fn transaction_merge_strategies() {
+        let rt = crate::runtime::Runtime::single_threaded().unwrap();
+        let mut transaction = toml::from_str::<TransactionConfig>(
+            r#"
+identifier_fields = [ "request_id" ]
+
+merge_strategies.foo = "concat"
+merge_strategies.bar = "array"
+merge_strategies.baz = "max"
+
+[ends_when]
+  "test_end.exists" = true
+"#,
+        )
+        .unwrap()
+        .build(TransformContext::new_test(rt.executor()))
+        .unwrap();
+
+        let mut outputs = Vec::new();
+
+        let mut e = Event::from("test message 1");
+        e.as_mut_log().insert("foo", "first foo");
+        e.as_mut_log().insert("bar", "first bar");
+        e.as_mut_log().insert("baz", 2);
+        e.as_mut_log().insert("request_id", "1");
+
+        transaction.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 2");
+        e.as_mut_log().insert("foo", "second foo");
+        e.as_mut_log().insert("bar", 2);
+        e.as_mut_log().insert("baz", "not number");
+        e.as_mut_log().insert("request_id", "1");
+
+        transaction.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 3");
+        e.as_mut_log().insert("foo", 10);
+        e.as_mut_log().insert("bar", "third bar");
+        e.as_mut_log().insert("baz", 3);
+        e.as_mut_log().insert("request_id", "1");
+        e.as_mut_log().insert("test_end", "yep");
+
+        transaction.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"message".into()],
+            "test message 1".into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"foo".into()],
+            "first foo second foo".into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"baz".into()],
+            3.into(),
         );
     }
 }

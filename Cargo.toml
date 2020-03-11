@@ -258,6 +258,7 @@ transforms = [
   "transforms-split",
   "transforms-swimlanes",
   "transforms-tokenizer",
+  "transforms-transaction",
 ]
 transforms-add_fields = []
 transforms-add_tags = []
@@ -282,6 +283,7 @@ transforms-sampler = ["seahash"]
 transforms-split = []
 transforms-swimlanes = []
 transforms-tokenizer = ["nom"]
+transforms-transaction = []
 
 # Sinks
 sinks = [
