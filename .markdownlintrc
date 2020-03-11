@@ -2,5 +2,8 @@
   "default": false,
 
   "MD003": { "style": "atx" },
-  "MD007": { "indent": 2 }
+  "MD007": { "indent": 2 },
+  "MD009": true,
+  "MD010": true,
+  "MD013": { "line_length": 80, "code_blocks": false, "tables": false }
 }
