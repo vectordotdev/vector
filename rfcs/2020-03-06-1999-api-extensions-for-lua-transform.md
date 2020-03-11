@@ -140,6 +140,7 @@ The following example illustrates fields manipulations with the new approach.
       emit(event)
     end
   """
+  ```
 
 ### Log to Metric
 
