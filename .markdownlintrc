@@ -3,6 +3,7 @@
 
   "MD001": true,
   "MD003": { "style": "atx" },
+  "MD004": true,
   "MD007": { "indent": 2 },
   "MD009": true,
   "MD010": true,
