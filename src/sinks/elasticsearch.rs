@@ -211,7 +211,8 @@ fn es(
         .unwrap_or(&HashMap::default())
         .clone();
 
-    let mut path_query = url::form_urlencoded::Serializer::new(String::from("/_bulk"));
+    let path = format!("/_bulk?timeout={}s", request.timeout.as_secs());
+    let mut path_query = url::form_urlencoded::Serializer::new(path);
     if let Some(ref query) = config.query {
         for (p, v) in query {
             path_query.append_pair(&p[..], &v[..]);
