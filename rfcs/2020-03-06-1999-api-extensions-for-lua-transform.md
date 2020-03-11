@@ -9,7 +9,8 @@ This RFC proposes a new API for the `lua` transform.
     * [Log To Metric](#log-to-metric)
         * [Inline Functions](#inline-functions)
         * [Single Source](#single-source)
-        * [Loadable Module](#loadable-module)
+        * [Loadable Module: Global Functions](#loadable-module-global-functions)
+        * [Loadable Module: Isolated Functions](#loadable-module-isolated-functions)
 * [Reference-level Proposal](#reference-level-proposal)
     * [New Concepts](#new-concepts)
         * [Hooks](#hooks)
@@ -272,7 +273,7 @@ This version of the config uses the same Lua code as the config using inline Lua
   timers = [{interval_seconds = 10, handler = "timer_handler"}]
 ```
 
-#### Loadable Module
+#### Loadable Module: Global Functions
 
 In this example the code from the `source` of the example above is put into a separate file:
 
@@ -334,6 +335,73 @@ It reduces the size of the transform configuration:
   hooks.process = "process"
   hooks.shutdown = "shutdown"
   timers = [{interval_seconds = 10, handler = "timer_handler"}]
+```
+
+#### Loadable Module: Isolated Functions
+
+The way to create modules in previous example above is simple, but might cause name collisions if there are multiple modules to be loaded.
+
+It is [recommended](http://lua-users.org/wiki/ModulesTutorial) to create tables for modules and put functions inside them:
+
+`example_transform.lua`
+```lua
+local example_transform = {}
+local event_counter = 0
+function example_transform.init (emit)
+  emit({
+    log = {
+      message = "starting up"
+    }
+  }, "auxiliary")
+end
+
+function example_transform.process (event, emit)
+  event_counter = event_counter + 1
+end
+
+function example_transform.shutdown (emit)
+  emit {
+    metric = {
+      name = "counter_10s",
+      counter = {
+        value = event_counter
+      }
+    }
+  }
+
+  emit({
+    log = {
+      message = "shutting down"
+    }
+  }, "auxiliary")
+end
+
+function example_transform.timer_handler (emit)
+  emit {
+    metric = {
+      name = "counter_10s",
+      counter = {
+        value = event_counter
+      }
+    }
+  }
+  counter = 0
+end
+```
+
+Then the transform configuration is the following:
+
+```toml
+[transforms.lua]
+  type = "lua"
+  inputs = []
+  version = "2"
+  search_dirs = ["/example/search/dir"]
+  source = "example_transform = require 'example_transform.lua'"
+  hooks.init = "example_transform.init"
+  hooks.process = "example_transform.process"
+  hooks.shutdown = "example_transform.shutdown"
+  timers = [{interval_seconds = 10, handler = "example_transform.timer_handler"}]
 ```
 
 ## Reference-level Proposal
