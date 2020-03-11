@@ -13,6 +13,8 @@ pub mod aws_ec2_metadata;
 pub mod coercer;
 #[cfg(feature = "transforms-concat")]
 pub mod concat;
+#[cfg(feature = "transforms-dedupe")]
+pub mod dedupe;
 #[cfg(feature = "transforms-field_filter")]
 pub mod field_filter;
 #[cfg(feature = "transforms-geoip")]

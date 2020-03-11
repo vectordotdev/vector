@@ -1450,6 +1450,61 @@ dns_servers = ["0.0.0.0:53"]
   joiner = "_"
   joiner = "+"
 
+# Accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache.
+[transforms.dedupe]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "dedupe"
+  type = "dedupe"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Cache
+  #
+
+  [transforms.dedupe.cache]
+    # The number of recent Events to cache and compare new incoming Events against.
+    #
+    # * optional
+    # * default: 5000
+    # * type: int
+    num_events = 5000
+
+  #
+  # Fields
+  #
+
+  [transforms.dedupe.fields]
+    # The field names to ignore when deciding if an Event is a duplicate.
+    # Incompatible with the "fields.match" option.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    ignore = ["field1", "field2"]
+    ignore = ["parent.child_field"]
+
+    # The field names considered when deciding if an Event is a duplicate.
+    # Incompatible with the "fields.ignore" option.
+    #
+    # * optional
+    # * default: ["timestamp"]
+    # * type: [string]
+    match = ["field1", "field2"]
+    match = ["parent.child_field"]
+
 # Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which

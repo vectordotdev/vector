@@ -88,6 +88,7 @@ scopes:
   - aws_ec2_metadata transform
   - coercer transform
   - concat transform
+  - dedupe transform
   - field_filter transform
   - geoip transform
   - grok_parser transform

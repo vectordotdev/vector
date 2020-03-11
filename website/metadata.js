@@ -22509,6 +22509,28 @@ module.exports = {
 
       ]
     },
+    "dedupe": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "filter",
+      "id": "dedupe_transform",
+      "name": "dedupe",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "field_filter": {
       "beta": true,
       "delivery_guarantee": null,
