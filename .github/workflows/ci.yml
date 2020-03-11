@@ -30,8 +30,6 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --release --no-default-features  --features "sources-kubernetes transforms-kubernetes sinks-console"
-    - name: Print permissions
-      run: ls -l ./target/release/vector
     - name: Save vector
       uses: actions/upload-artifact@v1
       with:
@@ -46,8 +44,6 @@ jobs:
       run: cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" --no-run
     - name: Rename test executable
       run: find -regex "./target/debug/deps/vector-[0-9a-fA-F]+" -exec mv {} ./target/debug/deps/vector-test ';'
-    - name: Print permissions
-      run: ls -l ./target/debug/deps/vector-test
     - name: Save vector
       uses: actions/upload-artifact@v1
       with:
@@ -59,16 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [v1.17.2] #[v1.13.2, v1.14.10, v1.17.2]
+        kube: [v1.13.2, v1.14.10, v1.17.2]
     steps:
     - name: Load vector
       uses: actions/download-artifact@v1
       with:
         name: builds
-    - name: Print permissions
-      run: |
-        ls -l ./builds/vector
-        ls -l ./builds/vector-test
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
         minikube-version: 1.7.3
