@@ -22865,7 +22865,7 @@ module.exports = {
     "tag_cardinality_limit": {
       "beta": true,
       "delivery_guarantee": null,
-      "description": "Accepts metric events and allows you to limit the cardinality of tags.",
+      "description": "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.",
       "event_types": [
         "metric"
       ],

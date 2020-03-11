@@ -2237,7 +2237,7 @@ end
       # * relevant when type = "check_fields"
       "environment.prefix" = "staging-"
 
-# Accepts and outputs `metric` events allowing you to limit the cardinality of tags.
+# Accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
