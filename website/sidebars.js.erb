@@ -94,6 +94,7 @@ module.exports = {
             <%= metadata.links.fetch_id("docs.guides").to_json %>,
             <%= metadata.links.fetch_id("docs.guides.getting-started").to_json %>,
             <%= metadata.links.fetch_id("docs.guides.unit-testing").to_json %>,
+            <%= metadata.links.fetch_id("docs.guides.advanced-configs").to_json %>,
             <%= metadata.links.fetch_id("docs.guides.troubleshooting").to_json %>,
           ]
         },
@@ -139,6 +140,7 @@ module.exports = {
           label: 'Advanced',
           items: [
             <%= metadata.links.fetch_id("docs.reference.env-vars").to_json %>,
+            <%= metadata.links.fetch_id("docs.reference.field-path-notation").to_json %>,
             <%= metadata.links.fetch_id("docs.reference.global-options").to_json %>,
             <%= metadata.links.fetch_id("docs.reference.templating").to_json %>,
             <%= metadata.links.fetch_id("docs.reference.tests").to_json %>,
@@ -163,6 +165,11 @@ module.exports = {
       label: 'Meta',
       items: [
         <%= metadata.links.fetch_id("docs.meta.glossary").to_json %>,
+        {
+          type: 'link',
+          label: 'Privacy',
+          href: '<%= metadata.links.fetch_id("urls.vector_privacy_policy") %>'
+        },
         {
           type: 'link',
           label: 'Security',

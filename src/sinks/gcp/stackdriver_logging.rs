@@ -3,7 +3,10 @@ use crate::{
     event::{Event, LogEvent},
     sinks::{
         util::{
-            http::{https_client, HttpRetryLogic, HttpService},
+            encoding::{
+                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
+            },
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
@@ -18,6 +21,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -36,6 +40,8 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -43,6 +49,14 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -109,7 +123,7 @@ impl StackdriverConfig {
     ) -> crate::Result<RouterSink> {
         let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
-
+        let encoding = self.encoding.clone();
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let creds = creds.clone();
 
@@ -122,26 +136,26 @@ impl StackdriverConfig {
             .expect("Unexpected encoded wrapper format")
             + SPLICE_OFFSET;
 
-        let http_service = HttpService::builder(cx.resolver())
-            .tls_settings(tls_settings)
-            .build(move |mut logs: Vec<u8>| {
-                logs.pop(); // Strip the trailing comma
+        let build_request = move |mut logs: Vec<u8>| {
+            logs.pop(); // Strip the trailing comma
 
-                let mut body = wrapper.clone().into_bytes();
-                body.splice(wrapper_splice..wrapper_splice, logs);
+            let mut body = wrapper.clone().into_bytes();
+            body.splice(wrapper_splice..wrapper_splice, logs);
 
-                let mut request = make_request(body);
-                if let Some(creds) = creds.as_ref() {
-                    creds.apply(&mut request);
-                }
+            let mut request = make_request(body);
+            if let Some(creds) = creds.as_ref() {
+                creds.apply(&mut request);
+            }
 
-                request
-            });
+            request
+        };
+
+        let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
         let sink = request
             .batch_sink(HttpRetryLogic, http_service, cx.acker())
             .batched_with_min(Buffer::new(false), &batch)
-            .with_flat_map(|event| iter_ok(Some(encode_event(event))));
+            .with_flat_map(move |event| iter_ok(Some(encode_event(event, &encoding))));
 
         Ok(Box::new(sink))
     }
@@ -157,16 +171,15 @@ impl StackdriverConfig {
             creds.apply(&mut request);
         }
 
-        let client = https_client(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
+        let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
         let creds = creds.clone();
-        let healthcheck =
-            client
-                .request(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    creds,
-                    HealthcheckError::NotFound.into(),
-                ));
+        let healthcheck = client
+            .call(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                creds,
+                HealthcheckError::NotFound.into(),
+            ));
 
         Ok(Box::new(healthcheck))
     }
@@ -202,7 +215,8 @@ fn make_request<T>(body: T) -> Request<T> {
     builder.body(body).unwrap()
 }
 
-fn encode_event(event: Event) -> Vec<u8> {
+fn encode_event(mut event: Event, encoding: &EncodingConfigWithDefault<Encoding>) -> Vec<u8> {
+    encoding.apply_rules(&mut event);
     let entry = LogEntry {
         json_payload: event.into_log(),
     };
@@ -263,7 +277,7 @@ mod tests {
     #[test]
     fn encode_valid1() {
         let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let body = encode_event(log.into());
+        let body = encode_event(log.into(), &Encoding::Default.into());
         let body = String::from_utf8_lossy(&body);
         assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}},");
     }
@@ -272,8 +286,8 @@ mod tests {
     fn encode_valid2() {
         let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
         let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
-        let mut event = encode_event(log1.into());
-        event.extend(encode_event(log2.into()));
+        let mut event = encode_event(log1.into(), &Encoding::Default.into());
+        event.extend(encode_event(log2.into(), &Encoding::Default.into()));
         let body = String::from_utf8_lossy(&event);
         assert_eq!(
             body,

@@ -1,6 +1,7 @@
 use crate::{
     sinks::util::{
         self,
+        encoding::{EncodingConfig, EncodingConfiguration},
         tcp::{tcp_healthcheck, TcpSink},
         uri::UriSerde,
         Encoding,
@@ -17,7 +18,7 @@ use serde::{Deserialize, Serialize};
 pub struct DatadogLogsConfig {
     endpoint: Option<UriSerde>,
     api_key: String,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     tls: Option<TlsOptions>,
 }
 
@@ -72,7 +73,13 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
-fn encode_event(event: crate::Event, mut api_key: Bytes, encoding: &Encoding) -> Option<Bytes> {
+fn encode_event(
+    mut event: crate::Event,
+    mut api_key: Bytes,
+    encoding: &EncodingConfig<Encoding>,
+) -> Option<Bytes> {
+    encoding.apply_rules(&mut event);
+
     if let Some(bytes) = util::encode_event(event, encoding) {
         // Prepend the api_key:
         // {API_KEY} {EVENT_BYTES}

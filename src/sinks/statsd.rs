@@ -215,18 +215,19 @@ mod test {
     use crate::{
         buffers::Acker,
         event::{metric::MetricKind, metric::MetricValue, Metric},
-        sources::statsd::parser::parse,
         test_util::{collect_n, runtime},
         Event,
     };
     use bytes::Bytes;
     use futures01::{stream, stream::Stream, sync::mpsc, Sink};
-    use std::str::from_utf8;
+    use std::time::{Duration, Instant};
     use tokio::{
         self,
         codec::BytesCodec,
         net::{UdpFramed, UdpSocket},
     };
+    #[cfg(feature = "sources-statsd")]
+    use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
     fn tags() -> BTreeMap<String, String> {
         vec![
@@ -246,6 +247,7 @@ mod test {
         );
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_counter() {
         let metric1 = Metric {
@@ -261,6 +263,7 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_gauge() {
         let metric1 = Metric {
@@ -276,6 +279,7 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_distribution() {
         let metric1 = Metric {
@@ -294,6 +298,7 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
+    #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_set() {
         let metric1 = Metric {
@@ -349,6 +354,14 @@ mod test {
 
         let stream = stream::iter_ok(events.clone().into_iter());
         let sender = sink.send_all(stream);
+        let deadline = Instant::now() + Duration::from_millis(100);
+
+        // Add a delay to the write side to let the read side
+        // poll for read interest. Otherwise, this could cause
+        // a race condition in noisy environments.
+        let sender = tokio::timer::Delay::new(deadline)
+            .map_err(drop)
+            .and_then(|_| sender);
 
         let (tx, rx) = mpsc::channel(1);
 

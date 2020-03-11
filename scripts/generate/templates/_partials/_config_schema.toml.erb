@@ -9,8 +9,6 @@
   <%- options.each do |option| -%>
     <%- if option.array_of_objects? -%>
 <%= config_schema(option.children_list, path: "#{opts[:path]}.#{option.name}", array: true).indent(2) %>
-    <%- elsif option.object? && option.inline? -%>
-  <%= option.name %> = {<%= option.children_list.first.name %> = <%= schema.type_string(option.children_list.first.type, option.children_list.first.enum) %>}
     <%- elsif option.object? -%>
 <%= config_schema(option.children_list, path: "#{opts[:path]}.#{option.name}").indent(2) %>
     <%- else -%>

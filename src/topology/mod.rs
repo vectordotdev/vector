@@ -529,7 +529,7 @@ fn handle_errors(
         })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
 mod tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::socket::SocketConfig;
@@ -550,7 +550,7 @@ mod tests {
             &[&"in"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
-                encoding: Encoding::Text,
+                encoding: Encoding::Text.into(),
             },
         );
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());

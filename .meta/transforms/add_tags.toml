@@ -23,8 +23,8 @@ metric.\
 type = "string"
 required = true
 examples = [
-  {"static_tag" = "my value"},
-  {"env_tag" = "${ENV_VAR}"},
+  {static_tag = "my value"},
+  {env_tag = "${ENV_VAR}"},
 ]
 description = """\
 The name of the tag to add. Due to the nature of metric tags, the value \

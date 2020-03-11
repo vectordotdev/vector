@@ -17,7 +17,6 @@
   [[tests.outputs]]
     extract_from = "merge"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "message.equals" = "hello world"
       "_partial.exists" = false
 
@@ -41,7 +40,6 @@
   [[tests.outputs]]
     extract_from = "merge_nested"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "nested.message.equals" = "hello world"
       "_partial.exists" = false
 
@@ -66,6 +64,5 @@
   [[tests.outputs]]
     extract_from = "merge_nested_marker"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "nested.message.equals" = "hello world"
       "nested.is_partial.exists" = false

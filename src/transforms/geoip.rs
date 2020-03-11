@@ -168,6 +168,7 @@ impl Transform for Geoip {
     }
 }
 
+#[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
     use super::Geoip;

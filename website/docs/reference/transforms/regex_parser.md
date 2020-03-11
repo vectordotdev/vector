@@ -2,6 +2,7 @@
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
+function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
 min_version: null
 service_name: "Regex Parser"
@@ -29,22 +30,20 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED - General
-  type = "regex_parser" # must be: "regex_parser"
-  inputs = ["my-source-id"] # example
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # example
+  # General
+  type = "regex_parser" # required
+  inputs = ["my-source-id"] # required
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
 
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int" # example
-    duration = "float" # example
-    success = "bool" # example
-    timestamp = "timestamp|%F" # example
-    timestamp = "timestamp|%a %b %e %T %Y" # example
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
 ```
 
 ## Options
@@ -65,7 +64,7 @@ import Field from '@site/src/components/Field';
   name={"drop_field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -83,12 +82,12 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   common={true}
   defaultValue={"message"}
   enumValues={null}
-  examples={["message"]}
+  examples={["message","parent.child"]}
   groups={[]}
   name={"field"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -96,7 +95,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 ### field
 
-The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
+The log field to parse. See [Failed Parsing](#failed-parsing) and [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -142,7 +141,7 @@ The Regular Expression to apply. Do not include the leading or trailing `/`. See
 
 ### types
 
-Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-syntax) for more info.
+Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types. See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
 
@@ -151,7 +150,7 @@ Key/Value pairs representing mapped log field types. See [Regex Syntax](#regex-s
   common={true}
   defaultValue={null}
   enumValues={{"bool":"Coerces `\"true\"`/`/\"false\"`, `\"1\"`/`\"0\"`, and `\"t\"`/`\"f\"` values into boolean.","float":"Coerce to a 64 bit float.","int":"Coerce to a 64 bit integer.","string":"Coerce to a string.","timestamp":"Coerces to a Vector timestamp. [`strptime` specificiers][urls.strptime_specifiers] must be used to parse the string."}}
-  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"}]}
+  examples={[{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]}
   groups={[]}
   name={"`[field-name]`"}
   path={"types"}
@@ -225,6 +224,13 @@ Things to note about the output:
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `regex_parser`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -243,6 +249,25 @@ depending on the `drop_failed` value.
 A failure includes any event that does not successfully parse against the
 provided [`regex`](#regex). This includes bad values as well as events missing the
 specified [`field`](#field).
+
+### Field Notation Syntax
+
+The [`field`](#field) options
+support [Vector's field notiation syntax][docs.reference.field-path-notation],
+enabling access to root-level, nested, and array field values. For example:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.my_regex_parser_transform_id]
+  # ...
+  field = "message"
+  field = "parent.child"
+  # ...
+```
+
+You can learn more about Vector's field notation in the
+[field notation reference][docs.reference.field-path-notation].
 
 ### Performance
 
@@ -304,6 +329,7 @@ documentation][urls.regex_grouping_and_flags].
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
@@ -311,3 +337,4 @@ documentation][urls.regex_grouping_and_flags].
 [urls.regex_tester]: https://rustexp.lpil.uk/
 [urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -107,8 +107,11 @@
 - name: "needs: outside help"
   description: Needs help outside of the Vector core team
   color: feca57
+- name: "needs: rfc"
+  description: Needs an RFC process before work can begin
+  color: feca57
 - name: "needs: spec"
-  description: Needs a specification before work can begin
+  description: Needs a light specification before work can begin
   color: feca57
 
 - name: "platform: docker"
@@ -125,6 +128,9 @@
   color: ff9ff3
 - name: "platform: macos"
   description: Anything MacOS related
+  color: ff9ff3
+- name: "platform: nixos"
+  description: Anything NixOS related
   color: ff9ff3
 - name: "platform: raspbian"
   description: Anything Raspbian related
@@ -143,6 +149,9 @@
   color: ff9ff3
 - name: "platform: homebrew"
   description: Anything Homebrew related
+  color: ff9ff3
+- name: "platform: nix"
+  description: Anything Nix related
   color: ff9ff3
 - name: "platform: rpm"
   description: Anything RPM related
@@ -181,6 +190,9 @@
   color: ff9ff3
 - name: "source: file"
   description: Anything `file` source realted
+  color: ff9ff3
+- name: "source: http"
+  description: Anything `http` source realted
   color: ff9ff3
 - name: "source: journald"
   description: Anything `journald` source realted
@@ -231,6 +243,9 @@
 - name: "transform: concat"
   description: Anything `concat` transform related
   color: 54a0ff
+- name: "transform: dedupe"
+  description: Anything `dedupe` transform related
+  color: 54a0ff
 - name: "transform: field_filter"
   description: Anything `field_filter` transform related
   color: 54a0ff
@@ -275,6 +290,9 @@
   color: 54a0ff
 - name: "transform: swimlanes"
   description: Anything `swimlanes` transform related
+  color: 54a0ff
+- name: "transform: tag_cardinality_limit"
+  description: Anything `tag_cardinality_limit` transform related
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related

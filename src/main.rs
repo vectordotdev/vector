@@ -58,6 +58,10 @@ struct RootOpts {
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
 
+    /// Set the logging format. Options are "text" or "json". Defaults to "text".
+    #[structopt(long)]
+    log_format: Option<LogFormat>,
+
     /// Control when ANSI terminal formatting is used.
     ///
     /// By default `vector` will try and detect if `stdout` is a terminal, if it is
@@ -115,6 +119,12 @@ enum Color {
     Never,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum LogFormat {
+    Text,
+    Json,
+}
+
 impl std::str::FromStr for Color {
     type Err = String;
 
@@ -131,27 +141,24 @@ impl std::str::FromStr for Color {
     }
 }
 
-fn get_version() -> String {
-    #[cfg(feature = "nightly")]
-    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
-    #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
+impl std::str::FromStr for LogFormat {
+    type Err = String;
 
-    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
-    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
-        .unwrap()
-        .format("%Y-%m-%d");
-    let built_string = if let Some(commit_hash) = commit_hash {
-        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
-    } else {
-        built_info::TARGET.into()
-    };
-    format!("{} ({})", pkg_version, built_string)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "text" => Ok(LogFormat::Text),
+            "json" => Ok(LogFormat::Json),
+            s => Err(format!(
+                "{} is not a valid option, expected `text` or `json`",
+                s
+            )),
+        }
+    }
 }
 
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let version = get_version();
+    let version = vector::get_version();
     let app = Opts::clap().version(&version[..]).global_settings(&[
         AppSettings::ColoredHelp,
         AppSettings::InferSubcommands,
@@ -196,8 +203,14 @@ fn main() {
 
     let (metrics_controller, metrics_sink) = metrics::build();
 
+    let json = match &opts.log_format.unwrap_or(LogFormat::Text) {
+        LogFormat::Text => false,
+        LogFormat::Json => true,
+    };
+
     trace::init(
         color,
+        json,
         levels.as_str(),
         opts.metrics_addr.map(|_| metrics_sink),
     );

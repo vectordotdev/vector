@@ -15,6 +15,7 @@ description = "A unique identifier for this test."
 type = "[table]"
 common = true
 required = true
+toml_display = "normal"
 description = "A table that defines a unit test input event."
 
 [tests.children.inputs.children.insert_at]
@@ -29,7 +30,6 @@ order to begin the test.\
 
 [tests.children.inputs.children.type]
 type = "string"
-examples = ["raw", "log", "metric"]
 required = true
 common = true
 description = "The event type."
@@ -41,24 +41,26 @@ metric = "Creates a metric event, where its type and fields are specified in the
 
 [tests.children.inputs.children.value]
 type = "string"
+common = true
 examples = ["some message contents"]
 relevant_when = {type = "raw"}
-common = true
+required = true
 description = "Specifies the log message field contents when the input type is 'raw'."
 
 [tests.children.inputs.children.log_fields]
 type = "table"
 common = false
 relevant_when = {type = "log"}
+required = true
 description = "Specifies the log fields when the input type is 'log'."
 
 [tests.children.inputs.children.log_fields.children."`[field-name]`"]
 type = "*"
-required = true
 examples = [
   {message = "some message contents"},
   {host = "myhost"},
 ]
+required = true
 description = """\
 A key/value pair representing a field to be added to the input event.\
 """
@@ -67,12 +69,12 @@ A key/value pair representing a field to be added to the input event.\
 type = "table"
 common = false
 relevant_when = {type = "metric"}
+required = true
 description = "Specifies the metric type when the input type is 'metric'."
 
 [tests.children.inputs.children.metric.children.type]
 type = "string"
 required = true
-examples = ["counter"]
 common = true
 description = "The metric type."
 
@@ -146,6 +148,7 @@ minus = "Decrease the gauge"
 type = "[table]"
 common = true
 required = true
+toml_display = "normal"
 description = "A table that defines a unit test expected output."
 
 [tests.children.outputs.children.extract_from]
