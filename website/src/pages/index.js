@@ -248,6 +248,7 @@ function Integrations() {
   const classes = {
     'aws_s3_sink': 'large',
     'clickhouse_sink': 'medium',
+    'deduoe': 'medium',
     'docker_source': 'large',
     'elasticsearch_sink': 'large',
     'file_source': 'medium',
@@ -260,6 +261,7 @@ function Integrations() {
     'regex_parser': 'medium',
     'socket_sink': 'medium',
     'syslog_source': 'medium',
+    'tag_cardinality_limit': 'large',
   }
 
   return (
