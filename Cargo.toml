@@ -32,6 +32,7 @@ members = [
   "lib/file-source",
   "lib/tracing-metrics",
   "lib/tracing-limit",
+  "test-data/engine/inspect"
 ]
 
 [dependencies]
@@ -202,7 +203,7 @@ leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 # This feature enables the WASM engine.
-engine = ["lucetc", "lucet-runtime", "lucet-wasi", "lru"]
+engine = ["lucetc", "lucet-runtime", "lucet-wasi", "lru", "uuid"]
 
 # Sources
 sources = [

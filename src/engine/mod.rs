@@ -137,10 +137,11 @@ impl Engine for DefaultEngine {
 
 #[test]
 fn engine() -> Result<()> {
+    let module = "target/wasm32-wasi/release/inspect.wasm";
     let mut engine = DefaultEngine::build(Default::default());
     let events = vec![Event::new_empty_log()];
-    engine.load("untitled.wasm")?;
-    let id = engine.instantiate("untitled.wasm")?;
+    engine.load(module)?;
+    let id = engine.instantiate(module)?;
     let out = engine.process(&id, events.clone())?;
     assert_eq!(events, out);
     Ok(())

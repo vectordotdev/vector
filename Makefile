@@ -3,7 +3,7 @@
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
 export USE_CONTAINER ?= docker
-
+export VECTOR_RUST_FLAGS ?= RUSTFLAGS="-C link-args=-rdynamic"
 
 help:
 	@echo "                                      __   __  __"
@@ -46,6 +46,7 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 check-blog: ## Checks that all blog articles are signed by their authors
 	@scripts/run.sh checker scripts/check-blog-signatures.rb
 
+
 export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta
 	@scripts/run.sh checker scripts/generate.rb
@@ -78,6 +79,20 @@ test: ## Spins up Docker resources and runs _every_ test
 
 test-behavior: ## Runs behavioral tests
 	@cargo run -- test tests/behavior/**/*.toml
+
+ensure-has-wasm-toolchain: ### Configures a wasm toolchain for test artifact building, if required
+	rustup target add wasm32-wasi --toolchain nightly
+
+ENGINE_TEST_MODULES := $(patsubst test-data/engine/%, target/wasm-wasi/release/%.wasm, $(wildcard test-data/engine/*))
+build-engine-test-modules: $(ENGINE_TEST_MODULES) ### Builds engine test modules, if required
+
+.ONESHELL:
+$(ENGINE_TEST_MODULES): ensure-has-wasm-toolchain ### Build the target test module
+	cd $(patsubst target/wasm-wasi/release/%.wasm, test-data/engine/%, $@)
+	cargo +nightly build --target wasm32-wasi --release
+
+test-engine: build-engine-test-modules  ### Run engine tests.
+	cargo test --no-default-features --features engine engine
 
 clean: ## Remove build artifacts
 	@cargo clean
