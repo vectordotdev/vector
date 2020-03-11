@@ -19,7 +19,7 @@ use hyper::client::HttpConnector;
 use hyper::Client;
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 use tokio::executor::DefaultExecutor;
 use tower::Service;
 use tracing::Span;
@@ -104,7 +104,6 @@ where
     }
 }
 
-// TODO: add manual debug impl
 pub struct HttpClient<B = Body> {
     client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
     span: Span,
@@ -191,6 +190,15 @@ impl<B> Clone for HttpClient<B> {
             span: self.span.clone(),
             version: self.version.clone(),
         }
+    }
+}
+
+impl<B> fmt::Debug for HttpClient<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HttpClient")
+            .field("client", &self.client)
+            .field("version", &self.version)
+            .finish()
     }
 }
 
