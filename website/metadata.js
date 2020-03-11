@@ -21853,7 +21853,7 @@ module.exports = {
     "papertrail": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to [Papertrail](https://www.papertrail.com/).",
+      "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
       "event_types": [
         "log"
       ],

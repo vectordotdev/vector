@@ -310,6 +310,7 @@ sinks = [
   "sinks-logdna",
   "sinks-loki",
   "sinks-new_relic_logs",
+  "sinks-papertrail",
   "sinks-prometheus",
   "sinks-sematext_logs",
   "sinks-socket",

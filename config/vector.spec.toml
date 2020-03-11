@@ -7034,7 +7034,7 @@ end
     # * unit: seconds
     timeout_secs = 30
 
-# Streams `log` events to Papertrail.
+# Streams `log` events to Papertrail via Syslog.
 [sinks.papertrail]
   #
   # General
@@ -7067,18 +7067,6 @@ end
   # * type: bool
   healthcheck = true
   healthcheck = false
-
-  #
-  # requests
-  #
-
-  # The encoding format used to serialize the events before outputting.
-  #
-  # * required
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   #
   # Buffer
@@ -7119,6 +7107,42 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.papertrail.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "json" or "text"
+    codec = "json"
+    codec = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]

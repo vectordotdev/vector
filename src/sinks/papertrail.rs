@@ -1,15 +1,16 @@
 use crate::{
     event::log_schema,
     sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
         tcp::{tcp_healthcheck, TcpSink},
-        tls::TlsSettings,
         uri::UriSerde,
         Encoding,
     },
+    tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, Sink};
+use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
@@ -17,7 +18,7 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
     endpoint: UriSerde,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
 }
 
 inventory::submit! {
@@ -63,7 +64,13 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(mut event: crate::Event, pid: u32, encoding: &Encoding) -> Option<Bytes> {
+fn encode_event(
+    mut event: crate::Event,
+    pid: u32,
+    encoding: &EncodingConfig<Encoding>,
+) -> Option<Bytes> {
+    encoding.apply_rules(&mut event);
+
     let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
         Some(host.to_string_lossy())
     } else {
@@ -81,8 +88,8 @@ fn encode_event(mut event: crate::Event, pid: u32, encoding: &Encoding) -> Optio
 
     let log = event.into_log();
 
-    let message = match encoding {
-        Encoding::Json => serde_json::to_string(&log.unflatten()).unwrap(),
+    let message = match encoding.codec() {
+        Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
             .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy())
