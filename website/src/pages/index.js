@@ -248,7 +248,7 @@ function Integrations() {
   const classes = {
     'aws_s3_sink': 'large',
     'clickhouse_sink': 'medium',
-    'deduoe': 'medium',
+    'dedupe': 'medium',
     'docker_source': 'large',
     'elasticsearch_sink': 'large',
     'file_source': 'medium',
