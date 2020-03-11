@@ -46,7 +46,7 @@ events from unrelated transactions from combining.\
 type = "table"
 common = false
 required = false
-examples = [{message="append",username="append"}]
+examples = [{message="concat",username="array"}]
 description = """\
 A map of field names to custom merge strategies. For each field specified this \
 strategy will be used for combining events rather than the default behavior.
@@ -54,7 +54,7 @@ strategy will be used for combining events rather than the default behavior.
 The default behavior is as follows:
 
 1. The first value of a string field is kept, subsequent values are discarded.
-2. For timestamp fields the first is kept and a new field `<field_name>_end` is
+2. For timestamp fields the first is kept and a new field `[field_name]_end` is
    added with the last received timestamp value.
 3. Numeric values are added.\
 """
@@ -67,7 +67,7 @@ description = "The custom merge strategy to use for a field."
 
 [transforms.transaction.options.merge_strategies.children."`[field_name]`".enum]
 "array" = "Each value is appended to an array."
-"append" = "Append each string value (delimited with a space)."
+"concat" = "Concatenate each string value (delimited with a space)."
 "discard" = "Discard all but the first value found."
 "sum" = "Sum all number values."
 "max" = "The maximum of all number values."
