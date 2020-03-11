@@ -24,6 +24,17 @@ The Vector `sampler` transform accepts and outputs [`log`][docs.data-model.log] 
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
@@ -36,6 +47,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
   pass_list = ["[error]", "field2"] # optional, no default
 ```
 
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "sampler" # required
+  inputs = ["my-source-id"] # required
+  rate = 10 # required
+  key_field = "message" # optional, no default
+  pass_list = ["[error]", "field2"] # optional, no default
+```
+
+</TabItem>
+</Tabs>
+
 ## Options
 
 import Fields from '@site/src/components/Fields';
@@ -43,6 +71,29 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["message"]}
+  groups={[]}
+  name={"key_field"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### key_field
+
+The name of the log field to use to determine if the event should be passed. This defaults to the [global `message_key` option][docs.reference.global-options#message_key].
+
+
+</Field>
 
 
 <Field
@@ -62,7 +113,7 @@ import Field from '@site/src/components/Field';
 
 ### pass_list
 
-A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.
+A list of regular expression patterns to exclude events from sampling. If an event's key field (see [`key_field`](#key_field)) matches _any_ of these patterns it will _not_ be sampled.
 
 
 </Field>
@@ -114,4 +165,5 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

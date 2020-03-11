@@ -67,6 +67,7 @@ fn sample() {
         &["in"],
         transforms::sampler::SamplerConfig {
             rate: 10,
+            key_field: None,
             pass_list: vec![],
         },
     );
