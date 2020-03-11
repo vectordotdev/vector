@@ -386,6 +386,8 @@ function example_transform.timer_handler (emit)
   }
   counter = 0
 end
+
+return example_transform
 ```
 
 Then the transform configuration is the following:
