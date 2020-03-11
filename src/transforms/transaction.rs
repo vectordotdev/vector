@@ -817,9 +817,6 @@ merge_strategies.baz = "max"
             outputs.first().unwrap().as_log()[&"bar".into()],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"baz".into()],
-            3.into(),
-        );
+        assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
     }
 }
