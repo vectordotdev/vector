@@ -46,7 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
 
   # Fields
-  fields.match = ["timestamp"] # optional, default
+  fields.match = ["timestamp", "host", "message"] # optional, default
 ```
 
 </TabItem>
@@ -64,8 +64,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   cache.num_events = 5000 # optional, default
 
   # Fields
-  fields.ignore = ["field1", "field2"] # optional, no default
-  fields.match = ["timestamp"] # optional, default
+  fields.ignore = ["field1", "parent.child_field"] # optional, no default
+  fields.match = ["timestamp", "host", "message"] # optional, default
 ```
 
 </TabItem>
@@ -156,7 +156,7 @@ Options controlling what fields to match against
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[["field1","field2"],["parent.child_field"]]}
+  examples={[["field1","parent.child_field"]]}
   groups={[]}
   name={"ignore"}
   path={"fields"}
@@ -169,7 +169,7 @@ Options controlling what fields to match against
 
 #### ignore
 
-The field names to ignore when deciding if an Event is a duplicate. Incompatible with the "fields.match" option.
+The field names to ignore when deciding if an Event is a duplicate. Incompatible with the `fields.match` option.
 
 
 </Field>
@@ -177,9 +177,9 @@ The field names to ignore when deciding if an Event is a duplicate. Incompatible
 
 <Field
   common={true}
-  defaultValue={["timestamp"]}
+  defaultValue={["timestamp","host","message"]}
   enumValues={null}
-  examples={[["field1","field2"],["parent.child_field"]]}
+  examples={[["field1","parent.child_field"]]}
   groups={[]}
   name={"match"}
   path={"fields"}
@@ -192,7 +192,8 @@ The field names to ignore when deciding if an Event is a duplicate. Incompatible
 
 #### match
 
-The field names considered when deciding if an Event is a duplicate. Incompatible with the "fields.ignore" option.
+The field names considered when deciding if an Event is a duplicate. This can
+also be globally set via the [global `log_schema` options][docs.reference.global-options#log_schema].Incompatible with the `fields.ignore` option.
 
 
 </Field>
@@ -251,10 +252,16 @@ If you want to estimate the memory requirements of this transform
 for your dataset, you can do so with these formulas:
 
 When using `fields.match`:
+
+```
 Sum(the average size of the *data* (but not including the field name) for each field in `fields.match`) * `cache.num_events`
+```
 
 When using `fields.ignore`:
+
+```
 (Sum(the average size of each incoming Event) - (the average size of the field name *and* value for each field in `fields.ignore`)) * `cache.num_events`
+```
 
 ### Missing Fields
 Fields with explicit null values will always be considered different than if
@@ -265,4 +272,5 @@ than the event "{b:5}".
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

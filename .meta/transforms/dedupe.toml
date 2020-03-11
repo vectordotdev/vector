@@ -19,16 +19,23 @@ required = true
 type = "[string]"
 common = true
 field_path_notation = true
-examples = [["field1", "field2"], ["parent.child_field"]]
-default = ["timestamp"]
-description = "The field names considered when deciding if an Event is a duplicate. Incompatible with the \"fields.ignore\" option."
+examples = [["field1", "parent.child_field"]]
+default = ["timestamp", "host", "message"]
+description = """\
+The field names considered when deciding if an Event is a duplicate. This can
+also be globally set via the \
+[global `log_schema` options][docs.reference.global-options#log_schema].\
+Incompatible with the `fields.ignore` option.\
+"""
 
 [transforms.dedupe.options.fields.children.ignore]
 type = "[string]"
 field_path_notation = true
-examples = [["field1", "field2"], ["parent.child_field"]]
-description = "The field names to ignore when deciding if an Event is a duplicate. Incompatible with the \"fields.match\" option."
-
+examples = [["field1", "parent.child_field"]]
+description = """
+The field names to ignore when deciding if an Event is a duplicate. \
+Incompatible with the `fields.match` option.\
+"""
 
 [transforms.dedupe.options.cache]
 type = "table"
