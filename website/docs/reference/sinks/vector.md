@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Vector"
 description: "The Vector `vector` sink streams `log` events to another downstream `vector` source."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Vector"
 sidebar_label: "vector|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/vector.rs
 status: "beta"
@@ -28,11 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,43 +44,42 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example
-
-  # OPTIONAL
-  healthcheck = true # default
+  type = "vector" # required
+  inputs = ["my-source-id"] # required
+  address = "92.12.333.224:5000" # required
+  healthcheck = true # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "vector" # must be: "vector"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example
+  # General
+  type = "vector" # required
+  inputs = ["my-source-id"] # required
+  address = "92.12.333.224:5000" # required
+  healthcheck = true # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
-
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = true # optional, default
+  tls.verify_hostname = true # optional, default
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -97,6 +96,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["92.12.333.224:5000"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -119,6 +119,7 @@ The downstream Vector address to connect to. The address _must_ include a port.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -140,10 +141,11 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -158,10 +160,11 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -184,10 +187,11 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -206,6 +210,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -233,6 +238,7 @@ The behavior when the buffer becomes full.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -246,6 +252,194 @@ The behavior when the buffer becomes full.
 
 Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tls"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### tls
+
+Configures the TLS options for connections from this sink.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"enabled"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### enabled
+
+Enable TLS during connections to the remote.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
+  name={"ca_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### ca_path
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
+  name={"crt_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### crt_path
+
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, [`key_path`](#key_path) must also be set.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
+  name={"key_pass"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### key_pass
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/host_certificate.key"]}
+  groups={[]}
+  name={"key_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### key_path
+
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be set.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"verify_certificate"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_certificate
+
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"verify_hostname"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_hostname
+
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 

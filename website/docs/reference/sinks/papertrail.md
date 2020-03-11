@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+papertrail%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Papertrail"
 sidebar_label: "papertrail|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/papertrail.rs
 status: "beta"
@@ -28,11 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,49 +44,40 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "papertrail" # must be: "papertrail"
-  inputs = ["my-source-id"] # example
-  endpoint = "logs.papertrailapp.com:12345" # example
+  # General
+  type = "papertrail" # required
+  inputs = ["my-source-id"] # required
+  endpoint = "logs.papertrailapp.com:12345" # required
+  healthcheck = true # optional, default
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
-  healthcheck = true # default
+  # requests
+  encoding = "json" # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "papertrail" # must be: "papertrail"
-  inputs = ["my-source-id"] # example
-  endpoint = "logs.papertrailapp.com:12345" # example
+  # General
+  type = "papertrail" # required
+  inputs = ["my-source-id"] # required
+  endpoint = "logs.papertrailapp.com:12345" # required
+  healthcheck = true # optional, default
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
+  # requests
+  encoding = "json" # required
 
-  # OPTIONAL - General
-  healthcheck = true # default
-
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
-
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -103,6 +94,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -124,10 +116,11 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -142,10 +135,11 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -168,10 +162,11 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -190,6 +185,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -217,6 +213,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
   examples={["json","text"]}
+  groups={[]}
   name={"encoding"}
   path={null}
   relevantWhen={null}
@@ -239,6 +236,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={null}
   enumValues={null}
   examples={["logs.papertrailapp.com:12345"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={null}
@@ -261,6 +259,7 @@ The endpoint to stream logs to.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}

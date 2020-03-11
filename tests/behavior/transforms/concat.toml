@@ -15,7 +15,6 @@
   [[tests.outputs]]
     extract_from = "concat_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "concatenated.equals" = "on wo re"
 
 [transforms.concat_nested]
@@ -35,5 +34,4 @@
   [[tests.outputs]]
     extract_from = "concat_nested"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "nested.concatenated.field.equals" = "ababab cdcdcd efe"

@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "HTTP"
 sidebar_label: "http|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 status: "prod-ready"
@@ -28,11 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,106 +44,89 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "http" # must be: "http"
-  inputs = ["my-source-id"] # example
-  uri = "https://10.22.212.22:9000/endpoint" # example
+  # General
+  type = "http" # required
+  inputs = ["my-source-id"] # required
+  uri = "https://10.22.212.22:9000/endpoint" # required
+  compression = "none" # optional, default
+  healthcheck = true # optional, default
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
+  # Batch
+  batch.max_size = 1049000 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - General
-  healthcheck = true # default
+  # Buffer
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
 
-  # OPTIONAL - requests
-  compression = "none" # default, enum
+  # Encoding
+  encoding.codec = "json" # required
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
-    timeout_secs = 1 # default, seconds
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 10 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 1000 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
+  # Request
+  request.in_flight_limit = 10 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 1000 # optional, default
+  request.timeout_secs = 30 # optional, default, seconds
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "http" # must be: "http"
-  inputs = ["my-source-id"] # example
-  uri = "https://10.22.212.22:9000/endpoint" # example
+  # General
+  type = "http" # required
+  inputs = ["my-source-id"] # required
+  uri = "https://10.22.212.22:9000/endpoint" # required
+  compression = "none" # optional, default
+  healthcheck = true # optional, default
+  healthcheck_uri = "https://10.22.212.22:9000/_health" # optional, no default
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
+  # Auth
+  auth.strategy = "basic" # required
+  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
+  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
 
-  # OPTIONAL - General
-  healthcheck = true # default
-  healthcheck_uri = "https://10.22.212.22:9000/_health" # example, no default
+  # Batch
+  batch.max_size = 1049000 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - requests
-  compression = "none" # default, enum
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
-  # OPTIONAL - Auth
-  [sinks.my_sink_id.auth]
-    strategy = "basic" # must be: "basic"
-    password = "${PASSWORD_ENV_VAR}" # example, relevant when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}" # example, relevant when strategy = "basic"
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 1049000 # default, bytes
-    timeout_secs = 1 # default, seconds
+  # Headers
+  headers.Authorization = "${TOKEN_ENV_VAR}" # example
+  headers.X-Powered-By = "Vector" # example
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Request
+  request.in_flight_limit = 10 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 1000 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 30 # optional, default, seconds
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
-
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    Authorization = "${TOKEN_ENV_VAR}" # example
-    X-Powered-By = "Vector" # example
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 10 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 1000 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
-
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
-    verify_hostname = true # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = true # optional, default
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -160,6 +143,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"auth"}
   path={null}
   relevantWhen={null}
@@ -181,6 +165,7 @@ Options for the authentication strategy.
   defaultValue={null}
   enumValues={{"basic":"The [basic authentication strategy][urls.basic_auth]."}}
   examples={["basic"]}
+  groups={[]}
   name={"strategy"}
   path={"auth"}
   relevantWhen={null}
@@ -203,6 +188,7 @@ The authentication strategy to use.
   defaultValue={null}
   enumValues={null}
   examples={["${PASSWORD_ENV_VAR}","password"]}
+  groups={[]}
   name={"password"}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
@@ -225,6 +211,7 @@ The basic authentication password.
   defaultValue={null}
   enumValues={null}
   examples={["${USERNAME_ENV_VAR}","username"]}
+  groups={[]}
   name={"user"}
   path={"auth"}
   relevantWhen={{"strategy":"basic"}}
@@ -252,6 +239,7 @@ The basic authentication user name.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -273,10 +261,11 @@ Configures the sink batching behavior.
   defaultValue={1049000}
   enumValues={null}
   examples={[1049000]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -295,10 +284,11 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -318,10 +308,11 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -343,10 +334,11 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -361,10 +353,11 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -387,10 +380,11 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -409,6 +403,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -436,6 +431,7 @@ The behavior when the buffer becomes full.
   defaultValue={"none"}
   enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
   examples={["none","gzip"]}
+  groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
@@ -456,10 +452,33 @@ The compression strategy used to compress the encoded event data before outputti
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","ndjson","text"]}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
   name={"encoding"}
   path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","ndjson":"Each event is encoded into JSON and the payload is new line delimited.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","ndjson","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -467,9 +486,9 @@ The compression strategy used to compress the encoded event data before outputti
   unit={null}
   >
 
-### encoding
+#### codec
 
-The encoding format used to serialize the events before outputting.
+The encoding codec used to serialize the events before outputting.
 
 
 </Field>
@@ -479,7 +498,82 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={[]}
+  groups={[]}
   name={"headers"}
   path={null}
   relevantWhen={null}
@@ -501,6 +595,7 @@ Options for custom headers. See [Authentication](#authentication) for more info.
   defaultValue={null}
   enumValues={null}
   examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
   name={"`[header-key]`"}
   path={"headers"}
   relevantWhen={null}
@@ -528,6 +623,7 @@ A custom header to be added to each outgoing HTTP request.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -550,6 +646,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={["https://10.22.212.22:9000/_health"]}
+  groups={[]}
   name={"healthcheck_uri"}
   path={null}
   relevantWhen={null}
@@ -572,6 +669,7 @@ A URI that Vector can request in order to determine the service health. See [Hea
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -593,6 +691,7 @@ Configures the sink request behavior.
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -615,6 +714,7 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -637,6 +737,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -655,10 +756,11 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -677,10 +779,11 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -699,10 +802,11 @@ The amount of time to wait before attempting the first retry for a failed reques
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -725,6 +829,7 @@ The maximum amount of time, in seconds, to wait between retries.
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -752,6 +857,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -773,6 +879,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -791,10 +898,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -817,6 +925,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -828,17 +937,18 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -861,6 +971,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -878,28 +989,6 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 </Field>
 
 
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"verify_hostname"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### verify_hostname
-
-If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-
-
-</Field>
-
-
 </Fields>
 
 </Field>
@@ -910,6 +999,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
   defaultValue={null}
   enumValues={null}
   examples={["https://10.22.212.22:9000/endpoint"]}
+  groups={[]}
   name={"uri"}
   path={null}
   relevantWhen={null}

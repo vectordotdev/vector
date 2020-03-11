@@ -4,7 +4,16 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
+min_version = "1.24"
 output_types = ["log"]
+requirements.additional = """\
+* The [`json-file`][urls.docker_logging_driver_json_file] (default) or \
+[`journald`][urls.docker_logging_driver_journald] Docker logging driver \
+must be enabled for this source to work. See the \
+[Docker Integration Strategy section](#docker-integration-strategy) \
+for more info.
+"""
+service_name = "Docker API"
 through_description = "the [Docker engine daemon][urls.docker_daemon]"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
@@ -13,13 +22,11 @@ through_description = "the [Docker engine daemon][urls.docker_daemon]"
 type = "string"
 default = "unix:///var/run/docker.sock"
 examples = ["unix://path/to/socket", "tcp://host:2375/path"]
-required = true
 description = "The docker host to connect to."
 
 [sources.docker.env_vars.DOCKER_VERIFY_TLS]
 type = "bool"
 default = true
-required = true
 description = """\
 If `true` (the default), Vector will validate the TLS certificate of the \
 remote host. Do NOT set this to `false` unless you understand the risks of \

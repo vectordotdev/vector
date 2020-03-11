@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
+min_version: "1.0"
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Prometheus"
 sidebar_label: "prometheus|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/prometheus/
 status: "beta"
@@ -23,23 +27,57 @@ The Vector `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "prometheus" # must be: "prometheus"
-  inputs = ["my-source-id"] # example
-  address = "0.0.0.0:9598" # example
-  namespace = "service" # example
-
-  # OPTIONAL
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
-  flush_period_secs = 60 # default, seconds
-  healthcheck = true # default
+  type = "prometheus" # required
+  inputs = ["my-source-id"] # required
+  address = "0.0.0.0:9598" # required
+  namespace = "service" # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  type = "prometheus" # required
+  inputs = ["my-source-id"] # required
+  address = "0.0.0.0:9598" # required
+  namespace = "service" # required
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
+  flush_period_secs = 60 # optional, default, seconds
+```
+
+</TabItem>
+</Tabs>
+
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Prometheus version >= 1.0 is required.
+
+
+</Alert>
 
 ## Options
 
@@ -55,6 +93,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["0.0.0.0:9598"]}
+  groups={[]}
   name={"address"}
   path={null}
   relevantWhen={null}
@@ -73,14 +112,15 @@ The address to expose for scraping. See [Exposing & Scraping](#exposing--scrapin
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
   enumValues={null}
   examples={[[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]]}
+  groups={[]}
   name={"buckets"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
@@ -95,14 +135,15 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
+  groups={[]}
   name={"flush_period_secs"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -118,31 +159,10 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 <Field
   common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
-
-</Field>
-
-
-<Field
-  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}
@@ -169,14 +189,10 @@ The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="histograms"
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="histograms">
 
@@ -351,8 +367,6 @@ The [`buckets`](#buckets) option defines the global default buckets for histogra
 These defaults are tailored to broadly measure the response time (in seconds)
 of a network service. Most likely, however, you will be required to define
 buckets customized to your use case.
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 

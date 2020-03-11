@@ -80,11 +80,6 @@
           "description": "The human friendly description of this option, markdown syntax is supported.",
           "minLength": 10
         },
-        "display": {
-          "type": "string",
-          "description": "Only relevant for `object` types. This determine the TOML display style.",
-          "enum": ["inline"]
-        },
         "enum": {
           "type": "object",
           "description": "Enumeration values for this option.",
@@ -99,13 +94,20 @@
           "type": "array",
           "description": "An array of example values used for documentation purposes."
         },
+        "field_path_notation": {
+          "type": "boolean",
+          "description": "Does this option support the field notation syntax?"
+        },
+        "groups": {
+          "type": "array",
+          "description": "The overaching group that this configuration belongs to. This is an advanced option that should be used for large groups of mutually exclusive options. For example, a set of options specifically for v1 and another set for v2.",
+          "items": {
+            "type": "string"
+          }
+        },
         "partition_key": {
           "type": "boolean",
           "description": "If this option can be used to partition data. For example, the `path` option in the `aws_s3` sink."
-        },
-        "prioritize": {
-          "type": "boolean",
-          "description": "Should this option be prioritized and moved to the top when displayed?"
         },
         "relevant_when": {
           "type": "object",
@@ -115,9 +117,21 @@
           "type": "boolean",
           "description": "If this option is required."
         },
+        "sort": {
+          "type": "int",
+          "description": "Manual sorting option."
+        },
         "templateable": {
           "type": "boolean",
           "description": "If this option support Vectors template/event field interpolation syntax."
+        },
+        "toml_display": {
+          "type": "string",
+          "description": "How to display this option in TOML examples.",
+          "enum": [
+            "normal",
+            "inline"
+          ]
         },
         "type": {
           "type": "string",
@@ -178,6 +192,19 @@
         }
       }
     },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "additional": {
+          "type": "string",
+          "description": "Additional free-form requirements. Markdown is supported and they should be in list format."
+        },
+        "network": {
+          "type": "boolean",
+          "description": "Is the network required for this component?"
+        }
+      }
+    },
     "sink": {
       "type": "object",
       "description": "A component that outputs/sends data from Vector.",
@@ -188,6 +215,7 @@
         "delivery_guarantee",
         "egress_method",
         "function_category",
+        "requirements",
         "title",
         "write_to_description"
       ],
@@ -239,7 +267,6 @@
           "type": "string",
           "description": "The function category the sink serves. Used for filtering.",
           "enum": [
-            "proxy",
             "test",
             "transmit"
           ]
@@ -256,6 +283,10 @@
             "enum": ["log", "metric"]
           }
         },
+        "min_version": {
+          "type": "string",
+          "description": "The minimum version supported for the system this component interfaces with."
+        },
         "options": {
           "$ref": "#/definitions/fields",
           "description": "The options provided by this sink, keyed by the option's name."
@@ -264,10 +295,18 @@
           "$ref": "#/definitions/output",
           "description": "Output examples of this sink."
         },
+        "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
+        },
         "service_limits_short_link": {
           "type": "string",
           "description": "A link to the target service's limits, if applicable.",
           "minLength": 1
+        },
+        "service_name": {
+          "type": "string",
+          "description": "The name of the underlying service that this component integrates with."
         },
         "service_providers": {
           "type": "array",
@@ -280,6 +319,7 @@
               "Datadog",
               "Elastic",
               "Google",
+              "InfluxData",
               "New Relic",
               "Splunk"
             ]
@@ -307,6 +347,7 @@
         "common",
         "delivery_guarantee",
         "function_category",
+        "requirements",
         "through_description",
         "title"
       ],
@@ -337,9 +378,12 @@
           "description": "The source's function category, used for filtering.",
           "enum": [
             "collect",
-            "proxy",
             "receive"
           ]
+        },
+        "min_version": {
+          "type": "string",
+          "description": "The minimum version supported for the system this component interfaces with."
         },
         "only_operating_systems": {
           "$ref": "#/definitions/operating_systems",
@@ -367,8 +411,12 @@
           "description": "The types of events this source outputs."
         },
         "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
+        },
+        "service_name": {
           "type": "string",
-          "description": "A description of requirements needed for this source to operate correctly. Markdown syntax is supported."
+          "description": "The name of the underlying service that this component integrates with."
         },
         "through_description": {
           "type": "string",
@@ -391,6 +439,7 @@
         "beta",
         "common",
         "function_category",
+        "requirements",
         "title"
       ],
       "properties": {
@@ -415,14 +464,15 @@
           "type": "string",
           "description": "The function category this transform performed. Used for filtering.",
           "enum": [
+            "aggregate",
             "convert",
             "enrich",
             "filter",
             "parse",
             "program",
+            "route",
             "sanitize",
-            "shape",
-            "merge"
+            "shape"
           ]
         },
         "input_types": {
@@ -449,6 +499,10 @@
         "output_types": {
           "$ref": "#/definitions/event_types",
           "description": "The types of events this transform outputs."
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements",
+          "description": "Component requirements"
         },
         "title": {
           "type": "string",

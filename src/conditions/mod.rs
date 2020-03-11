@@ -3,6 +3,10 @@ use crate::Event;
 use inventory;
 
 pub mod check_fields;
+pub mod is_log;
+pub mod is_metric;
+
+pub use check_fields::CheckFieldsConfig;
 
 pub trait Condition: Send + Sync {
     fn check(&self, e: &Event) -> bool;

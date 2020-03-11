@@ -22,15 +22,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 <CodeHeader fileName="vector.toml" />
 
 ```toml
-# OPTIONAL - General
-  data_dir = "/var/lib/vector" # example, no default
-  dns_servers = ["0.0.0.0:53"] # example, no default
+# General
+data_dir = "/var/lib/vector" # optional, no default
+dns_servers = ["0.0.0.0:53"] # optional, no default
 
-  # OPTIONAL - Log schema
-  [log_schema]
-    host_key = "host" # default
-    message_key = "message" # default
-    timestamp_key = "timestamp" # default
+# Log schema
+log_schema.host_key = "host" # optional, default
+log_schema.message_key = "message" # optional, default
+log_schema.timestamp_key = "timestamp" # optional, default
 ```
 
 ## Options
@@ -47,6 +46,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
+  groups={[]}
   name={"data_dir"}
   path={null}
   relevantWhen={null}
@@ -69,6 +69,7 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
   defaultValue={null}
   enumValues={null}
   examples={[["0.0.0.0:53"]]}
+  groups={[]}
   name={"dns_servers"}
   path={null}
   relevantWhen={null}
@@ -91,6 +92,7 @@ The list of DNS servers Vector will use to resolve DNS requests. When set Vector
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"log_schema"}
   path={null}
   relevantWhen={null}
@@ -113,6 +115,7 @@ The default log schema that all Vector components operate on. See the [log data 
   defaultValue={"host"}
   enumValues={null}
   examples={["host","@host","instance","machine"]}
+  groups={[]}
   name={"host_key"}
   path={"log_schema"}
   relevantWhen={null}
@@ -135,6 +138,7 @@ The key used to hold the log host. See the [log data model page][docs.data-model
   defaultValue={"message"}
   enumValues={null}
   examples={["message","@message","msg"]}
+  groups={[]}
   name={"message_key"}
   path={"log_schema"}
   relevantWhen={null}
@@ -157,6 +161,7 @@ The key used to hold the log message. See the [log data model page][docs.data-mo
   defaultValue={"timestamp"}
   enumValues={null}
   examples={["timestamp","@timestamp","datetime"]}
+  groups={[]}
   name={"timestamp_key"}
   path={"log_schema"}
   relevantWhen={null}

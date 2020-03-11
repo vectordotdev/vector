@@ -7,6 +7,7 @@ egress_method = "batching"
 function_category = "transmit"
 input_types = ["log"]
 healthcheck = true
+requirements = {}
 service_providers = ["New Relic"]
 write_to_description = "[New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api]"
 
@@ -14,7 +15,11 @@ write_to_description = "[New Relic's log service][urls.new_relic] via their [log
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.new_relic_logs.options", common: false, max_events: nil, max_size: 524000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.new_relic_logs.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.new_relic_logs.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -50,3 +55,9 @@ description = "The API region to send logs to."
 [sinks.new_relic_logs.options.region.enum]
 us = "The US region"
 eu = "The EU region"
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.new_relic_logs.options",
+  encodings: ["json"],
+  default: "json"
+) %>

@@ -1,4 +1,4 @@
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use std::fmt;
 
 /// High level topology task.

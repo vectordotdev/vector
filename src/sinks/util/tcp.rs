@@ -1,19 +1,16 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        encode_event,
-        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
-        Encoding, SinkExt,
-    },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
+    tls::{tls_connector, TlsConfig, TlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
-use futures::{
+use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::{
@@ -21,20 +18,12 @@ use tokio::{
     net::tcp::{ConnectFuture, TcpStream},
     timer::Delay,
 };
+use tokio_openssl::{ConnectAsync as SslConnectAsync, ConnectConfigurationExt, SslStream};
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_tls::{Connect as TlsConnect, TlsConnector, TlsStream};
 use tracing::field;
 
 #[derive(Debug, Snafu)]
 enum TcpBuildError {
-    #[snafu(display("Must specify both TLS key_file and crt_file"))]
-    MissingCrtKeyFile,
-    #[snafu(display("Could not build TLS connector: {}", source))]
-    TlsBuildError { source: native_tls::Error },
-    #[snafu(display("Could not set TCP TLS identity: {}", source))]
-    TlsIdentityError { source: native_tls::Error },
-    #[snafu(display("Could not export identity to DER: {}", source))]
-    DerExportError { source: openssl::error::ErrorStack },
     #[snafu(display("Missing host in address field"))]
     MissingHost,
     #[snafu(display("Missing port in address field"))]
@@ -45,23 +34,15 @@ enum TcpBuildError {
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
     pub tls: Option<TlsConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct TlsConfig {
-    pub enabled: Option<bool>,
-    #[serde(flatten)]
-    pub options: TlsOptions,
-}
-
 impl TcpSinkConfig {
-    pub fn new(address: String) -> Self {
+    pub fn new(address: String, encoding: EncodingConfig<Encoding>) -> Self {
         Self {
             address,
-            encoding: Encoding::Text,
+            encoding,
             tls: None,
         }
     }
@@ -72,16 +53,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
 
-        let tls = match self.tls {
-            Some(ref tls) => {
-                if tls.enabled.unwrap_or(false) {
-                    Some(TlsSettings::from_options(&Some(tls.options.clone()))?)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        };
+        let tls = TlsSettings::from_config(&self.tls, false)?;
 
         let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(host, port, cx.resolver());
@@ -104,14 +76,14 @@ enum TcpSinkState {
     Disconnected,
     ResolvingDns(crate::dns::ResolverFuture),
     Connecting(ConnectFuture),
-    TlsConnecting(TlsConnect<TcpStream>),
+    TlsConnecting(SslConnectAsync<TcpStream>),
     Connected(TcpOrTlsStream),
     Backoff(Delay),
 }
 
 type TcpOrTlsStream = MaybeTlsStream<
     FramedWrite<TcpStream, BytesCodec>,
-    FramedWrite<TlsStream<TcpStream>, BytesCodec>,
+    FramedWrite<SslStream<TcpStream>, BytesCodec>,
 >;
 
 impl TcpSink {
@@ -180,13 +152,9 @@ impl TcpSink {
                         debug!(message = "connected");
                         self.backoff = Self::fresh_backoff();
                         match self.tls {
-                            Some(ref tls) => match native_tls::TlsConnector::builder()
-                                .use_tls_settings(tls.clone())
-                                .build()
-                                .context(TlsBuildError)
-                            {
+                            Some(ref tls) => match tls_connector(Some(tls.clone())) {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
-                                    TlsConnector::from(connector).connect(&self.host, socket),
+                                    connector.connect_async(&self.host, socket),
                                 ),
                                 Err(err) => {
                                     error!(message = "unable to establish TLS connection.", error = %err);
@@ -287,7 +255,7 @@ pub fn raw_tcp(
     host: String,
     port: u16,
     cx: SinkContext,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     tls: Option<TlsSettings>,
 ) -> RouterSink {
     Box::new(
@@ -341,14 +309,14 @@ where
     type SinkItem = I;
     type SinkError = E;
 
-    fn start_send(&mut self, item: I) -> futures::StartSend<I, E> {
+    fn start_send(&mut self, item: I) -> futures01::StartSend<I, E> {
         match self {
             MaybeTlsStream::Raw(r) => r.start_send(item),
             MaybeTlsStream::Tls(t) => t.start_send(item),
         }
     }
 
-    fn poll_complete(&mut self) -> futures::Poll<(), E> {
+    fn poll_complete(&mut self) -> futures01::Poll<(), E> {
         match self {
             MaybeTlsStream::Raw(r) => r.poll_complete(),
             MaybeTlsStream::Tls(t) => t.poll_complete(),

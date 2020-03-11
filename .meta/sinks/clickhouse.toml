@@ -7,13 +7,19 @@ function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
+min_version = "1.1.54378"
+requirements = {}
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
 
 <%= render("_partials/_component_options.toml", type: "sink", name: "clickhouse") %>
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.clickhouse.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.clickhouse.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.clickhouse.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -35,8 +41,8 @@ description = "Options for the authentication strategy."
 
 [sinks.clickhouse.options.auth.children.strategy]
 type = "string"
-prioritize = true
 required = true
+sort = 1
 description = "The authentication strategy to use."
 
 [sinks.clickhouse.options.auth.children.strategy.enum]
@@ -45,15 +51,15 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 [sinks.clickhouse.options.auth.children.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = "The basic authentication password."
 
 [sinks.clickhouse.options.auth.children.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = "The basic authentication user name."
 
 [sinks.clickhouse.options.compression]
@@ -84,10 +90,15 @@ examples = ["mytable"]
 required = true
 description = "The table that data will be inserted into."
 
-<%= render("_partials/_tls_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
 
 [sinks.clickhouse.options.database]
 type = "string"
 common = true
 examples = ["mydatabase"]
 description = "The database that contains the stable that data will be inserted into."
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.clickhouse.options",
+  encodings: [],
+) %>

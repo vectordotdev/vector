@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP or Unix domain socket."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+socket%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "Socket"
 sidebar_label: "socket|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/socket.rs
 status: "prod-ready"
@@ -27,16 +31,12 @@ import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
-  defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  defaultValue="unix"
+  values={[{"label":"unix","value":"unix"},{"label":"tcp","value":"tcp"},{"label":"unix (adv)","value":"unix-adv"},{"label":"tcp (adv)","value":"tcp-adv"}]}>
 
 import TabItem from '@theme/TabItem';
 
-<TabItem value="common">
+<TabItem value="unix">
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
@@ -44,63 +44,67 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example, relevant when mode = "tcp"
-  mode = "tcp" # example, enum
-  path = "/path/to/socket" # example, relevant when mode = "unix"
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
-  healthcheck = true # default
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
 ```
 
 </TabItem>
-<TabItem value="advanced">
+<TabItem value="tcp">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "socket" # must be: "socket"
-  inputs = ["my-source-id"] # example
-  address = "92.12.333.224:5000" # example, relevant when mode = "tcp"
-  mode = "tcp" # example, enum
-  path = "/path/to/socket" # example, relevant when mode = "unix"
-
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
-  healthcheck = true # default
-
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
-
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
-
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
-    verify_hostname = true # default
+  address = "92.12.333.224:5000" # required, required when mode = "tcp"
+  mode = "tcp" # required
 ```
 
 </TabItem>
+<TabItem value="unix-adv">
 
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  # General
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
+```
+
+</TabItem>
+<TabItem value="tcp-adv">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sinks.my_sink_id]
+  # General
+  address = "92.12.333.224:5000" # required, required when mode = "tcp"
+  mode = "tcp" # required
+
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
+
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = true # optional, default
+  tls.verify_hostname = true # optional, default
+```
+
+</TabItem>
 </Tabs>
 
 ## Options
@@ -117,6 +121,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["92.12.333.224:5000"]}
+  groups={["tcp"]}
   name={"address"}
   path={null}
   relevantWhen={{"mode":"tcp"}}
@@ -139,6 +144,7 @@ The address to connect to. The address _must_ include a port.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={["tcp","unix"]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -160,10 +166,11 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={["tcp","unix"]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -178,10 +185,11 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={["tcp","unix"]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -204,10 +212,11 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={["tcp","unix"]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -226,6 +235,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={["tcp","unix"]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -251,10 +261,33 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON.","text":"Each event is encoded into text via the `message` key."}}
-  examples={["json","text"]}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
   name={"encoding"}
   path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -262,10 +295,84 @@ The behavior when the buffer becomes full.
   unit={null}
   >
 
-### encoding
+#### codec
 
-The encoding format used to serialize the events before outputting.
+The encoding codec used to serialize the events before outputting.
 
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
 
 </Field>
 
@@ -275,6 +382,7 @@ The encoding format used to serialize the events before outputting.
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -297,6 +405,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={{"tcp":"TCP Socket.","unix":"Unix Domain Socket."}}
   examples={["tcp","unix"]}
+  groups={["tcp","unix"]}
   name={"mode"}
   path={null}
   relevantWhen={null}
@@ -319,6 +428,7 @@ The type of socket to use.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/socket"]}
+  groups={["unix"]}
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
@@ -341,6 +451,7 @@ The unix socket path. This should be the absolute path.
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={["tcp"]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -358,10 +469,11 @@ Configures the TLS options for connections from this sink.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
+  groups={["tcp"]}
   name={"enabled"}
   path={"tls"}
   relevantWhen={null}
@@ -384,6 +496,7 @@ Enable TLS during connections to the remote.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={["tcp"]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -402,10 +515,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={["tcp"]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -428,6 +542,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={["tcp"]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -439,17 +554,18 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={["tcp"]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -472,6 +588,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={["tcp"]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -494,6 +611,7 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={["tcp"]}
   name={"verify_hostname"}
   path={"tls"}
   relevantWhen={null}

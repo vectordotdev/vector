@@ -10,14 +10,14 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{Future, Poll};
+use futures01::{Future, Poll};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use tower::Service;
 
@@ -247,7 +247,7 @@ fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-fn tags_to_dimensions(tags: HashMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)
@@ -432,7 +432,7 @@ mod integration_tests {
     use crate::test_util::{random_string, runtime};
     use crate::topology::config::SinkContext;
     use chrono::offset::TimeZone;
-    use futures::{stream, Sink};
+    use futures01::{stream, Sink};
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {

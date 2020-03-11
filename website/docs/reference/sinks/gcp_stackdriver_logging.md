@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "best_effort"
+component_title: "GCP Stackdriver Logging"
 description: "The Vector `gcp_stackdriver_logging` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "GCP Stackdriver Logging"
 sidebar_label: "gcp_stackdriver_logging|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logging.rs
 status: "beta"
@@ -28,11 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,83 +44,68 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
-  inputs = ["my-source-id"] # example
-  credentials_path = "/path/to/credentials.json" # example
-  log_id = "vector-logs" # example
-  project_id = "vector-123456" # example
-
-  # OPTIONAL
-  healthcheck = true # default
+  type = "gcp_stackdriver_logging" # required
+  inputs = ["my-source-id"] # required
+  credentials_path = "/path/to/credentials.json" # required
+  healthcheck = true # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "gcp_stackdriver_logging" # must be: "gcp_stackdriver_logging"
-  inputs = ["my-source-id"] # example
-  credentials_path = "/path/to/credentials.json" # example
-  log_id = "vector-logs" # example
-  project_id = "vector-123456" # example
+  # General
+  type = "gcp_stackdriver_logging" # required
+  inputs = ["my-source-id"] # required
+  credentials_path = "/path/to/credentials.json" # required
+  log_id = "vector-logs" # required
+  project_id = "vector-123456" # required
+  billing_account_id = "012345-6789AB-CDEF01" # optional, no default
+  folder_id = "My Folder" # optional, no default
+  healthcheck = true # optional, default
+  organization_id = "622418129737" # optional, no default
 
-  # OPTIONAL - General
-  billing_account_id = "012345-6789AB-CDEF01" # example, no default
-  folder_id = "My Folder" # example, no default
-  healthcheck = true # default
-  organization_id = "622418129737" # example, no default
+  # Batch
+  batch.max_size = 5242880 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_size = 5242880 # default, bytes
-    timeout_secs = 1 # default, seconds
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
+  # Encoding
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
+  # Request
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 1000 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 1000 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
+  # Resource
+  resource.type = "global" # required
+  resource.projectId = "vector-123456" # example
+  resource.zone = "Twilight" # example
 
-  # OPTIONAL - Resource
-  [sinks.my_sink_id.resource]
-    # REQUIRED
-    type = "global" # example
-
-    # OPTIONAL
-    projectId = "vector-123456" # example
-    zone = "Twilight" # example
-
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # example, no default
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
-    verify_certificate = true # default
-    verify_hostname = true # default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = true # optional, default
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -137,6 +122,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -158,10 +144,11 @@ Configures the sink batching behavior.
   defaultValue={5242880}
   enumValues={null}
   examples={[5242880]}
+  groups={[]}
   name={"max_size"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"bytes"}
@@ -180,10 +167,11 @@ The maximum size of a batch, in bytes, before it is flushed. See [Buffers & Batc
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -207,6 +195,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={["012345-6789AB-CDEF01"]}
+  groups={[]}
   name={"billing_account_id"}
   path={null}
   relevantWhen={null}
@@ -231,6 +220,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -252,10 +242,11 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -270,10 +261,11 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -296,10 +288,11 @@ The maximum size of the buffer on the disk. See [Buffers & Batches](#buffers--ba
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -318,6 +311,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -345,6 +339,7 @@ The behavior when the buffer becomes full.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
+  groups={[]}
   name={"credentials_path"}
   path={null}
   relevantWhen={null}
@@ -356,7 +351,7 @@ The behavior when the buffer becomes full.
 
 ### credentials_path
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the stackdriver logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. If this is unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -366,7 +361,104 @@ The filename for a Google Cloud service account credentials JSON file used to au
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["My Folder"]}
+  groups={[]}
   name={"folder_id"}
   path={null}
   relevantWhen={null}
@@ -392,6 +484,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -410,10 +503,11 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["vector-logs"]}
+  groups={[]}
   name={"log_id"}
   path={null}
   relevantWhen={null}
@@ -436,6 +530,7 @@ The log ID to which to publish logs. This is a name you create to identify this 
   defaultValue={null}
   enumValues={null}
   examples={["622418129737"]}
+  groups={[]}
   name={"organization_id"}
   path={null}
   relevantWhen={null}
@@ -456,10 +551,11 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["vector-123456"]}
+  groups={[]}
   name={"project_id"}
   path={null}
   relevantWhen={null}
@@ -484,6 +580,7 @@ Exactly one of [`billing_account_id`](#billing_account_id), [`folder_id`](#folde
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -501,10 +598,11 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -523,10 +621,11 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -545,10 +644,11 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -571,6 +671,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -593,6 +694,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -615,6 +717,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -633,10 +736,11 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -664,6 +768,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"resource"}
   path={null}
   relevantWhen={null}
@@ -685,6 +790,7 @@ Options for describing the logging resource.
   defaultValue={null}
   enumValues={null}
   examples={["global","gce_instance"]}
+  groups={[]}
   name={"type"}
   path={"resource"}
   relevantWhen={null}
@@ -709,6 +815,7 @@ See the [Google Cloud Platform monitored resource documentation][urls.gcp_resour
   defaultValue={null}
   enumValues={null}
   examples={[{"projectId":"vector-123456"},{"zone":"Twilight"}]}
+  groups={[]}
   name={"`[label]`"}
   path={"resource"}
   relevantWhen={null}
@@ -738,6 +845,7 @@ For example, Compute Engine VM instances use the labels `projectId`, `instanceId
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"tls"}
   path={null}
   relevantWhen={null}
@@ -759,6 +867,7 @@ Configures the TLS options for connections from this sink.
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
   name={"ca_path"}
   path={"tls"}
   relevantWhen={null}
@@ -777,10 +886,11 @@ Absolute path to an additional CA certificate file, in DER or PEM format (X.509)
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.crt"]}
+  groups={[]}
   name={"crt_path"}
   path={"tls"}
   relevantWhen={null}
@@ -803,6 +913,7 @@ Absolute path to a certificate file used to identify this connection, in DER or 
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
+  groups={[]}
   name={"key_pass"}
   path={"tls"}
   relevantWhen={null}
@@ -814,17 +925,18 @@ Absolute path to a certificate file used to identify this connection, in DER or 
 
 #### key_pass
 
-Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_pass`](#key_pass) is set.
+Pass phrase used to unlock the encrypted key file. This has no effect unless [`key_path`](#key_path) is set.
 
 
 </Field>
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/host_certificate.key"]}
+  groups={[]}
   name={"key_path"}
   path={"tls"}
   relevantWhen={null}
@@ -847,6 +959,7 @@ Absolute path to a certificate key file used to identify this connection, in DER
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"verify_certificate"}
   path={"tls"}
   relevantWhen={null}
@@ -859,28 +972,6 @@ Absolute path to a certificate key file used to identify this connection, in DER
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  name={"verify_hostname"}
-  path={"tls"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-#### verify_hostname
-
-If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
 
 
 </Field>
@@ -899,10 +990,11 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
+  groups={[]}
   name={"GOOGLE_APPLICATION_CREDENTIALS"}
   path={null}
   relevantWhen={null}
@@ -914,7 +1006,7 @@ If `true` (the default), Vector will validate the configured remote host name ag
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication. See [GCP Authentication](#gcp-authentication) for more info.
+The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. See [GCP Authentication](#gcp-authentication) for more info.
 
 
 </Field>
@@ -951,6 +1043,7 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
+
 ### GCP Authentication
 
 GCP offers a [variety of authentication methods][urls.gcp_authentication] and
@@ -1014,7 +1107,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.guarantees]: /docs/about/guarantees/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
 [urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects

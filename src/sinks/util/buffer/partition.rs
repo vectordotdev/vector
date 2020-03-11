@@ -1,5 +1,5 @@
 use crate::sinks::util::Batch;
-use futures::{
+use futures01::{
     future::Either, stream::FuturesUnordered, sync::oneshot, Async, AsyncSink, Future, Poll, Sink,
     StartSend, Stream,
 };
@@ -264,7 +264,7 @@ impl<B, S, K> fmt::Debug for PartitionedBatchSink<B, S, K> {
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use std::time::Duration;
     use tokio01_test::clock;
 
@@ -273,7 +273,7 @@ mod tests {
         let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
 
         let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(0..22))
+            .send_all(futures01::stream::iter_ok(0..22))
             .wait()
             .unwrap();
 
@@ -313,7 +313,7 @@ mod tests {
     //         vec![24],
     //     ];
     //     let (buffered, _) = buffered
-    //         .send_all(futures::stream::iter_ok(input))
+    //         .send_all(futures01::stream::iter_ok(input))
     //         .wait()
     //         .unwrap();
 
@@ -340,7 +340,7 @@ mod tests {
         let input = vec![Partitions::A, Partitions::B];
 
         let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
+            .send_all(futures01::stream::iter_ok(input))
             .wait()
             .unwrap();
 
@@ -356,7 +356,7 @@ mod tests {
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
 
         let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
+            .send_all(futures01::stream::iter_ok(input))
             .wait()
             .unwrap();
 

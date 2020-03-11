@@ -14,7 +14,7 @@ module.exports = {
       hideOnScroll: true,
       logo: {
         alt: 'Vector',
-        src: 'img/logo-light.svg',
+        src: 'img/logo-light.svg'
       },
       links: [
         {to: 'components/', label: 'Components', position: 'left'},
@@ -124,9 +124,6 @@ module.exports = {
         href: 'https://timber.io/',
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
-    },
-    googleAnalytics: {
-      trackingID: 'UA-79173230-9',
     },
     algolia: {
       apiKey: '2356c5cb76b57b43624c6450b0a031cc',

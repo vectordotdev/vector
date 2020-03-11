@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 bytes = { version = "0.4.10", features = ["serde"] }
 crc = "1.8.1"
-futures = "0.1.25"
+futures = { version = "0.3", default-features = false, features = ["executor"] }
 glob = "0.2.11"
 scan_fmt = "0.2.3"
 tracing = "0.1.2"

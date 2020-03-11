@@ -5,6 +5,7 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
 output_types = ["log"]
+requirements = {}
 through_description = "one or more local files"
 
 <%= render("_partials/_component_options.toml", type: "source", name: "file") %>
@@ -39,7 +40,6 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported.\
 type = "string"
 category = "Context"
 default = "file"
-required = true
 description = """\
 The key name added to each event with the full path of the file.\
 """
@@ -47,7 +47,6 @@ The key name added to each event with the full path of the file.\
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
-required = true
 unit = "milliseconds"
 description = """\
 Delay between file discovery calls. This controls the interval at which \
@@ -58,7 +57,6 @@ Vector searches for files.\
 type = "string"
 category = "Context"
 default = "host"
-required = true
 description = """\
 The key name added to each event representing the current host. This can also \
 be globally set via the \
@@ -87,7 +85,6 @@ files.\
 [sources.file.options.start_at_beginning]
 type = "bool"
 common = true
-required = true
 default = false
 description = """\
 For files with a stored checkpoint at startup, setting this option \
@@ -104,7 +101,7 @@ Configuration for how the file source should identify files.\
 [sources.file.options.fingerprinting.children.strategy]
 type = "string"
 default = "checksum"
-prioritize = true
+sort = 1
 description = """\
 The strategy used to uniquely identify files. This is important for \
 [checkpointing](#checkpointing) when file rotation is used.\
@@ -117,7 +114,6 @@ device_and_inode = "Uses the [device and inode][urls.inode] to unique identify f
 [sources.file.options.fingerprinting.children.fingerprint_bytes]
 type = "int"
 default = 256
-required = true
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
 description = """\
@@ -128,34 +124,11 @@ fingerprint.\
 [sources.file.options.fingerprinting.children.ignored_header_bytes]
 type = "int"
 default = 0
-required = true
 unit = "bytes"
 relevant_when = {strategy = "checksum"}
 description = """\
 The number of bytes to skip ahead (or ignore) when generating a unique \
 fingerprint. This is helpful if all files share a common header.\
-"""
-
-[sources.file.options.message_start_indicator]
-type = "string"
-category = "Multi-line"
-examples = ["^(INFO|ERROR)"]
-description = """\
-When present, Vector will aggregate multiple lines into a single event, using \
-this pattern as the indicator that the previous lines should be flushed and \
-a new event started. The pattern will be matched against entire lines as \
-a regular expression, so remember to anchor as appropriate.\
-"""
-
-[sources.file.options.multi_line_timeout]
-type = "int"
-category = "Multi-line"
-default = 1000
-unit = "milliseconds"
-description = """\
-When `message_start_indicator` is present, this sets the amount of time Vector \
-will buffer lines into a single event before flushing, regardless of whether \
-or not it has seen a line indicating the start of a new message.\
 """
 
 [sources.file.options.max_read_bytes]
@@ -166,6 +139,86 @@ unit = "bytes"
 description = """\
 An approximate limit on the amount of data read from a single file at a given \
 time.\
+"""
+
+[sources.file.options.multiline]
+type = "table"
+category = "Multiline"
+description = """\
+Multiline parsing configuration (per file).
+If not speicified, multiline parsing is disabled.\
+"""
+
+[sources.file.options.multiline.children.start_pattern]
+type = "string"
+category = "Multiline"
+examples = ["^[^\\s]", "\\\\$", "^(INFO|ERROR) ", "[^;]$"]
+required = true
+sort = 1
+description = """\
+Start regex pattern to look for as a beginning of the message.\
+"""
+
+[sources.file.options.multiline.children.condition_pattern]
+type = "string"
+category = "Multiline"
+examples = ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
+required = true
+sort = 3
+description = """\
+Condition regex pattern to look for. Exact behavior is configured via `mode`.\
+"""
+
+[sources.file.options.multiline.children.mode]
+type = "string"
+category = "Multiline"
+required = true
+sort = 2
+description = """\
+Mode of operation, specifies how the `condition_pattern` is interpreted.\
+"""
+
+[sources.file.options.multiline.children.mode.enum]
+continue_through = """\
+All consecutive lines matching this pattern are included in the group. \
+The first line (the line that matched the start pattern) does not need \
+to match the `ContinueThrough` pattern. \
+This is useful in cases such as a Java stack trace, where some indicator \
+in the line (such as leading whitespace) indicates that it is an \
+extension of the preceeding line.\
+"""
+continue_past = """\
+All consecutive lines matching this pattern, plus one additional line, \
+are included in the group. \
+This is useful in cases where a log message ends with a continuation \
+marker, such as a backslash, indicating that the following line is part \
+of the same message.\
+"""
+halt_before = """\
+All consecutive lines not matching this pattern are included in the \
+group. \
+This is useful where a log line contains a marker indicating that it \
+begins a new message.\
+"""
+halt_with = """\
+All consecutive lines, up to and including the first line matching this \
+pattern, are included in the group. \
+This is useful where a log line ends with a termination marker, such as \
+a semicolon.\
+"""
+
+[sources.file.options.multiline.children.timeout_ms]
+type = "int"
+category = "Multiline"
+examples = [1000, 600000]
+unit = "milliseconds"
+common = true
+required = true
+sort = 4
+description = """\
+The maximum time to wait for the continuation. Once this timeout is \
+reached, the buffered message is guaraneed to be flushed, even if \
+incomplete.\
 """
 
 [sources.file.options.oldest_first]
@@ -201,7 +254,8 @@ type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
 description = """\
-The raw log message, unaltered.\
+The raw log message, unaltered. This can be renamed via the \
+[global `message_key` option][docs.reference.global-options#message_key].\
 """
 
 [sources.file.output.log.fields.timestamp]
@@ -209,5 +263,6 @@ type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
 description = """\
-The exact time the event was ingested.\
+The exact time the event was ingested. This can be renamed via the \
+[global `timestamp_key` option][docs.reference.global-options#timestamp_key].\
 """

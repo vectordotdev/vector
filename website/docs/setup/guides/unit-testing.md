@@ -72,14 +72,14 @@ live with us indefinitely. We will do _anything_ to prevent that.
 ## Input
 
 First we shall write a single unit test at the bottom of our config called
-`check_simple_log`. Each test must define a single input event, which initiates
-the test by injecting that event into a transform of the topology:
+`check_simple_log`. Each test must define input events (usually just one), which
+initiates the test by injecting those events into a transform of the topology:
 
 ```toml
 [[tests]]
   name = "check_simple_log"
 
-  [tests.input]
+  [[tests.inputs]]
     insert_at = "foo"
     type = "raw"
     value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
@@ -99,7 +99,7 @@ order to perform checks with this unit test we define an output to inspect:
 [[tests]]
   name = "check_simple_log"
 
-  [tests.input]
+  [[tests.inputs]]
     insert_at = "foo"
     type = "raw"
     value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"

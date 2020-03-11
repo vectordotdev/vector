@@ -6,12 +6,14 @@ common = false
 function_category = "shape"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "remove_fields") %>
 
 [transforms.remove_fields.options.fields]
 type = "[string]"
 common = true
-examples = [["field1", "field2"]]
+examples = [["field1", "field2", "parent.child"]]
+field_path_notation = true
 required = true
 description = "The log field names to drop."

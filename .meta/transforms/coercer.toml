@@ -6,6 +6,7 @@ common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "coercer") %>
 
@@ -48,11 +49,10 @@ And the following configuration:
 [transforms.<transform-id>]
   type = "coercer"
 
-[transforms.<transform-id>.types]
-  bytes_in = "int"
-  bytes_out = "int"
-  timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-  status = "int"
+  types.bytes_in = "int"
+  types.bytes_out = "int"
+  types.timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+  types.status = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

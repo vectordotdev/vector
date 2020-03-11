@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "AWS Kinesis Data Streams"
 description: "The Vector `aws_kinesis_streams` sink batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint."
 event_types: ["log"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_kinesis_streams%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS Kinesis Data Streams"
 sidebar_label: "aws_kinesis_streams|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
 status: "beta"
@@ -28,11 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,68 +44,60 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
-  inputs = ["my-source-id"] # example
-  region = "us-east-1" # example, relevant when host = ""
-  stream_name = "my-stream" # example
+  # General
+  type = "aws_kinesis_streams" # required
+  inputs = ["my-source-id"] # required
+  region = "us-east-1" # required, required when endpoint = ""
+  stream_name = "my-stream" # required
+  partition_key_field = "user_id" # optional, no default
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
-
-  # OPTIONAL - General
-  partition_key_field = "user_id" # example, no default
+  # Encoding
+  encoding.codec = "json" # required
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
-  inputs = ["my-source-id"] # example
-  region = "us-east-1" # example, relevant when host = ""
-  stream_name = "my-stream" # example
+  # General
+  type = "aws_kinesis_streams" # required
+  inputs = ["my-source-id"] # required
+  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  region = "us-east-1" # required, required when endpoint = ""
+  stream_name = "my-stream" # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  partition_key_field = "user_id" # optional, no default
 
-  # REQUIRED - requests
-  encoding = "json" # example, enum
+  # Batch
+  batch.max_events = 500 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
-  partition_key_field = "user_id" # example, no default
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 500 # default, events
-    timeout_secs = 1 # default, seconds
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
 
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    # OPTIONAL
-    type = "memory" # default, enum
-    max_events = 500 # default, events, relevant when type = "memory"
-    when_full = "block" # default, enum
-
-    # REQUIRED
-    max_size = 104900000 # example, bytes, relevant when type = "disk"
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 30 # default, seconds
+  # Request
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 30 # optional, default, seconds
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -122,6 +114,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
   name={"assume_role"}
   path={null}
   relevantWhen={null}
@@ -144,6 +137,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authe
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -165,10 +159,11 @@ Configures the sink batching behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -187,10 +182,11 @@ The maximum size of a batch, in events, before it is flushed. See [Buffers & Bat
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -214,6 +210,7 @@ The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffer
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"buffer"}
   path={null}
   relevantWhen={null}
@@ -235,10 +232,11 @@ Configures the sink specific buffer behavior.
   defaultValue={500}
   enumValues={null}
   examples={[500]}
+  groups={[]}
   name={"max_events"}
   path={"buffer"}
   relevantWhen={{"type":"memory"}}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -253,10 +251,11 @@ The maximum number of [events][docs.data-model] allowed in the buffer. See [Buff
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[104900000]}
+  groups={[]}
   name={"max_size"}
   path={"buffer"}
   relevantWhen={{"type":"disk"}}
@@ -279,10 +278,11 @@ The maximum size of the buffer on the disk.
   defaultValue={"memory"}
   enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
   examples={["memory","disk"]}
+  groups={[]}
   name={"type"}
   path={"buffer"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -301,6 +301,7 @@ The buffer's type and storage mechanism.
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
   examples={["block","drop_newest"]}
+  groups={[]}
   name={"when_full"}
   path={"buffer"}
   relevantWhen={null}
@@ -326,10 +327,33 @@ The behavior when the buffer becomes full.
 <Field
   common={true}
   defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
-  examples={["json","text"]}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
   name={"encoding"}
   path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+<Fields filters={false}>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the `message` key and the payload is new line delimited."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
   relevantWhen={null}
   required={true}
   templateable={false}
@@ -337,9 +361,9 @@ The behavior when the buffer becomes full.
   unit={null}
   >
 
-### encoding
+#### codec
 
-The encoding format used to serialize the events before outputting.
+The encoding codec used to serialize the events before outputting.
 
 
 </Field>
@@ -349,11 +373,86 @@ The encoding format used to serialize the events before outputting.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+</Field>
+
+
+</Fields>
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -372,6 +471,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   defaultValue={null}
   enumValues={null}
   examples={["user_id"]}
+  groups={[]}
   name={"partition_key_field"}
   path={null}
   relevantWhen={null}
@@ -394,9 +494,10 @@ The log field used as the Kinesis record's partition key value. See [Partitionin
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
+  groups={[]}
   name={"region"}
   path={null}
-  relevantWhen={{"host":""}}
+  relevantWhen={{"endpoint":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -416,6 +517,7 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"request"}
   path={null}
   relevantWhen={null}
@@ -433,10 +535,11 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -455,10 +558,11 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -477,10 +581,11 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
+  groups={[]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -503,6 +608,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
+  groups={[]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -525,6 +631,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -547,6 +654,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
+  groups={[]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -565,10 +673,11 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
+  groups={[]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}
@@ -596,6 +705,7 @@ The maximum time a request can take before being aborted. It is highly recommend
   defaultValue={null}
   enumValues={null}
   examples={["my-stream"]}
+  groups={[]}
   name={"stream_name"}
   path={null}
   relevantWhen={null}
@@ -625,6 +735,7 @@ The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs strea
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -647,6 +758,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}

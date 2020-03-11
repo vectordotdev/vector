@@ -1,12 +1,13 @@
 [sinks.aws_cloudwatch_logs]
 title = "AWS Cloudwatch Logs"
-beta = true
+beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+requirements = {}
 service_limits_short_link = "aws_cw_logs_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
@@ -19,7 +20,11 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.aws_cloudwatch_logs.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.aws_cloudwatch_logs.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -34,18 +39,10 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
   timeout_secs: 30
 ) %>
 
-[sinks.aws_cloudwatch_logs.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.aws_cloudwatch_logs.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.aws_cloudwatch_logs.options",
+  encodings: ["json", "text"]
+) %>
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"

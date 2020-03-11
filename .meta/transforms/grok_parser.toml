@@ -6,6 +6,7 @@ common = false
 function_category = "parse"
 input_types = ["log"]
 output_types = ["log"]
+requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "grok_parser") %>
 
@@ -13,7 +14,6 @@ output_types = ["log"]
 type = "bool"
 common = true
 default = true
-required = true
 description = """\
 If `true` will drop the specified `field` after parsing.\
 """
@@ -22,7 +22,8 @@ If `true` will drop the specified `field` after parsing.\
 type = "string"
 common = true
 default = "message"
-required = true
+examples = ["message", "parent.child", "array[0]"]
+field_path_notation = true
 description = """\
 The log field to execute the `pattern` against. Must be a `string` value.\
 """

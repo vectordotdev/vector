@@ -1,9 +1,13 @@
 ---
 delivery_guarantee: "at_least_once"
+component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
+min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
+service_name: "AWS Cloudwatch Metrics"
 sidebar_label: "aws_cloudwatch_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
 status: "beta"
@@ -28,11 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="common"
-  values={[
-    { label: 'Common', value: 'common', },
-    { label: 'Advanced', value: 'advanced', },
-  ]
-}>
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -44,42 +44,35 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"] # example
-  namespace = "service" # example
-  region = "us-east-1" # example, relevant when host = ""
-
-  # OPTIONAL
-  healthcheck = true # default
+  type = "aws_cloudwatch_metrics" # required
+  inputs = ["my-source-id"] # required
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
+  healthcheck = true # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
-  inputs = ["my-source-id"] # example
-  namespace = "service" # example
-  region = "us-east-1" # example, relevant when host = ""
+  # General
+  type = "aws_cloudwatch_metrics" # required
+  inputs = ["my-source-id"] # required
+  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  healthcheck = true # optional, default
 
-  # OPTIONAL - General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # example, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # example, no default, relevant when region = ""
-  healthcheck = true # default
-
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
+  # Batch
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 ```
 
 </TabItem>
-
 </Tabs>
 
 ## Options
@@ -96,6 +89,7 @@ import Field from '@site/src/components/Field';
   defaultValue={null}
   enumValues={null}
   examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
   name={"assume_role"}
   path={null}
   relevantWhen={null}
@@ -118,6 +112,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup. See [AWS Authe
   defaultValue={null}
   enumValues={null}
   examples={[]}
+  groups={[]}
   name={"batch"}
   path={null}
   relevantWhen={null}
@@ -139,10 +134,11 @@ Configures the sink batching behavior.
   defaultValue={20}
   enumValues={null}
   examples={[20]}
+  groups={[]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -161,10 +157,11 @@ The maximum size of a batch, in events, before it is flushed.
   defaultValue={1}
   enumValues={null}
   examples={[1]}
+  groups={[]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -188,10 +185,11 @@ The maximum age of a batch before it is flushed.
   defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
+  groups={[]}
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -210,6 +208,7 @@ Custom endpoint for use with AWS-compatible services. Providing a value for this
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"healthcheck"}
   path={null}
   relevantWhen={null}
@@ -232,6 +231,7 @@ Enables/disables the sink healthcheck upon start. See [Health Checks](#health-ch
   defaultValue={null}
   enumValues={null}
   examples={["service"]}
+  groups={[]}
   name={"namespace"}
   path={null}
   relevantWhen={null}
@@ -254,9 +254,10 @@ A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/clo
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
+  groups={[]}
   name={"region"}
   path={null}
-  relevantWhen={{"host":""}}
+  relevantWhen={{"endpoint":""}}
   required={true}
   templateable={false}
   type={"string"}
@@ -283,6 +284,7 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -305,6 +307,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}
@@ -402,7 +405,7 @@ The following matrix outlines how Vector metric types are mapped into CloudWatch
 1. Gauge values are persisted between flushes. On Vector start up each gauge is assumed to have
 zero (0.0) value, that can be updated explicitly by the consequent absolute (not delta) gauge
 observation, or by delta increments/decrements. Delta gauges are considered an advanced feature
-useful in distributed setting, however it should be used with care.
+useful itn distributed setting, however it should be used with care.
 
 ### Streaming
 
