@@ -612,6 +612,8 @@ impl Transform for Transaction {
                 }
             }
         }
+
+        self.flush_into(output);
     }
 
     fn transform_stream(
@@ -628,7 +630,6 @@ impl Transform for Transaction {
 
         let mut input_rx = Compat01As03::new(input_rx);
 
-        // let poller_shared_state = shared_state.clone();
         let poll_flush = move |ctx: &mut Context| -> Poll<Option<Result<StreamEvent, ()>>> {
             let p = Pin::new(&mut input_rx).poll_next(ctx);
             match p {
