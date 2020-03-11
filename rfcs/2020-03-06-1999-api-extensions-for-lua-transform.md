@@ -4,9 +4,9 @@ This RFC proposes a new API for the `lua` transform.
 
 * [Motivation](#motivation)
 * [Prior Art](#prior-art)
-* [Guide-level Proposal](#guide-level-proposal)
-    * [Motivating Example](#motivating-example)
-    * [Possible Configs](#possible-configs)
+* [Motivating Examples](#motivating-examples)
+    * [Fields Manipulation](#fields-manipulation)
+    * [Log To Metric](#log-to-metric)
         * [Inline Functions](#inline-functions)
         * [Single Source](#single-source)
         * [Loadable Module](#loadable-module)
@@ -96,11 +96,54 @@ Events have type [`userdata`](https://www.lua.org/pil/28.1.html) with custom [me
 
 The fields are accessed through string indexes using [Vector's field path notation](https://vector.dev/docs/about/data-model/log/).
 
-## Guide-level Proposal
+## Motivating Examples
 
-### Motivating example
+### Fields Manipulation
 
-The motivating example is a log to metric transform which produces metric events from incoming log events using the following algorithm:
+The following example illustrates fields manipulations with the new approach.
+
+```toml
+[tranforms.lua]
+  type = "lua"
+  inputs = []
+  version = "2"
+  hooks.process = """
+    function (event, emit)
+      -- add new field (simple)
+      event.new_field = "example"
+      -- add new nested field
+      -- add new field (nested, overwriting the content of "nested" map)
+      event.nested = {
+        field = "example value"
+      }
+      -- add new field (nested, to already existing map)
+      event.nested.another_field = "example value"
+      -- add new field (nestd, without assumptions about presence of the parent map)
+      if event.possibly_existing == nil then
+        event.possibly_existing = {}
+      end
+      event.possibly_existing.example_field = "example value"
+
+      -- remove field
+      event.removed_field = nil
+      -- remove nested field, but keep parent maps
+      event.nested.field = nil
+      -- remove nested field and, if the parent map is empty, the parent map too
+      event.another_nested.field = nil
+      if next(event.another_nested) == nil then
+        event.another_nested = nil
+      end
+
+      -- rename field from "original_field" to "another_field"
+      event.original_field, event.another_field = nil, event.original_field
+
+      emit(event)
+    end
+  """
+
+### Log to Metric
+
+This example is a log to metric transform which produces metric events from incoming log events using the following algorithm:
 
 1. There is an internal counter which is increased on each incoming log event.
 2. The log events are discarded.
@@ -109,11 +152,7 @@ The motivating example is a log to metric transform which produces metric events
    1. If there are no incoming invents, the metric event with the counter equal to 0 still has to be produced.
    2. On Vector's shutdown the transform has to produce the final metric event with the count of received events since the last flush.
 
-This example would be used in the following to illustrate different ways to execute the transform.
-
-### Possible Configs
-
-Two versions of a config running the same Lua code are listed below, both of them implement the transform described in the motivating example.
+Two versions of a config running the same Lua code are listed below, both of them implement the transform described above.
 
 #### Inline Functions
 
