@@ -2237,6 +2237,59 @@ end
       # * relevant when type = "check_fields"
       "environment.prefix" = "staging-"
 
+# Accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
+[transforms.tag_cardinality_limit]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "tag_cardinality_limit"
+  type = "tag_cardinality_limit"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Controls what approach is used internally to keep track of previously seen
+  # tags and deterime when a tag on an incoming metric exceeds the limit.
+  #
+  # * required
+  # * type: string
+  # * enum: "exact" or "probabilistic"
+  mode = "exact"
+  mode = "probabilistic"
+
+  # The size of the cache in bytes to use to detect duplicate tags. The bigger
+  # the cache the less likely it is to have a 'false positive' or a case where we
+  # allow a new value for tag even after we have reached the configured limits.
+  #
+  # * optional
+  # * default: 5120000
+  # * type: int
+  # * unit: bytes
+  # * relevant when mode = "probabilistic"
+  cache_size_per_tag = 5120000
+
+  # Controls what should happen when a metric comes in with a tag that would
+  # exceed the configured limit on cardinality.
+  #
+  # * optional
+  # * default: "drop_tag"
+  # * type: string
+  # * enum: "drop_tag" or "drop_event"
+  limit_exceeded_action = "drop_tag"
+  limit_exceeded_action = "drop_event"
+
+  # How many distinct values to accept for any given key.
+  #
+  # * optional
+  # * default: 500
+  # * type: int
+  value_limit = 500
+
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #

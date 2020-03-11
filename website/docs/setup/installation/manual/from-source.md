@@ -409,6 +409,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `transforms-sampler` | Enables building of [`sampler` transform][docs.transforms.sampler].  |
 | `transforms-split` | Enables building of [`split` transform][docs.transforms.split].  |
 | `transforms-swimlanes` | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].  |
+| `transforms-tag_cardinality_limit` | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].  |
 | `transforms-tokenizer` | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].  |
 | `sinks-aws_cloudwatch_logs` | Enables building of [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs].  |
 | `sinks-aws_cloudwatch_metrics` | Enables building of [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics].  |
@@ -510,6 +511,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.transforms.sampler]: /docs/reference/transforms/sampler/
 [docs.transforms.split]: /docs/reference/transforms/split/
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [urls.jemalloc]: https://github.com/jemalloc/jemalloc
 [urls.leveldb]: https://github.com/google/leveldb

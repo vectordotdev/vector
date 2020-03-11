@@ -147,6 +147,7 @@ once_cell = "1.3"
 getset = "0.1.0"
 lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
+bloom = "0.3.2"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -259,6 +260,7 @@ transforms = [
   "transforms-sampler",
   "transforms-split",
   "transforms-swimlanes",
+  "transforms-tag_cardinality_limit",
   "transforms-tokenizer",
 ]
 transforms-add_fields = []
@@ -284,6 +286,7 @@ transforms-rename_fields = []
 transforms-sampler = ["seahash"]
 transforms-split = []
 transforms-swimlanes = []
+transforms-tag_cardinality_limit = []
 transforms-tokenizer = ["nom"]
 
 # Sinks

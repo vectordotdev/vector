@@ -291,6 +291,9 @@
 - name: "transform: swimlanes"
   description: Anything `swimlanes` transform related
   color: 54a0ff
+- name: "transform: tag_cardinality_limit"
+  description: Anything `tag_cardinality_limit` transform related
+  color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
   color: 54a0ff

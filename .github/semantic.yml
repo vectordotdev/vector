@@ -104,6 +104,7 @@ scopes:
   - sampler transform
   - split transform
   - swimlanes transform
+  - tag_cardinality_limit transform
   - tokenizer transform
 
   # sinks

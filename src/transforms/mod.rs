@@ -47,6 +47,8 @@ pub mod sampler;
 pub mod split;
 #[cfg(feature = "transforms-swimlanes")]
 pub mod swimlanes;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
