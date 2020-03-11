@@ -1,9 +1,17 @@
 {
   "default": false,
 
+  "MD001": true,
   "MD003": { "style": "atx" },
   "MD007": { "indent": 2 },
   "MD009": true,
   "MD010": true,
-  "MD013": { "line_length": 80, "code_blocks": false, "tables": false }
+  "MD027": true,
+  "MD028": true,
+  "MD030": false,
+  "MD033": false, // we allow HTML
+  "MD034": false, // we allow full URLs in special cases, such as component attributes
+  "MD037": true,
+  "MD038": true,
+  "MD039": true
 }

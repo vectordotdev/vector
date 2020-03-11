@@ -465,7 +465,7 @@ time.
 Multiline parsing configuration (per file).
 If not speicified, multiline parsing is disabled.
 
- See [ Multi-Line Messages](#-multi-line-messages) for more info.
+ See [Multi-Line Messages](#multi-line-messages) for more info.
 
 <Fields filters={false}>
 
@@ -489,7 +489,7 @@ If not speicified, multiline parsing is disabled.
 
 Start regex pattern to look for as a beginning of the message.
 
- See [ Multi-Line Messages](#-multi-line-messages) for more info.
+ See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
 </Field>
@@ -514,7 +514,7 @@ Start regex pattern to look for as a beginning of the message.
 
 Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) is interpreted.
 
- See [ Multi-Line Messages](#-multi-line-messages) for more info.
+ See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
 </Field>
@@ -539,7 +539,7 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
 
 Condition regex pattern to look for. Exact behavior is configured via [`mode`](#mode).
 
- See [ Multi-Line Messages](#-multi-line-messages) for more info.
+ See [Multi-Line Messages](#multi-line-messages) for more info.
 
 
 </Field>
@@ -757,108 +757,6 @@ The exact time the event was ingested. This can be renamed via the [global
 
 ## How It Works
 
-###  Multi-Line Messages
-
-Sometimes a single log event will appear as multiple log lines. To handle this,
-Vector provides a set of [`multiline`](#multiline) options. These options were carefully
-thought through and will allow you to solve the simplest and most complex
-cases. Let's look at a few examples:
-
-#### Example 1: Ruby Exceptions
-
-Ruby exceptions, when logged, consist of multiple lines:
-
-```
-foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
-  from foobar.rb:6:in `bar'
-  from foobar.rb:2:in `foo'
-  from foobar.rb:9:in `<main>'
-```
-
-To consume these lines as a single event, use the following Vector configuration:
-
-```toml
-[sources.my_file_source]
-  type = "file"
-  # ...
-
-  [sources.my_file_source.multiline]
-    start_pattern = "^[^\\s]"
-    mode = "continue_through"
-    condition_pattern = "^[\\s]+from"
-    timeout_ms = 1000
-```
-
-* [`start_pattern`](#start_pattern), set to `^[^\\s]`, tells Vector that new multi-line events
-  should _not_ start  with white-space.
-* [`mode`](#mode), set to `continue_through`, tells Vector continue aggregating lines
-  until the [`condition_pattern`](#condition_pattern) is no longer valid (excluding the invalid line).
-* [`condition_pattern`](#condition_pattern), set to `^[\\s]+from`, tells Vector to continue
-  aggregating lines if they start with white-space followed by `from`.
-
-#### Example 2: Line Continuations
-
-Some programming languages use the backslash (`\`) character to signal that a
-line will continue on the next line:
-
-```
-First line\
-second line\
-third line
-```
-
-To consume these lines as a single event, use the following Vector configuration:
-
-```toml
-[sources.my_file_source]
-  type = "file"
-  # ...
-
-  [sources.my_file_source.multiline]
-    start_pattern = "\\$"
-    mode = "continue_past"
-    condition_pattern = "\\$"
-    timeout_ms = 1000
-```
-
-* [`start_pattern`](#start_pattern), set to `\\$`, tells Vector that new multi-line events
-  start with lines that end in `\`.
-* [`mode`](#mode), set to `continue_past`, tells Vector continue aggregating lines, plus
-  one additional line, until [`condition_pattern`](#condition_pattern) is false.
-* [`condition_pattern`](#condition_pattern), set to `\\$`, tells Vector to continue aggregating lines
-  if they _end_ with a `\` character.
-
-#### Example 3: Timestamps
-
-Activity logs from services such as Elasticsearch typically begin with a
-timestamp, followed by information on the specific activity, as in this example:
-
-```
-[2015-08-24 11:49:14,389][ INFO ][env                      ] [Letha] using [1] data paths, mounts [[/
-(/dev/disk1)]], net usable_space [34.5gb], net total_space [118.9gb], types [hfs]
-```
-
-To consume these lines as a single event, use the following Vector configuration:
-
-```toml
-[sources.my_file_source]
-  type = "file"
-  # ...
-
-  [sources.my_file_source.multiline]
-    start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-    mode = "halt_before"
-    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-    timeout_ms = 1000
-```
-
-* [`start_pattern`](#start_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector that
-  new multi-line events start with a timestamp sequence.
-* [`mode`](#mode), set to `halt_before`, tells Vector to continue aggregating lines as
-  long as the [`condition_pattern`](#condition_pattern) does not match.
-* [`condition_pattern`](#condition_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector to
-  continue aggregating up until a line starts with a timestamp sequence.
-
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
@@ -984,6 +882,108 @@ be [autodiscovered](#auto-discovery) continually at a rate defined by the
 ### Line Delimiters
 
 Each line is read until a new line delimiter (the `0xA` byte) or `EOF` is found.
+
+### Multi-Line Messages
+
+Sometimes a single log event will appear as multiple log lines. To handle this,
+Vector provides a set of [`multiline`](#multiline) options. These options were carefully
+thought through and will allow you to solve the simplest and most complex
+cases. Let's look at a few examples:
+
+#### Example 1: Ruby Exceptions
+
+Ruby exceptions, when logged, consist of multiple lines:
+
+```
+foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
+  from foobar.rb:6:in `bar'
+  from foobar.rb:2:in `foo'
+  from foobar.rb:9:in `<main>'
+```
+
+To consume these lines as a single event, use the following Vector configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^[^\\s]"
+    mode = "continue_through"
+    condition_pattern = "^[\\s]+from"
+    timeout_ms = 1000
+```
+
+* [`start_pattern`](#start_pattern), set to `^[^\\s]`, tells Vector that new multi-line events
+  should _not_ start  with white-space.
+* [`mode`](#mode), set to `continue_through`, tells Vector continue aggregating lines
+  until the [`condition_pattern`](#condition_pattern) is no longer valid (excluding the invalid line).
+* [`condition_pattern`](#condition_pattern), set to `^[\\s]+from`, tells Vector to continue
+  aggregating lines if they start with white-space followed by `from`.
+
+#### Example 2: Line Continuations
+
+Some programming languages use the backslash (`\`) character to signal that a
+line will continue on the next line:
+
+```
+First line\
+second line\
+third line
+```
+
+To consume these lines as a single event, use the following Vector configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "\\$"
+    mode = "continue_past"
+    condition_pattern = "\\$"
+    timeout_ms = 1000
+```
+
+* [`start_pattern`](#start_pattern), set to `\\$`, tells Vector that new multi-line events
+  start with lines that end in `\`.
+* [`mode`](#mode), set to `continue_past`, tells Vector continue aggregating lines, plus
+  one additional line, until [`condition_pattern`](#condition_pattern) is false.
+* [`condition_pattern`](#condition_pattern), set to `\\$`, tells Vector to continue aggregating lines
+  if they _end_ with a `\` character.
+
+#### Example 3: Timestamps
+
+Activity logs from services such as Elasticsearch typically begin with a
+timestamp, followed by information on the specific activity, as in this example:
+
+```
+[2015-08-24 11:49:14,389][ INFO ][env                      ] [Letha] using [1] data paths, mounts [[/
+(/dev/disk1)]], net usable_space [34.5gb], net total_space [118.9gb], types [hfs]
+```
+
+To consume these lines as a single event, use the following Vector configuration:
+
+```toml
+[sources.my_file_source]
+  type = "file"
+  # ...
+
+  [sources.my_file_source.multiline]
+    start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    mode = "halt_before"
+    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    timeout_ms = 1000
+```
+
+* [`start_pattern`](#start_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector that
+  new multi-line events start with a timestamp sequence.
+* [`mode`](#mode), set to `halt_before`, tells Vector to continue aggregating lines as
+  long as the [`condition_pattern`](#condition_pattern) does not match.
+* [`condition_pattern`](#condition_pattern), set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells Vector to
+  continue aggregating up until a line starts with a timestamp sequence.
 
 ### Read Position
 
