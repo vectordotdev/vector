@@ -5,7 +5,7 @@ use crate::{
     sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
+use futures01::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use pulsar::{
@@ -162,7 +162,7 @@ impl Sink for PulsarSink {
 fn encode_event(item: Event, enc: Encoding) -> crate::Result<Vec<u8>> {
     let log = item.into_log();
     let data = match enc {
-        Encoding::Json => serde_json::to_vec(&log.unflatten())?,
+        Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(&event::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())

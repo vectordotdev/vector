@@ -2633,7 +2633,7 @@ dependencies = [
  "crc",
  "futures 0.1.29",
  "futures-timer",
- "log 0.4.8",
+ "log",
  "nom 5.1.0",
  "prost",
  "prost-build",
