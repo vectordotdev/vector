@@ -419,6 +419,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `sinks-blackhole` | Enables building of [`blackhole` sink][docs.sinks.blackhole].  |
 | `sinks-clickhouse` | Enables building of [`clickhouse` sink][docs.sinks.clickhouse].  |
 | `sinks-console` | Enables building of [`console` sink][docs.sinks.console].  |
+| `sinks-datadog_logs` | Enables building of [`datadog_logs` sink][docs.sinks.datadog_logs].  |
 | `sinks-datadog_metrics` | Enables building of [`datadog_metrics` sink][docs.sinks.datadog_metrics].  |
 | `sinks-elasticsearch` | Enables building of [`elasticsearch` sink][docs.sinks.elasticsearch].  |
 | `sinks-file` | Enables building of [`file` sink][docs.sinks.file].  |
@@ -457,6 +458,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.sinks.blackhole]: /docs/reference/sinks/blackhole/
 [docs.sinks.clickhouse]: /docs/reference/sinks/clickhouse/
 [docs.sinks.console]: /docs/reference/sinks/console/
+[docs.sinks.datadog_logs]: /docs/reference/sinks/datadog_logs/
 [docs.sinks.datadog_metrics]: /docs/reference/sinks/datadog_metrics/
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
 [docs.sinks.file]: /docs/reference/sinks/file/

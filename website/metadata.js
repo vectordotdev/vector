@@ -21539,7 +21539,7 @@ module.exports = {
     "datadog_logs": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to [Datadog's][urls.datadog] logs.",
+      "description": "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints].",
       "event_types": [
         "log"
       ],

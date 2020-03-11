@@ -1,4 +1,5 @@
 use crate::{
+    event::{log_schema, Event},
     sinks::util::{
         self,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -74,11 +75,25 @@ impl SinkConfig for DatadogLogsConfig {
 }
 
 fn encode_event(
-    mut event: crate::Event,
+    mut event: Event,
     mut api_key: Bytes,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<Bytes> {
     encoding.apply_rules(&mut event);
+
+    let log = event.as_mut_log();
+
+    if let Some(message) = log.remove(&log_schema().message_key()) {
+        log.insert("message".into(), message);
+    }
+
+    if let Some(timestamp) = log.remove(&log_schema().timestamp_key()) {
+        log.insert("date".into(), timestamp);
+    }
+
+    if let Some(host) = log.remove(&log_schema().host_key()) {
+        log.insert("host".into(), host);
+    }
 
     if let Some(bytes) = util::encode_event(event, encoding) {
         // Prepend the api_key:
