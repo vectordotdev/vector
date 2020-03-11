@@ -18,7 +18,7 @@ use string_cache::DefaultAtom as Atom;
 pub struct RegexParserConfig {
     pub regex: String,
     pub field: Option<Atom>,
-    #[derivative(Default(value = "false"))]
+    #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub drop_failed: bool,
     pub target_field: Option<Atom>,
@@ -246,7 +246,7 @@ mod tests {
         let log = do_transform(
             "status=1234 time=5678",
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            "",
+            "drop_field = false",
         )
         .unwrap();
 
@@ -257,7 +257,8 @@ mod tests {
 
     #[test]
     fn doesnt_do_anything_if_no_match() {
-        let log = do_transform("asdf1234", r"status=(?P<status>\d+)", "").unwrap();
+        let log =
+            do_transform("asdf1234", r"status=(?P<status>\d+)", "drop_field = false").unwrap();
 
         assert_eq!(log.get(&"status".into()), None);
         assert!(log.get(&"message".into()).is_some());
@@ -268,10 +269,7 @@ mod tests {
         let log = do_transform(
             "status=1234 time=5678",
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            r#"
-               field = "message"
-               drop_field = true
-            "#,
+            r#"field = "message""#,
         )
         .unwrap();
 
@@ -285,10 +283,7 @@ mod tests {
         let log = do_transform(
             "status=1234 message=yes",
             r"status=(?P<status>\d+) message=(?P<message>\S+)",
-            r#"
-               field = "message"
-               drop_field = true
-            "#,
+            r#"field = "message""#,
         )
         .unwrap();
 
@@ -301,10 +296,7 @@ mod tests {
         let log = do_transform(
             "asdf1234",
             r"status=(?P<message>\S+)",
-            r#"
-               field = "message"
-               drop_field = true
-            "#,
+            r#"field = "message""#,
         )
         .unwrap();
 
@@ -316,7 +308,10 @@ mod tests {
         let mut log = do_transform(
             "status=1234 time=5678",
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            r#"target_field = "prefix""#,
+            r#"
+               target_field = "prefix"
+               drop_field = false
+            "#,
         )
         .unwrap();
 
@@ -356,6 +351,7 @@ mod tests {
             r#"
                target_field = "message"
                overwrite_target = true
+               drop_field = false
             "#,
         )
         .unwrap();
