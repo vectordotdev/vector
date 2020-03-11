@@ -612,8 +612,6 @@ impl Transform for Transaction {
                 }
             }
         }
-
-        self.flush_into(output);
     }
 
     fn transform_stream(
