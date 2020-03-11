@@ -84,7 +84,10 @@ impl ShutdownCoordinator {
     /// Creates the necessary Triggers and Tripwires for coordinating shutdown of this Source and
     /// stores them as needed.  Returns the ShutdownSignal for this Source as well as a Tripwire
     /// that will be notified if the Source should be forcibly shut down.
-    pub fn register_source(&mut self, name: &str) -> (ShutdownSignal, Tripwire) {
+    pub fn register_source(
+        &mut self,
+        name: &str,
+    ) -> (ShutdownSignal, impl Future<Item = (), Error = ()>) {
         let (shutdown_begun_trigger, shutdown_begun_tripwire) = Tripwire::new();
         let (force_shutdown_trigger, force_shutdown_tripwire) = Tripwire::new();
         let (shutdown_complete_trigger, shutdown_complete_tripwire) = Tripwire::new();
@@ -99,6 +102,11 @@ impl ShutdownCoordinator {
         let shutdown_signal =
             ShutdownSignal::new(shutdown_begun_tripwire, shutdown_complete_trigger);
 
+        // shutdown_source_end drops the force_shutdown_trigger even on success when we should *not*
+        // be shutting down.  Dropping the trigger will cause the Tripwire to resolve with an error,
+        // so we use or_else with future::empty() to make it so it never resolves if the Trigger is
+        // prematurely dropped instead.
+        let force_shutdown_tripwire = force_shutdown_tripwire.or_else(|_| future::empty());
         (shutdown_signal, force_shutdown_tripwire)
     }
 
@@ -192,11 +200,7 @@ impl ShutdownCoordinator {
             );
         };
         if success {
-            // TODO Shouldn't need to cancel here, we should be able to call
-            // `shutdown_force_trigger.disable()` instead.  We can't yet though because
-            // some topology tests rely on notifying this trigger to mask failures of the
-            // underlying 'source_task'.
-            shutdown_force_trigger.cancel();
+            shutdown_force_trigger.disable();
         } else {
             shutdown_force_trigger.cancel();
         }
