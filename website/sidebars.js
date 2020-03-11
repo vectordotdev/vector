@@ -163,6 +163,8 @@ module.exports = {
             
               "reference/transforms/concat",
             
+              "reference/transforms/dedupe",
+            
               "reference/transforms/field_filter",
             
               "reference/transforms/geoip",
@@ -266,6 +268,7 @@ module.exports = {
           label: 'Advanced',
           items: [
             "reference/env-vars",
+            "reference/field-path-notation",
             "reference/global-options",
             "reference/templating",
             "reference/tests",
@@ -290,6 +293,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Privacy',
+          href: 'https://github.com/timberio/vector/blob/master/PRIVACY.md'
+        },
         {
           type: 'link',
           label: 'Security',

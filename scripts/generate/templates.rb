@@ -2,7 +2,7 @@ require "erb"
 
 require "active_support/core_ext/string/output_safety"
 
-require_relative "templates/config_example"
+require_relative "templates/config_example_writer"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 
@@ -93,14 +93,13 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, skip_path: false, common: false, path: nil, titles: true)
+  def config_example(options, array: false, key_path: [], table_path: [], &block)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    options = options.sort_by(&:config_file_sort_token)
-    example = ConfigExample.new(options)
-    render("#{partials_path}/_config_example.toml", binding).strip
+    example = ConfigExampleWriter.new(options, array: array, key_path: key_path, table_path: table_path, &block)
+    example.to_toml
   end
 
   def config_schema(options, opts = {})
@@ -222,7 +221,8 @@ class Templates
     end
 
     if option.relevant_when
-      description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}."
+      word = option.required? ? "required" : "relevant"
+      description << " Only #{word} when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}."
     end
 
     description
@@ -291,7 +291,8 @@ class Templates
     end
 
     if relevant_when && option.relevant_when
-      tag = "relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
+      word = option.required? ? "required" : "relevant"
+      tag = "#{word} when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
       tags << tag
     end
 

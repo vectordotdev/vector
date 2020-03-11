@@ -13,7 +13,12 @@ a blackhole that simply discards data, designed for testing and \
 benchmarking purposes\
 """
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "blackhole") %>
+<%= render(
+  "_partials/_component_options.toml",
+  type: "sink",
+  name: "blackhole",
+  healthcheck: false
+) %>
 
 [sinks.blackhole.options.print_amount]
 type = "int"

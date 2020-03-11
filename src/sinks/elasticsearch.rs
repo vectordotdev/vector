@@ -2,6 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         http::{https_client, HttpRetryLogic, HttpService},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -32,6 +33,8 @@ pub struct ElasticSearchConfig {
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub compression: Option<Compression>,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
@@ -48,6 +51,14 @@ lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         ..Default::default()
     };
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -182,7 +193,7 @@ fn es(
         Compression::None => false,
         Compression::Gzip => true,
     };
-
+    let encoding = config.encoding.clone();
     let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
     let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -260,17 +271,19 @@ fn es(
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
+        .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key, &encoding)));
 
     Box::new(sink)
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     index: &Template,
     doc_type: &str,
     id_key: &Option<String>,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<Vec<u8>> {
+    encoding.apply_rules(&mut event);
     let index = index
         .render_string(&event)
         .map_err(|missing_keys| {

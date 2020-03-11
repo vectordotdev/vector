@@ -12,7 +12,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Component({delivery_guarantee, description, event_types, name, status, type}) {
+function Component({delivery_guarantee, description, event_types, function_category, name, status, type}) {
   let path = null;
   if(type == "source") path = `/docs/reference/sources/${name}/`;
   if(type == "transform") path = `/docs/reference/transforms/${name}/`;
@@ -37,6 +37,7 @@ function Component({delivery_guarantee, description, event_types, name, status, 
         {delivery_guarantee == "best_effort" ?
           <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i></span> :
           <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i></span>}
+        <span className="badge badge--secondary">{function_category}</span>
       </div>
     </Link>
   );
@@ -103,7 +104,7 @@ function VectorComponents(props) {
   //
 
   const {siteConfig} = useDocusaurusContext();
-  const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
+  const {metadata: {event_types, sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
   const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
@@ -119,9 +120,8 @@ function VectorComponents(props) {
   //
 
   const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
+  const [onlyEventTypes, setOnlyEventTypes] = useState(new Set(queryObj['event-types']));
   const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['functions']));
-  const [onlyLog, setOnlyLog] = useState(queryObj['log'] == 'true');
-  const [onlyMetric, setOnlyMetric] = useState(queryObj['metric'] == 'true');
   const [onlyOperatingSystems, setOnlyOperatingSystems] = useState(new Set(queryObj['operating-systems']));
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
   const [onlyProviders, setOnlyProviders] = useState(new Set(queryObj['providers']));
@@ -142,16 +142,12 @@ function VectorComponents(props) {
     components = components.filter(component => component.delivery_guarantee == "at_least_once");
   }
 
+  if (onlyEventTypes.size > 0) {
+    components = components.filter(component => Array.from(onlyEventTypes).every(x => component.event_types.includes(x)));
+  }
+
   if (onlyFunctions.size > 0) {
     components = components.filter(component => onlyFunctions.has(component.function_category) );
-  }
-
-  if (onlyLog) {
-    components = components.filter(component => component.event_types.includes("log"));
-  }
-
-  if (onlyMetric) {
-    components = components.filter(component => component.event_types.includes("metric"));
   }
 
   if (onlyOperatingSystems.size > 0) {
@@ -169,6 +165,8 @@ function VectorComponents(props) {
   //
   // Filter options
   //
+
+  const eventTypes = new Set(event_types);
 
   const operatingSystems = new Set(
     _(components).
@@ -188,8 +186,28 @@ function VectorComponents(props) {
       sort().
       value());
 
-  const functionCategories = new Set(
+  const sourceFunctionCategories = new Set(
     _(components).
+      filter(component => component.type == "source").
+      map(component => component.function_category).
+      uniq().
+      compact().
+      sort().
+      value());
+
+  const transformFunctionCategories = new Set(
+    _(components).
+      filter(component => component.type == "transform").
+      map(component => component.function_category).
+      uniq().
+      compact().
+      sort().
+      value());
+
+
+  const sinkFunctionCategories = new Set(
+    _(components).
+      filter(component => component.type == "sink").
       map(component => component.function_category).
       uniq().
       compact().
@@ -216,18 +234,13 @@ function VectorComponents(props) {
             </Link>
           </div>
           <div className="filter--choices">
-            <label title="Show only components that work with log event types.">
-              <input
-                type="checkbox"
-                onChange={(event) => setOnlyLog(event.currentTarget.checked)}
-                checked={onlyLog} /> Log
-            </label>
-            <label title="Show only components that work with metric event types.">
-              <input
-                type="checkbox"
-                onChange={(event) => setOnlyMetric(event.currentTarget.checked)}
-                checked={onlyMetric} /> Metric
-            </label>
+            <CheckboxList
+              label="Event Types"
+              icon="database"
+              values={eventTypes}
+              humanize={true}
+              currentState={onlyEventTypes}
+              setState={setOnlyEventTypes} />
           </div>
         </div>
         <div className="filter">
@@ -253,18 +266,45 @@ function VectorComponents(props) {
             </label>
           </div>
         </div>
-        <div className="filter">
-          <div className="filter--label">Functions</div>
-          <div className="filter--choices">
-            <CheckboxList
-              label="Functions"
-              icon="settings"
-              values={functionCategories}
-              humanize={true}
-              currentState={onlyFunctions}
-              setState={setOnlyFunctions} />
-          </div>
-        </div>
+        {sourceFunctionCategories.size > 0 &&
+          <div className="filter">
+            <div className="filter--label">Source Functions</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Functions"
+                icon="settings"
+                values={sourceFunctionCategories}
+                humanize={true}
+                currentState={onlyFunctions}
+                setState={setOnlyFunctions} />
+            </div>
+          </div>}
+        {transformFunctionCategories.size > 0 &&
+          <div className="filter">
+            <div className="filter--label">Transform Functions</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Functions"
+                icon="settings"
+                values={transformFunctionCategories}
+                humanize={true}
+                currentState={onlyFunctions}
+                setState={setOnlyFunctions} />
+            </div>
+          </div>}
+        {sinkFunctionCategories.size > 0 &&
+          <div className="filter">
+            <div className="filter--label">Sink Functions</div>
+            <div className="filter--choices">
+              <CheckboxList
+                label="Functions"
+                icon="settings"
+                values={sinkFunctionCategories}
+                humanize={true}
+                currentState={onlyFunctions}
+                setState={setOnlyFunctions} />
+            </div>
+          </div>}
         {serviceProviders.size > 0 && (
           <div className="filter">
             <div className="filter--label">Providers</div>

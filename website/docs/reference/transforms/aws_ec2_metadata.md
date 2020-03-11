@@ -2,6 +2,7 @@
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
+function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
 min_version: null
 service_name: "AWS EC2 Metadata"
@@ -29,15 +30,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "aws_ec2_metadata" # must be: "aws_ec2_metadata"
-  inputs = ["my-source-id"] # example
-
-  # OPTIONAL
-  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # default
-  host = "http://169.254.169.254" # default
-  namespace = "" # default
-  refresh_interval_secs = 10 # default
+  type = "aws_ec2_metadata" # required
+  inputs = ["my-source-id"] # required
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
+  host = "http://169.254.169.254" # optional, default
+  namespace = "" # optional, default
+  refresh_interval_secs = 10 # optional, default
 ```
 
 ## Requirements
@@ -438,6 +436,13 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `aws_ec2_metadata`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -466,3 +471,4 @@ Learn more in the [Docker networking docs][urls.docker_networking].
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

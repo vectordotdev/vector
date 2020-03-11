@@ -2,6 +2,7 @@ use crate::{tls::TlsSettings, Event};
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
+use openssl::ssl::SslAcceptor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
     fmt, io,
@@ -16,7 +17,7 @@ use tokio::{
     reactor::Handle,
     timer,
 };
-use tokio_tls::TlsAcceptor;
+use tokio_openssl::SslAcceptorExt;
 use tracing::{field, Span};
 use tracing_futures::Instrument;
 
@@ -150,8 +151,8 @@ fn accept_socket(
             Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
             Ok(acceptor) => {
                 let inner_span = span.clone();
-                let handler = TlsAcceptor::from(acceptor)
-                    .accept(socket)
+                let handler = SslAcceptor::from(acceptor)
+                    .accept_async(socket)
                     .map_err(|error| warn!(message = "TLS connection accept error.", %error))
                     .map(|socket| handle_stream(inner_span, socket, source, tripwire, host, out));
 

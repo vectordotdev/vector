@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -32,14 +33,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED
-  type = "statsd" # must be: "statsd"
-  inputs = ["my-source-id"] # example
-  namespace = "service" # example
-
-  # OPTIONAL
-  address = "127.0.0.1:8125" # default
-  healthcheck = true # default
+  type = "statsd" # required
+  inputs = ["my-source-id"] # required
+  namespace = "service" # required
+  address = "127.0.0.1:8125" # optional, default
+  healthcheck = true # optional, default
 ```
 
 ## Options

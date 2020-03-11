@@ -2,12 +2,13 @@
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of tags."
 event_types: ["metric"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tag_cardinality_limit%22
 min_version: null
 service_name: "Tag Cardinality Limit"
 sidebar_label: "tag_cardinality_limit|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tag_cardinality_limit.rs
-status: "prod-ready"
+status: "beta"
 title: "Tag Cardinality Limit Transform"
 ---
 
@@ -29,15 +30,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "tag_cardinality_limit" # must be: "tag_cardinality_limit"
-  inputs = ["my-source-id"] # example
-  mode = "exact" # example, enum
-
-  # OPTIONAL
-  cache_size_per_tag = 5120000 # default, bytes, relevant when mode = "probabilistic"
-  limit_exceeded_action = "drop_tag" # default, enum
-  value_limit = 500 # default
+  type = "tag_cardinality_limit" # required
+  inputs = ["my-source-id"] # required
+  mode = "exact" # required
+  cache_size_per_tag = 5120000 # optional, default, bytes, relevant when mode = "probabilistic"
+  limit_exceeded_action = "drop_tag" # optional, default
+  value_limit = 500 # optional, default
 ```
 
 
@@ -149,6 +147,13 @@ How many distinct values to accept for any given key. See [Memory Utilization](#
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `tag_cardinality_limit`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -198,3 +203,4 @@ in bits (1/8 of a byte).
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.metric]: /docs/about/data-model/metric/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

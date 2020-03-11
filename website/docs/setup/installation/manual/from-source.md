@@ -69,7 +69,7 @@ The following steps should be used to compile Vector directly on Linux based sys
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -143,7 +143,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -151,7 +151,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     ```
     git clone https://github.com/timberio/vector
-    git checkout v0.8.0
+    git checkout v0.8.2
     cd vector
     ```
 
@@ -195,7 +195,7 @@ Building steps:
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Master', value: 'master'},
       ]}>
 
@@ -393,6 +393,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `transforms-aws_ec2_metadata` | Enables building of [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].  |
 | `transforms-coercer` | Enables building of [`coercer` transform][docs.transforms.coercer].  |
 | `transforms-concat` | Enables building of [`concat` transform][docs.transforms.concat].  |
+| `transforms-dedupe` | Enables building of [`dedupe` transform][docs.transforms.dedupe].  |
 | `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.field_filter].  |
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
@@ -494,6 +495,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.transforms.aws_ec2_metadata]: /docs/reference/transforms/aws_ec2_metadata/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [docs.transforms.concat]: /docs/reference/transforms/concat/
+[docs.transforms.dedupe]: /docs/reference/transforms/dedupe/
 [docs.transforms.field_filter]: /docs/reference/transforms/field_filter/
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/

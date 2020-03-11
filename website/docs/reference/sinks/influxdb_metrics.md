@@ -3,6 +3,7 @@ delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
 event_types: ["metric"]
+function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
 min_version: "0"
 operating_systems: ["Linux","MacOS","Windows"]
@@ -31,7 +32,7 @@ import Tabs from '@theme/Tabs';
 <Tabs
   block={true}
   defaultValue="v2"
-  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (advanced)","value":"v2-advanced"},{"label":"v1 (advanced)","value":"v1-advanced"}]}>
+  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
 
 import TabItem from '@theme/TabItem';
 
@@ -43,19 +44,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  bucket = "vector-bucket" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
+  # General
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  bucket = "vector-bucket" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
-  # REQUIRED - auth
-  org = "Organization" # example
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
-
-  # OPTIONAL - General
-  healthcheck = true # default
+  # auth
+  org = "Organization" # required
+  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
 ```
 
 </TabItem>
@@ -65,101 +64,91 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  database = "vector-database" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
+  # General
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  database = "vector-database" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
+  # auth
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  username = "todd" # optional, no default
 
-  # OPTIONAL - auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
-  username = "todd" # example, no default
-
-  # OPTIONAL - persistence
-  consistency = "any" # example, no default
-  retention_policy_name = "autogen" # example, no default
+  # persistence
+  consistency = "any" # optional, no default
+  retention_policy_name = "autogen" # optional, no default
 ```
 
 </TabItem>
-<TabItem value="v2-advanced">
+<TabItem value="v2-adv">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  bucket = "vector-bucket" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
+  # General
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  bucket = "vector-bucket" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
-  # REQUIRED - auth
-  org = "Organization" # example
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # example
+  # auth
+  org = "Organization" # required
+  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
 
-  # OPTIONAL - General
-  healthcheck = true # default
+  # Batch
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
+  # Request
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
-<TabItem value="v1-advanced">
+<TabItem value="v1-adv">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
-  # REQUIRED - General
-  type = "influxdb_metrics" # must be: "influxdb_metrics"
-  inputs = ["my-source-id"] # example
-  database = "vector-database" # example
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # example
-  namespace = "service" # example
+  # General
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  database = "vector-database" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
 
-  # OPTIONAL - General
-  healthcheck = true # default
+  # auth
+  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  username = "todd" # optional, no default
 
-  # OPTIONAL - auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # example, no default
-  username = "todd" # example, no default
+  # persistence
+  consistency = "any" # optional, no default
+  retention_policy_name = "autogen" # optional, no default
 
-  # OPTIONAL - persistence
-  consistency = "any" # example, no default
-  retention_policy_name = "autogen" # example, no default
+  # Batch
+  batch.max_events = 20 # optional, default, events
+  batch.timeout_secs = 1 # optional, default, seconds
 
-  # OPTIONAL - Batch
-  [sinks.my_sink_id.batch]
-    max_events = 20 # default, events
-    timeout_secs = 1 # default, seconds
-
-  # OPTIONAL - Request
-  [sinks.my_sink_id.request]
-    in_flight_limit = 5 # default, requests
-    rate_limit_duration_secs = 1 # default, seconds
-    rate_limit_num = 5 # default
-    retry_attempts = -1 # default
-    retry_initial_backoff_secs = 1 # default, seconds
-    retry_max_duration_secs = 10 # default, seconds
-    timeout_secs = 60 # default, seconds
+  # Request
+  request.in_flight_limit = 5 # optional, default, requests
+  request.rate_limit_duration_secs = 1 # optional, default, seconds
+  request.rate_limit_num = 5 # optional, default
+  request.retry_attempts = -1 # optional, default
+  request.retry_initial_backoff_secs = 1 # optional, default, seconds
+  request.retry_max_duration_secs = 10 # optional, default, seconds
+  request.timeout_secs = 60 # optional, default, seconds
 ```
 
 </TabItem>
@@ -201,11 +190,11 @@ Configures the sink batching behavior.
   defaultValue={20}
   enumValues={null}
   examples={[20]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"max_events"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"events"}
@@ -224,11 +213,11 @@ The maximum size of a batch, in events, before it is flushed.
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"timeout_secs"}
   path={"batch"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -454,11 +443,11 @@ Configures the sink request behavior.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"in_flight_limit"}
   path={"request"}
   relevantWhen={null}
@@ -477,11 +466,11 @@ The maximum number of in-flight requests allowed at any given time. See [Rate Li
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"rate_limit_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -500,11 +489,11 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={5}
   enumValues={null}
   examples={[5]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"rate_limit_num"}
   path={"request"}
   relevantWhen={null}
@@ -527,7 +516,7 @@ The maximum number of requests allowed within the [`rate_limit_duration_secs`](#
   defaultValue={-1}
   enumValues={null}
   examples={[-1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"retry_attempts"}
   path={"request"}
   relevantWhen={null}
@@ -550,7 +539,7 @@ The maximum number of retries to make for failed requests. See [Retry Policy](#r
   defaultValue={1}
   enumValues={null}
   examples={[1]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"retry_initial_backoff_secs"}
   path={"request"}
   relevantWhen={null}
@@ -573,7 +562,7 @@ The amount of time to wait before attempting the first retry for a failed reques
   defaultValue={10}
   enumValues={null}
   examples={[10]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"retry_max_duration_secs"}
   path={"request"}
   relevantWhen={null}
@@ -592,11 +581,11 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={60}
   enumValues={null}
   examples={[60]}
-  groups={[]}
+  groups={["v1","v2"]}
   name={"timeout_secs"}
   path={"request"}
   relevantWhen={null}

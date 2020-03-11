@@ -2,6 +2,7 @@
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
 event_types: ["log"]
+function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
 min_version: null
 service_name: "Sampler"
@@ -29,13 +30,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [transforms.my_transform_id]
-  # REQUIRED
-  type = "sampler" # must be: "sampler"
-  inputs = ["my-source-id"] # example
-  rate = 10 # example
-
-  # OPTIONAL
-  pass_list = ["[error]", "field2"] # example, no default
+  type = "sampler" # required
+  inputs = ["my-source-id"] # required
+  rate = 10 # required
+  pass_list = ["[error]", "field2"] # optional, no default
 ```
 
 ## Options
@@ -97,6 +95,13 @@ The rate at which events will be forwarded, expressed as 1/N. For example, `rate
 
 ## How It Works
 
+### Complex Processing
+
+If you encounter limitations with the `sampler`
+transform then we recommend using a [runtime transform][urls.vector_programmable_transforms].
+These transforms are designed for complex processing and give you the power of
+full programming runtime.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
@@ -109,3 +114,4 @@ section.
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
+[urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

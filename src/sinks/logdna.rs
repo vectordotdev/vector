@@ -2,7 +2,10 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
+    sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
+    },
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -28,6 +31,9 @@ pub struct LogdnaConfig {
     ip: Option<String>,
     tags: Option<Vec<String>>,
 
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
+
     default_app: Option<String>,
 
     #[serde(default)]
@@ -39,6 +45,14 @@ pub struct LogdnaConfig {
 
 inventory::submit! {
     SinkDescription::new_without_default::<LogdnaConfig>("logdna")
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[typetag::serde(name = "logdna")]
