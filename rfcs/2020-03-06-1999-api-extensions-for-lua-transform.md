@@ -112,7 +112,6 @@ The following example illustrates fields manipulations with the new approach.
     function (event, emit)
       -- add new field (simple)
       event.new_field = "example"
-      -- add new nested field
       -- add new field (nested, overwriting the content of "nested" map)
       event.nested = {
         field = "example value"
@@ -125,11 +124,11 @@ The following example illustrates fields manipulations with the new approach.
       end
       event.possibly_existing.example_field = "example value"
 
-      -- remove field
+      -- remove field (simple)
       event.removed_field = nil
-      -- remove nested field, but keep parent maps
+      -- remove field (nested, keep parent maps)
       event.nested.field = nil
-      -- remove nested field and, if the parent map is empty, the parent map too
+      -- remove field (nested, if the parent map is empty, the parent map is removed too)
       event.another_nested.field = nil
       if next(event.another_nested) == nil then
         event.another_nested = nil
