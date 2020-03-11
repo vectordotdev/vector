@@ -1,14 +1,14 @@
-use crate::{dns::Resolver, sinks::util::http::https_client, tls::TlsSettings};
+use crate::{dns::Resolver, sinks::util::http::HttpClient, tls::TlsSettings};
+use bytes::Bytes;
 use futures01::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
-use hyper::{client::HttpConnector, Body, Chunk};
-use hyper_openssl::HttpsConnector;
 use k8s_openapi::{
     api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
     apimachinery::pkg::apis::meta::v1::WatchEvent,
     RequestError, Response, ResponseError, WatchOptional,
 };
 use snafu::{futures01::future::FutureExt, ResultExt, Snafu};
+use tower::Service;
 
 /// Config which could be loaded from kubeconfig or local kubernetes cluster.
 /// Used to build WatchClient which is in turn used to build Stream of metadata.
@@ -24,7 +24,7 @@ pub struct ClientConfig {
 impl ClientConfig {
     pub fn build(&self) -> Result<WatchClient, BuildError> {
         let client =
-            https_client(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
+            HttpClient::new(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
 
         Ok(WatchClient {
             client,
@@ -33,7 +33,7 @@ impl ClientConfig {
     }
 
     // Builds request to watch Pod data.
-    fn build_request(&self, version: Option<Version>) -> Result<Request<Body>, BuildError> {
+    fn build_request(&self, version: Option<Version>) -> Result<Request<hyper::Body>, BuildError> {
         // Selector for current node
         let field_selector = self
             .node_name
@@ -69,7 +69,7 @@ impl ClientConfig {
 /// Kubernetes client for watching changes on Kubernetes Objects.
 pub struct WatchClient {
     config: ClientConfig,
-    client: hyper::Client<HttpsConnector<HttpConnector<Resolver>>>,
+    client: HttpClient,
 }
 
 impl WatchClient {
@@ -109,13 +109,13 @@ impl WatchClient {
     }
 
     fn build_watch_stream(
-        &self,
-        request: Request<Body>,
+        &mut self,
+        request: Request<hyper::Body>,
     ) -> impl Stream<Item = Pod, Error = RuntimeError> {
         let mut decoder = Decoder::default();
 
         self.client
-            .request(request)
+            .call(request)
             .context(FailedConnecting)
             .and_then(|response| {
                 let status = response.status();
@@ -132,7 +132,7 @@ impl WatchClient {
             })
             .flatten_stream()
             // Process Server responses/data.
-            .map(move |chunk| decoder.decode(chunk))
+            .map(move |chunk| decoder.decode(chunk.into_bytes()))
             .flatten()
             // Extracts event from response
             .and_then(|response| match response {
@@ -168,14 +168,14 @@ struct Decoder {
 impl Decoder {
     fn decode(
         &mut self,
-        chunk: Chunk,
+        chunk: Bytes,
     ) -> impl Stream<Item = WatchPodForAllNamespacesResponse, Error = RuntimeError> {
         // We need to process unused data as soon as we get
         // them. Because a watch on Kubernetes object behaves
         // like a never ending stream of bytes.
 
         // Append new data to unused.
-        self.unused.extend_from_slice(chunk.as_ref());
+        self.unused.extend_from_slice(&chunk[..]);
 
         // Decodes watch response from unused data.
         // Repeats decoding so long as there is sufficient data.

@@ -73,7 +73,6 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
-tower-hyper = "0.1"
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }

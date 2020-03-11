@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{HttpBatchService, HttpClient, HttpRetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, value::Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use string_cache::DefaultAtom as Atom;
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -108,23 +109,23 @@ pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::Route
 
     let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service = HttpService::builder(cx.resolver())
-        .tls_settings(tls_settings)
-        .build(move |body: Vec<u8>| {
-            let mut builder = Request::builder();
-            builder.method(Method::POST);
-            builder.uri(uri.clone());
+    let build_request = move |body: Vec<u8>| {
+        let mut builder = Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri.clone());
 
-            builder.header("Content-Type", "application/json");
+        builder.header("Content-Type", "application/json");
 
-            if gzip {
-                builder.header("Content-Encoding", "gzip");
-            }
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
 
-            builder.header("Authorization", token.clone());
+        builder.header("Authorization", token.clone());
 
-            builder.body(body).unwrap()
-        });
+        builder.body(body).unwrap()
+    };
+
+    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
     let indexed_fields = config.indexed_fields.clone();
 
@@ -158,10 +159,10 @@ pub fn healthcheck(
         .unwrap();
 
     let tls = TlsSettings::from_options(&config.tls)?;
-    let client = https_client(resolver, tls)?;
+    let mut client = HttpClient::new(resolver, tls)?;
 
     let healthcheck = client
-        .request(request)
+        .call(request)
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),

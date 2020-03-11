@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{https_client, HttpRetryLogic, HttpService},
+        http::{HttpBatchService, HttpClient, HttpRetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
+use tower::Service;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -222,51 +223,52 @@ fn es(
         gzip = false;
     }
 
-    let http_service = HttpService::builder(cx.resolver())
-        .tls_settings(common.tls_settings.clone())
-        .build(move |body: Vec<u8>| {
-            let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
+    let tls_settings = common.tls_settings.clone();
+    let build_request = move |body: Vec<u8>| {
+        let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 
-            match common.credentials {
-                None => {
-                    builder.header("Content-Type", "application/x-ndjson");
-                    if gzip {
-                        builder.header("Content-Encoding", "gzip");
-                    }
-
-                    for (header, value) in &headers {
-                        builder.header(&header[..], &value[..]);
-                    }
-
-                    if let Some(ref auth) = common.authorization {
-                        builder.header("Authorization", &auth[..]);
-                    }
-
-                    builder.body(body).unwrap()
+        match common.credentials {
+            None => {
+                builder.header("Content-Type", "application/x-ndjson");
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
                 }
-                Some(ref credentials) => {
-                    let mut request = signed_request("POST", &uri);
 
-                    request.add_header("Content-Type", "application/x-ndjson");
+                for (header, value) in &headers {
+                    builder.header(&header[..], &value[..]);
+                }
 
-                    for (header, value) in &headers {
-                        request.add_header(header, value);
-                    }
+                if let Some(ref auth) = common.authorization {
+                    builder.header("Authorization", &auth[..]);
+                }
 
-                    request.set_payload(Some(body));
+                builder.body(body).unwrap()
+            }
+            Some(ref credentials) => {
+                let mut request = signed_request("POST", &uri);
 
-                    finish_signer(&mut request, &credentials, &mut builder);
+                request.add_header("Content-Type", "application/x-ndjson");
 
-                    // The SignedRequest ends up owning the body, so we have
-                    // to play games here
-                    let body = request.payload.take().unwrap();
-                    match body {
-                        SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
-                        _ => unreachable!(),
-                    }
+                for (header, value) in &headers {
+                    request.add_header(header, value);
+                }
+
+                request.set_payload(Some(body));
+
+                finish_signer(&mut request, &credentials, &mut builder);
+
+                // The SignedRequest ends up owning the body, so we have
+                // to play games here
+                let body = request.payload.take().unwrap();
+                match body {
+                    SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                    _ => unreachable!(),
                 }
             }
-        });
+        }
+    };
+
+    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())
@@ -334,8 +336,8 @@ fn healthcheck(
     let request = builder.body(Body::empty())?;
 
     Ok(Box::new(
-        https_client(resolver, common.tls_settings.clone())?
-            .request(request)
+        HttpClient::new(resolver, common.tls_settings.clone())?
+            .call(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
@@ -430,7 +432,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event,
-        sinks::util::http::https_client,
+        sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},
         tls::TlsOptions,
         topology::config::{SinkConfig, SinkContext},
@@ -441,6 +443,7 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+    use tower::Service;
 
     #[test]
     fn structures_events_correctly() {
@@ -594,9 +597,10 @@ mod integration_tests {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        https_client(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush")
-            .request(request)
+        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
+            .expect("Could not build client to flush");
+        client
+            .call(request)
             .map_err(|source| source.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
