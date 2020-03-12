@@ -225,7 +225,7 @@ For example:
 
 Given the following log event:
 
-```
+```javascript
 {
   "message": "{"key": "value"}"
 }
@@ -258,7 +258,7 @@ option.
 It is possible to chain `json_parser` transforms to effectively "unwrap"
 nested JSON documents. For example, give this log event:
 
-```
+```javascript
 {
   "message": "{"parent": "{"child": "value2"}"}"
 }

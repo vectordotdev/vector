@@ -501,7 +501,7 @@ For example:
 
 Given the following input line:
 
-```
+```text
 2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
 ```
 

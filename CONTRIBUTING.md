@@ -92,7 +92,7 @@ Your commits must include a [DCO](https://developercertificate.org/) signature.
 This is simpler than it sounds; it just means that all of your commits
 must contain:
 
-```
+```text
 Signed-off-by: Joe Smith <joe.smith@email.com>
 ```
 
@@ -126,7 +126,7 @@ A list of allowed sub-categories is defined
 
 The following are all good examples of pull request titles:
 
-```
+```text
 feat(new sink): new `xyz` sink
 feat(tcp source): add foo bar baz feature
 fix(tcp source): fix foo bar baz bug

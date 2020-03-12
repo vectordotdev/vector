@@ -139,7 +139,7 @@ operating systems.
    installed on the previous step to `PATH`. For example, for default
    installation of Strawberry Perl it is
 
-    ```
+    ```bat
     set PATH=%PATH%;C:\Strawberry\perl\bin
     ```
 
@@ -155,7 +155,7 @@ operating systems.
 
     <TabItem value="latest">
 
-    ```
+    ```bat
     git clone https://github.com/timberio/vector
     git checkout v0.8.2
     cd vector
@@ -164,7 +164,7 @@ operating systems.
     </TabItem>
     <TabItem value="master">
 
-    ```
+    ```bat
     git clone https://github.com/timberio/vector
     cd vector
     ```
@@ -174,7 +174,7 @@ operating systems.
 
 5.  Build Vector in release mode:
 
-    ```
+    ```bat
     set RUSTFLAGS=-Ctarget-feature=+crt-static
     cargo build --no-default-features --features default-msvc --release
     ```
@@ -182,7 +182,7 @@ operating systems.
 6.  After these steps a binary `vector.exe` in `target\release` would be
     created. It can be started by running
 
-    ```
+    ```bat
     .\target\release\vector --config config\vector.toml
     ```
 
@@ -285,7 +285,7 @@ Building steps:
 
 The Vector configuration file is located at:
 
-```
+```text
 config/vector.toml
 ```
 
@@ -298,7 +298,7 @@ Vector in the [Configuration][docs.configuration] section.
 We highly recommend creating a [data directory][docs.global-options#data_dir]
 that Vector can use:
 
-```
+```bash
 mkdir /var/lib/vector
 ```
 

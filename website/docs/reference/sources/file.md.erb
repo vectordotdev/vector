@@ -123,7 +123,7 @@ cases. Let's look at a few examples:
 
 Ruby exceptions, when logged, consist of multiple lines:
 
-```
+```text
 foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
   from foobar.rb:6:in `bar'
   from foobar.rb:2:in `foo'
@@ -156,7 +156,7 @@ To consume these lines as a single event, use the following Vector configuration
 Some programming languages use the backslash (`\`) character to signal that a
 line will continue on the next line:
 
-```
+```text
 First line\
 second line\
 third line
@@ -188,7 +188,7 @@ To consume these lines as a single event, use the following Vector configuration
 Activity logs from services such as Elasticsearch typically begin with a
 timestamp, followed by information on the specific activity, as in this example:
 
-```
+```text
 [2015-08-24 11:49:14,389][ INFO ][env                      ] [Letha] using [1] data paths, mounts [[/
 (/dev/disk1)]], net usable_space [34.5gb], net total_space [118.9gb], types [hfs]
 ```
