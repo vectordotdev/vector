@@ -30,7 +30,7 @@ write_to_description = "[Google Cloud Platform's BigQuery service][urls.gcp_bigq
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_bigquery", access: "bigquery project, dataset, and table", required: true) %>
+<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_bigquery", access: "BigQuery project, dataset, and table", required: true) %>
 
 [sinks.gcp_bigquery.options.project]
 type = "string"

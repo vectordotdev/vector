@@ -4629,7 +4629,7 @@ end
   inputs = ["my-source-id"]
 
   # The filename for a Google Cloud service account credentials JSON file used to
-  # authenticate access to the bigquery project, dataset, and table. If this is
+  # authenticate access to the BigQuery project, dataset, and table. If this is
   # unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment
   # variable for a filename.
   #

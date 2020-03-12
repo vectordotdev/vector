@@ -335,7 +335,7 @@ The behavior when the buffer becomes full.
 ### credentials_path
 
 The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the bigquery project, dataset, and table. If this is
+authenticate access to the BigQuery project, dataset, and table. If this is
 unset, Vector checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable
 for a filename.
 
@@ -865,10 +865,10 @@ you understand the risks of not verifying the remote hostname.
   unit={null}
   >
 
-# GOOGLE_APPLICATION_CREDENTIALS
+### GOOGLE_APPLICATION_CREDENTIALS
 
 The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the bigquery project, dataset, and table.
+authenticate access to the BigQuery project, dataset, and table.
 
  See [GCP Authentication](#gcp-authentication) for more info.
 
