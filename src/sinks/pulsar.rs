@@ -112,7 +112,7 @@ impl PulsarSink {
         })
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "pulsar-integration-tests")]
     pub(crate) fn pulsar(&self) -> &'_ Pulsar {
         &self.pulsar
     }
