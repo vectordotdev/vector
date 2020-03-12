@@ -35,7 +35,6 @@ struct BigQueryConfig {
     dataset: String,
     table: String,
 
-    pub emulator_host: Option<String>,
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
@@ -99,13 +98,9 @@ impl BigQuerySink {
     fn from_config(config: &BigQueryConfig) -> crate::Result<Self> {
         let creds = config.auth.make_required_credentials(Scope::BigQuery)?;
 
-        let base = match config.emulator_host.as_ref() {
-            Some(host) => format!("http://{}", host),
-            None => "https://bigquery.googleapis.com".into(),
-        };
         let uri_base = format!(
-            "{}/bigquery/v2/projects/{}/datasets/{}/tables/{}",
-            base, config.project, config.dataset, config.table
+            "https://bigquery.googleapis.com/bigquery/v2/projects/{}/datasets/{}/tables/{}",
+            config.project, config.dataset, config.table
         );
         uri_base.parse::<Uri>().context(UriParseError)?;
 
