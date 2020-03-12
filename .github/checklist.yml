@@ -9,6 +9,6 @@ paths:
   "src/**":
     - "For each failure path, is there sufficient context logged for users to investigate the issue?"
     - "Do the tests ensure that behavior is sane for inputs that don't meet normal assumptions (e.g. missing field, non-string, etc)?"
-    - "Did you add adequate documentation?
+    - "Did you add adequate documentation?"
   "src/transforms/**":
     - "Did you add behavior tests (`tests/behavior`) that represent the behavior of this change? For example, testing for Vector's field path notation for nested fields."
