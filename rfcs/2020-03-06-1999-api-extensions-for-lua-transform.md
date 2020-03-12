@@ -12,6 +12,7 @@ This RFC proposes a new API for the `lua` transform.
         * [Loadable Module: Global Functions](#loadable-module-global-functions)
         * [Loadable Module: Isolated Functions](#loadable-module-isolated-functions)
 * [Reference-level Proposal](#reference-level-proposal)
+    * [Versions](#versions)
     * [New Concepts](#new-concepts)
         * [Hooks](#hooks)
         * [Timers](#timers)
@@ -406,6 +407,12 @@ Then the transform configuration is the following:
 ```
 
 ## Reference-level Proposal
+
+### Versions
+
+Lua transform configuration have to be versioned in order to distinguish between the old and the new APIs.
+
+The old API is identified by version `1` and the new one, which is proposed in the present RFC, is identified by version `2`. The version can be set using a `version` option in the configuration file. During the transitional period, omitting the version should result in using version `1`. After all changes proposed here are implemented and sufficiently tested, version `1` could be deprecated and version `2` used as the default version.
 
 ### New Concepts
 
