@@ -7150,14 +7150,14 @@ end
   [sinks.pulsar.auth]
     # The basic authentication token.
     #
-    # * required
+    # * optional
     # * type: string
     auth_token = "${TOKEN_ENV_VAR}"
     auth_token = "token"
 
     # The basic authentication user name.
     #
-    # * required
+    # * optional
     # * type: string
     auth_name = "${USERNAME_ENV_VAR}"
     auth_name = "username"
