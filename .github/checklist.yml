@@ -1,10 +1,13 @@
 paths:
-  "Cargo.lock":
-    - Did you review changed dependencies for security concerns?
-    - Has at least one other team member approved the dependency changes?
+  ".meta/releases/**":
+    - "Did you review all commits to ensure they are categorized correctly and user friendly?"
+    - "Have you run all test harness benchmarks to compare results? (ex: `/test`)"
+  "Cargo.toml":
+    - "Has at least one other team member approved the dependency changes?"
   "rfcs/**":
-    - Have at least 3 team members approved this RFC?
+    - "Have at least 3 team members approved this RFC?"
   "src/**":
-    - Did you add adequate behavior tests (`tests/behavior`)? Specifically, nested fields support.
-    - Did you add adequate logging? Note: we support rate-limited logging for the hot path.
-    - Did you add adequate documentation?
+    - "For each failure path, is there sufficient context logged for users to investigate the issue?"
+    - "Did you add adequate documentation?
+  "src/transforms/**":
+    - "Did you add behavior tests (`tests/behavior`) that represent the behavior of this change? For example, testing for Vector's field path notation for nested fields."
