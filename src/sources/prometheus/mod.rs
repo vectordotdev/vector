@@ -3,6 +3,7 @@ use futures01::{sync::mpsc, Future, Sink, Stream};
 use http::Uri;
 use hyper;
 use hyper_openssl::HttpsConnector;
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
@@ -66,16 +67,25 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
                 .request(request)
                 .and_then(|response| response.into_body().concat2())
                 .map(|body| {
+                    counter!("sources.prometheus.requests_completed", 1);
+
                     let packet = String::from_utf8_lossy(&body);
                     let metrics = parser::parse(&packet)
-                        .map_err(|e| error!("parsing error: {:?}", e))
+                        .map_err(|error| {
+                            error!(message = "parsing error", %error);
+                            counter!("sources.prometheus.parse_errors", 1);
+                        })
                         .unwrap_or_default()
                         .into_iter()
                         .map(Event::Metric);
+
                     futures01::stream::iter_ok(metrics)
                 })
                 .flatten_stream()
-                .map_err(|e| error!("http request processing error: {:?}", e))
+                .map_err(|error| {
+                    error!(message = "http request processing error", %error);
+                    counter!("sources.prometheus.request_errors", 1);
+                })
         })
         .flatten()
         .forward(out)

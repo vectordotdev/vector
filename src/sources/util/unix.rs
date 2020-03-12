@@ -2,6 +2,7 @@ use crate::event::Event;
 use crate::sources::Source;
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use metrics::counter;
 use std::path::PathBuf;
 use tokio01::{
     self,
@@ -59,7 +60,10 @@ pub fn build_unix_source(
                     path.map(|p| p.to_string_lossy().into_owned().into());
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(move |line| build_event(&host_key, received_from.clone(), &line))
-                    .map_err(|e| error!("error reading line: {:?}", e));
+                    .map_err(|error| {
+                        error!(message = "error reading line.", %error);
+                        counter!("sources.unix_socket_read_errors", 1);
+                    });
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
                 tokio01::spawn(handler.instrument(span))

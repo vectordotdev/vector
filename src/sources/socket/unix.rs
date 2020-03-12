@@ -3,6 +3,7 @@ use crate::sources::util::build_unix_source;
 use crate::sources::Source;
 use bytes::Bytes;
 use futures01::sync::mpsc;
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -34,11 +35,14 @@ impl UnixConfig {
 * Takes a single line of a received message and builds an Event object.
 **/
 fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
+    let byte_count = line.len() as u64;
     let mut event = Event::from(line);
     if let Some(host) = received_from {
         event.as_mut_log().insert(host_key, host);
     }
     trace!(message = "Received one event.", ?event);
+    counter!("sources.socket.unix.events", 1);
+    counter!("sources.socket.unix.total_bytes", byte_count);
     Some(event)
 }
 

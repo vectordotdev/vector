@@ -5,6 +5,7 @@ use crate::Event;
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
+use metrics::counter;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
     fmt, io,
@@ -159,7 +160,10 @@ fn handle_stream(
             let host = host.clone();
             source.build_event(frame, host)
         })
-        .map_err(|error| warn!(message = "connection error.", %error))
+        .map_err(|error| {
+            warn!(message = "connection error.", %error);
+            counter!("sources.tcp_connection_errors", 1);
+        })
         .forward(out)
         .map(|_| debug!("connection closed."))
         .map_err(|_| warn!("Error received while processing TCP source"));

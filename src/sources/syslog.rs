@@ -7,11 +7,11 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 #[cfg(unix)]
@@ -171,7 +171,10 @@ pub fn udp(
                         .ok()
                         .and_then(|s| event_from_str(&host_key, Some(received_from), s))
                 })
-                .map_err(|e| error!("error reading line: {:?}", e));
+                .map_err(|error| {
+                    error!(message = "error reading datagram.", %error);
+                    counter!("sources.syslog.udp_read_errors", 1);
+                });
 
             lines_in.forward(out).map(|_| info!("finished sending"))
         }),
@@ -202,6 +205,8 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         message = "Received line.",
         bytes = &field::display(line.len())
     );
+    counter!("sources.syslog.events", 1);
+    counter!("sources.syslog.total_bytes", line.len() as u64);
 
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);

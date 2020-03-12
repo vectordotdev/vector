@@ -4,6 +4,7 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
+use metrics::counter;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -134,6 +135,7 @@ impl Transform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
+        counter!("transforms.regex_parser.events", 1);
 
         if let Some(value) = &value {
             if self
@@ -185,12 +187,14 @@ impl Transform for RegexParser {
                     field = &truncate_string_at(&String::from_utf8_lossy(&value), 60)[..],
                     rate_limit_secs = 30
                 );
+                counter!("transforms.regex_parser.failed_match", 1);
             }
         } else {
             debug!(
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
             );
+            counter!("transforms.regex_parser.missing_field", 1);
         }
 
         if self.drop_failed {

@@ -5,6 +5,7 @@ use crate::stream::StreamExt;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
@@ -50,6 +51,7 @@ pub fn udp(
             UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
                 .take_until(shutdown)
                 .map(move |(line, addr): (Bytes, _)| {
+                    let byte_count = line.len() as u64;
                     let mut event = Event::from(line);
 
                     event
@@ -57,10 +59,15 @@ pub fn udp(
                         .insert(host_key.clone(), addr.to_string());
 
                     trace!(message = "Received one event.", ?event);
+                    counter!("sources.socket.udp.events", 1);
+                    counter!("sources.socket.udp.total_bytes", byte_count);
                     event
                 })
                 // Error from Decoder or UdpSocket
-                .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
+                .map_err(|error: io::Error| {
+                    error!(message = "error reading datagram.", %error);
+                    counter!("sources.socket.udp.errors", 1);
+                })
                 .forward(out)
                 // Done with listening and sending
                 .map(|_| ())
