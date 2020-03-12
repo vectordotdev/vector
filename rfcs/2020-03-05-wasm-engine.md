@@ -6,7 +6,7 @@ Introduce the Vector Engine, an ergonomic runtime supporting the WASM (and WASI)
 
 There is a plurality of reasons for us to wish for flexible, practical WASM support in Vector.
 
-Since the concept of a WASM engine is very abstract, this section will instead discus a number of seemingly unrelated topics.
+Since the concept of a WASM engine is very abstract, this section will instead discus a number of seemingly unrelated topics, all asking for different features. Later, we'll see how wasm helps us.
 
 ### Protobufs & other custom codecs
 
@@ -28,13 +28,45 @@ One downside is our current strategy can require tests (See the `make check-feat
 
 ### Language runtime support
 
+Vector currently bundles a [`lua` transform](https://vector.dev/docs/reference/transforms/lua/), and there is ongoing work on a [`javascript` transform](https://github.com/timberio/vector/issues/667).
+
+Currently, each language requires as separate runtime, and possibly separate integration subtleties like needing to call a [GC](https://github.com/timberio/vector/pull/1990). It would be highly convenient if we could focus our efforts on one consistent API for all languages, and spend this time saved providing a better, faster, more safe experience.
+
 ### A Plugin System
+
+As Vector grows and supports more integrations, our binary size and build complexity will inevitable grow. In informal discussions we've previously noted the [module system of Terraform](https://www.terraform.io/docs/commands/init.html). This kind of architecture can help us simplify the codebase, reduce binary sizes, formalize our APIs, and open Vector up to a third-party module ecosystem.
+
+Terraform typically runs on CIs and developer machines, making portability valuable. For Terraform, users can follow the [guide](https://www.terraform.io/docs/extend/writing-custom-providers.html) to write a Go-based provider, which they can then distribute as a portable binary. Notably: This means either distributing an unoptimized binary, distributing a lot of optimized binaries, or requiring folks build their own optimized binaries. Terraform doesn't care much about speed, so unoptimized binaries are acceptable.
+
+Vector is in a slightly different position than Terraform though! Vector runs primarily in servers and even end user machines. We can't expect users to have build tooling installed to their servers (it's a security risk!) and we definitely can't expect it on an end-user machines. Most people just aren't that interested in computers.
+
+Vector has different performance needs, too. While folk's aren't generally wanting to execute terraform providers hundreds of thousands (or millions) of times per second they are absolutely doing that with Vector.
+
+When we're processing the firehose of events originating from a modern infrastructure every millisecond counts. Vector needs a way to ship portable, *optimizable* modules if we ever hope of making this a reality.
 
 ### Exploring DSL driven pipelines
 
+We've discussed various refinements to our pipelines such as [Pipelines Proposal V2](https://github.com/timberio/vector/issues/1679) and [Proposal: Compose Transform](https://github.com/timberio/vector/issues/1653). Some of these discussions have been about improving our TOML syntax, others about new syntax entirely, and others about how we could let users write in the language of their choice.
+
+The path forward is unclear, but if we choose to adopt something new we must focus on providing a good user experience as well as performance. Having a fast, simple, portable compile target would make this an easier effort.
+
 ### Ecosystem Harmony with Tremor
 
+We exist in an ecosystem, [Tremor](https://www.tremor.rs/) exists and we'd really love to be able to work in harmony somehow. While both tools process events, Vector focuses on acting as a host-level or container-level last/first mile router, Tremor focuses on servicing demanding workloads from it's position as an infrastructure-wide service.
+
+What if we could provide users of Tremor and Vector with some sort of familiar shared experience? What if we could share functionality? What kind of framework could satisfy both our needs? There are so many questions!
+
+We need to talk to them. TODO.
+
 ### Simplifying common basic transforms
+
+We would like to avoid asking users to chain together a number of transforms to accomplish simple tasks. This is evidenced by issues like [#750](https://github.com/timberio/vector/issues/750), [#1653](https://github.com/timberio/vector/issues/1653), and [#1926](https://github.com/timberio/vector/issues/1926). Having to, for example, use two transforms just to add 1 field and remove another is very verbose.
+
+We noted that the existing lua runtime was able to accomplish these tasks quite elegantly, however it was an order of magnitude slower than a native transform.
+
+(TODO: Proof)
+
+Users shouldn't pay a high price just for a few lines saved in a configuration file. They shouldn't feel frustration when building these kinds of pipelines either.
 
 ## Prior Art
 
