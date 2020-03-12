@@ -7127,19 +7127,16 @@ end
   # * type: string
   region = "us-east-1"
 
-  #
-  # requests
-  #
+  [sinks.pulsar.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "json" or "text"
+    codec = "json"
+    codec = "text"
 
-  # The encoding format used to serialize the events before outputting.
   #
-  # * optional
-  # * no default
-  # * type: string
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
- #
   # Auth
   #
 

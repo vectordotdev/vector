@@ -9,9 +9,10 @@ healthcheck = true
 input_types = ["log"]
 write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]"
 
-[sinks.pulsar.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is represented as a JSON array."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.pulsar.options",
+  encodings: ["json", "text"]
+) %>
 
 [sinks.pulsar.options.address]
 type = "string"
