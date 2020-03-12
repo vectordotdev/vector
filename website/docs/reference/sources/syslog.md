@@ -424,6 +424,7 @@ For example:
   "version": 1
 }
 ```
+
 More detail on the output schema is below.
 
 <Fields filters={true}>

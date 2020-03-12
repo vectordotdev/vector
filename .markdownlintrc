@@ -20,9 +20,12 @@
   "MD023": true,
   "MD024": false, // due to the way we generate docs, there are cases where duplicate headings are out of our control
   "MD025": true,
+  "MD026": { "punctuation": ".,;:" },
   "MD027": true,
   "MD028": true,
   "MD030": false,
+  "MD031": true,
+  "MD032": true,
   "MD033": false, // we allow HTML
   "MD034": false, // we allow full URLs in special cases, such as component attributes
   "MD037": true,

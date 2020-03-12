@@ -184,6 +184,7 @@ For example:
   "vpc-id": "vpc-a51da4dc"
 }
 ```
+
 More detail on the output schema is below.
 
 <Fields filters={true}>

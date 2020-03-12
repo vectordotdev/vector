@@ -151,6 +151,7 @@ A log event will be output with the following structure:
 }
 ```
 
+
 More detail on the output schema is below.
 
 <Fields filters={true}>

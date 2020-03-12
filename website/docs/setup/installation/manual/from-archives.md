@@ -303,6 +303,7 @@ import TabItem from '@theme/TabItem';
     ```bat
     cd vector-x86_64-pc-windows-msvc
     ```
+
 4.  Start Vector:
 
     ```bat

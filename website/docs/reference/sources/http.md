@@ -364,6 +364,7 @@ For example:
   "timestamp": "2019-11-01T21:15:47+00:00"
 }
 ```
+
 More detail on the output schema is below.
 
 <Fields filters={true}>

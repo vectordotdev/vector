@@ -147,6 +147,7 @@ For example:
   }
 }
 ```
+
 More detail on the output schema is below.
 
 <Fields filters={true}>

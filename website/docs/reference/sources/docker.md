@@ -301,6 +301,7 @@ For example:
   "com.example.vendor": "Timber Inc."
 }
 ```
+
 More detail on the output schema is below.
 
 <Fields filters={true}>

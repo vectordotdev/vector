@@ -417,8 +417,9 @@ If you'd like to disable health checks for this sink you can set the
 ### Metric Types
 
 CloudWatch Metrics types are organized not by their semantics, but by storage properties:
-- Statistic Sets
-- Data Points
+
+* Statistic Sets
+* Data Points
 
 In Vector only the latter is used to allow lossless statistics calculations on CloudWatch side.
 

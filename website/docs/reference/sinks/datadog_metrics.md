@@ -522,9 +522,10 @@ If you'd like to disable health checks for this sink you can set the
 ### Metric Types
 
 Datadog accepts the following types for [submission via API](https://docs.datadoghq.com/developers/metrics/#submission-types-and-datadog-in-app-types):
-- Count
-- Gauge
-- Rate
+
+* Count
+* Gauge
+* Rate
 
 The following matrix outlines how Vector metric types are mapped into Datadog metrics types.
 

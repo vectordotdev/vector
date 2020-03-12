@@ -357,6 +357,7 @@ times:
    ```sh
    export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
    ```
+
 3. Run in the root directory of Vector's source
 
    ```sh

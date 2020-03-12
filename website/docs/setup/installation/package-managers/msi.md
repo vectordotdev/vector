@@ -60,6 +60,7 @@ import TabItem from '@theme/TabItem';
     ```bat
     msiexec /i vector-x64.msi /quiet
     ```
+
 3.  Navigate to the Vector directory:
 
     ```bat
