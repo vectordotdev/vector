@@ -39,6 +39,8 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
+#[cfg(feature = "sinks-papertrail")]
+pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sinks-sematext_logs")]

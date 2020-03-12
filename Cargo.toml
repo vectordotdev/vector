@@ -106,6 +106,7 @@ indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
+syslog = "5"
 syslog_loose = { version = "0.2.0", optional = true }
 tokio-uds = { version = "0.2.5", optional = true }
 derive_is_enum_variant = "0.1.1"
@@ -309,6 +310,7 @@ sinks = [
   "sinks-logdna",
   "sinks-loki",
   "sinks-new_relic_logs",
+  "sinks-papertrail",
   "sinks-prometheus",
   "sinks-sematext_logs",
   "sinks-socket",
@@ -338,6 +340,7 @@ sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext_logs = ["sinks-elasticsearch"]
 sinks-socket = ["tokio-uds"]
+sinks-papertrail = ["sinks-socket"]
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = []
 sinks-vector = []

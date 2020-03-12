@@ -432,6 +432,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 | `sinks-logdna` | Enables building of [`logdna` sink][docs.sinks.logdna].  |
 | `sinks-loki` | Enables building of [`loki` sink][docs.sinks.loki].  |
 | `sinks-new_relic_logs` | Enables building of [`new_relic_logs` sink][docs.sinks.new_relic_logs].  |
+| `sinks-papertrail` | Enables building of [`papertrail` sink][docs.sinks.papertrail].  |
 | `sinks-prometheus` | Enables building of [`prometheus` sink][docs.sinks.prometheus].  |
 | `sinks-sematext_logs` | Enables building of [`sematext_logs` sink][docs.sinks.sematext_logs].  |
 | `sinks-socket` | Enables building of [`socket` sink][docs.sinks.socket].  |
@@ -470,6 +471,7 @@ to do it, it instead of `default` features one has to pass a comma-separated lis
 [docs.sinks.logdna]: /docs/reference/sinks/logdna/
 [docs.sinks.loki]: /docs/reference/sinks/loki/
 [docs.sinks.new_relic_logs]: /docs/reference/sinks/new_relic_logs/
+[docs.sinks.papertrail]: /docs/reference/sinks/papertrail/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
 [docs.sinks.sematext_logs]: /docs/reference/sinks/sematext_logs/
 [docs.sinks.socket]: /docs/reference/sinks/socket/
