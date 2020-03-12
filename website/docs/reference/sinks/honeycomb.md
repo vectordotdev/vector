@@ -599,7 +599,7 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
-### Obtaining a Honeycomb api key
+### Obtaining a Honeycomb API key
 
 1. Register for a free account at [honeycomb.io](https://ui.honeycomb.io/signup)
 
