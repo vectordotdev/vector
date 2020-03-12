@@ -7127,6 +7127,13 @@ end
   # * type: string
   region = "us-east-1"
 
+  # Batch size for messages
+  #
+  # * optional
+  # * no default
+  # * type: int
+  batch_size = 1000
+
   [sinks.pulsar.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
