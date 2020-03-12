@@ -9,8 +9,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@1.0.0
-      - name: markdownlint-cli
-        uses: nosborn/github-action-markdown-cli@v1.1.1
-        with:
-          files: "**/*.md"
-          config_file: .markdownlintrc
+      - run: "cd tests && make check-markdown"
