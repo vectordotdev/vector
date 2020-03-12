@@ -31,8 +31,8 @@ pub enum BuildError {
 pub struct HecSinkConfig {
     pub token: String,
     pub host: String,
-    #[serde(default = "default_host_field")]
-    pub host_field: Atom,
+    #[serde(default = "default_host_key")]
+    pub host_key: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
@@ -62,7 +62,7 @@ pub enum Encoding {
     Json,
 }
 
-fn default_host_field() -> Atom {
+fn default_host_key() -> Atom {
     event::LogSchema::default().host_key().clone()
 }
 
@@ -92,7 +92,7 @@ impl SinkConfig for HecSinkConfig {
 pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let token = config.token.clone();
-    let host_field = config.host_field;
+    let host_key = config.host_key;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
         Compression::None => false,
@@ -132,7 +132,7 @@ pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::Route
     let sink = request
         .batch_sink(HttpRetryLogic, http_service, cx.acker())
         .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &indexed_fields, &encoding)));
+        .with_flat_map(move |e| iter_ok(encode_event(&host_key, e, &indexed_fields, &encoding)));
 
     Ok(Box::new(sink))
 }
@@ -197,7 +197,7 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
 }
 
 fn encode_event(
-    host_field: &Atom,
+    host_key: &Atom,
     mut event: Event,
     indexed_fields: &[Atom],
     encoding: &EncodingConfigWithDefault<Encoding>,
@@ -205,7 +205,7 @@ fn encode_event(
     encoding.apply_rules(&mut event);
     let mut event = event.into_log();
 
-    let host = event.get(&host_field).cloned();
+    let host = event.get(&host_key).cloned();
     let timestamp =
         if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key()) {
             ts.timestamp()
@@ -439,7 +439,7 @@ mod integration_tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let config = super::HecSinkConfig {
-            host_field: "roast".into(),
+            host_key: "roast".into(),
             ..config(Encoding::Json, vec![Atom::from("asdf")])
         };
 
@@ -556,7 +556,7 @@ mod integration_tests {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
-            host_field: "host".into(),
+            host_key: "host".into(),
             compression: Some(Compression::None),
             encoding: encoding.into(),
             batch: BatchBytesConfig {

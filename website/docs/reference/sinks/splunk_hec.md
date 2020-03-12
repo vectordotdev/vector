@@ -52,6 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   host = "http://my-splunk-host.com" # required
   token = "${TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
+  host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
 
   # Encoding
@@ -71,6 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   host = "http://my-splunk-host.com" # required
   token = "${TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
+  host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
 
   # Batch
@@ -500,6 +502,29 @@ Enables/disables the sink healthcheck upon start.
 Your Splunk HEC host.
 
  See [Setup](#setup) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["hostname"]}
+  groups={[]}
+  name={"host_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### host_key
+
+The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global [`host_key`](#host_key) option][docs.reference.global-options#host_key].
 
 
 </Field>
@@ -1013,6 +1038,7 @@ should supply to the [`host`](#host) and [`token`](#token) options.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
+[docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [urls.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+splunk_hec
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.splunk_hec_indexed_fields]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC

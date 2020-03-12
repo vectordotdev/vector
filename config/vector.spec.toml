@@ -7630,6 +7630,14 @@ end
   healthcheck = true
   healthcheck = false
 
+  # The name of the log field to be used as the hostname sent to Splunk HEC. This
+  # overrides the global `host_key` option.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host_key = "hostname"
+
   # Fields to be added to Splunk index.
   #
   # * optional
