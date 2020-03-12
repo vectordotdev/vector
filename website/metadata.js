@@ -21683,7 +21683,7 @@ module.exports = {
     },
     "honeycomb": {
       "beta": true,
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
       "event_types": [
         "log"

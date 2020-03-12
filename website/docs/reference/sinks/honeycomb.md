@@ -1,5 +1,5 @@
 ---
-delivery_guarantee: "best_effort"
+delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."
 event_types: ["log"]

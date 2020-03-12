@@ -1,7 +1,7 @@
 use crate::{
     dns::Resolver,
     event::{log_schema, Event, Value},
-    sinks::util::http::{HttpClient, BatchedHttpSink, HttpSink},
+    sinks::util::http::{BatchedHttpSink, HttpClient, HttpSink},
     sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

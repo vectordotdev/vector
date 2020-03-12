@@ -2,7 +2,7 @@
 title = "Honeycomb"
 beta = true
 common = false
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
