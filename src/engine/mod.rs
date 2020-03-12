@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
 
+mod util;
 mod context;
 use context::EngineContext;
 use crate::topology::unit_test::build_unit_tests;
@@ -39,7 +40,7 @@ trait Engine {
     fn instantiate<P>(&mut self, path: P) -> Result<Uuid>
     where
         P: Into<PathBuf>;
-    fn process(&mut self, id: &Uuid, events: Vec<Event>) -> Result<Vec<Event>>;
+    fn process(&mut self, id: &Uuid, events: Event) -> Result<Option<Event>>;
 }
 
 #[derive(Derivative, Clone)]
@@ -106,7 +107,10 @@ impl Engine for DefaultEngine {
         let path = path.into();
         let module = self.modules.get(&path).ok_or("Could not load path")?;
         // create a new memory region with default limits on heap and stack size
-        let region = &MmapRegion::create(1, &Limits::default())?;
+        let region = &MmapRegion::create(1, &Limits {
+            heap_memory_size: 16 * 64 * 1024 * 10, // 10MB
+            ..Limits::default()
+        })?;
         // instantiate the module in the memory region
         let instance = region.new_instance_builder(module.clone()).build()?;
 
@@ -115,7 +119,7 @@ impl Engine for DefaultEngine {
         Ok(id)
     }
 
-    fn process(&mut self, id: &Uuid, events: Vec<Event>) -> Result<Vec<Event>> {
+    fn process(&mut self, id: &Uuid, event: Event) -> Result<Option<Event>> {
         let instance = self
             .instance_handles
             .get_mut(id)
@@ -124,26 +128,42 @@ impl Engine for DefaultEngine {
         // The instance context is essentially an anymap, so this these aren't colliding!
         let wasi_ctx = WasiCtxBuilder::new().build()?;
         instance.insert_embed_ctx(wasi_ctx);
-        let engine_context = EngineContext::new(events);
+        let engine_context = EngineContext::new(event);
         instance.insert_embed_ctx(engine_context);
 
-        let _TODO = instance.run("process", &[])?;
+        let worked = instance.run("process", &[])?;
+
         let engine_context: EngineContext = instance.remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
-        let EngineContext { events } = engine_context;
-        Ok(events)
+        let EngineContext { event: out } = engine_context;
+        Ok(out)
     }
 }
 
 #[test]
-fn engine() -> Result<()> {
+fn inspect() -> Result<()> {
     let module = "target/wasm32-wasi/release/inspect.wasm";
     let mut engine = DefaultEngine::build(Default::default());
-    let events = vec![Event::new_empty_log()];
+    let event = Event::new_empty_log();
+
     engine.load(module)?;
     let id = engine.instantiate(module)?;
-    let out = engine.process(&id, events.clone())?;
-    assert_eq!(events, out);
+    let out = engine.process(&id, event.clone())?;
+    assert_eq!(event, out.unwrap());
+    Ok(())
+}
+
+#[test]
+fn protobuf() -> Result<()> {
+    let module = "target/wasm32-wasi/release/protobuf.wasm";
+    let mut engine = DefaultEngine::build(Default::default());
+    let mut event = Event::new_empty_log();
+    event.as_mut_log().insert("test", "testing");
+
+    engine.load(module)?;
+    let id = engine.instantiate(module)?;
+    let out = engine.process(&id, event.clone())?;
+    println!("{:#?}", out);
     Ok(())
 }
 

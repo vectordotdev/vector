@@ -32,7 +32,9 @@ members = [
   "lib/file-source",
   "lib/tracing-metrics",
   "lib/tracing-limit",
-  "test-data/engine/inspect"
+  # Wasm test modules.
+  "test-data/engine/inspect",
+  "test-data/engine/protobuf",
 ]
 
 [dependencies]

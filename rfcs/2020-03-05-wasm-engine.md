@@ -20,7 +20,7 @@ We should enable and encourage these goals, our users should be empowered to cap
 
 ### Increasing build complexity and our slow build times
 
-Recently, we've been discussing the tradeoffs associated with different code modularization techniques. We currently make fairly heavy use of the Rust Feature Flag system.
+Recently, we've been discussing the trade offs associated with different code modularization techniques. We currently make fairly heavy use of the Rust Feature Flag system.
 
 This is great because it enables us to build in multi-platform support as well as specialized (eg only 1 source) builds. We also noted builds with only 1 or two feature flags are **significantly** faster than builds with all features supported.
 

@@ -5,7 +5,7 @@ use core::panic::PanicInfo;
 
 mod vector_api {
     pub(crate) fn foo() {
-        unsafe { ffi::foo(); }
+        unsafe { ffi::foo() }
     }
 
     mod ffi {
