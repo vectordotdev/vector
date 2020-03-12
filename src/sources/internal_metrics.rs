@@ -14,7 +14,7 @@ use futures01::{sync::mpsc, Future, Sink};
 use metrics_core::Key;
 use metrics_runtime::{Controller, Measurement};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 use stream_cancel::Tripwire;
 use tokio01::timer::Interval;
 
@@ -105,10 +105,20 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
             }
         }
     };
+
+    let labels = key
+        .labels()
+        .map(|label| (String::from(label.key()), String::from(label.value())))
+        .collect::<BTreeMap<_, _>>();
+
     let metric = Metric {
         name: key.name().to_string(),
         timestamp: Some(Utc::now()),
-        tags: None,
+        tags: if labels.len() == 0 {
+            None
+        } else {
+            Some(labels)
+        },
         kind: MetricKind::Absolute,
         value,
     };
@@ -146,8 +156,8 @@ mod tests {
         counter!("bar", 4);
         timing!("baz", 5);
         timing!("baz", 6);
-        value!("quux", 7);
-        value!("quux", 8);
+        value!("quux", 7, "host" => "foo");
+        value!("quux", 8, "host" => "foo");
 
         // TODO: split out function from `run` so we can drive it without sleeping
         thread::sleep(Duration::from_secs(5));
@@ -179,5 +189,9 @@ mod tests {
             },
             output["quux"].value
         );
+
+        let mut labels = BTreeMap::new();
+        labels.insert(String::from("host"), String::from("foo"));
+        assert_eq!(Some(labels), output["quux"].tags);
     }
 }
