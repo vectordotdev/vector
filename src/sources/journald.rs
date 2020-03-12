@@ -488,36 +488,31 @@ mod tests {
     }
 
     #[test]
-    fn journald_source_works() {
+    fn reads_journal() {
         let received = run_journal(&[], None);
         assert_eq!(received.len(), 2);
         assert_eq!(
-            received[0].as_log()[&event::log_schema().message_key()],
+            message(&received[0]),
             Value::Bytes("System Initialization".into())
         );
-        assert_eq!(
-            received[1].as_log()[&event::log_schema().message_key()],
-            Value::Bytes("unit message".into())
-        );
+        assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
     }
 
     #[test]
-    fn journald_source_filters_units() {
+    fn filters_units() {
         let received = run_journal(&["unit.service"], None);
         assert_eq!(received.len(), 1);
-        assert_eq!(
-            received[0].as_log()[&event::log_schema().message_key()],
-            Value::Bytes("unit message".into())
-        );
+        assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
     }
 
     #[test]
-    fn journald_source_handles_checkpoint() {
+    fn handles_checkpoint() {
         let received = run_journal(&[], Some("1"));
         assert_eq!(received.len(), 1);
-        assert_eq!(
-            received[0].as_log()[&event::log_schema().message_key()],
-            Value::Bytes("unit message".into())
-        );
+        assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
+    }
+
+    fn message(event: &Event) -> Value {
+        event.as_log()[&event::log_schema().message_key()].clone()
     }
 }
