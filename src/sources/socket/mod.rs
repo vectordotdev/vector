@@ -127,7 +127,7 @@ mod test {
     use crate::runtime;
     use crate::shutdown::{ShutdownCoordinator, ShutdownSignal};
     use crate::test_util::{
-        block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp,
+        block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -139,8 +139,10 @@ mod test {
     #[cfg(unix)]
     use std::path::PathBuf;
     use std::{net::SocketAddr, thread, time::Duration, time::Instant};
+    use stream_cancel::{StreamExt, Tripwire};
     #[cfg(unix)]
     use tokio::codec::{FramedWrite, LinesCodec};
+    use tokio::prelude::{Async, Poll};
     #[cfg(unix)]
     use tokio_uds::UnixStream;
 
@@ -305,34 +307,73 @@ mod test {
     }
 
     //////// UDP TESTS ////////
-    fn send_lines_udp<'a>(
-        addr: SocketAddr,
-        lines: impl IntoIterator<Item = &'a str>,
-    ) -> SocketAddr {
-        let bind = next_addr();
+    struct UdpSender<I: Iterator<Item = String>> {
+        lines: I,
+        bind_addr: SocketAddr,
+        dest_addr: SocketAddr,
+        socket: UdpSocket,
+    }
 
-        let socket = UdpSocket::bind(bind)
-            .map_err(|e| panic!("{:}", e))
-            .ok()
-            .unwrap();
+    impl<I> UdpSender<I>
+    where
+        I: Iterator<Item = String>,
+    {
+        pub fn new(addr: SocketAddr, lines: I) -> Self {
+            let bind = next_addr();
 
-        for line in lines {
-            assert_eq!(
-                socket
-                    .send_to(line.as_bytes(), addr)
-                    .map_err(|e| panic!("{:}", e))
-                    .ok()
-                    .unwrap(),
-                line.as_bytes().len()
-            );
-            // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(1));
+            let socket = UdpSocket::bind(bind)
+                .map_err(|e| panic!("{:}", e))
+                .ok()
+                .unwrap();
+            Self {
+                lines,
+                bind_addr: bind,
+                dest_addr: addr,
+                socket,
+            }
         }
+
+        pub fn get_bind_addr(&self) -> SocketAddr {
+            self.bind_addr
+        }
+    }
+
+    impl<I> Stream for UdpSender<I>
+    where
+        I: Iterator<Item = String>,
+    {
+        type Item = ();
+        type Error = ();
+
+        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+            match self.lines.next() {
+                Some(line) => {
+                    assert_eq!(
+                        self.socket
+                            .send_to(line.as_bytes(), self.dest_addr)
+                            .map_err(|e| panic!("{:}", e))
+                            .ok()
+                            .unwrap(),
+                        line.as_bytes().len()
+                    );
+                    // Space things out slightly to try to avoid dropped packets
+                    thread::sleep(Duration::from_millis(1));
+                    Ok(Async::Ready(Some(())))
+                }
+                None => Ok(Async::Ready(None)),
+            }
+        }
+    }
+
+    fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
+        let sender = UdpSender::new(addr, lines.into_iter());
+        let bind = sender.get_bind_addr();
+
+        sender.for_each(|_| Ok(())).wait().ok().unwrap();
 
         // Give packets some time to flow through
         thread::sleep(Duration::from_millis(10));
 
-        // Done
         bind
     }
 
@@ -381,7 +422,7 @@ mod test {
 
         let (address, mut rt) = init_udp(tx);
 
-        send_lines_udp(address, vec!["test"]);
+        send_lines_udp(address, vec!["test".to_string()]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(
@@ -396,7 +437,7 @@ mod test {
 
         let (address, mut rt) = init_udp(tx);
 
-        send_lines_udp(address, vec!["test\ntest2"]);
+        send_lines_udp(address, vec!["test\ntest2".to_string()]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(
@@ -415,7 +456,7 @@ mod test {
 
         let (address, mut rt) = init_udp(tx);
 
-        send_lines_udp(address, vec!["test", "test2"]);
+        send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
         let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
 
         assert_eq!(
@@ -434,7 +475,7 @@ mod test {
 
         let (address, mut rt) = init_udp(tx);
 
-        let from = send_lines_udp(address, vec!["test"]);
+        let from = send_lines_udp(address, vec!["test".to_string()]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(
@@ -452,7 +493,7 @@ mod test {
         let (address, mut rt, source_handle) =
             init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
-        send_lines_udp(address, vec!["test"]);
+        send_lines_udp(address, vec!["test".to_string()]);
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
 
         assert_eq!(
@@ -471,43 +512,46 @@ mod test {
         rt.block_on(source_handle).unwrap();
     }
 
-    // #[test]
-    // fn udp_shutdown_infinite_stream() {
-    //     let (tx, rx) = mpsc::channel(1000);
-    //     let source_name = "udp";
-    //
-    //     let mut shutdown = ShutdownCoordinator::new();
-    //     let (address, mut rt, source_handle) =
-    //         init_udp_with_shutdown(tx, source_name, &mut shutdown);
-    //
-    //     // Future that keeps sending lines to the UDP source forever.
-    //     // We leak this thread and let it run forever until the test binary terminates.
-    //     let pump_handle = std::thread::spawn(move || {
-    //         send_lines_udp(address, std::iter::repeat("test"));
-    //     });
-    //
-    //     // This consumes `rx` which causes the Source to error when it tries to forward its results
-    //     // into `tx` but finds the other side of the channel has been dropped.
-    //     let events = rt.block_on(collect_n(rx, 100)).ok().unwrap();
-    //     assert_eq!(100, events.len());
-    //     for event in events {
-    //         assert_eq!(
-    //             event.as_log()[&event::log_schema().message_key()],
-    //             "test".into()
-    //         );
-    //     }
-    //
-    //     shutdown.shutdown_source_begin(source_name);
-    //     let deadline = Instant::now() + Duration::from_secs(1000);
-    //     let shutdown_success =
-    //         shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
-    //     assert_eq!(true, shutdown_success);
-    //
-    //     assert!(pump_handle.join().is_ok());
-    //
-    //     // Ensure that the source has actually shut down.
-    //     rt.block_on(source_handle).unwrap();
-    // }
+    #[test]
+    fn udp_shutdown_infinite_stream() {
+        let (tx, rx) = mpsc::channel(10);
+        let source_name = "udp";
+
+        let mut shutdown = ShutdownCoordinator::new();
+        let (address, mut rt, source_handle) =
+            init_udp_with_shutdown(tx, source_name, &mut shutdown);
+
+        // Stream that keeps sending lines to the UDP source forever.
+        let pump = UdpSender::new(address, std::iter::repeat("test".to_string()));
+        let (stop_pump_trigger, stop_pump_tripwire) = Tripwire::new();
+        let pump = pump.take_until(stop_pump_tripwire);
+        let pump_handle = std::thread::spawn(move || {
+            pump.for_each(|_| Ok(())).wait().ok().unwrap();
+        });
+
+        // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
+        let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
+        assert_eq!(100, events.len());
+        for event in events {
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                "test".into()
+            );
+        }
+
+        shutdown.shutdown_source_begin(source_name);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_success =
+            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        assert_eq!(true, shutdown_success);
+
+        // Ensure that the source has actually shut down.
+        rt.block_on(source_handle).unwrap();
+
+        // Stop the pump from sending lines forever.
+        stop_pump_trigger.cancel();
+        assert!(pump_handle.join().is_ok());
+    }
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
