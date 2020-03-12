@@ -431,7 +431,8 @@ class Templates
 
         "<Jump to=\"#{path}/\">#{name}</Jump>"
       end.
-      join("\n")
+      join("\n").
+      strip
   end
 
   def tags(tags)

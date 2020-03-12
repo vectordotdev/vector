@@ -20,7 +20,7 @@
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= fields(component.env_vars_list) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 ## Output
@@ -50,7 +50,7 @@ have been seen for a given key, at which point new values for that key will be
 rejected.  So to estimate the memory usage of this transform in mode `exact`
 you can use the following formula:
 
-```
+```text
 (number of distinct field names in the tags for your metrics * average length of
 the field names for the tags) + (number of distinct field names in the tags of
 your metrics * `value_limit` * average length of the values of tags for your
@@ -62,7 +62,7 @@ distinct key has a bloom filter which can probabilistically determine whether
 a given value has been seen for that key.  The formula for estimating memory
 usage in mode `probabilistic` is:
 
-```
+```text
 (number of distinct field names in the tags for your metrics * average length of
 the field names for the tags) + (number of distinct field names in the tags of
 -your metrics * `cache_size_per_tag`)
