@@ -21850,6 +21850,30 @@ module.exports = {
 
       ]
     },
+    "papertrail": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "papertrail_sink",
+      "name": "papertrail",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",

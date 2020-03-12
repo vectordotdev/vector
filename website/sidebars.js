@@ -249,6 +249,8 @@ module.exports = {
             
               "reference/sinks/new_relic_logs",
             
+              "reference/sinks/papertrail",
+            
               "reference/sinks/prometheus",
             
               "reference/sinks/sematext_logs",

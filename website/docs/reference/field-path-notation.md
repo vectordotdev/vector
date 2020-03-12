@@ -48,7 +48,7 @@ We can access the values like so:
 Root-level values can be access by simply supplying the name of the field as
 shown in the example above.
 
-```
+```text
 field_name
 ```
 
@@ -57,7 +57,7 @@ field_name
 Nested values can be accessed by separating ancestor fields with the `.`
 character:
 
-```
+```text
 grandparent.parent.child
 ```
 
@@ -65,13 +65,13 @@ grandparent.parent.child
 
 Array values can be access with the `[<index>]` syntax:
 
-```
+```text
 field_name[0]
 ```
 
 Accesses the _first_ value since it has an index of 0.
 
-```
+```text
 parent.child[0]
 ```
 
@@ -81,7 +81,7 @@ Accesses the _first_ value of the nested `child` field.
 
 The special characters `.`, `[`, and `]` can be escaped with a `\`:
 
-```
+```text
 field\.with\.dots
 ```
 
