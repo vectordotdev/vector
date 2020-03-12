@@ -19,14 +19,14 @@ use stream_cancel::Tripwire;
 use tokio01::timer::Interval;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct InternalConfig;
+pub struct InternalMetricsConfig;
 
 inventory::submit! {
-    SourceDescription::new::<InternalConfig>("internal")
+    SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
 
-#[typetag::serde(name = "internal")]
-impl SourceConfig for InternalConfig {
+#[typetag::serde(name = "internal_metrics")]
+impl SourceConfig for InternalMetricsConfig {
     fn build(
         &self,
         _name: &str,
@@ -45,7 +45,7 @@ impl SourceConfig for InternalConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "internal"
+        "internal_metrics"
     }
 }
 

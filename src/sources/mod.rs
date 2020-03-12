@@ -8,7 +8,7 @@ pub mod file;
 #[cfg(feature = "sources-http")]
 pub mod http;
 #[cfg(feature = "sources-journald")]
-pub mod internal;
+pub mod internal_metrics;
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
