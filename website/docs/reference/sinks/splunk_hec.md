@@ -524,7 +524,11 @@ Your Splunk HEC host.
 
 ### host_key
 
-The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global [`host_key`](#host_key) option][docs.reference.global-options#host_key].
+The name of the log field to be used as the hostname sent to Splunk HEC. This
+overrides the [global [`host_key`](#host_key)
+option][docs.reference.global-options#host_key].
+
+
 
 
 </Field>
