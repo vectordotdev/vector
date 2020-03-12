@@ -147,7 +147,7 @@ getset = "0.1.0"
 lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
-pulsar = { git = "https://github.com/wyyerd/pulsar-rs", optional = true }
+pulsar = { version = "0.3.0", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
