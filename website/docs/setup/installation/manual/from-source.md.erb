@@ -4,7 +4,8 @@ sidebar_label: From Source
 description: Install Vector from the Vector source code
 ---
 
-This page covers installing Vector from source using the native toolchain for the host.
+This page covers installing Vector from source using the native toolchain for
+the host.
 
 Vector can also be compiled to a static binary for Linux for `x86_64`, `ARM64`,
 and `ARMv7` architectures. See [compiling using Docker](#compiling-using-docker)
@@ -99,10 +100,10 @@ The following steps should be used to compile Vector directly on Linux based sys
     default features with this variable. See [feature flags](#feature-flags)
     for more info.
 
-    When finished, the vector binary will be placed in `target/<target>/release/vector`.
-    For example, if you are building Vector on your Mac, your target triple
-    is `x86_64-apple-darwin`, and the Vector binary will be located at
-    `target/x86_64-apple-darwin/release/vector`.
+    When finished, the vector binary will be placed in
+    `target/<target>/release/vector`. For example, if you are building Vector
+    on your Mac, your target triple is `x86_64-apple-darwin`, and the Vector
+    binary will be located at `target/x86_64-apple-darwin/release/vector`.
 
 7.  Start Vector
 
@@ -115,15 +116,20 @@ The following steps should be used to compile Vector directly on Linux based sys
 </TabItem>
 <TabItem value="windows">
 
-The steps to compile Vector on Windows are different from the ones for other operating systems.
+The steps to compile Vector on Windows are different from the ones for other
+operating systems.
 
-1. Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build tools, the installer would prompt you to install them.
+1. Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build
+   tools, the installer would prompt you to install them.
 
 2. Install [Perl for Windows][urls.perl_windows].
 
-3. In a Rust/MSVC environment (for example, using `x64 Native Tools Command Prompt`) add the binary directory of Perl installed on the previous step to `PATH`. For example, for default installation of  Strawberry Perl it is
+3. In a Rust/MSVC environment (for example, using
+   `x64 Native Tools Command Prompt`) add the binary directory of Perl
+   installed on the previous step to `PATH`. For example, for default
+   installation of Strawberry Perl it is
 
-    ```
+    ```bat
     set PATH=%PATH%;C:\Strawberry\perl\bin
     ```
 
@@ -139,7 +145,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
     <TabItem value="latest">
 
-    ```
+    ```bat
     git clone https://github.com/timberio/vector
     git checkout v<%= metadata.latest_version %>
     cd vector
@@ -148,7 +154,7 @@ The steps to compile Vector on Windows are different from the ones for other ope
     </TabItem>
     <TabItem value="master">
 
-    ```
+    ```bat
     git clone https://github.com/timberio/vector
     cd vector
     ```
@@ -158,21 +164,23 @@ The steps to compile Vector on Windows are different from the ones for other ope
 
 5.  Build Vector in release mode:
 
-    ```
+    ```bat
     set RUSTFLAGS=-Ctarget-feature=+crt-static
     cargo build --no-default-features --features default-msvc --release
     ```
 
-6.  After these steps a binary `vector.exe` in `target\release` would be created. It can be started by running
+6.  After these steps a binary `vector.exe` in `target\release` would be
+    created. It can be started by running
 
-    ```
+    ```bat
     .\target\release\vector --config config\vector.toml
     ```
 
 </TabItem>
 <TabItem value="docker">
 
-It is possible to build statically linked binaries of Vector for Linux using Docker.
+It is possible to build statically linked binaries of Vector for Linux using
+Docker.
 
 In this case the dependencies listed in the previous section are not
 needed, as all of them would be automatically pulled by Docker.
@@ -252,9 +260,10 @@ Building steps:
     </TabItem>
     </Tabs>
 
-    The command above builds a Docker image with Rust toolchain for a Linux target for the
-    corresponding architecture using `musl` as the C library, then starts a container from
-    this image, and then builds inside the Container. The target binary is located in
+    The command above builds a Docker image with Rust toolchain for a Linux
+    target for the corresponding architecture using `musl` as the C library,
+    then starts a container from this image, and then builds inside the
+    Container. The target binary is located in
     `target/<target triple>/release/vector` like in the previous case.
 
 </TabItem>
@@ -275,29 +284,31 @@ executing `make build`:
 [FEATURES="<flag1>,<flag2>,..."] make build
 ```
 
-There are three meta-features which can be used when compiling for the corresponding targets. If no features
-are specified, then the `default` one is used.
+There are three meta-features which can be used when compiling for the
+corresponding targets. If no features are specified, then the `default` one is
+used.
 
-| Feature | Description | Enabled by default |
-| :------ | :---------- | :----------------- |
-| `default` | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets. | <i className="feather icon-check"></i> |
-| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. | |
-| `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies. | |
+| Feature        | Description                                                                                                    | Enabled by default                     |
+|:---------------|:---------------------------------------------------------------------------------------------------------------|:---------------------------------------|
+| `default`      | Default set of features for `*-unknown-linux-gnu` and `*-apple-darwin` targets.                                | <i className="feather icon-check"></i> |
+| `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. |                                        |
+| `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies.    |                                        |
 
-Alternatively, for finer control over dependencies and operating system features, it is possible to use specific
-features from the list below:
+Alternatively, for finer control over dependencies and operating system
+features, it is possible to use specific features from the list below:
 
-| Feature | Description | Included in `default` feature |
-| :------ | :---------- | :----------------- |
-| `unix` | Enables features that require `cfg(unix)` to be present on the platform, namely support for Unix domain sockets in [docker][docs.sources.docker] source and [jemalloc][urls.jemalloc] instead of the default memory allocator. | <i className="feather icon-check"></i> |
-| `vendored` | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency. | <i className="feather icon-check"></i>|
-| `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb]. | <i className="feather icon-check"></i> |
-| `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`. | |
-| `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
-| `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
+| Feature         | Description                                                                                                                                                                                                                    | Included in `default` feature          |
+|:----------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------|
+| `unix`          | Enables features that require `cfg(unix)` to be present on the platform, namely support for Unix domain sockets in [docker][docs.sources.docker] source and [jemalloc][urls.jemalloc] instead of the default memory allocator. | <i className="feather icon-check"></i> |
+| `vendored`      | Forces vendoring of [OpenSSL][urls.openssl] and [ZLib][urls.zlib] dependencies instead of using their versions installed in the system. Requires `perl` as a build dependency.                                                 | <i className="feather icon-check"></i> |
+| `leveldb-plain` | Enables support for [disk buffers][docs.glossary#buffer] using vendored [LevelDB][urls.leveldb].                                                                                                                               | <i className="feather icon-check"></i> |
+| `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`.                                                                          |                                        |
+| `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka].                                                                 | <i className="feather icon-check"></i> |
+| `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`.                                                                          |                                        |
 
-In addition, it is possible to pick only a subset of Vector's components for the build using feature flags. In order
-to do it, it instead of `default` features one has to pass a comma-separated list of component features.
+In addition, it is possible to pick only a subset of Vector's components for
+the build using feature flags. In order to do it, it instead of `default`
+features one has to pass a comma-separated list of component features.
 
 <details><summary>Click to see all supported component features</summary>
 <p>

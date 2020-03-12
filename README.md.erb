@@ -29,33 +29,33 @@
 
 ## [Documentation](https://vector.dev/docs/)
 
-#### About
+### About
 
 * [**Concepts**][docs.concepts]
 * [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
-#### Setup
+### Setup
 
 * [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 * [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
 
-#### Reference
+### Reference
 
 * [**Sources**][docs.sources] - <%= common_component_links(:source) %>
 * [**Transforms**][docs.transforms] - <%= common_component_links(:transform) %>
 * [**Sinks**][docs.sinks] - <%= common_component_links(:sink) %>
 
-#### Administration
+### Administration
 
 * [**Process management**][docs.process-management]
 * [**Monitoring**][docs.monitoring]
 * [**Updating**][docs.updating]
 * [**Validating**][docs.validating]
 
-#### Resources
+### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
 * [**Releases**][urls.vector_releases] - [v<%= metadata.latest_version %> (latest)][urls.v<%= metadata.latest_version %>]
@@ -98,7 +98,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 ## The Little Details
 
-#### Data Model
+### Data Model
 
 * **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon).
 * **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
@@ -106,13 +106,13 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Metrics interoperability** - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperability between systems.
 * **Metrics aggregation** - Aggregated [histgorams][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
 
-#### Control Flow
+### Control Flow
 
 * **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
 * **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
 * **Dynamic partitioning** - Create [dynamic partitions on the fly][docs.sinks.aws_s3#partitioning] with Vector's [templating syntax][docs.reference.templating].
 
-#### Data Processing
+### Data Processing
 
 * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
 * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
@@ -120,7 +120,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
 
-#### Operations
+### Operations
 
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
@@ -131,7 +131,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
 * **TLS support** - All relevant Vector components offer TLS options for secure communication.
 
-#### Reliability
+### Reliability
 
 * **Memory safety** - Vector is built in Rust and is [memory safe][urls.rust_memory_safety], avoiding a large class of memory related errors.
 * **Decoupled buffer design** - Buffers are per-[sink][docs.sinks]; a bad sink won't bring the entire pipeline to a halt.
@@ -141,7 +141,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.
 * **Robust disk buffering** - Vector uses `leveldb` for robust data durability across restarts.
 
-#### UX
+### UX
 
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
 * **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.

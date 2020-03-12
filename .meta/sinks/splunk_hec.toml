@@ -46,6 +46,16 @@ examples = ["http://my-splunk-host.com"]
 required = true
 description = "Your Splunk HEC host."
 
+[sinks.splunk_hec.options.host_key]
+type = "string"
+common = true
+examples = ["hostname"]
+required = false
+description = """\
+The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the \
+[global `host_key` option][docs.reference.global-options#host_key].\
+"""
+
 [sinks.splunk_hec.options.token]
 type = "string"
 common = true

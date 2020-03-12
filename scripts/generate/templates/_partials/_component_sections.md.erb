@@ -28,6 +28,7 @@ account access.
 <%- end -%>
 <%- if component.options.respond_to?(:buffer) -%>
 <%- if component.options.respond_to?(:batch) -%>
+
 ### Buffers & Batches
 
 <%- if component.partition_options.any? -%>
@@ -49,6 +50,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 
 *Buffers* are controlled via the [`buffer.*`](#buffer) options.
 <%- else -%>
+
 ### Buffers
 
 <SVG src="/img/buffers.svg" />
@@ -83,8 +85,8 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration#environment-variables]
-section.
+You can learn more in the
+[Environment Variables][docs.configuration#environment-variables] section.
 <%- if component.sink? && component.exposing? -%>
 
 ### Exposing & Scraping
@@ -172,6 +174,7 @@ supported for these options, enabling you to use field values as partition keys.
 <%- end -%>
 <%- end -%>
 <%- if component.requirements.network -%>
+
 ### Network Access
 
 The `<%= component.name %>` <%= component.type %> requires network access to
