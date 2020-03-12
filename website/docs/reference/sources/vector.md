@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
 event_types: ["log","metric"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -26,19 +27,50 @@ The Vector `vector` source ingests data through another upstream [`vector` sink]
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED
-  type = "vector" # must be: "vector"
-  address = "0.0.0.0:9000" # example
-
-  # OPTIONAL
-  shutdown_timeout_secs = 30 # default, seconds
+  type = "vector" # required
+  address = "0.0.0.0:9000" # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[sources.my_source_id]
+  # General
+  type = "vector" # required
+  address = "0.0.0.0:9000" # required
+  shutdown_timeout_secs = 30 # optional, default, seconds
+
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 ## Options
 
@@ -74,7 +106,7 @@ The TCP address to listen for connections on, or `systemd#N to use the Nth socke
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={30}
   enumValues={null}
   examples={[30]}
@@ -82,7 +114,7 @@ The TCP address to listen for connections on, or `systemd#N to use the Nth socke
   name={"shutdown_timeout_secs"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
   unit={"seconds"}
@@ -116,6 +148,29 @@ The timeout before a connection is forcefully closed during shutdown.
 Configures the TLS options for connections from this source.
 
 <Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
+  name={"ca_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### ca_path
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+
+</Field>
 
 
 <Field
@@ -205,6 +260,29 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 #### key_path
 
 Absolute path to a certificate key file used to identify this server, in DER or PEM format (PKCS#8).
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"verify_certificate"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_certificate
+
+If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if it is not valid. If `false` (the default), Vector will ignore the presence of a client certificate.
 
 
 </Field>

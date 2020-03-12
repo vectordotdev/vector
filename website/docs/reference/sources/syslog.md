@@ -3,6 +3,7 @@ delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
 event_types: ["log"]
+function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
@@ -43,16 +44,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "syslog" # must be: "syslog"
-  mode = "tcp" # example, enum
-
-  # OPTIONAL - Context
-  host_key = "host" # default
-
-  # OPTIONAL - General
-  address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
+  type = "syslog" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
 ```
 
 </TabItem>
@@ -62,24 +57,23 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sources.my_source_id]
-  # REQUIRED - General
-  type = "syslog" # must be: "syslog"
-  mode = "tcp" # example, enum
+  # General
+  type = "syslog" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "tcp" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+  max_length = 102400 # optional, default, bytes
 
-  # OPTIONAL - Context
-  host_key = "host" # default
+  # Context
+  host_key = "host" # optional, default
 
-  # OPTIONAL - General
-  address = "0.0.0.0:9000" # example, no default, relevant when mode = "tcp" or mode = "udp"
-  max_length = 102400 # default, bytes
-  path = "/path/to/socket" # example, no default, relevant when mode = "unix"
-
-  # OPTIONAL - Tls
-  [sources.my_source_id.tls]
-    crt_path = "/path/to/host_certificate.crt" # example, no default
-    enabled = false # default
-    key_pass = "${KEY_PASS_ENV_VAR}" # example, no default
-    key_path = "/path/to/host_certificate.key" # example, no default
+  # TLS
+  tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.enabled = false # optional, default
+  tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
+  tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.verify_certificate = false # optional, default
 ```
 
 </TabItem>
@@ -103,7 +97,7 @@ import Field from '@site/src/components/Field';
   name={"address"}
   path={null}
   relevantWhen={{"mode":["tcp","udp"]}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -118,7 +112,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"host"}
   enumValues={null}
   examples={["host"]}
@@ -126,7 +120,7 @@ The TCP or UDP address to listen for connections on, or "systemd#N" to use the N
   name={"host_key"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -195,7 +189,7 @@ The input mode.
   name={"path"}
   path={null}
   relevantWhen={{"mode":"unix"}}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
@@ -230,6 +224,29 @@ The unix socket path. *This should be absolute path.*
 Configures the TLS options for connections from this source.
 
 <Fields filters={false}>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/certificate_authority.crt"]}
+  groups={[]}
+  name={"ca_path"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### ca_path
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+
+</Field>
 
 
 <Field
@@ -319,6 +336,29 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless [`k
 #### key_path
 
 Absolute path to a certificate key file used to identify this server, in DER or PEM format (PKCS#8).
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"verify_certificate"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_certificate
+
+If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if it is not valid. If `false` (the default), Vector will ignore the presence of a client certificate.
 
 
 </Field>

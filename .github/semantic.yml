@@ -45,12 +45,14 @@ scopes:
   - centos platform
   - debian platform
   - macos platform
+  - nixos platform
   - raspbian platform
   - rhel platform
   - ubuntu platform
   - windows platform
   - dpkg platform
   - homebrew platform
+  - nix platform
   - rpm platform
   - msi platform
 
@@ -67,6 +69,7 @@ scopes:
   # sources
   - docker source
   - file source
+  - http source
   - journald source
   - kafka source
   - logplex source
@@ -85,6 +88,7 @@ scopes:
   - aws_ec2_metadata transform
   - coercer transform
   - concat transform
+  - dedupe transform
   - field_filter transform
   - geoip transform
   - grok_parser transform
@@ -100,6 +104,7 @@ scopes:
   - sampler transform
   - split transform
   - swimlanes transform
+  - tag_cardinality_limit transform
   - tokenizer transform
 
   # sinks
@@ -125,6 +130,7 @@ scopes:
   - logdna sink
   - loki sink
   - new_relic_logs sink
+  - papertrail sink
   - prometheus sink
   - sematext_logs sink
   - socket sink

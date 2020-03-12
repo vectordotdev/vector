@@ -23,7 +23,6 @@
   [[tests.outputs]]
     extract_from = "coercer_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "integer_field.equals" = 123
       "boolean_field.equals" = true
       "float_field.equals" = 3.1415926535
@@ -46,5 +45,4 @@
   [[tests.outputs]]
     extract_from = "coercer_nested"
     [[tests.outputs.conditions]]
-      type = "check_fields"
       "nested.field.equals" = 1234

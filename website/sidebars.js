@@ -43,6 +43,7 @@ module.exports = {
                 "setup/installation/package-managers",
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
+                  "setup/installation/package-managers/nix",
                   "setup/installation/package-managers/rpm",
                   "setup/installation/package-managers/msi",
               ],
@@ -56,6 +57,7 @@ module.exports = {
                   "setup/installation/operating-systems/centos",
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
+                  "setup/installation/operating-systems/nixos",
                   "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
                   "setup/installation/operating-systems/ubuntu",
@@ -98,6 +100,7 @@ module.exports = {
             "setup/guides",
             "setup/guides/getting-started",
             "setup/guides/unit-testing",
+            "setup/guides/advanced-configs",
             "setup/guides/troubleshooting",
           ]
         },
@@ -117,6 +120,8 @@ module.exports = {
               "reference/sources/docker",
             
               "reference/sources/file",
+            
+              "reference/sources/http",
             
               "reference/sources/journald",
             
@@ -158,6 +163,8 @@ module.exports = {
             
               "reference/transforms/concat",
             
+              "reference/transforms/dedupe",
+            
               "reference/transforms/field_filter",
             
               "reference/transforms/geoip",
@@ -187,6 +194,8 @@ module.exports = {
               "reference/transforms/split",
             
               "reference/transforms/swimlanes",
+            
+              "reference/transforms/tag_cardinality_limit",
             
               "reference/transforms/tokenizer",
             
@@ -242,6 +251,8 @@ module.exports = {
             
               "reference/sinks/new_relic_logs",
             
+              "reference/sinks/papertrail",
+            
               "reference/sinks/prometheus",
             
               "reference/sinks/sematext_logs",
@@ -261,6 +272,7 @@ module.exports = {
           label: 'Advanced',
           items: [
             "reference/env-vars",
+            "reference/field-path-notation",
             "reference/global-options",
             "reference/templating",
             "reference/tests",
@@ -285,6 +297,11 @@ module.exports = {
       label: 'Meta',
       items: [
         "meta/glossary",
+        {
+          type: 'link',
+          label: 'Privacy',
+          href: 'https://github.com/timberio/vector/blob/master/PRIVACY.md'
+        },
         {
           type: 'link',
           label: 'Security',

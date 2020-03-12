@@ -14,7 +14,11 @@
 <CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>"/ >
 
 ```toml
-<%= config_example(component.option_example_groups.fetch(key), path: "#{component.type.pluralize}.my_#{component.type}_id") %>
+<%=
+  config_example(component.options_list, table_path: [component.type.pluralize, "my_#{component.type}_id"]) do |option|
+    component.option_example_groups.fetch(key).call(option)
+  end
+%>
 ```
 <%- if keys.length > 1 -%>
 

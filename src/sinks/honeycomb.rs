@@ -1,7 +1,7 @@
 use crate::{
     dns::Resolver,
     event::{log_schema, Event, Value},
-    sinks::util::http::{https_client, BatchedHttpSink, HttpSink},
+    sinks::util::http::{HttpClient, BatchedHttpSink, HttpSink},
     sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
     tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -106,11 +106,11 @@ impl HoneycombConfig {
 }
 
 async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> Result<(), crate::Error> {
-    let client = https_client(resolver, TlsSettings::from_options(&None)?)?;
+    let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
     let req = config.build_request(Vec::new()).map(hyper::Body::from);
 
-    let res = client.request(req).compat().await?;
+    let res = client.send(req).await?;
 
     let status = res.status();
     let body = res.into_body().concat2().compat().await?;

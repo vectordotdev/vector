@@ -284,7 +284,8 @@ are specified, then the `default` one is used.
 | `default-musl` | Default set of features for `*-unknown-linux-musl` targets. Requires `cmake` and `perl` as build dependencies. | |
 | `default-msvc` | Default set of features for `*-pc-windows-msvc` targets. Requires `cmake` and `perl` as build dependencies. | |
 
-Alternatively, for finer control, it is possible to use specific features from the list below:
+Alternatively, for finer control over dependencies and operating system features, it is possible to use specific
+features from the list below:
 
 | Feature | Description | Included in `default` feature |
 | :------ | :---------- | :----------------- |
@@ -294,3 +295,23 @@ Alternatively, for finer control, it is possible to use specific features from t
 | `leveldb-cmake` | The same as `leveldb-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `leveldb-plain`. | |
 | `rdkafka-plain` | Enables vendored [librdkafka][urls.lib_rdkafka] dependency, which is required for [`kafka` source][docs.sources.kafka] and [`kafka` sink][docs.sources.kafka]. | <i className="feather icon-check"></i> |
 | `rdkafka-cmake` | The same as `rdkafka-plain`, but is more portable. Requires `cmake` as a build dependency. Use it in case of compilation issues with `rdkafka-plain`. | |
+
+In addition, it is possible to pick only a subset of Vector's components for the build using feature flags. In order
+to do it, it instead of `default` features one has to pass a comma-separated list of component features.
+
+<details><summary>Click to see all supported component features</summary>
+<p>
+
+| Name  | Description |
+|:------|:------------|
+<% metadata.components.each do |component| -%>
+| `<%= component.type.pluralize %>-<%= component.name %>` | Enables building of [`<%= component.name %>` <%= component.type %>][docs.<%= component.type.pluralize %>.<%= component.name %>]. <%
+if component.name == "kafka" then
+-%> Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled. <%
+elsif component.name == "docker" then
+-%> Requires `unix` feature to be also enabled for support of Unix domain sockets. <%
+end -%> |
+<% end -%>
+
+</p>
+</details>
