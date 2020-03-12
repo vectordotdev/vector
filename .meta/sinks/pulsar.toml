@@ -47,11 +47,11 @@ description = "An optional auth token that can be passed to pulsar"
 [sinks.pulsar.options.auth.children.auth_name]
 type = "string"
 examples = ["${NAME_ENV_VAR}", "name123"]
-required = true
+required = false
 description = "The basic authentication name."
 
 [sinks.http.options.auth.children.auth_token]
 type = "string"
 examples = ["${TOKEN_ENV_VAR}", "123456789"]
-required = true
+required = false
 description = "The basic authentication password."

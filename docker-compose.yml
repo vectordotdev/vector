@@ -511,6 +511,7 @@ services:
         - ./tests/data/localhost.p12:/certs/localhost.p12:ro
     pulsar:
       image: apachepulsar/pulsar
+      command: bin/pulsar standalone
       ports:
         - "6650:6650"
         - "8080:8080"

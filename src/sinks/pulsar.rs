@@ -112,7 +112,7 @@ impl PulsarSink {
         })
     }
 
-    #[cfg(feature = "pulsar-integration-tests")]
+    #[allow(dead_code)]
     pub(crate) fn pulsar(&self) -> &'_ Pulsar {
         &self.pulsar
     }
@@ -231,7 +231,7 @@ mod integration_tests {
     fn pulsar_happy() {
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {
-            address: "localhost:6650".to_owned(),
+            address: "127.0.0.1:6650".to_owned(),
             topic: topic.clone(),
             encoding: Encoding::Text,
             batch_size: None,
