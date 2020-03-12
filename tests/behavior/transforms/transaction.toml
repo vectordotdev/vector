@@ -87,7 +87,7 @@
   identifier_fields = [ "request_id" ]
 
   [transforms.transaction_strats.merge_strategies]
-    "message" = "append"
+    "message" = "concat"
     "other_value" = "array"
 
   [transforms.transaction_strats.ends_when]
