@@ -17,6 +17,9 @@
   "MD020": true,
   "MD021": true,
   "MD022": true,
+  "MD023": true,
+  "MD024": false, // due to the way we generate docs, there are cases where duplicate headings are out of our control
+  "MD025": true,
   "MD027": true,
   "MD028": true,
   "MD030": false,

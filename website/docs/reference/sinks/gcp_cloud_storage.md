@@ -1208,7 +1208,7 @@ you understand the risks of not verifying the remote hostname.
   unit={null}
   >
 
-# GOOGLE_APPLICATION_CREDENTIALS
+### GOOGLE_APPLICATION_CREDENTIALS
 
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API.
