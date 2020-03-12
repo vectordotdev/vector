@@ -138,8 +138,7 @@ mod test {
     use std::net::UdpSocket;
     #[cfg(unix)]
     use std::path::PathBuf;
-    use std::time::Instant;
-    use std::{net::SocketAddr, thread, time::Duration};
+    use std::{net::SocketAddr, thread, time::Duration, time::Instant};
     #[cfg(unix)]
     use tokio::codec::{FramedWrite, LinesCodec};
     #[cfg(unix)]

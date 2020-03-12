@@ -56,7 +56,7 @@ impl ShutdownSignal {
         }
     }
 
-    /// Only for testing.
+    #[cfg(test)]
     pub fn noop() -> Self {
         let (trigger, tripwire) = Tripwire::new();
         Self {
@@ -112,24 +112,60 @@ impl ShutdownCoordinator {
 
     /// Takes ownership of all internal state for the given source from another ShutdownCoordinator.
     pub fn takeover_source(&mut self, name: &str, other: &mut Self) {
-        self.shutdown_begun_triggers.insert(
+        let existing = self.shutdown_begun_triggers.insert(
             name.to_string(),
-            other.shutdown_begun_triggers.remove(name).unwrap(),
+            other.shutdown_begun_triggers.remove(name).expect(&format!(
+                "Other ShutdownCoordinator didn't have a shutdown_begun_trigger for {}",
+                name
+            )),
         );
+        if !existing.is_none() {
+            panic!(
+                "ShutdownCoordinator already has a shutdown_begin_trigger for source {}",
+                name
+            );
+        }
 
-        self.shutdown_force_triggers.insert(
+        let existing = self.shutdown_force_triggers.insert(
             name.to_string(),
-            other.shutdown_force_triggers.remove(name).unwrap(),
+            other.shutdown_force_triggers.remove(name).expect(&format!(
+                "Other ShutdownCoordinator didn't have a shutdown_force_trigger for {}",
+                name
+            )),
         );
+        if !existing.is_none() {
+            panic!(
+                "ShutdownCoordinator already has a shutdown_force_trigger for source {}",
+                name
+            );
+        }
 
-        self.shutdown_complete_tripwires.insert(
+        let existing = self.shutdown_complete_tripwires.insert(
             name.to_string(),
-            other.shutdown_complete_tripwires.remove(name).unwrap(),
+            other
+                .shutdown_complete_tripwires
+                .remove(name)
+                .expect(&format!(
+                    "Other ShutdownCoordinator didn't have a shutdown_complete_tripwire for {}",
+                    name
+                )),
         );
+        if !existing.is_none() {
+            panic!(
+                "ShutdownCoordinator already has a shutdown_complete_tripwire for source {}",
+                name
+            );
+        }
     }
 
     pub fn shutdown_source_begin(&mut self, name: &str) {
-        self.shutdown_begun_triggers.remove(name).unwrap().cancel();
+        self.shutdown_begun_triggers
+            .remove(name)
+            .expect(&format!(
+                "shutdown_begun_trigger for source '{}' not found in the ShutdownCoordinator",
+                name
+            ))
+            .cancel();
     }
 
     /// Waits for the source to shut down until the deadline.  If the source does not
@@ -139,7 +175,7 @@ impl ShutdownCoordinator {
     // TODO: The timing and reporting logic is very similar to the logic in
     // `RunningTopology::stop()`. Once `RunningTopology::stop()` has been updated to utilize the
     // ShutdownCoordinator, see if some of this logic can be de-duped.
-    pub fn shutdown_source_end<'a>(
+    pub fn shutdown_source_end(
         &mut self,
         rt: &mut runtime::Runtime,
         name: String,
@@ -147,8 +183,17 @@ impl ShutdownCoordinator {
     ) -> bool {
         let name2 = name.clone();
         let name3 = name.clone();
-        let shutdown_complete_tripwire = self.shutdown_complete_tripwires.remove(&name).unwrap();
-        let shutdown_force_trigger = self.shutdown_force_triggers.remove(&name).unwrap();
+        let shutdown_complete_tripwire =
+            self.shutdown_complete_tripwires
+                .remove(&name)
+                .expect(&format!(
+                "shutdown_complete_tripwire for source '{}' not found in the ShutdownCoordinator",
+                name
+            ));
+        let shutdown_force_trigger = self.shutdown_force_triggers.remove(&name).expect(&format!(
+            "shutdown_force_trigger for source '{}' not found in the ShutdownCoordinator",
+            name
+        ));
 
         let success = shutdown_complete_tripwire.map(move |_| {
             info!("Source \"{}\" shut down successfully", name);
@@ -188,7 +233,16 @@ impl ShutdownCoordinator {
             Box::new(reporter),
         ]);
 
-        let (_, index, _) = rt.block_on(union).ok().unwrap();
+        // Now block until one of the futures resolves and use the index of the resolved future
+        // to decide whether it was the success or timeout future that resolved first.
+        let index = match rt.block_on(union) {
+            Ok((_, index, _)) => index,
+            Err((err, _, _)) => panic!(
+                "Error from select_all future while waiting for source to shut down: {:?}",
+                err
+            ),
+        };
+
         let success = if index == 0 {
             true
         } else if index == 1 {
