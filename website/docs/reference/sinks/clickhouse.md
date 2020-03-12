@@ -537,7 +537,7 @@ Limit the sink to only encoding the specified labels.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={"rfc3339"}
   enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
   examples={["rfc3339","unix"]}
