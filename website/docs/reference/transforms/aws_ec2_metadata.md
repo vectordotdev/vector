@@ -483,6 +483,7 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
 ### Network Access
 
 The `aws_ec2_metadata` transform requires network access to

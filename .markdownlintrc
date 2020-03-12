@@ -8,6 +8,15 @@
   "MD007": { "indent": 2 },
   "MD009": true,
   "MD010": true,
+  "MD011": true,
+  "MD012": false, // due to the way we generate docs, it is not possible to strictly enforce new lines
+  "MD013": false, // due to the way we generate docs, it is not possible to enforce a line length
+  "MD014": false, // we allow commands without output
+  "MD018": true,
+  "MD019": true,
+  "MD020": true,
+  "MD021": true,
+  "MD022": true,
   "MD027": true,
   "MD028": true,
   "MD030": false,

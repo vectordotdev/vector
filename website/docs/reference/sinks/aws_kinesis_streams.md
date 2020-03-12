@@ -910,6 +910,7 @@ how to do this.
 Vector can assume an AWS IAM role via the [`assume_role`](#assume_role) option. This is an
 optional setting that is helpful for a variety of use cases, such as cross
 account access.
+
 ### Buffers & Batches
 
 import SVG from 'react-inlinesvg';

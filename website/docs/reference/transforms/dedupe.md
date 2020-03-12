@@ -279,6 +279,7 @@ When using `fields.ignore`:
 ```
 
 ### Missing Fields
+
 Fields with explicit null values will always be considered different than if
 that field was omitted entirely.  For example, if you run this transform with
 `fields.match = ["a"]`, the event "{a: null, b:5}" will be considered different
