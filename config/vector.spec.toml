@@ -7085,20 +7085,6 @@ end
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `pulsar`.
-  #
-  # * required
-  # * type: string
-  # * must be: "pulsar"
-  type = "pulsar"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
   # A host and port pair that the pulsar client should connect to.
   #
   # * required
@@ -7111,28 +7097,40 @@ end
   # * type: string
   topic = "topic-1234"
 
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  region = "us-east-1"
-
-  # Batch size for messages
+  # An optional batch size for sending messages. Cannot exceeed `4294967295`.
   #
   # * optional
   # * no default
   # * type: int
   batch_size = 1000
+  batch_size = 5
+
+  [sinks.pulsar.pulsar]
+
+  #
+  # Auth
+  #
+
+  [sinks.pulsar.auth]
+    # The basic authentication name.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    auth_name = "${NAME_ENV_VAR}"
+    auth_name = "name123"
+
+    # The basic authentication password.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    auth_token = "${TOKEN_ENV_VAR}"
+    auth_token = "123456789"
+
+  #
+  # Encoding
+  #
 
   [sinks.pulsar.encoding]
     # The encoding codec used to serialize the events before outputting.
@@ -7143,24 +7141,28 @@ end
     codec = "json"
     codec = "text"
 
-  #
-  # Auth
-  #
-
-  [sinks.pulsar.auth]
-    # The basic authentication token.
+    # Prevent the sink from encoding the specified labels.
     #
     # * optional
-    # * type: string
-    auth_token = "${TOKEN_ENV_VAR}"
-    auth_token = "token"
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
 
-    # The basic authentication user name.
+    # Limit the sink to only encoding the specified labels.
     #
     # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
     # * type: string
-    auth_name = "${USERNAME_ENV_VAR}"
-    auth_name = "username"
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
 
 # Batches `log` events to Sematext via the Elasticsearch API.
 [sinks.sematext_logs]

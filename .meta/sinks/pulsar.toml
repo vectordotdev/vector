@@ -1,12 +1,13 @@
 [sinks.pulsar]
 title = "Apache Pulsar"
 beta = true
-common = true
+common = false
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+requirements = {}
 write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]"
 
 <%= render("_partials/_encoding.toml",
@@ -34,10 +35,9 @@ description = "The Pulsar topic name to write events to."
 type = "int"
 common = false
 examples = [1000, 5]
-max_size = 4294967295
 required = false
 description = """\
-An optional batch size for sending messages
+An optional batch size for sending messages. Cannot exceeed `4294967295`.
 """
 
 [sinks.pulsar.options.pulsar]
@@ -45,13 +45,18 @@ type = "table"
 common = true
 description = "An optional auth token that can be passed to pulsar"
 
+[sinks.pulsar.options.auth]
+type = "table"
+common = false
+description = "Options for the authentication strategy."
+
 [sinks.pulsar.options.auth.children.auth_name]
 type = "string"
 examples = ["${NAME_ENV_VAR}", "name123"]
 required = false
 description = "The basic authentication name."
 
-[sinks.http.options.auth.children.auth_token]
+[sinks.pulsar.options.auth.children.auth_token]
 type = "string"
 examples = ["${TOKEN_ENV_VAR}", "123456789"]
 required = false
