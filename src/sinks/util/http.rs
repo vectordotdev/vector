@@ -61,7 +61,7 @@ where
         batch: B,
         request_settings: TowerRequestSettings,
         batch_settings: BatchSettings,
-        tls_settings: Option<TlsSettings>,
+        tls_settings: impl Into<Option<TlsSettings>>,
         cx: &SinkContext,
     ) -> Self {
         let sink = Arc::new(sink);
