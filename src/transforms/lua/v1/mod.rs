@@ -1,7 +1,7 @@
-use super::Transform;
 use crate::{
     event::{Event, Value},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext},
+    transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -20,11 +20,7 @@ pub struct LuaConfig {
     search_dirs: Vec<String>,
 }
 
-inventory::submit! {
-    TransformDescription::new_without_default::<LuaConfig>("lua")
-}
-
-#[typetag::serde(name = "lua")]
+#[typetag::serde(name = "lua_v1")]
 impl TransformConfig for LuaConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
