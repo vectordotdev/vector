@@ -18,7 +18,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .finish()
             .with(Limit::default());
 
-            Dispatch::new(subscriber)
+        Dispatch::new(subscriber)
     } else {
         let subscriber = FmtSubscriber::builder()
             .with_ansi(color)
@@ -26,7 +26,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .finish()
             .with(Limit::default());
 
-            Dispatch::new(subscriber)
+        Dispatch::new(subscriber)
     };
 
     let _ = LogTracer::init();
