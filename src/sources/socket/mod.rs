@@ -141,10 +141,8 @@ mod test {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::{net::SocketAddr, thread, time::Duration, time::Instant};
-    use stream_cancel::{StreamExt, Tripwire};
     #[cfg(unix)]
     use tokio::codec::{FramedWrite, LinesCodec};
-    use tokio::prelude::{Async, Poll};
     #[cfg(unix)]
     use tokio_uds::UnixStream;
 
@@ -366,73 +364,31 @@ mod test {
     }
 
     //////// UDP TESTS ////////
-    struct UdpSender<I: Iterator<Item = String>> {
-        lines: I,
-        bind_addr: SocketAddr,
-        dest_addr: SocketAddr,
-        socket: UdpSocket,
-    }
-
-    impl<I> UdpSender<I>
-    where
-        I: Iterator<Item = String>,
-    {
-        pub fn new(addr: SocketAddr, lines: I) -> Self {
-            let bind = next_addr();
-
-            let socket = UdpSocket::bind(bind)
-                .map_err(|e| panic!("{:}", e))
-                .ok()
-                .unwrap();
-            Self {
-                lines,
-                bind_addr: bind,
-                dest_addr: addr,
-                socket,
-            }
-        }
-
-        pub fn get_bind_addr(&self) -> SocketAddr {
-            self.bind_addr
-        }
-    }
-
-    impl<I> Stream for UdpSender<I>
-    where
-        I: Iterator<Item = String>,
-    {
-        type Item = ();
-        type Error = ();
-
-        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-            match self.lines.next() {
-                Some(line) => {
-                    assert_eq!(
-                        self.socket
-                            .send_to(line.as_bytes(), self.dest_addr)
-                            .map_err(|e| panic!("{:}", e))
-                            .ok()
-                            .unwrap(),
-                        line.as_bytes().len()
-                    );
-                    // Space things out slightly to try to avoid dropped packets
-                    thread::sleep(Duration::from_millis(1));
-                    Ok(Async::Ready(Some(())))
-                }
-                None => Ok(Async::Ready(None)),
-            }
-        }
-    }
-
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
-        let sender = UdpSender::new(addr, lines.into_iter());
-        let bind = sender.get_bind_addr();
+        let bind = next_addr();
 
-        sender.for_each(|_| Ok(())).wait().ok().unwrap();
+        let socket = UdpSocket::bind(bind)
+            .map_err(|e| panic!("{:}", e))
+            .ok()
+            .unwrap();
+
+        for line in lines {
+            assert_eq!(
+                socket
+                    .send_to(line.as_bytes(), addr)
+                    .map_err(|e| panic!("{:}", e))
+                    .ok()
+                    .unwrap(),
+                line.as_bytes().len()
+            );
+            // Space things out slightly to try to avoid dropped packets
+            thread::sleep(Duration::from_millis(1));
+        }
 
         // Give packets some time to flow through
         thread::sleep(Duration::from_millis(10));
 
+        // Done
         bind
     }
 
@@ -581,11 +537,14 @@ mod test {
             init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
         // Stream that keeps sending lines to the UDP source forever.
-        let pump = UdpSender::new(address, std::iter::repeat("test".to_string()));
-        let (stop_pump_trigger, stop_pump_tripwire) = Tripwire::new();
-        let pump = pump.take_until(stop_pump_tripwire);
+        let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
+        let run_pump_atomic_receiver = run_pump_atomic_sender.clone();
         let pump_handle = std::thread::spawn(move || {
-            pump.for_each(|_| Ok(())).wait().ok().unwrap();
+            send_lines_udp(
+                address,
+                std::iter::repeat("test".to_string())
+                    .take_while(move |_| run_pump_atomic_receiver.load(Ordering::Relaxed)),
+            );
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
@@ -608,7 +567,7 @@ mod test {
         rt.block_on(source_handle).unwrap();
 
         // Stop the pump from sending lines forever.
-        stop_pump_trigger.cancel();
+        run_pump_atomic_sender.store(false, Ordering::Relaxed);
         assert!(pump_handle.join().is_ok());
     }
 
