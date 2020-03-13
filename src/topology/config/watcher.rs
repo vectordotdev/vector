@@ -41,7 +41,7 @@ pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(),
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
 
-                    // We need to readd paths to resolve any symlink changes that may have happened.
+                    // We need to readd paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
                         error!(message = "Failed to readd files to watch.", ?error);
@@ -102,9 +102,7 @@ fn create_watcher(
 #[cfg(unix)]
 fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &Vec<PathBuf>) -> Result<(), Error> {
     for path in config_paths {
-        // We need to canonicalize paths to resolve any symlink.
-        let canonical_path = path.canonicalize()?;
-        watcher.watch(&canonical_path, RecursiveMode::NonRecursive)?;
+        watcher.watch(path, RecursiveMode::NonRecursive)?;
     }
     Ok(())
 }
