@@ -23,7 +23,7 @@ pub struct LuaConfig {
 // Implementation of methods from `TransformConfig`
 // Note that they are implemented as struct methods instead of trait implementation methods
 // because `TransformConfig` trait requires specification of a unique `typetag::serde` name.
-// Specifying this name (for example, "lua_v1") results in this name being listed among
+// Specifying some name (for example, "lua_v*") results in this name being listed among
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
@@ -58,6 +58,13 @@ const GC_INTERVAL: usize = 16;
 pub struct Lua {
     lua: rlua::Lua,
     invocations_after_gc: usize,
+}
+
+// This wrapping structure is added in order to make it possible to have independent implementations
+// of `rlua::UserData` trait for event in version 1 and version 2 of the transform.
+#[derive(Clone)]
+struct LuaEvent {
+    inner: Event,
 }
 
 impl Lua {
@@ -96,11 +103,13 @@ impl Lua {
         let result = self.lua.context(|ctx| {
             let globals = ctx.globals();
 
-            globals.set("event", event)?;
+            globals.set("event", LuaEvent { inner: event })?;
 
             let func = ctx.named_registry_value::<_, rlua::Function<'_>>("vector_func")?;
             func.call(())?;
-            globals.get::<_, Option<Event>>("event")
+            globals
+                .get::<_, Option<LuaEvent>>("event")
+                .map(|option| option.map(|lua_event| lua_event.inner))
         });
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
@@ -123,26 +132,26 @@ impl Transform for Lua {
     }
 }
 
-impl rlua::UserData for Event {
+impl rlua::UserData for LuaEvent {
     fn add_methods<'lua, M: rlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_meta_method_mut(
             rlua::MetaMethod::NewIndex,
             |_ctx, this, (key, value): (String, Option<rlua::Value<'lua>>)| {
                 match value {
                     Some(rlua::Value::String(string)) => {
-                        this.as_mut_log().insert(key, string.as_bytes());
+                        this.inner.as_mut_log().insert(key, string.as_bytes());
                     }
                     Some(rlua::Value::Integer(integer)) => {
-                        this.as_mut_log().insert(key, Value::Integer(integer));
+                        this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
                     Some(rlua::Value::Number(number)) => {
-                        this.as_mut_log().insert(key, Value::Float(number));
+                        this.inner.as_mut_log().insert(key, Value::Float(number));
                     }
                     Some(rlua::Value::Boolean(boolean)) => {
-                        this.as_mut_log().insert(key, Value::Boolean(boolean));
+                        this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
                     }
                     Some(rlua::Value::Nil) | None => {
-                        this.as_mut_log().remove(&key.into());
+                        this.inner.as_mut_log().remove(&key.into());
                     }
                     _ => {
                         info!(
@@ -151,7 +160,7 @@ impl rlua::UserData for Event {
                             field = key.as_str(),
                             rate_limit_secs = 30
                         );
-                        this.as_mut_log().remove(&key.into());
+                        this.inner.as_mut_log().remove(&key.into());
                     }
                 }
 
@@ -160,7 +169,7 @@ impl rlua::UserData for Event {
         );
 
         methods.add_meta_method(rlua::MetaMethod::Index, |ctx, this, key: String| {
-            if let Some(value) = this.as_log().get(&key.into()) {
+            if let Some(value) = this.inner.as_log().get(&key.into()) {
                 let string = ctx.create_string(&value.as_bytes())?;
                 Ok(Some(string))
             } else {
@@ -168,21 +177,25 @@ impl rlua::UserData for Event {
             }
         });
 
-        methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: Event| {
+        methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: LuaEvent| {
             let state = ctx.create_table()?;
             {
-                let keys =
-                    ctx.create_table_from(event.as_log().keys().map(|k| (k.to_string(), true)))?;
+                let keys = ctx.create_table_from(
+                    event.inner.as_log().keys().map(|k| (k.to_string(), true)),
+                )?;
                 state.set("event", event)?;
                 state.set("keys", keys)?;
             }
             let function =
                 ctx.create_function(|ctx, (state, prev): (rlua::Table, Option<String>)| {
-                    let event: Event = state.get("event")?;
+                    let event: LuaEvent = state.get("event")?;
                     let keys: rlua::Table = state.get("keys")?;
                     let next: rlua::Function = ctx.globals().get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
-                    match key.clone().and_then(|k| event.as_log().get(&k.into())) {
+                    match key
+                        .clone()
+                        .and_then(|k| event.inner.as_log().get(&k.into()))
+                    {
                         Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
                         None => Ok((None, None)),
                     }
