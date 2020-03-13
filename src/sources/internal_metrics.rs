@@ -71,11 +71,7 @@ async fn run(
             break;
         }
 
-        let metrics = controller
-            .snapshot()
-            .into_measurements()
-            .into_iter()
-            .map(|(k, m)| into_event(k, m));
+        let metrics = capture_metrics(&controller);
 
         let (sink, _) = out
             .send_all(futures01::stream::iter_ok(metrics))
@@ -86,6 +82,16 @@ async fn run(
     }
 
     Ok(())
+}
+
+fn capture_metrics(
+    controller: &Controller,
+) -> impl Iterator<Item=Event> {
+        controller
+            .snapshot()
+            .into_measurements()
+            .into_iter()
+            .map(|(k, m)| into_event(k, m))
 }
 
 fn into_event(key: Key, measurement: Measurement) -> Event {
@@ -128,27 +134,18 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_controller, run};
+    use super::{get_controller, capture_metrics};
     use crate::{
         event::metric::{Metric, MetricValue},
-        test_util::{collect_n, runtime},
     };
-    use futures01::sync::mpsc;
     use metrics::{counter, gauge, timing, value};
-    use std::{collections::BTreeMap, thread, time::Duration};
-    use stream_cancel::Tripwire;
+    use std::{collections::BTreeMap};
 
     #[test]
     fn captures_internal_metrics() {
         crate::metrics::init();
-        let mut runtime = runtime();
 
         let controller = get_controller().expect("no controller");
-        let (tx, rx) = mpsc::channel(10);
-        let (trigger, tripwire) = Tripwire::new();
-        runtime.executor().spawn_std(async {
-            run(controller, tx, tripwire).await.unwrap();
-        });
 
         gauge!("foo", 1);
         gauge!("foo", 2);
@@ -159,14 +156,7 @@ mod tests {
         value!("quux", 7, "host" => "foo");
         value!("quux", 8, "host" => "foo");
 
-        // TODO: split out function from `run` so we can drive it without sleeping
-        thread::sleep(Duration::from_secs(5));
-        drop(trigger);
-
-        let output = runtime
-            .block_on(collect_n(rx, 4))
-            .unwrap()
-            .into_iter()
+        let output = capture_metrics(&controller)
             .map(|event| {
                 let m = event.into_metric();
                 (m.name.clone(), m)
