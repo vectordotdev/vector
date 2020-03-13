@@ -129,6 +129,7 @@ scopes:
   - logdna sink
   - loki sink
   - new_relic_logs sink
+  - papertrail sink
   - prometheus sink
   - pulsar sink
   - sematext_logs sink

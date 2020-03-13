@@ -361,6 +361,9 @@
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related
   color: 4ddbfb
+- name: "sink: papertrail"
+  description: Anything `papertrail` sink related
+  color: 4ddbfb
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb

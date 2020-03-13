@@ -47,7 +47,10 @@ import Field from '@site/src/components/Field';
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+Used for AWS authentication when communicating with AWS services. See relevant
+[AWS components][pages.aws_components] for more info.
+
+
 
 
 </Field>
@@ -70,7 +73,10 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+Used for AWS authentication when communicating with AWS services. See relevant
+[AWS components][pages.aws_components] for more info.
+
+
 
 
 </Field>
@@ -96,6 +102,8 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 The docker host to connect to.
 
 
+
+
 </Field>
 
 
@@ -116,7 +124,11 @@ The docker host to connect to.
 
 ### DOCKER_VERIFY_TLS
 
-If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+If `true` (the default), Vector will validate the TLS certificate of the remote
+host. Do NOT set this to `false` unless you understand the risks of not
+verifying the remote certificate.
+
+
 
 
 </Field>
@@ -139,7 +151,10 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API.
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the Stackdriver Logging API.
+
+
 
 
 </Field>
@@ -162,7 +177,10 @@ The filename for a Google Cloud service account credentials JSON file used to au
 
 ### LOG
 
-Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#levels] for more information on the available levels.
+Sets Vector's log level. See the [log section in the monitoring
+guide][docs.monitoring#levels] for more information on the available levels.
+
+
 
 
 </Field>
@@ -185,7 +203,10 @@ Sets Vector's log level. See the [log section in the monitoring guide][docs.moni
 
 ### RUST_BACKTRACE
 
-Enables backtraces when errors are logged. Use this when debugging only since it can degrade performance.
+Enables backtraces when errors are logged. Use this when debugging only since
+it can degrade performance.
+
+
 
 
 </Field>

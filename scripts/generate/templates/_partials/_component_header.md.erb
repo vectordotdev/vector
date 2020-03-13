@@ -24,4 +24,5 @@ unsupported_operating_systems: <%= component.unsupported_operating_systems.to_js
 <%- end -%>
 ---
 
-The Vector `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
+The Vector `<%= component.name %>` <%= component.type %>
+<%= component_description(component).continuize.wrap(80) %>
