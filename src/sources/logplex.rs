@@ -1,6 +1,8 @@
 use crate::{
     event::{self, Event},
     shutdown::ShutdownSignal,
+    sources::util::{ErrorMessage, HttpSource},
+    tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Buf;
