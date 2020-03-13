@@ -185,7 +185,8 @@ fn handle_stream(
         })
         .map_err(|error| warn!(message = "connection error.", %error))
         .forward(out)
-        .map(|_| debug!("connection closed."));
+        .map(|_| debug!("connection closed."))
+        .map_err(|_| warn!("Error received while processing TCP source"));
     tokio::spawn(handler.instrument(span));
 }
 
