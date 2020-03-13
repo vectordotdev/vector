@@ -1,5 +1,5 @@
-mod v1;
-mod v2;
+pub mod v1;
+pub mod v2;
 
 use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
