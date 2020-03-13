@@ -7,8 +7,9 @@ pub mod docker;
 pub mod file;
 #[cfg(feature = "sources-http")]
 pub mod http;
-#[cfg(feature = "sources-journald")]
+#[cfg(feature = "sources-internal_metrics")]
 pub mod internal_metrics;
+#[cfg(feature = "sources-journald")]
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;

@@ -210,6 +210,7 @@ sources = [
   "sources-docker",
   "sources-file",
   "sources-http",
+  "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes",
@@ -226,6 +227,7 @@ sources = [
 sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
+sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
