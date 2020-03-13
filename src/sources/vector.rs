@@ -110,7 +110,12 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
 
         let server = source
-            .build("default", &GlobalOptions::default(), ShutdownSignal::noop(), tx)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);
