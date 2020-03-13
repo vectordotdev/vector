@@ -244,8 +244,10 @@ impl RunningTopology {
         }
 
         // Second pass to wait for the shutdowns to complete
-        info!("Waiting for up to 30 seconds for sources to finish shutting down");
-        let deadline = Instant::now() + Duration::from_secs(30);
+        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
+        // more like 30-60 seconds.
+        info!("Waiting for up to 3 seconds for sources to finish shutting down");
+        let deadline = Instant::now() + Duration::from_secs(3);
         for name in &sources_to_remove {
             self.shutdown_source_end(rt, name, deadline.clone());
         }
