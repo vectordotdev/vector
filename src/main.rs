@@ -11,7 +11,7 @@ use structopt::{clap::AppSettings, StructOpt};
 #[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
-use vector::{config_paths, event, generate, list, runtime, topology, trace, unit_test};
+use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -204,6 +204,8 @@ fn main() {
     };
 
     trace::init(color, json, levels.as_str());
+
+    metrics::init();
 
     sub_command.map(|s| {
         std::process::exit(match s {

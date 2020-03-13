@@ -60,6 +60,8 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809
 
 # Metrics
 metrics = "0.12.1"
+metrics-core = "0.5.2"
+metrics-runtime = "0.13.0"
 
 # Aws
 rusoto_core = { version = "0.41.0", optional = true }
