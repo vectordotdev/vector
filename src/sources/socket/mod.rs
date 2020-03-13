@@ -138,6 +138,8 @@ mod test {
     use std::net::UdpSocket;
     #[cfg(unix)]
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
     use std::{net::SocketAddr, thread, time::Duration, time::Instant};
     use stream_cancel::{StreamExt, Tripwire};
     #[cfg(unix)]
@@ -297,13 +299,70 @@ mod test {
 
         // Now signal to the Source to shut down.
         shutdown.shutdown_source_begin(source_name);
-        let deadline = Instant::now() + Duration::from_secs(1000);
+        let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_success =
             shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
         rt.block_on(source_handle).unwrap();
+    }
+
+    #[test]
+    fn tcp_shutdown_infinite_stream() {
+        // It's important that the buffer be large enough that the TCP source doesn't have
+        // to block trying to forward its input into the Sender because the channel is full,
+        // otherwise even sending the signal to shut down won't wake it up.
+        let (tx, rx) = mpsc::channel(1000);
+        let source_name = "tcp_shutdown_infinite_stream";
+
+        let addr = next_addr();
+
+        let mut shutdown = ShutdownCoordinator::new();
+        let (shutdown_signal, _) = shutdown.register_source(source_name);
+
+        // Start TCP Source
+        let server = SocketConfig::from(TcpConfig::new(addr.into()))
+            .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+            .unwrap();
+        let mut rt = runtime::Runtime::new().unwrap();
+        let source_handle = oneshot::spawn(server, &rt.executor());
+        wait_for_tcp(addr);
+
+        // Spawn future that keeps sending lines to the TCP source forever.
+        let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
+        let run_pump_atomic_receiver = run_pump_atomic_sender.clone();
+        let pump_future = send_lines(
+            addr,
+            std::iter::repeat("test".to_string())
+                .take_while(move |_| run_pump_atomic_receiver.load(Ordering::Relaxed)),
+        );
+        let pump_handle = std::thread::spawn(move || {
+            pump_future.wait().ok().unwrap();
+        });
+
+        // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
+        let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
+        assert_eq!(100, events.len());
+        for event in events {
+            assert_eq!(
+                event.as_log()[&event::log_schema().message_key()],
+                "test".into()
+            );
+        }
+
+        shutdown.shutdown_source_begin(source_name);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_success =
+            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        assert_eq!(true, shutdown_success);
+
+        // Ensure that the source has actually shut down.
+        rt.block_on(source_handle).unwrap();
+
+        // Stop the pump from sending lines forever.
+        run_pump_atomic_sender.store(false, Ordering::Relaxed);
+        assert!(pump_handle.join().is_ok());
     }
 
     //////// UDP TESTS ////////
@@ -515,7 +574,7 @@ mod test {
     #[test]
     fn udp_shutdown_infinite_stream() {
         let (tx, rx) = mpsc::channel(10);
-        let source_name = "udp";
+        let source_name = "udp_shutdown_infinite_stream";
 
         let mut shutdown = ShutdownCoordinator::new();
         let (address, mut rt, source_handle) =
