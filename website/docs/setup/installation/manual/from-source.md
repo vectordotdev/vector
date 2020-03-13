@@ -71,7 +71,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8.2 | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8 | \
       tar xzf - -C vector --strip-components=1
     ```
 
