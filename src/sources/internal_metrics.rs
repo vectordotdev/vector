@@ -84,14 +84,12 @@ async fn run(
     Ok(())
 }
 
-fn capture_metrics(
-    controller: &Controller,
-) -> impl Iterator<Item=Event> {
-        controller
-            .snapshot()
-            .into_measurements()
-            .into_iter()
-            .map(|(k, m)| into_event(k, m))
+fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
+    controller
+        .snapshot()
+        .into_measurements()
+        .into_iter()
+        .map(|(k, m)| into_event(k, m))
 }
 
 fn into_event(key: Key, measurement: Measurement) -> Event {
@@ -134,12 +132,10 @@ fn into_event(key: Key, measurement: Measurement) -> Event {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_controller, capture_metrics};
-    use crate::{
-        event::metric::{Metric, MetricValue},
-    };
+    use super::{capture_metrics, get_controller};
+    use crate::event::metric::{Metric, MetricValue};
     use metrics::{counter, gauge, timing, value};
-    use std::{collections::BTreeMap};
+    use std::collections::BTreeMap;
 
     #[test]
     fn captures_internal_metrics() {
