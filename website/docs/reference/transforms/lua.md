@@ -111,8 +111,8 @@ The inline Lua source to evaluate.
 <Field
   common={true}
   defaultValue={"1"}
-  enumValues={{"1":"transform API version 1","2":"transform API version 2"}}
-  examples={["1","2"]}
+  enumValues={{"1":"transform API version 1"}}
+  examples={["1"]}
   groups={[]}
   name={"version"}
   path={null}
