@@ -3,7 +3,9 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, HttpBatchService, HttpClient, HttpRetryLogic, Response},
+        http::{
+            Auth, BatchedHttpSink, HttpBatchService, HttpClient, HttpRetryLogic, HttpSink, Response,
+        },
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
@@ -58,9 +60,19 @@ pub enum Encoding {
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let healthcheck = healthcheck(cx.resolver(), &self)?;
-        let sink = clickhouse(self.clone(), cx)?;
 
-        Ok((sink, healthcheck))
+        let gzip = match self.compression.unwrap_or(Compression::Gzip) {
+            Compression::None => false,
+            Compression::Gzip => true,
+        };
+
+        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+
+        let sink = BatchedHttpSink::new(self.clone(), Buffer::new(gzip), request, batch, tls, &cx);
+
+        Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -69,6 +81,49 @@ impl SinkConfig for ClickhouseConfig {
 
     fn sink_type(&self) -> &'static str {
         "clickhouse"
+    }
+}
+
+impl HttpSink for ClickhouseConfig {
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
+
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
+
+        let mut body =
+            serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+        body.push(b'\n');
+
+        Some(body)
+    }
+
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let database = if let Some(database) = &self.database {
+            database.as_str()
+        } else {
+            "default"
+        };
+
+        let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
+
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri.clone());
+
+        builder.header("Content-Type", "application/x-ndjson");
+
+        if let Compression::Gzip = self.compression.unwrap_or(Compression::Gzip) {
+            builder.header("Content-Encoding", "gzip");
+        }
+
+        let mut request = builder.body(events).unwrap();
+
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
+
+        request
     }
 }
 
