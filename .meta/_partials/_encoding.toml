@@ -1,3 +1,4 @@
+<%- common ||= false %>
 <%- default ||= nil %>
 [<%= namespace %>.encoding]
 type = "table"
@@ -28,7 +29,7 @@ Configures the encoding specific sink behavior.\
 
 [<%= namespace %>.encoding.children.only_fields]
 type = "[string]"
-common = false
+common = <%= common == true || (common.is_a?(Array) && common.include?("only_fields")) %>
 examples = [["timestamp", "message", "host"]]
 required = false
 description = """\
@@ -37,7 +38,7 @@ Limit the sink to only encoding the specified labels.\
 
 [<%= namespace %>.encoding.children.except_fields]
 type = "[string]"
-common = false
+common = <%= common == true || (common.is_a?(Array) && common.include?("except_fields")) %>
 examples = [["timestamp", "message", "host"]]
 required = false
 description = """\
@@ -46,7 +47,7 @@ Prevent the sink from encoding the specified labels.\
 
 [<%= namespace %>.encoding.children.timestamp_format]
 type = "string"
-common = false
+common = <%= common == true || (common.is_a?(Array) && common.include?("timestamp_format")) %>
 default = "rfc3339"
 required = false
 description = "How to format event timestamps."

@@ -150,6 +150,7 @@ Let's place our new transform in between our existing source and sink:
   index = "example-index"
   host = "http://10.24.32.122:9000"
 ```
+
 </TabItem>
 </Tabs>
 
@@ -250,6 +251,7 @@ config just like you would for regular code:
       "path.eq" = "/mesh"
       "status.eq" = "406"
 ```
+
 </TabItem>
 </Tabs>
 

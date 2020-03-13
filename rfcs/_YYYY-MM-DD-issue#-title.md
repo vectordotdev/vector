@@ -43,9 +43,9 @@ List any outstanding questions that we can discuss and resolve.
 
 Incremental steps that execute this change. Generally this is in the form of:
 
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
+* [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
+* [ ] Incremental change #1
+* [ ] Incremental change #2
+* [ ] ...
 
 Note: This can be filled out during the review process.

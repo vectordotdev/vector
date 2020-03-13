@@ -7,7 +7,7 @@ status: beta
 Vector supports a template syntax for select configuration options. This allows
 you to use event fields when configuring Vector:
 
-```
+```text
 field = "application_id={{ application_id }}/date=%F/"
 ```
 
@@ -47,7 +47,7 @@ though Vector:
 
 The value of the `key_prefix` option would equal:
 
-```
+```text
 application_id=1/date=2020-02-14
 ```
 
@@ -106,7 +106,7 @@ Each value above will be treated _literally_.
 Array values can be accessed using Vector's
 [field notation syntax][docs.reference.field-path-notation]:
 
-```
+```text
 option = "{{ parent.child[0] }}"
 ```
 
@@ -138,7 +138,7 @@ will not error, drop the event, or log anything.
 Nested fields can be accessed using Vector's
 [field notation syntax][docs.reference.field-path-notation]:
 
-```
+```text
 option = "{{ parent.child }}"
 ```
 

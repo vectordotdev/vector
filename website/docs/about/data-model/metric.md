@@ -187,7 +187,9 @@ import Field from '@site/src/components/Field';
 
 ### kind
 
-The metric value kind. This determines how the value is merged downstream if metrics are aggregated.
+The metric value kind. This determines how the value is merged downstream if
+metrics are aggregated.
+
 
 
 
@@ -214,6 +216,8 @@ The metric value kind. This determines how the value is merged downstream if met
 The metric name.
 
 
+
+
 </Field>
 
 
@@ -234,7 +238,10 @@ The metric name.
 
 ### tags
 
-Tags that add additional metadata or context to the metric. These are simple key/value pairs in `string` format and cannot be nested.
+Tags that add additional metadata or context to the metric. These are simple
+key/value pairs in `string` format and cannot be nested.
+
+
 
 
 </Field>
@@ -257,7 +264,10 @@ Tags that add additional metadata or context to the metric. These are simple key
 
 ### timestamp
 
-The metric timestamp, representing when the metric was created/ingested within Vector.
+The metric timestamp, representing when the metric was created/ingested within
+Vector.
+
+
 
 
 </Field>
@@ -280,7 +290,10 @@ The metric timestamp, representing when the metric was created/ingested within V
 
 ### type
 
-The metric value. The value is an enumeration and will be comprised of different attributes depending on the value type.
+The metric value. The value is an enumeration and will be comprised of
+different attributes depending on the value type.
+
+
 
 <Fields filters={false}>
 
@@ -302,7 +315,11 @@ The metric value. The value is an enumeration and will be comprised of different
 
 #### aggregated_histogram
 
-Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually
+things like request durations or response sizes) and counts them in
+configurable buckets. It also provides a sum of all observed values.
+
+
 
 <Fields filters={false}>
 
@@ -325,6 +342,8 @@ Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples
 ##### buckets
 
 The buckets contained within this histogram.
+
+
 
 
 </Field>
@@ -350,6 +369,8 @@ The buckets contained within this histogram.
 The total number of values contained within the histogram.
 
 
+
+
 </Field>
 
 
@@ -373,6 +394,8 @@ The total number of values contained within the histogram.
 The number of values contained within each bucket.
 
 
+
+
 </Field>
 
 
@@ -394,6 +417,8 @@ The number of values contained within each bucket.
 ##### sum
 
 The sum of all values contained within the histogram.
+
+
 
 
 </Field>
@@ -421,7 +446,11 @@ The sum of all values contained within the histogram.
 
 #### aggregated_summary
 
-Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+Similar to a histogram, a summary samples observations (usually things like
+request durations and response sizes). While it also provides a total count of
+observations and a sum of all observed values, it calculates configurable
+quantiles over a sliding time window.
+
 
 
 <Fields filters={false}>
@@ -447,6 +476,8 @@ Similar to a histogram, a summary samples observations (usually things like requ
 The total number of values contained within the summary.
 
 
+
+
 </Field>
 
 
@@ -468,6 +499,8 @@ The total number of values contained within the summary.
 ##### quantiles
 
 The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
+
+
 
 
 </Field>
@@ -493,6 +526,8 @@ The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
 The sum of all values contained within the summary.
 
 
+
+
 </Field>
 
 
@@ -514,6 +549,8 @@ The sum of all values contained within the summary.
 ##### values
 
 The values contained within the summary that align with the [`quantiles`](#quantiles).
+
+
 
 
 </Field>
@@ -541,7 +578,10 @@ The values contained within the summary that align with the [`quantiles`](#quant
 
 #### counter
 
-A single value that can _only_ be incremented or reset to zero value, it cannot be decremented.
+A single value that can _only_ be incremented or reset to zero value, it cannot
+be decremented.
+
+
 
 <Fields filters={false}>
 
@@ -564,6 +604,8 @@ A single value that can _only_ be incremented or reset to zero value, it cannot 
 ##### value
 
 The value to increment the counter by. Can only be positive.
+
+
 
 
 </Field>
@@ -593,6 +635,8 @@ The value to increment the counter by. Can only be positive.
 
 A distribution represents a distribution of sampled values.
 
+
+
 <Fields filters={false}>
 
 
@@ -616,6 +660,8 @@ A distribution represents a distribution of sampled values.
 The rate at which each individual value was sampled.
 
 
+
+
 </Field>
 
 
@@ -637,6 +683,8 @@ The rate at which each individual value was sampled.
 ##### values
 
 The list of values contained within the distribution.
+
+
 
 
 </Field>
@@ -664,7 +712,11 @@ The list of values contained within the distribution.
 
 #### gauge
 
-A gauge represents a point-in-time value that can increase and decrease. Vector's internal gauge type represents changes to that value. Gauges should be used to track fluctuations in values, like current memory or CPU usage.
+A gauge represents a point-in-time value that can increase and decrease.
+Vector's internal gauge type represents changes to that value. Gauges should be
+used to track fluctuations in values, like current memory or CPU usage.
+
+
 
 <Fields filters={false}>
 
@@ -687,6 +739,8 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
 ##### value
 
 A specific point-in-time value for the gauge.
+
+
 
 
 </Field>
@@ -716,6 +770,8 @@ A specific point-in-time value for the gauge.
 
 A set represents a count of unique values, AKA the cardinality.
 
+
+
 <Fields filters={false}>
 
 
@@ -737,6 +793,8 @@ A set represents a count of unique values, AKA the cardinality.
 ##### values
 
 The list of unique values.
+
+
 
 
 </Field>

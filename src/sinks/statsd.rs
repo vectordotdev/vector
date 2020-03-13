@@ -220,6 +220,7 @@ mod test {
     };
     use bytes::Bytes;
     use futures01::{stream, stream::Stream, sync::mpsc, Sink};
+    use std::time::{Duration, Instant};
     use tokio::{
         self,
         codec::BytesCodec,
@@ -353,6 +354,14 @@ mod test {
 
         let stream = stream::iter_ok(events.clone().into_iter());
         let sender = sink.send_all(stream);
+        let deadline = Instant::now() + Duration::from_millis(100);
+
+        // Add a delay to the write side to let the read side
+        // poll for read interest. Otherwise, this could cause
+        // a race condition in noisy environments.
+        let sender = tokio::timer::Delay::new(deadline)
+            .map_err(drop)
+            .and_then(|_| sender);
 
         let (tx, rx) = mpsc::channel(1);
 

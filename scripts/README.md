@@ -16,7 +16,7 @@ rbenv global 2.6.3
 
 We also need bundler
 
-```
+```bash
 gem install bundler
 ```
 

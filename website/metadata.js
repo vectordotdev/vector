@@ -21850,6 +21850,30 @@ module.exports = {
 
       ]
     },
+    "papertrail": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "papertrail_sink",
+      "name": "papertrail",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -22509,6 +22533,28 @@ module.exports = {
 
       ]
     },
+    "dedupe": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "filter",
+      "id": "dedupe_transform",
+      "name": "dedupe",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "prod-ready",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "field_filter": {
       "beta": true,
       "delivery_guarantee": null,
@@ -22828,6 +22874,28 @@ module.exports = {
       "function_category": "route",
       "id": "swimlanes_transform",
       "name": "swimlanes",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "tag_cardinality_limit": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "filter",
+      "id": "tag_cardinality_limit_transform",
+      "name": "tag_cardinality_limit",
       "operating_systems": [
 
       ],
