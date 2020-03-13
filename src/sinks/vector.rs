@@ -7,6 +7,7 @@ use crate::{
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use futures01::{stream::iter_ok, Sink};
+use metrics::counter;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -73,6 +74,9 @@ fn encode_event(event: Event) -> Option<Bytes> {
     let event = proto::EventWrapper::from(event);
     let event_len = event.encoded_len() as u32;
     let full_len = event_len + 4;
+
+    counter!("sinks.vector.events", 1);
+    counter!("sinks.vector.total_bytes", full_len as u64);
 
     let mut out = BytesMut::with_capacity(full_len as usize);
     out.put_u32_be(event_len);
