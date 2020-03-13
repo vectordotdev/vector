@@ -1,6 +1,6 @@
 use crate::{
     event::{Event, Value},
-    topology::config::{DataType, TransformConfig, TransformContext},
+    topology::config::{DataType, TransformContext},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
@@ -20,24 +20,29 @@ pub struct LuaConfig {
     search_dirs: Vec<String>,
 }
 
-#[typetag::serde(name = "lua_v1")]
-impl TransformConfig for LuaConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+// Implementation of methods from `TransformConfig`
+// Note that they are implemented as struct methods instead of trait implementation methods
+// because `TransformConfig` trait requires specification of a unique `typetag::serde` name.
+// Specifying this name (for example, "lua_v2") results in this name being listed among
+// possible configuration options for `transforms` section, but such internal name should not
+// be exposed to users.
+impl LuaConfig {
+    pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
         })
     }
 
-    fn input_type(&self) -> DataType {
+    pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
-    fn output_type(&self) -> DataType {
+    pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
-    fn transform_type(&self) -> &'static str {
+    pub fn transform_type(&self) -> &'static str {
         "lua"
     }
 }
