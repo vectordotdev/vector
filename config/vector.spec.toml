@@ -1869,6 +1869,15 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
+  # transform API version
+  #
+  # * optional
+  # * default: "1"
+  # * type: string
+  # * enum: "1" or "2"
+  version = "1"
+  version = "2"
+
 # Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
