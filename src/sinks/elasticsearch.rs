@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
+        http::{HttpBatchService, HttpClient, HttpRetryLogic, HttpSink},
         BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
     },
     template::Template,
@@ -107,7 +107,10 @@ pub struct ElasticSearchCommon {
     pub base_url: String,
     authorization: Option<String>,
     credentials: Option<AwsCredentials>,
+    index: Template,
     tls_settings: TlsSettings,
+    path_and_query: String,
+    config: ElasticSearchConfig,
 }
 
 #[derive(Debug, Snafu)]
@@ -120,6 +123,94 @@ enum ParseError {
     AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
+}
+
+impl HttpSink for ElasticSearchCommon {
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
+
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.config.encoding.apply_rules(&mut event);
+
+        let index = self
+            .index
+            .render_string(&event)
+            .map_err(|missing_keys| {
+                warn!(
+                    message = "Keys do not exist on the event; Dropping event.",
+                    ?missing_keys,
+                    rate_limit_secs = 30,
+                );
+            })
+            .ok()?;
+
+        let mut action = json!({
+            "index": {
+                "_index": index,
+                "_type": self.config.doc_type,
+            }
+        });
+        maybe_set_id(
+            self.config.id_key.as_ref(),
+            action.pointer_mut("/index").unwrap(),
+            &event,
+        );
+
+        let mut body = serde_json::to_vec(&action).unwrap();
+        body.push(b'\n');
+
+        serde_json::to_writer(&mut body, &event.into_log()).unwrap();
+        body.push(b'\n');
+        Some(body)
+    }
+
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let uri = format!("{}{}", self.base_url, self.path_and_query);
+        let uri = uri.parse::<Uri>().unwrap(); // Already tested that this parses above.
+        let mut builder = Request::post(&uri);
+
+        if let Some(credentials) = &self.credentials {
+            let mut request = signed_request("POST", &uri);
+
+            request.add_header("Content-Type", "application/x-ndjson");
+
+            if let Some(headers) = &self.config.headers {
+                for (header, value) in headers {
+                    request.add_header(header, value);
+                }
+            }
+
+            request.set_payload(Some(events));
+
+            finish_signer(&mut request, &credentials, &mut builder);
+
+            // The SignedRequest ends up owning the body, so we have
+            // to play games here
+            let body = request.payload.take().unwrap();
+            match body {
+                SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                _ => unreachable!(),
+            }
+        } else {
+            builder.header("Content-Type", "application/x-ndjson");
+
+            if matches!(&self.config.compression, Some(Compression::Gzip) | None) {
+                builder.header("Content-Encoding", "gzip");
+            }
+
+            if let Some(headers) = &self.config.headers {
+                for (header, value) in headers {
+                    builder.header(&header[..], &value[..]);
+                }
+            }
+
+            if let Some(auth) = &self.authorization {
+                builder.header("Authorization", &auth[..]);
+            }
+
+            builder.body(events).unwrap()
+        }
+    }
 }
 
 impl ElasticSearchCommon {
@@ -164,13 +255,34 @@ impl ElasticSearchCommon {
             }
         };
 
+        let index = if let Some(idx) = &config.index {
+            Template::from(idx.as_str())
+        } else {
+            Template::from("vector-%Y.%m.%d")
+        };
+
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let path = format!("/_bulk?timeout={}s", request.timeout.as_secs());
+        let mut path_query = url::form_urlencoded::Serializer::new(path);
+        if let Some(ref query) = config.query {
+            for (p, v) in query {
+                path_query.append_pair(&p[..], &v[..]);
+            }
+        }
+        let path_and_query = path_query.finish();
+
         let tls_settings = TlsSettings::from_options(&config.tls)?;
+        let config = config.clone();
 
         Ok(Self {
             base_url,
             authorization,
             credentials,
+            index,
+            path_and_query,
             tls_settings,
+            config,
         })
     }
 

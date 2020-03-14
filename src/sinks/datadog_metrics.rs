@@ -4,11 +4,8 @@ use crate::{
         Event,
     },
     sinks::util::{
-        http::{
-            BatchedHttpSink, Error as HttpError, HttpBatchService, HttpRetryLogic, HttpSink,
-            Response as HttpResponse,
-        },
-        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        http::{BatchedHttpSink, HttpSink},
+        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -62,6 +59,12 @@ lazy_static! {
         retry_attempts: Some(5),
         ..Default::default()
     };
+}
+
+// https://docs.datadoghq.com/api/?lang=bash#post-timeseries-points
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct DatadogRequest {
+    series: Vec<DatadogMetric>,
 }
 
 pub fn default_host() -> String {
@@ -258,7 +261,7 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
 }
 
 fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
-    let series: Vec<_> = events
+    let series = events
         .into_iter()
         .filter_map(|event| {
             let fullname = encode_namespace(namespace, &event.name);
@@ -356,7 +359,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
             }
         })
         .flatten()
-        .collect();
+        .collect::<Vec<_>>();
 
     DatadogRequest { series }
 }
