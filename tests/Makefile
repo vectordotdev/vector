@@ -34,6 +34,9 @@ test-behavior: build
 test-docker: build
 	$(RUN) test-docker
 
+test-kubernetes: build
+	$(RUN) test-kubernetes
+
 # checks
 
 check: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features
