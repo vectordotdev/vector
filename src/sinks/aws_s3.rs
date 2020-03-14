@@ -2,16 +2,19 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
+    serde::to_string,
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchBytesConfig, Buffer, PartitionBuffer,
-        PartitionInnerBuffer, ServiceBuilderExt, SinkExt, TowerRequestConfig,
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        retries::RetryLogic,
+        rusoto, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
+        SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
@@ -43,7 +46,8 @@ pub struct S3SinkConfig {
     options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: Encoding,
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -300,11 +304,6 @@ impl Service<Request> for S3Sink {
     }
 }
 
-fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(&value).unwrap();
-    value.as_str().unwrap().into()
-}
-
 fn build_request(
     req: PartitionInnerBuffer<Vec<u8>, Bytes>,
     time_format: String,
@@ -376,10 +375,11 @@ impl RetryLogic for S3RetryLogic {
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     key_prefix: &Template,
-    encoding: &Encoding,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -392,14 +392,14 @@ fn encode_event(
         .ok()?;
 
     let log = event.into_log();
-    let bytes = match encoding {
+    let bytes = match encoding.codec {
         Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        &Encoding::Text => {
+        Encoding::Text => {
             let mut bytes = log
                 .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
@@ -423,8 +423,12 @@ mod tests {
     fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes =
-            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
+        let bytes = encode_event(
+            message.clone().into(),
+            &batch_time_format,
+            &Encoding::Text.into(),
+        )
+        .unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -438,7 +442,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
@@ -512,7 +516,7 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use flate2::read::GzDecoder;
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
@@ -578,7 +582,7 @@ mod integration_tests {
             e
         });
 
-        let pump = sink.send_all(futures::stream::iter_ok(events));
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
@@ -613,7 +617,7 @@ mod integration_tests {
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
-        let (tx, rx) = futures::sync::mpsc::channel(1);
+        let (tx, rx) = futures01::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
         let mut rt = Runtime::new().unwrap();

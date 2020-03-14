@@ -2,7 +2,7 @@
 //       that is to be tested is present.
 #![cfg(feature = "kubernetes-integration-tests")]
 
-use crate::test_util::{trace_init, wait_for};
+use crate::test_util::{random_string, trace_init, wait_for};
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
@@ -112,7 +112,7 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-kube-newline-bug:latest
+        image: ktff/vector-kube-biger-test-logs:latest
         imagePullPolicy: Always
         volumeMounts:
         - name: var-log
@@ -399,7 +399,7 @@ fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
 #[test]
 fn kube_one_log() {
     let namespace = format!("one-log-{}", Uuid::new_v4());
-    let message = "12";
+    let message = random_string(300);
     let user_namespace = user_namespace(&namespace);
 
     let kube = Kube::new(&namespace);
@@ -409,7 +409,7 @@ fn kube_one_log() {
     let vector = start_vector(&kube, user_namespace.as_str(), None);
 
     // Start echo
-    let _echo = echo(&user, "echo", message);
+    let _echo = echo(&user, "echo", &message);
 
     // Verify logs
     // If any daemon logged message, done.
@@ -429,21 +429,21 @@ fn kube_one_log() {
 #[test]
 fn kube_old_log() {
     let namespace = format!("old-log-{}", Uuid::new_v4());
-    let message_old = "13";
-    let message_new = "14";
+    let message_old = random_string(300);
+    let message_new = random_string(300);
     let user_namespace = user_namespace(&namespace);
 
     let user = Kube::new(&user_namespace);
     let kube = Kube::new(&namespace);
 
     // echo old
-    let _echo_old = echo(&user, "echo-old", message_old);
+    let _echo_old = echo(&user, "echo-old", &message_old);
 
     // Start vector
     let vector = start_vector(&kube, user_namespace.as_str(), None);
 
     // echo new
-    let _echo_new = echo(&user, "echo-new", message_new);
+    let _echo_new = echo(&user, "echo-new", &message_new);
 
     // Verify logs
     wait_for(|| {
@@ -465,7 +465,12 @@ fn kube_old_log() {
 #[test]
 fn kube_multi_log() {
     let namespace = format!("multi-log-{}", Uuid::new_v4());
-    let mut messages = vec!["15", "16", "17", "18"];
+    let mut messages = vec![
+        random_string(300),
+        random_string(300),
+        random_string(300),
+        random_string(300),
+    ];
     let user_namespace = user_namespace(&namespace);
 
     let kube = Kube::new(&namespace);
@@ -480,7 +485,7 @@ fn kube_multi_log() {
     // Verify logs
     wait_for(|| {
         for line in logs(&kube, &vector) {
-            if Some(&line["message"].as_str().unwrap()) == messages.first() {
+            if Some(line["message"].as_str().unwrap()) == messages.first().map(|s| s.as_str()) {
                 messages.remove(0);
             } else {
                 debug!(namespace=%namespace,log=%line);
@@ -493,7 +498,7 @@ fn kube_multi_log() {
 #[test]
 fn kube_object_uid() {
     let namespace = format!("object-uid-{}", Uuid::new_v4());
-    let message = "19";
+    let message = random_string(300);
     let user_namespace = user_namespace(&namespace);
 
     let kube = Kube::new(&namespace);
@@ -503,7 +508,7 @@ fn kube_object_uid() {
     let vector = start_vector(&kube, user_namespace.as_str(), None);
 
     // Start echo
-    let _echo = echo(&user, "echo", message);
+    let _echo = echo(&user, "echo", &message);
     // Verify logs
     wait_for(|| {
         // If any daemon has object uid, done.
@@ -522,8 +527,8 @@ fn kube_object_uid() {
 #[test]
 fn kube_diff_container() {
     let namespace = format!("diff-container-{}", Uuid::new_v4());
-    let message0 = "20";
-    let message1 = "21";
+    let message0 = random_string(300);
+    let message1 = random_string(300);
     let user_namespace = user_namespace(&namespace);
 
     let kube = Kube::new(&namespace);
@@ -533,8 +538,8 @@ fn kube_diff_container() {
     let vector = start_vector(&kube, user_namespace.as_str(), "echo1");
 
     // Start echo0
-    let _echo0 = echo(&user, "echo0", message0);
-    let _echo1 = echo(&user, "echo1", message1);
+    let _echo0 = echo(&user, "echo0", &message0);
+    let _echo1 = echo(&user, "echo1", &message1);
 
     // Verify logs
     // If any daemon logged message, done.
@@ -556,7 +561,7 @@ fn kube_diff_container() {
 #[test]
 fn kube_diff_namespace() {
     let namespace = format!("diff-namespace-{}", Uuid::new_v4());
-    let message = "22";
+    let message = random_string(300);
     let user_namespace0 = user_namespace(namespace.to_owned() + "0");
     let user_namespace1 = user_namespace(namespace.to_owned() + "1");
 
@@ -568,8 +573,8 @@ fn kube_diff_namespace() {
     let vector = start_vector(&kube, user_namespace1.as_str(), None);
 
     // Start echo0
-    let _echo0 = echo(&user0, "echo", message);
-    let _echo1 = echo(&user1, "echo", message);
+    let _echo0 = echo(&user0, "echo", &message);
+    let _echo1 = echo(&user1, "echo", &message);
 
     // Verify logs
     // If any daemon logged message, done.
@@ -592,15 +597,15 @@ fn kube_diff_namespace() {
 #[test]
 fn kube_diff_pod_uid() {
     let namespace = format!("diff-pod-uid-{}", Uuid::new_v4());
-    let message = "23";
+    let message = random_string(300);
     let user_namespace = user_namespace(&namespace);
 
     let kube = Kube::new(&namespace);
     let user = Kube::new(&user_namespace);
 
     // Start echo
-    let echo0 = echo_create(REPEATING_ECHO_YAML, &user, "echo0", message);
-    let echo1 = echo_create(REPEATING_ECHO_YAML, &user, "echo1", message);
+    let echo0 = echo_create(REPEATING_ECHO_YAML, &user, "echo0", &message);
+    let echo1 = echo_create(REPEATING_ECHO_YAML, &user, "echo1", &message);
 
     let uid0 = echo0.metadata.uid.as_ref().expect("UID present");
     let uid1 = echo1.metadata.uid.as_ref().expect("UID present");

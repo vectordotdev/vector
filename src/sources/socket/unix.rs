@@ -2,7 +2,7 @@ use crate::event::Event;
 use crate::sources::util::build_unix_source;
 use crate::sources::Source;
 use bytes::Bytes;
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

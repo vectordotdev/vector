@@ -13,6 +13,7 @@ requirements = {}
 [transforms.remove_fields.options.fields]
 type = "[string]"
 common = true
-examples = [["field1", "field2"]]
+examples = [["field1", "field2", "parent.child"]]
+field_path_notation = true
 required = true
 description = "The log field names to drop."

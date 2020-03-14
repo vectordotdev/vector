@@ -1,7 +1,8 @@
 use crate::runtime::Runtime;
 use crate::Event;
 
-use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use futures01::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -17,7 +18,7 @@ use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::util::FutureExt;
-use tokio_tls::TlsConnector;
+use tokio_openssl::SslConnectorExt;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -52,7 +53,7 @@ pub fn send_lines(
     addr: SocketAddr,
     lines: impl Iterator<Item = String>,
 ) -> impl Future<Item = (), Error = ()> {
-    let lines = futures::stream::iter_ok::<_, ()>(lines);
+    let lines = futures01::stream::iter_ok::<_, ()>(lines);
 
     TcpStream::connect(&addr)
         .map_err(|e| panic!("{:}", e))
@@ -75,20 +76,18 @@ pub fn send_lines_tls(
     host: String,
     lines: impl Iterator<Item = String>,
 ) -> impl Future<Item = (), Error = ()> {
-    let lines = futures::stream::iter_ok::<_, ()>(lines);
+    let lines = futures01::stream::iter_ok::<_, ()>(lines);
 
-    let connector: TlsConnector = native_tls::TlsConnector::builder()
-        .danger_accept_invalid_certs(true)
-        .danger_accept_invalid_hostnames(true)
-        .build()
-        .expect("Failed to build TLS connector")
-        .into();
+    let mut connector =
+        SslConnector::builder(SslMethod::tls()).expect("Failed to create TLS builder");
+    connector.set_verify(SslVerifyMode::NONE);
+    let connector = connector.build();
 
     TcpStream::connect(&addr)
         .map_err(|e| panic!("{:}", e))
         .and_then(move |socket| {
             connector
-                .connect(&host, socket)
+                .connect_async(&host, socket)
                 .map_err(|e| panic!("{:}", e))
                 .and_then(|stream| {
                     let out = FramedWrite::new(stream, LinesCodec::new())
@@ -287,7 +286,7 @@ where
 }
 
 pub struct Receiver {
-    handle: futures::sync::oneshot::SpawnHandle<Vec<String>, ()>,
+    handle: futures01::sync::oneshot::SpawnHandle<Vec<String>, ()>,
     count: Arc<AtomicUsize>,
     trigger: Trigger,
     _runtime: Runtime,
@@ -325,7 +324,7 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
         .map_err(|e| panic!("{:?}", e))
         .collect();
 
-    let handle = futures::sync::oneshot::spawn(lines, &runtime.executor());
+    let handle = futures01::sync::oneshot::spawn(lines, &runtime.executor());
     Receiver {
         handle,
         count,
@@ -335,7 +334,7 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
 }
 
 pub struct CountReceiver {
-    handle: futures::sync::oneshot::SpawnHandle<usize, ()>,
+    handle: futures01::sync::oneshot::SpawnHandle<usize, ()>,
     trigger: Trigger,
     _runtime: Runtime,
 }
@@ -362,7 +361,7 @@ pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
         .map_err(|e| panic!("{:?}", e))
         .fold(0, |n, _| future::ok(n + 1));
 
-    let handle = futures::sync::oneshot::spawn(count, &runtime.executor());
+    let handle = futures01::sync::oneshot::spawn(count, &runtime.executor());
     CountReceiver {
         handle,
         trigger,

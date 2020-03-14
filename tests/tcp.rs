@@ -1,5 +1,7 @@
+#![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
+
 use approx::assert_relative_eq;
-use futures::{Future, Stream};
+use futures01::{Future, Stream};
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
@@ -65,6 +67,7 @@ fn sample() {
         &["in"],
         transforms::sampler::SamplerConfig {
             rate: 10,
+            key_field: None,
             pass_list: vec![],
         },
     );
@@ -326,7 +329,7 @@ fn reconnect() {
         .flatten()
         .map_err(|e| panic!("{:?}", e))
         .collect();
-    let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
+    let output_lines = futures01::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic

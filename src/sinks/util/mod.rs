@@ -1,20 +1,23 @@
 pub mod batch;
 pub mod buffer;
+pub mod encoding;
 pub mod http;
 pub mod retries;
+#[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
-#[cfg(unix)]
+#[cfg(all(feature = "sinks-socket", unix))]
 pub mod unix;
 pub mod uri;
 
 use crate::buffers::Acker;
 use crate::event::{self, Event};
 use bytes::Bytes;
-use futures::{
+use encoding::{EncodingConfig, EncodingConfiguration};
+use futures01::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use serde::{Deserialize, Serialize};
@@ -45,10 +48,11 @@ pub enum Encoding {
 * the given encoding.  If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
+pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
 
-    let b = match encoding {
+    let b = match encoding.codec {
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
@@ -266,7 +270,7 @@ mod tests {
     use crate::buffers::Acker;
     use crate::runtime::Runtime;
     use crate::test_util::wait_for;
-    use futures::{stream, sync::oneshot, Future, Poll, Sink};
+    use futures01::{stream, sync::oneshot, Future, Poll, Sink};
     use std::sync::{atomic::Ordering, Arc, Mutex};
     use tower::Service;
 

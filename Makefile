@@ -28,11 +28,14 @@ build: ## Build the project
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors (only default features)
-	@scripts/run.sh checker cargo check --all --all-targets
+	@scripts/run.sh checker cargo check --all --all-targets --features docker,kubernetes
 
 check-fmt: ## Checks code formatting correctness
 	@scripts/run.sh checker scripts/check-style.sh
 	@scripts/run.sh checker cargo fmt -- --check
+
+check-markdown: ## Check Markdown style
+	@scripts/run.sh checker-markdown markdownlint .
 
 check-generate: ## Checks for pending `make generate` changes
 	@scripts/run.sh checker scripts/check-generate.sh
@@ -45,6 +48,9 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 
 check-blog: ## Checks that all blog articles are signed by their authors
 	@scripts/run.sh checker scripts/check-blog-signatures.rb
+
+check-component-features: ## Checks that all component are behind corresponding features
+	@scripts/run.sh checker-component-features scripts/check-component-features.sh
 
 export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta

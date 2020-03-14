@@ -1,0 +1,15 @@
+name: pr-checklist
+on: [pull_request]
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    name: checklist
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Checklist
+        uses: wyozi/contextual-qa-checklist-action@master
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          input-file: .github/checklist.yml

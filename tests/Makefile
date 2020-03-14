@@ -36,16 +36,22 @@ test-docker: build
 
 # checks
 
-check: check-code check-fmt check-style check-generate check-blog check-version check-examples
+check: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features
 
 check-code:
 	$(RUN) check-code
+
+check-component-features:
+	$(RUN) check-component-features
 
 check-fmt:
 	$(RUN) check-fmt
 
 check-style:
 	$(RUN) check-style
+
+check-markdown:
+	$(RUN) check-markdown
 
 check-generate:
 	$(RUN) check-generate

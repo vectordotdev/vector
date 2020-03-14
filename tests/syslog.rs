@@ -1,10 +1,12 @@
+#![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
+
 use approx::assert_relative_eq;
 #[cfg(unix)]
-use futures::{Future, Sink, Stream};
+use futures01::{Future, Sink, Stream};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use sinks::socket::SocketSinkConfig;
-use sinks::util::Encoding;
+use sinks::util::{encoding::EncodingConfig, Encoding};
 use std::{collections::HashMap, thread, time::Duration};
 #[cfg(unix)]
 use tokio::codec::{FramedWrite, LinesCodec};
@@ -155,7 +157,7 @@ fn test_unix_stream_syslog() {
         .collect();
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
-    let input_stream = futures::stream::iter_ok::<_, ()>(input_lines.clone().into_iter());
+    let input_stream = futures01::stream::iter_ok::<_, ()>(input_lines.clone().into_iter());
 
     UnixStream::connect(&in_path)
         .map_err(|e| panic!("{:}", e))
@@ -326,5 +328,5 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
 }
 
 fn tcp_json_sink(address: String) -> SocketSinkConfig {
-    SocketSinkConfig::make_tcp_config(address, Encoding::Json, None)
+    SocketSinkConfig::make_tcp_config(address, EncodingConfig::from(Encoding::Json), None)
 }

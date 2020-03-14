@@ -1,12 +1,11 @@
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
-
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     event::Value,
     Event,
 };
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -74,6 +73,74 @@ impl CheckFieldsPredicate for EqualsPredicate {
                     CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                     _ => false,
                 }),
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct ContainsPredicate {
+    target: Atom,
+    arg: String,
+}
+
+impl ContainsPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
+                target: target.into(),
+                arg: s.clone(),
+            })),
+            _ => Err("contains predicate requires a string argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for ContainsPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l
+                .get(&self.target)
+                .map_or(false, |v| v.to_string_lossy().contains(&self.arg)),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct PrefixPredicate {
+    target: Atom,
+    arg: String,
+}
+
+impl PrefixPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
+                target: target.into(),
+                arg: s.clone(),
+            })),
+            _ => Err("contains predicate requires a string argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for PrefixPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l
+                .get(&self.target)
+                .map_or(false, |v| v.to_string_lossy().starts_with(&self.arg)),
+            _ => false,
         }
     }
 }
@@ -164,6 +231,8 @@ fn build_predicate(
     match predicate {
         "eq" | "equals" => EqualsPredicate::new(target, arg),
         "neq" | "not_equals" => NotEqualsPredicate::new(target, arg),
+        "contains" => ContainsPredicate::new(target, arg),
+        "prefix" => PrefixPredicate::new(target, arg),
         "exists" => ExistsPredicate::new(target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
@@ -360,6 +429,92 @@ mod test {
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ message.equals: \"foo\" ]".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_field_contains() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.contains".into(),
+            CheckFieldsPredicateArg::String("foo".into()),
+        );
+        preds.insert(
+            "other_thing.contains".into(),
+            CheckFieldsPredicateArg::String("bar".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("neither");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.contains: \"foo\", other_thing.contains: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "hello foo world");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.contains: \"bar\" ]".to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "hello bar world");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("message", "not fo0");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.contains: \"foo\" ]".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_field_prefix() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.prefix".into(),
+            CheckFieldsPredicateArg::String("foo".into()),
+        );
+        preds.insert(
+            "other_thing.prefix".into(),
+            CheckFieldsPredicateArg::String("bar".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("neither");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.prefix: \"foo\", other_thing.prefix: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "foo hello world");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.prefix: \"bar\" ]".to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "bar hello world");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("message", "not prefixed");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.prefix: \"foo\" ]".to_owned())
         );
     }
 

@@ -1,11 +1,11 @@
 use crate::{
     event::Event,
-    kafka::KafkaTlsConfig,
+    kafka::{KafkaCompression, KafkaTlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
-use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
-use futures03::compat::Compat;
+use futures::compat::Compat;
+use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,
@@ -25,12 +25,13 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
     topics: Vec<String>,
     group_id: String,
+    compression: Option<KafkaCompression>,
     #[serde(default = "default_auto_offset_reset")]
     auto_offset_reset: String,
     #[serde(default = "default_session_timeout_ms")]
@@ -198,7 +199,7 @@ impl Stream for OwnedConsumerStream {
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use futures::sync::mpsc;
+    use futures01::sync::mpsc;
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -208,12 +209,10 @@ mod test {
             auto_offset_reset: "earliest".to_string(),
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
-            host_key: None,
             key_field: Some("message_key".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
-            librdkafka_options: None,
-            tls: None,
+            ..Default::default()
         }
     }
 
@@ -241,8 +240,8 @@ mod integration_test {
         event,
         test_util::{collect_n, random_string, runtime},
     };
-    use futures::{sync::mpsc, Future};
-    use futures03::compat::Compat;
+    use futures::compat::Compat;
+    use futures01::{sync::mpsc, Future};
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
@@ -280,12 +279,10 @@ mod integration_test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
-            host_key: None,
             key_field: Some("message_key".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
-            librdkafka_options: None,
-            tls: None,
+            ..Default::default()
         };
 
         let mut rt = runtime();

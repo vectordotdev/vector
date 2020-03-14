@@ -84,6 +84,21 @@ services:
       working_dir: $PWD
       command: cargo check --all --all-targets
 
+    check-component-features:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
+      environment:
+        RUSTFLAGS: "-D warnings"
+        CARGO_TERM_COLOR: always
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/root/.cargo/registry
+        - ./target/cargo/git:/root/.cargo/git
+        - ./target/rustup/tmp:/root/.rustup/tmp
+      working_dir: $PWD
+      command: ./scripts/check-component-features.sh
+
     check-fmt:
       build:
         context: .
@@ -107,6 +122,16 @@ services:
       working_dir: $PWD
       user: $USER
       command: ./scripts/check-style.sh
+
+    check-markdown:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/checker-markdown/Dockerfile
+      volumes:
+        - $PWD:$PWD
+      working_dir: $PWD
+      user: $USER
+      command: markdownlint .
 
     check-generate:
       build:
@@ -387,6 +412,8 @@ services:
         dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
+        TEST_LOG: debug
+        RUST_BACKTRACE: full
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
@@ -403,6 +430,8 @@ services:
         CARGO_TERM_COLOR: always
         AWS_ACCESS_KEY_ID: dummy
         AWS_SECRET_ACCESS_KEY: dummy
+        TEST_LOG: debug
+        RUST_BACKTRACE: full
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
@@ -413,7 +442,7 @@ services:
         - test-runtime-deps
       network_mode: host
       working_dir: $PWD
-      command: cargo test --all --no-default-features --features docker,default-musl --target x86_64-unknown-linux-musl -- --test-threads 4
+      command: cargo test --all --no-default-features --features default-musl,docker,kubernetes --target x86_64-unknown-linux-musl -- --test-threads 4
 
     test-behavior:
       image: ubuntu:18.04

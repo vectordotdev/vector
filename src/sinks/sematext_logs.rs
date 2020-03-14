@@ -1,10 +1,13 @@
 use crate::{
-    sinks::elasticsearch::ElasticSearchConfig,
-    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
+    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
+    sinks::util::{
+        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
+        BatchBytesConfig, Compression, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -13,6 +16,9 @@ pub struct SematextLogsConfig {
     // TODO: replace this with `UriEncode` once that is on master.
     host: Option<String>,
     token: String,
+
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -54,6 +60,7 @@ impl SinkConfig for SematextLogsConfig {
             index: Some(self.token.clone()),
             batch: self.batch.clone(),
             request: self.request.clone(),
+            encoding: self.encoding.clone(),
             ..Default::default()
         }
         .build(cx)?;
@@ -84,7 +91,7 @@ fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
         log.insert("os.host", host);
     }
 
-    futures::future::ok(event)
+    futures01::future::ok(event)
 }
 
 #[cfg(test)]
@@ -94,7 +101,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use crate::topology::config::SinkConfig;
-    use futures::{Sink, Stream};
+    use futures01::{Sink, Stream};
 
     #[test]
     fn smoke() {

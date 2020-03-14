@@ -26,8 +26,6 @@ import TabItem from '@theme/TabItem';
   defaultValue="x86_64"
   urlKey="arch"
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
-
-
 <TabItem value="x86_64">
 
 1.  Download the Vector `.rpm` file:
@@ -36,7 +34,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -71,8 +69,6 @@ import TabItem from '@theme/TabItem';
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 </TabItem>
-
-
 <TabItem value="ARM64">
 
 1.  Download the Vector `.rpm` file:
@@ -81,7 +77,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -116,8 +112,6 @@ import TabItem from '@theme/TabItem';
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 </TabItem>
-
-
 <TabItem value="ARMv7">
 
 1.  Download the Vector `.rpm` file:
@@ -126,7 +120,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -161,8 +155,6 @@ import TabItem from '@theme/TabItem';
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 </TabItem>
-
-
 </Tabs>
 
 ### Previous Versions
@@ -175,7 +167,7 @@ Once you've found the version you'd like to install you can re-follow the
 
 The Vector configuration file is placed in:
 
-```
+```text
 etc/vector/vector.toml
 ```
 

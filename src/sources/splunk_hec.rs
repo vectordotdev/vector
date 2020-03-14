@@ -1,11 +1,12 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{sync::mpsc, Async, Future, Sink, Stream};
+use futures01::{sync::mpsc, Async, Future, Sink, Stream};
 use hyper::{Body, Response, StatusCode};
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
@@ -37,6 +38,7 @@ pub struct SplunkConfig {
     address: SocketAddr,
     /// Splunk HEC token
     token: Option<String>,
+    tls: Option<TlsConfig>,
 }
 
 impl Default for SplunkConfig {
@@ -44,6 +46,7 @@ impl Default for SplunkConfig {
         SplunkConfig {
             address: default_socket_address(),
             token: None,
+            tls: None,
         }
     }
 }
@@ -81,8 +84,11 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        // Build server
-        let (_, server) = warp::serve(services).bind_with_graceful_shutdown(self.address, tripwire);
+        let tls = TlsSettings::from_config(&self.tls, true)?;
+        let incoming = MaybeTlsIncoming::bind(&self.address, tls)?;
+
+        let server =
+            warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);
 
         Ok(Box::new(server))
     }
@@ -183,7 +189,7 @@ impl SplunkSource {
             .and_then(
                 move |_, _, channel: String, host: Option<String>, gzip: bool, body: FullBody| {
                     // Construct event parser
-                    futures::stream::once(raw_event(body, gzip, channel, host))
+                    futures01::stream::once(raw_event(body, gzip, channel, host))
                         .forward(source.sink_with_shutdown())
                         .map(|_| ())
                 },
@@ -674,18 +680,22 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
     }
 }
 
+#[cfg(features = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::SplunkConfig;
     use crate::runtime::{Runtime, TaskExecutor};
-    use crate::sinks::splunk_hec::{Encoding, HecSinkConfig};
-    use crate::sinks::{util::Compression, Healthcheck, RouterSink};
     use crate::test_util::{self, collect_n};
     use crate::{
         event::{self, Event},
+        sinks::{
+            splunk_hec::{Encoding, HecSinkConfig},
+            util::{encoding::EncodingConfigWithDefault, Compression},
+            Healthcheck, RouterSink,
+        },
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
-    use futures::{stream, sync::mpsc, Sink};
+    use futures01::{stream, sync::mpsc, Sink};
     use http::Method;
     use std::net::SocketAddr;
 
@@ -712,14 +722,14 @@ mod tests {
 
     fn sink(
         address: SocketAddr,
-        encoding: Encoding,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
         exec: TaskExecutor,
     ) -> (RouterSink, Healthcheck) {
         HecSinkConfig {
             host: format!("http://{}", address),
             token: TOKEN.to_owned(),
-            encoding,
+            encoding: encoding.into(),
             compression: Some(compression),
             ..HecSinkConfig::default()
         }
@@ -728,7 +738,7 @@ mod tests {
     }
 
     fn start(
-        encoding: Encoding,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
         let mut rt = test_util::runtime();

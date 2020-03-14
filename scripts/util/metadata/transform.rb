@@ -25,14 +25,6 @@ class Transform < Component
       raise("#{self.class.name}#allow_you_to_description cannot not end with a period")
     end
 
-    if (invalid_types = @input_types - EVENT_TYPES) != []
-      raise("#{self.class.name}#input_types contains invalid values: #{invalid_types.inspect}")
-    end
-
-    if (invalid_types = @output_types - EVENT_TYPES) != []
-      raise("#{self.class.name}#output_types contains invalid values: #{invalid_types.inspect}")
-    end
-
     # output
 
     output = hash["output"] || {}

@@ -1,16 +1,20 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    kafka::KafkaTlsConfig,
-    sinks::util::MetadataFuture,
+    kafka::{KafkaCompression, KafkaTlsConfig},
+    serde::to_string,
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+        MetadataFuture,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{
+use futures::compat::Compat;
+use futures01::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
-use futures03::compat::Compat;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
@@ -27,12 +31,13 @@ enum BuildError {
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Encoding,
+    encoding: EncodingConfigWithDefault<Encoding>,
+    compression: Option<KafkaCompression>,
     tls: Option<KafkaTlsConfig>,
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
@@ -49,9 +54,11 @@ fn default_message_timeout_ms() -> u64 {
     300000 // default in librdkafka
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
@@ -60,7 +67,7 @@ pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
     acker: Acker,
@@ -97,6 +104,10 @@ impl KafkaSinkConfig {
         if let Some(tls) = &self.tls {
             tls.apply(&mut client_config)?;
         }
+        client_config.set(
+            "compression.codec",
+            &to_string(self.compression.unwrap_or_default()),
+        );
         client_config.set("socket.timeout.ms", &self.socket_timeout_ms.to_string());
         client_config.set("message.timeout.ms", &self.message_timeout_ms.to_string());
         if let Some(ref librdkafka_options) = self.librdkafka_options {
@@ -115,7 +126,7 @@ impl KafkaSink {
             producer,
             topic: config.topic,
             key_field: config.key_field,
-            encoding: config.encoding,
+            encoding: config.encoding.into(),
             in_flight: FuturesUnordered::new(),
             acker,
             seq_head: 0,
@@ -132,7 +143,7 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let (key, body) = encode_event(&item, &self.key_field, &self.encoding);
+        let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
         let record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
@@ -218,17 +229,18 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 }
 
 fn encode_event(
-    event: &Event,
+    mut event: Event,
     key_field: &Option<Atom>,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
+    encoding.apply_rules(&mut event);
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
 
-    let body = match encoding {
+    let body = match encoding.codec {
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
@@ -250,7 +262,11 @@ mod tests {
     fn kafka_encode_event_text() {
         let key = "";
         let message = "hello world".to_string();
-        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &Encoding::Text);
+        let (key_bytes, bytes) = encode_event(
+            message.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Text),
+        );
 
         assert_eq!(&key_bytes[..], key.as_bytes());
         assert_eq!(&bytes[..], message.as_bytes());
@@ -263,7 +279,11 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         event.as_mut_log().insert("foo", "bar");
 
-        let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
+        let (key, bytes) = encode_event(
+            event,
+            &Some("key".into()),
+            &EncodingConfig::from(Encoding::Json),
+        );
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
@@ -284,7 +304,7 @@ mod integration_test {
         test_util::{block_on, random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::Sink;
+    use futures01::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -293,7 +313,7 @@ mod integration_test {
 
     #[test]
     fn kafka_happy_path_plaintext() {
-        kafka_happy_path("localhost:9092", None);
+        kafka_happy_path("localhost:9092", None, None);
     }
 
     const TEST_CA: &str = "tests/data/Vector_CA.crt";
@@ -309,22 +329,48 @@ mod integration_test {
                     ..Default::default()
                 },
             }),
+            None,
         );
     }
 
-    fn kafka_happy_path(server: &str, tls: Option<KafkaTlsConfig>) {
+    #[test]
+    fn kafka_happy_path_gzip() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Gzip));
+    }
+
+    #[test]
+    fn kafka_happy_path_lz4() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Lz4));
+    }
+
+    #[test]
+    fn kafka_happy_path_snappy() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Snappy));
+    }
+
+    #[test]
+    fn kafka_happy_path_zstd() {
+        kafka_happy_path("localhost:9092", None, Some(KafkaCompression::Zstd));
+    }
+
+    fn kafka_happy_path(
+        server: &str,
+        tls: Option<KafkaTlsConfig>,
+        compression: Option<KafkaCompression>,
+    ) {
         let topic = format!("test-{}", random_string(10));
 
         let tls_enabled = tls.as_ref().map(|tls| tls.enabled()).unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
             topic: topic.clone(),
-            encoding: Encoding::Text,
+            compression,
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
             tls,
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            librdkafka_options: None,
+            ..Default::default()
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
