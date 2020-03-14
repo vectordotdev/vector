@@ -5,21 +5,21 @@ This RFC proposes a new API for the `lua` transform.
 * [Motivation](#motivation)
 * [Prior Art](#prior-art)
 * [Motivating Examples](#motivating-examples)
-    * [Fields Manipulation](#fields-manipulation)
-    * [Log To Metric](#log-to-metric)
-        * [Inline Functions](#inline-functions)
-        * [Single Source](#single-source)
-        * [Loadable Module: Global Functions](#loadable-module-global-functions)
-        * [Loadable Module: Isolated Functions](#loadable-module-isolated-functions)
+  * [Fields Manipulation](#fields-manipulation)
+  * [Log To Metric](#log-to-metric)
+    * [Inline Functions](#inline-functions)
+    * [Single Source](#single-source)
+    * [Loadable Module: Global Functions](#loadable-module-global-functions)
+    * [Loadable Module: Isolated Functions](#loadable-module-isolated-functions)
 * [Reference-level Proposal](#reference-level-proposal)
-    * [Versions](#versions)
-    * [New Concepts](#new-concepts)
-        * [Hooks](#hooks)
-        * [Timers](#timers)
-        * [Emitting Functions](#emitting-functions)
-    * [Event Schema](#event-schema)
-    * [Data Types](#data-types)
-    * [Configuration](#configuration)
+  * [Versions](#versions)
+  * [New Concepts](#new-concepts)
+    * [Hooks](#hooks)
+    * [Timers](#timers)
+    * [Emitting Functions](#emitting-functions)
+  * [Event Schema](#event-schema)
+  * [Data Types](#data-types)
+  * [Configuration](#configuration)
 * [Sales Pitch](#sales-pitch)
 * [Plan of Action](#plan-of-action)
 
@@ -278,6 +278,7 @@ This version of the config uses the same Lua code as the config using inline Lua
 In this example the code from the `source` of the example above is put into a separate file:
 
 `example_transform.lua`
+
 ```lua
 function init (emit)
   event_counter = 0
@@ -344,6 +345,7 @@ The way to create modules in previous example above is simple, but might cause n
 It is [recommended](http://lua-users.org/wiki/ModulesTutorial) to create tables for modules and put functions inside them:
 
 `example_transform.lua`
+
 ```lua
 local example_transform = {}
 local event_counter = 0
@@ -423,26 +425,32 @@ In order to enable writing complex transforms, such as the one from the motivati
 Hooks are user-defined functions which are called on certain events.
 
 * `init` hook is a function with signature
+
     ```lua
     function (emit)
       -- ...
     end
    ```
+
    which is called when the transform is created. It takes a single argument, `emit` function, which can be used to produce new events from the hook.
 
 * `shutdown` hook is a function with signature
+
     ```lua
     function (emit)
       -- ...
     end
     ```
+
     which is called when the transform is destroyed, for example on Vector's shutdown. After the shutdown is called, no code from the transform would be called.
 * `process` hook is a function with signature
+
     ```lua
     function (event, emit)
       -- ...
     end
     ```
+
     which takes two arguments, an incoming event and the `emit` function. It is called immediately when a new event comes to the transform.
 
 #### Timers
@@ -472,14 +480,17 @@ end
 
 Here `event` is an encoded event to be produced by the transform, and `lane` is an optional parameter specifying the output lane. In order to read events produced by the transform on a certain lane, the downstream components have to use the name of the transform suffixed by `.` character and the name of the lane.
 
-**Example**
+##### Example
+
 > An emitting function is called from a transform component called `example_transform` with `lane` parameter set to `example_lane`. Then the downstream `console` sink have to be defined as the following to be able to read the emitted event:
+>
 >    ```toml
 >    [sinks.example_console]
 >      type = "console"
 >      inputs = ["example_transform.example_lane"] # would output the event from `example_lane`
 >      encoding = "text"
 >    ```
+>
 > Other components connected to the same transform, but with different lanes names or without lane names at all would not receive any event.
 
 ### Event Schema
@@ -520,15 +531,18 @@ Both log and metrics events are encoded using [external tagging](https://serde.r
     >   }
     > }
     > ```
+    >
     > and then emitted through an emitting function, Vector would examine its fields and add `timestamp` containing the current timestamp and `instance_id` field with the current hostname.
 
     **Example 2**
     > The global schema has [default settings](https://vector.dev/docs/reference/global-options/#log_schema).
     >
     > A log event created by `stdin` source is passed to the `process` hook inside the transform, where it appears to have `userdata` type. The Lua code inside the transform deletes the `timestamp` field by setting it to `nil`:
+    >
     > ```lua
     > event.log.timestamp = nil
     > ```
+    >
     > And then emits the event. In that case Vector would not automatically insert the `timestamp` field.
 
 * [Metric events](https://vector.dev/docs/about/data-model/metric/) could be seen as tables created using
@@ -677,12 +691,12 @@ The proposal
 
 ## Plan of Action
 
-- [ ] Implement support for `version` config option and split implementations for versions 1 and 2.
-- [ ] Add support for `userdata` type for timestamps.
-- [ ] Implement access to the nested structure of logs events.
-- [ ] Implement metrics support.
-- [ ] Support creation of events as table inside the transform.
-- [ ] Support emitting functions.
-- [ ] Implement hooks invocation.
-- [ ] Implement timers invocation.
-- [ ] Add behavior tests and examples to the documentation.
+* [ ] Implement support for `version` config option and split implementations for versions 1 and 2.
+* [ ] Add support for `userdata` type for timestamps.
+* [ ] Implement access to the nested structure of logs events.
+* [ ] Implement metrics support.
+* [ ] Support creation of events as table inside the transform.
+* [ ] Support emitting functions.
+* [ ] Implement hooks invocation.
+* [ ] Implement timers invocation.
+* [ ] Add behavior tests and examples to the documentation.
