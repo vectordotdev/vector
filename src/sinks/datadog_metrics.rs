@@ -1,7 +1,7 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{
-        http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
+        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
         BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -33,7 +33,7 @@ struct DatadogState {
 struct DatadogSvc {
     config: DatadogConfig,
     state: DatadogState,
-    inner: HttpService,
+    inner: HttpBatchService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -127,14 +127,16 @@ impl DatadogSvc {
             .parse::<Uri>()
             .context(super::UriParseError)?;
 
-        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
+        let build_request = move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
 
             builder.header("Content-Type", "application/json");
             builder.body(body).unwrap()
-        });
+        };
+
+        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
 
         let datadog_http_service = DatadogSvc {
             config,

@@ -163,6 +163,8 @@ module.exports = {
             
               "reference/transforms/concat",
             
+              "reference/transforms/dedupe",
+            
               "reference/transforms/field_filter",
             
               "reference/transforms/geoip",
@@ -192,6 +194,8 @@ module.exports = {
               "reference/transforms/split",
             
               "reference/transforms/swimlanes",
+            
+              "reference/transforms/tag_cardinality_limit",
             
               "reference/transforms/tokenizer",
             
@@ -231,6 +235,8 @@ module.exports = {
             
               "reference/sinks/gcp_stackdriver_logging",
             
+              "reference/sinks/honeycomb",
+            
               "reference/sinks/http",
             
               "reference/sinks/humio_logs",
@@ -244,6 +250,8 @@ module.exports = {
               "reference/sinks/loki",
             
               "reference/sinks/new_relic_logs",
+            
+              "reference/sinks/papertrail",
             
               "reference/sinks/prometheus",
             
@@ -264,6 +272,7 @@ module.exports = {
           label: 'Advanced',
           items: [
             "reference/env-vars",
+            "reference/field-path-notation",
             "reference/global-options",
             "reference/templating",
             "reference/tests",

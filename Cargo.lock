@@ -7,6 +7,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d2e7343e7fc9de883d1b0341e0b13970f764c14101234857d2ddafa1cb1cac2"
 
 [[package]]
+name = "ahash"
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f33b5018f120946c1dcf279194f238a9f146725593ead1c08fa47ff22b0b5d3"
+dependencies = [
+ "const-random",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -148,8 +157,14 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e84c238982c4b1e1ee668d136c510c67a13465279c0cb367ea6baf6310620a80"
 dependencies = [
- "bit-vec",
+ "bit-vec 0.5.1",
 ]
+
+[[package]]
+name = "bit-vec"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02b4ff8b16e6076c3e14220b39fbc1fabb6737522281a388998046859400895f"
 
 [[package]]
 name = "bit-vec"
@@ -193,6 +208,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
 dependencies = [
  "byte-tools",
+]
+
+[[package]]
+name = "bloom"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d00ac8e5056d6d65376a3c1aa5c7c34850d6949ace17f0266953a254eb3d6fe8"
+dependencies = [
+ "bit-vec 0.4.4",
 ]
 
 [[package]]
@@ -358,6 +382,26 @@ dependencies = [
  "atty",
  "lazy_static",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "const-random"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f1af9ac737b2dd2d577701e59fd09ba34822f6f2ebdb30a7647405d9e55e16a"
+dependencies = [
+ "const-random-macro",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "const-random-macro"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25e4c606eb459dd29f7c57b2e0879f2b6f14ee130918c2b78ccb58a9624e6c7a"
+dependencies = [
+ "getrandom",
+ "proc-macro-hack",
 ]
 
 [[package]]
@@ -1232,6 +1276,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e6073d0ca812575946eb5f35ff68dbe519907b25c42530389ff946dc84c6ead"
+dependencies = [
+ "ahash",
+ "autocfg 0.1.7",
+]
+
+[[package]]
 name = "hdrhistogram"
 version = "6.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1324,7 +1378,7 @@ dependencies = [
  "crossbeam-channel",
  "derivative",
  "fnv",
- "hashbrown",
+ "hashbrown 0.1.8",
  "hdrhistogram",
  "parking_lot 0.7.1",
  "quanta",
@@ -1353,16 +1407,6 @@ dependencies = [
  "futures 0.1.29",
  "http",
  "tokio-buf",
-]
-
-[[package]]
-name = "http-connection"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f6080cea47f7371d4da9a46dd52787c598ce93886393e400bc178f9039bac27"
-dependencies = [
- "http",
- "tokio-tcp",
 ]
 
 [[package]]
@@ -1809,6 +1853,15 @@ name = "logfmt"
 version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
+
+[[package]]
+name = "lru"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0609345ddee5badacf857d4f547e0e5a2e987db77085c24cd887f73573a04237"
+dependencies = [
+ "hashbrown 0.6.3",
+]
 
 [[package]]
 name = "lru-cache"
@@ -2849,6 +2902,7 @@ dependencies = [
  "num_enum",
  "openssl-sys",
  "pkg-config",
+ "zstd-sys",
 ]
 
 [[package]]
@@ -3685,6 +3739,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "syslog"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a5d8ef1b679c07976f3ee336a436453760c470f54b5e7237556728b8589515d"
+dependencies = [
+ "error-chain",
+ "libc",
+ "log",
+ "time",
+]
+
+[[package]]
 name = "syslog_loose"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4089,41 +4155,6 @@ checksum = "73a7632286f78164d65d18fd0e570307acde9362489aa5c8c53e6315cc2bde47"
 dependencies = [
  "futures 0.1.29",
  "tower-service",
-]
-
-[[package]]
-name = "tower-http-util"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "442ba79e23bda499cdaa5ee52b3776bf08cb84a1d5ca6d3d82bfd4f12c1eefc3"
-dependencies = [
- "futures 0.1.29",
- "http",
- "http-body",
- "http-connection",
- "tokio-buf",
- "tokio-io",
- "tower-service",
-]
-
-[[package]]
-name = "tower-hyper"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cff60538bc14baa9cc84fbe4c040d498163daf23bc9846a9aef0e2e40dcc1d51"
-dependencies = [
- "futures 0.1.29",
- "http",
- "http-body",
- "http-connection",
- "hyper",
- "log",
- "tokio-buf",
- "tokio-executor",
- "tokio-io",
- "tower-http-util",
- "tower-service",
- "tower-util",
 ]
 
 [[package]]
@@ -4633,6 +4664,7 @@ dependencies = [
  "approx",
  "atty",
  "base64 0.10.1",
+ "bloom",
  "built",
  "bytes",
  "bytesize",
@@ -4672,6 +4704,7 @@ dependencies = [
  "libz-sys",
  "listenfd",
  "logfmt",
+ "lru",
  "matches",
  "maxminddb",
  "native-tls",
@@ -4713,6 +4746,7 @@ dependencies = [
  "string_cache",
  "strip-ansi-escapes",
  "structopt",
+ "syslog",
  "syslog_loose",
  "tempfile",
  "tokio",
@@ -4725,7 +4759,6 @@ dependencies = [
  "tokio01-test",
  "toml 0.4.10",
  "tower",
- "tower-hyper",
  "tower-test",
  "tracing",
  "tracing-futures 0.2.1",
@@ -5033,4 +5066,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65923dd1784f44da1d2c3dbbc5e822045628c590ba72123e1c73d3c230c4434d"
 dependencies = [
  "linked-hash-map",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "1.4.15+zstd.1.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89719b034dc22d240d5b407fb0a3fe6d29952c181cff9a9f95c0bd40b4f8f7d8"
+dependencies = [
+ "cc",
+ "glob 0.3.0",
+ "libc",
 ]

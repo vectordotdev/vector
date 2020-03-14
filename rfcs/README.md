@@ -42,7 +42,7 @@ Examples of changes that do not require a RFC:
 
 1. Create a new branch with the `rfcs/YYYY-MM-DD-issue#-title.md` file.
    * Example: `rfcs/2020-02-10-445-internal-observability.md`
-3. Submit your RFC as a pull request for discussion.
-4. At least 3 other team members must approve your RFC.
-5. Create issues representing the individual changes.
-6. Virtual high-five your team members and begin work.
+2. Submit your RFC as a pull request for discussion.
+3. At least 3 other team members must approve your RFC.
+4. Create issues representing the individual changes.
+5. Virtual high-five your team members and begin work.

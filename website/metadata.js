@@ -1,4 +1,8 @@
 module.exports = {
+  "event_types": [
+    "log",
+    "metric"
+  ],
   "installation": {
     "containers": [
       {
@@ -21677,6 +21681,30 @@ module.exports = {
 
       ]
     },
+    "honeycomb": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "honeycomb_sink",
+      "name": "honeycomb",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -21846,6 +21874,30 @@ module.exports = {
 
       ]
     },
+    "papertrail": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "papertrail_sink",
+      "name": "papertrail",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "prometheus": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -21973,7 +22025,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "proxy",
+      "function_category": "transmit",
       "id": "vector_sink",
       "name": "vector",
       "operating_systems": [
@@ -22287,7 +22339,7 @@ module.exports = {
         "log",
         "metric"
       ],
-      "function_category": "proxy",
+      "function_category": "receive",
       "id": "vector_source",
       "name": "vector",
       "operating_systems": [
@@ -22490,7 +22542,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "filter",
+      "function_category": "shape",
       "id": "concat_transform",
       "name": "concat",
       "operating_systems": [
@@ -22500,6 +22552,28 @@ module.exports = {
 
       ],
       "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "dedupe": {
+      "beta": false,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "filter",
+      "id": "dedupe_transform",
+      "name": "dedupe",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "prod-ready",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22667,7 +22741,7 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "merge",
+      "function_category": "aggregate",
       "id": "merge_transform",
       "name": "merge",
       "operating_systems": [
@@ -22821,9 +22895,31 @@ module.exports = {
       "event_types": [
         "log"
       ],
-      "function_category": "filter",
+      "function_category": "route",
       "id": "swimlanes_transform",
       "name": "swimlanes",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "tag_cardinality_limit": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.",
+      "event_types": [
+        "metric"
+      ],
+      "function_category": "filter",
+      "id": "tag_cardinality_limit_transform",
+      "name": "tag_cardinality_limit",
       "operating_systems": [
 
       ],

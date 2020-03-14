@@ -15,7 +15,11 @@ write_to_description = "[Loki][urls.loki]"
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.loki.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.loki.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.loki.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -112,8 +116,8 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 [sinks.loki.options.auth.children.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = """\
 The basic authentication password.\
 
@@ -124,8 +128,8 @@ to your `instanceId`.\
 [sinks.loki.options.auth.children.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = """\
 The basic authentication user name.\
 

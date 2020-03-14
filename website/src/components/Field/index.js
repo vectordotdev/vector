@@ -111,12 +111,15 @@ function RelevantWhen({value}) {
   );
 }
 
-function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, unit}) {
+function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, required, unit}) {
   const [showExamples, setShowExamples] = useState(false);
 
   if (defaultValue || enumValues || (examples && examples.length > 0) || (groups && groups.length > 0)) {
     return (
       <div className="info">
+        {relevantWhen ?
+          <div>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></div> :
+          null}
         {defaultValue !== undefined ?
           (defaultValue ?
             <div>Default: <Example name={name} path={path} value={defaultValue} unit={unit} /></div> :
@@ -124,9 +127,6 @@ function FieldFooter({defaultValue, enumValues, examples, groups, name, path, re
           null}
         {enumValues ?
           <div>Enum, must be one of: <Enum values={enumValues} /></div> :
-          null}
-        {relevantWhen ?
-          <div>Only relevant when: <RelevantWhen value={relevantWhen} /></div> :
           null}
         <div>
           <div className="show-more" onClick={() => setShowExamples(!showExamples)}>
@@ -159,7 +159,7 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
         {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary" title="This option is an enumation and only allows specific values">enum</span>}
         {common && <span className="badge badge--primary" title="This is a popular that we recommend for getting started">common</span>}
         {required ?
-          <span className="badge badge--danger">required</span> :
+          <span className="badge badge--danger">required{relevantWhen && '*'}</span> :
           <span className="badge badge--secondary">optional</span>}
       </div>
       {filteredChildren}
@@ -172,6 +172,7 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
           name={name}
           path={path}
           relevantWhen={relevantWhen}
+          required={required}
           unit={unit} />}
     </div>
   );

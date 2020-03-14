@@ -154,30 +154,11 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "file"
   type = "file"
 
-  # Delay between file discovery calls. This controls the interval at which
-  # Vector searches for files.
-  #
-  # * required
-  # * default: 1000
-  # * type: int
-  # * unit: milliseconds
-  glob_minimum_cooldown = 1000
-
   # Array of file patterns to include. Globbing is supported.
   #
   # * required
   # * type: [string]
   include = ["/var/log/nginx/*.log"]
-
-  # For files with a stored checkpoint at startup, setting this option to `true`
-  # will tell Vector to read from the beginning of the file instead of the stored
-  # checkpoint.
-  #
-  # * required
-  # * default: false
-  # * type: bool
-  start_at_beginning = false
-  start_at_beginning = true
 
   # The directory used to persist file checkpoint positions. By default, the
   # global `data_dir` option is used. Please make sure the Vector project has
@@ -196,6 +177,15 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   exclude = ["/var/log/nginx/*.[0-9]*.log"]
 
+  # Delay between file discovery calls. This controls the interval at which
+  # Vector searches for files.
+  #
+  # * optional
+  # * default: 1000
+  # * type: int
+  # * unit: milliseconds
+  glob_minimum_cooldown = 1000
+
   # Ignore files with a data modification date that does not exceed this age.
   #
   # * optional
@@ -213,13 +203,23 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_line_bytes = 102400
 
+  # For files with a stored checkpoint at startup, setting this option to `true`
+  # will tell Vector to read from the beginning of the file instead of the stored
+  # checkpoint.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  start_at_beginning = false
+  start_at_beginning = true
+
   #
   # Context
   #
 
   # The key name added to each event with the full path of the file.
   #
-  # * required
+  # * optional
   # * default: "file"
   # * type: string
   file_key = "file"
@@ -227,7 +227,7 @@ dns_servers = ["0.0.0.0:53"]
   # The key name added to each event representing the current host. This can also
   # be globally set via the global `host_key` option.
   #
-  # * required
+  # * optional
   # * default: "host"
   # * type: string
   host_key = "host"
@@ -260,26 +260,6 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.file.fingerprinting]
-    # The number of bytes read off the head of the file to generate a unique
-    # fingerprint.
-    #
-    # * required
-    # * default: 256
-    # * type: int
-    # * unit: bytes
-    # * relevant when strategy = "checksum"
-    fingerprint_bytes = 256
-
-    # The number of bytes to skip ahead (or ignore) when generating a unique
-    # fingerprint. This is helpful if all files share a common header.
-    #
-    # * required
-    # * default: 0
-    # * type: int
-    # * unit: bytes
-    # * relevant when strategy = "checksum"
-    ignored_header_bytes = 0
-
     # The strategy used to uniquely identify files. This is important for
     # checkpointing when file rotation is used.
     #
@@ -289,6 +269,26 @@ dns_servers = ["0.0.0.0:53"]
     # * enum: "checksum" or "device_and_inode"
     strategy = "checksum"
     strategy = "device_and_inode"
+
+    # The number of bytes read off the head of the file to generate a unique
+    # fingerprint.
+    #
+    # * optional
+    # * default: 256
+    # * type: int
+    # * unit: bytes
+    # * relevant when strategy = "checksum"
+    fingerprint_bytes = 256
+
+    # The number of bytes to skip ahead (or ignore) when generating a unique
+    # fingerprint. This is helpful if all files share a common header.
+    #
+    # * optional
+    # * default: 0
+    # * type: int
+    # * unit: bytes
+    # * relevant when strategy = "checksum"
+    ignored_header_bytes = 0
 
   #
   # Multiline
@@ -353,14 +353,10 @@ dns_servers = ["0.0.0.0:53"]
   address = "0.0.0.0:80"
   address = "localhost:8080"
 
-  # The expected encoding of received data. `text` indicates newline-delimited
-  # text, with each line forming a message. `ndjson` indicates newline-delimited
-  # JSON, where each line must contain a json object. `json` indicates a JSON
-  # payload, which must be a JSON array containing JSON objects. Note that for
-  # `json` and `ndjson` encodings, the fields of the JSON objects are output as
-  # separate fields.
+  # The expected encoding of received data. Note that for `json` and `ndjson`
+  # encodings, the fields of the JSON objects are output as separate fields.
   #
-  # * required
+  # * optional
   # * default: "text"
   # * type: string
   # * enum: "text", "ndjson", and "json"
@@ -379,7 +375,7 @@ dns_servers = ["0.0.0.0:53"]
   headers = ["User-Agent", "X-My-Custom-Header"]
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.http.tls]
@@ -585,9 +581,10 @@ dns_servers = ["0.0.0.0:53"]
     # * type: string
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
+    "socket.send.buffer.bytes" = "100"
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.kafka.tls]
@@ -654,7 +651,7 @@ dns_servers = ["0.0.0.0:53"]
   address = "0.0.0.0:8088"
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.logplex.tls]
@@ -753,7 +750,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  # * relevant when mode = "tcp" or mode = "udp"
+  # * required when mode = "tcp" or mode = "udp"
   address = "0.0.0.0:9000"
   address = "systemd"
   address = "systemd#3"
@@ -771,17 +768,8 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  # * relevant when mode = "unix"
+  # * required when mode = "unix"
   path = "/path/to/socket"
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  #
-  # * required
-  # * default: 30
-  # * type: int
-  # * unit: seconds
-  # * relevant when mode = "tcp"
-  shutdown_timeout_secs = 30
 
   # The maximum bytes size of incoming messages before they are discarded.
   #
@@ -791,6 +779,15 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_length = 102400
 
+  # The timeout before a connection is forcefully closed during shutdown.
+  #
+  # * optional
+  # * default: 30
+  # * type: int
+  # * unit: seconds
+  # * relevant when mode = "tcp"
+  shutdown_timeout_secs = 30
+
   #
   # Context
   #
@@ -798,13 +795,13 @@ dns_servers = ["0.0.0.0:53"]
   # The key name added to each event representing the current host. This can also
   # be globally set via the global `host_key` option.
   #
-  # * required
+  # * optional
   # * default: "host"
   # * type: string
   host_key = "host"
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.socket.tls]
@@ -814,6 +811,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * no default
     # * type: string
+    # * relevant when mode = "tcp"
     ca_path = "/path/to/certificate_authority.crt"
 
     # Absolute path to a certificate file used to identify this server, in DER or
@@ -862,6 +860,7 @@ dns_servers = ["0.0.0.0:53"]
     # * optional
     # * default: false
     # * type: bool
+    # * relevant when mode = "tcp"
     verify_certificate = false
     verify_certificate = true
 
@@ -881,7 +880,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # The address to accept connections on.
   #
-  # * required
+  # * optional
   # * default: "0.0.0.0:8088"
   # * type: string
   address = "0.0.0.0:8088"
@@ -897,7 +896,7 @@ dns_servers = ["0.0.0.0:53"]
   token = "A94A8FE5CCB19BA61C4C08"
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.splunk_hec.tls]
@@ -999,7 +998,7 @@ dns_servers = ["0.0.0.0:53"]
   # The key name added to each event representing the current host. This can also
   # be globally set via the global `host_key` option.
   #
-  # * required
+  # * optional
   # * default: "host"
   # * type: string
   host_key = "host"
@@ -1018,6 +1017,16 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "syslog"
   type = "syslog"
 
+  # The TCP or UDP address to listen for connections on, or "systemd#N" to use
+  # the Nth socket passed by systemd socket activation.
+  #
+  # * required
+  # * type: string
+  # * required when mode = "tcp" or mode = "udp"
+  address = "0.0.0.0:9000"
+  address = "systemd"
+  address = "systemd#2"
+
   # The input mode.
   #
   # * required
@@ -1027,16 +1036,12 @@ dns_servers = ["0.0.0.0:53"]
   mode = "udp"
   mode = "unix"
 
-  # The TCP or UDP address to listen for connections on, or "systemd#N" to use
-  # the Nth socket passed by systemd socket activation.
+  # The unix socket path. *This should be absolute path.*
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
-  # * relevant when mode = "tcp" or mode = "udp"
-  address = "0.0.0.0:9000"
-  address = "systemd"
-  address = "systemd#2"
+  # * required when mode = "unix"
+  path = "/path/to/socket"
 
   # The maximum bytes size of incoming messages before they are discarded.
   #
@@ -1046,14 +1051,6 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_length = 102400
 
-  # The unix socket path. *This should be absolute path.*
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when mode = "unix"
-  path = "/path/to/socket"
-
   #
   # Context
   #
@@ -1061,13 +1058,13 @@ dns_servers = ["0.0.0.0:53"]
   # The key name added to each event representing the current host. This can also
   # be globally set via the global `host_key` option.
   #
-  # * required
+  # * optional
   # * default: "host"
   # * type: string
   host_key = "host"
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.syslog.tls]
@@ -1150,14 +1147,14 @@ dns_servers = ["0.0.0.0:53"]
 
   # The timeout before a connection is forcefully closed during shutdown.
   #
-  # * required
+  # * optional
   # * default: 30
   # * type: int
   # * unit: seconds
   shutdown_timeout_secs = 30
 
   #
-  # Tls
+  # TLS
   #
 
   [sources.vector.tls]
@@ -1256,7 +1253,7 @@ dns_servers = ["0.0.0.0:53"]
     float_field = 1.2
     bool_field = true
     timestamp_field = 1979-05-27T00:32:00Z
-    parent = {child = "child_value"}
+    parent = {child_field = "child_value"}
     list_field = ["first", "second", "third"]
 
 # Accepts and outputs `metric` events allowing you to add one or more metric tags.
@@ -1310,10 +1307,12 @@ dns_servers = ["0.0.0.0:53"]
 
   # The target field to strip ANSI escape sequences from.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
 # Accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata.
 [transforms.aws_ec2_metadata]
@@ -1408,6 +1407,7 @@ dns_servers = ["0.0.0.0:53"]
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one.
 [transforms.concat]
@@ -1432,9 +1432,17 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   items = ["first[..3]", "second[-5..]", "third[3..6]"]
 
-  # The string that is used to join all items.
+  # The name for the new label.
   #
   # * required
+  # * type: string
+  target = "root_field_name"
+  target = "parent.child"
+  target = "array[0]"
+
+  # The string that is used to join all items.
+  #
+  # * optional
   # * default: " "
   # * type: string
   joiner = " "
@@ -1442,11 +1450,59 @@ dns_servers = ["0.0.0.0:53"]
   joiner = "_"
   joiner = "+"
 
-  # The name for the new label.
+# Accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache.
+[transforms.dedupe]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
   #
   # * required
   # * type: string
-  target = "dest_field_name"
+  # * must be: "dedupe"
+  type = "dedupe"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Cache
+  #
+
+  [transforms.dedupe.cache]
+    # The number of recent Events to cache and compare new incoming Events against.
+    #
+    # * optional
+    # * default: 5000
+    # * type: int
+    num_events = 5000
+
+  #
+  # Fields
+  #
+
+  [transforms.dedupe.fields]
+    # The field names to ignore when deciding if an Event is a duplicate.
+    # Incompatible with the `fields.match` option.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    ignore = ["field1", "parent.child_field"]
+
+    # The field names considered when deciding if an Event is a duplicate. This can
+    # also be globally set via the global `log_schema` options.Incompatible with
+    # the `fields.ignore` option.
+    #
+    # * optional
+    # * default: ["timestamp", "host", "message"]
+    # * type: [string]
+    match = ["field1", "parent.child_field"]
 
 # Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
@@ -1468,7 +1524,9 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  field = "file"
+  field = "application_id"
+  field = "parent.child"
+  field = "array[0]"
 
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
@@ -1508,14 +1566,17 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   source = "ip_address"
   source = "x-forwarded-for"
+  source = "parent.child"
+  source = "array[0]"
 
   # The default field to insert the resulting GeoIP data into. See output for
   # more info.
   #
-  # * required
+  # * optional
   # * default: "geoip"
   # * type: string
   target = "geoip"
+  target = "parent.child"
 
 # Accepts and outputs `log` events allowing you to parse a log field value with Grok.
 [transforms.grok_parser]
@@ -1537,9 +1598,15 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If `true` will drop the specified `field` after parsing.
+  # The Grok pattern
   #
   # * required
+  # * type: string
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+
+  # If `true` will drop the specified `field` after parsing.
+  #
+  # * optional
   # * default: true
   # * type: bool
   drop_field = true
@@ -1547,16 +1614,12 @@ dns_servers = ["0.0.0.0:53"]
 
   # The log field to execute the `pattern` against. Must be a `string` value.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
-
-  # The Grok pattern
-  #
-  # * required
-  # * type: string
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  field = "parent.child"
+  field = "array[0]"
 
   #
   # Types
@@ -1576,6 +1639,7 @@ dns_servers = ["0.0.0.0:53"]
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to parse a log field value as JSON.
 [transforms.json_parser]
@@ -1593,15 +1657,6 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If the specified `field` should be dropped (removed) after parsing. If
-  # parsing fails, the field will not be removed, irrespective of this setting.
-  #
-  # * required
-  # * default: true
-  # * type: bool
-  drop_field = true
-  drop_field = false
-
   # If `true` events with invalid JSON will be dropped, otherwise the event will
   # be kept and passed through.
   #
@@ -1609,12 +1664,23 @@ dns_servers = ["0.0.0.0:53"]
   # * type: bool
   drop_invalid = true
 
+  # If the specified `field` should be dropped (removed) after parsing. If
+  # parsing fails, the field will not be removed, irrespective of this setting.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  drop_field = true
+  drop_field = false
+
   # The log field to decode as JSON. Must be a `string` value type.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
   # If `target_field` is set and the log contains a field of the same name as the
   # target, it will only be overwritten if this is set to `true`.
@@ -1632,7 +1698,8 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: string
-  target_field = "target"
+  target_field = "root_field"
+  target_field = "parent.child"
 
 # Accepts `log` events but outputs `metric` events allowing you to convert logs into one or more metrics.
 [transforms.log_to_metric]
@@ -1659,6 +1726,7 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [[transforms.log_to_metric.metrics]]
+
     # The metric type.
     #
     # * required
@@ -1674,16 +1742,7 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     field = "duration"
-
-    # If `true` the metric will be incremented by the `field` value. If `false` the
-    # metric will be incremented by 1 regardless of the `field` value.
-    #
-    # * required
-    # * default: false
-    # * type: bool
-    # * relevant when type = "counter"
-    increment_by_value = false
-    increment_by_value = true
+    field = "parent.child"
 
     # The name of the metric. Defaults to `<field>_total` for `counter` and
     # `<field>` for `gauge`.
@@ -1691,6 +1750,17 @@ dns_servers = ["0.0.0.0:53"]
     # * required
     # * type: string
     name = "duration_total"
+
+    # If `true` the metric will be incremented by the `field` value. If `false` the
+    # metric will be incremented by 1 regardless of the `field` value.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    # * relevant when type = "counter"
+    increment_by_value = false
+    increment_by_value = true
+
 
     [transforms.log_to_metric.metrics.tags]
       # Key/value pairs representing metric tags. Environment variables and field
@@ -1724,7 +1794,7 @@ dns_servers = ["0.0.0.0:53"]
 
   # If the specified `field` should be dropped (removed) after parsing.
   #
-  # * required
+  # * optional
   # * default: true
   # * type: bool
   drop_field = true
@@ -1732,10 +1802,12 @@ dns_servers = ["0.0.0.0:53"]
 
   # The log field to parse.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
+  field = "parent.child"
+  field = "array[0]"
 
   #
   # Types
@@ -1755,6 +1827,7 @@ dns_servers = ["0.0.0.0:53"]
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
@@ -1823,6 +1896,7 @@ end
   # * default: ["message"]
   # * type: [string]
   merge_fields = ["message"]
+  merge_fields = ["message", "parent.child"]
 
   # The field that indicates that the event is partial. A consequent stream of
   # partial events along with the first non-partial event will be merged together.
@@ -1831,6 +1905,7 @@ end
   # * default: "_partial"
   # * type: string
   partial_event_marker_field = "_partial"
+  partial_event_marker_field = "parent.child"
 
   # An ordered list of fields to distinguish streams by. Each stream has a
   # separate partial event merging state. Should be used to prevent events from
@@ -1840,7 +1915,8 @@ end
   # * optional
   # * default: []
   # * type: [string]
-  stream_discriminant_fields = []
+  stream_discriminant_fields = ["host"]
+  stream_discriminant_fields = ["host", "parent.child"]
 
 # Accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
@@ -1862,9 +1938,15 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If the specified `field` should be dropped (removed) after parsing.
+  # The Regular Expression to apply. Do not include the leading or trailing `/`.
   #
   # * required
+  # * type: string
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+
+  # If the specified `field` should be dropped (removed) after parsing.
+  #
+  # * optional
   # * default: true
   # * type: bool
   drop_field = true
@@ -1872,16 +1954,11 @@ end
 
   # The log field to parse.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
-
-  # The Regular Expression to apply. Do not include the leading or trailing `/`.
-  #
-  # * required
-  # * type: string
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
+  field = "parent.child"
 
   #
   # Types
@@ -1901,6 +1978,7 @@ end
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to remove one or more log fields.
 [transforms.remove_fields]
@@ -1922,7 +2000,7 @@ end
   #
   # * required
   # * type: [string]
-  fields = ["field1", "field2"]
+  fields = ["field1", "field2", "parent.child"]
 
 # Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
@@ -1971,11 +2049,12 @@ end
   #
 
   [transforms.rename_fields.fields]
-    # The name of the field to move. Use `.` for adding nested fields.
+    # Old-key/New-key pair reprsenting the key to be moved.
     #
     # * required
     # * type: *
-    old field name = "new field name"
+    old_field_name = "new_field_name"
+    parent = {old_child_name = "parent.new_child_name"}
 
 # Accepts and outputs `log` events allowing you to sample events with a configurable rate.
 [transforms.sampler]
@@ -2001,9 +2080,17 @@ end
   # * type: int
   rate = 10
 
+  # The name of the log field to use to determine if the event should be passed.
+  # This defaults to the global `message_key` option.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  key_field = "message"
+
   # A list of regular expression patterns to exclude events from sampling. If an
-  # event's `"message"` key matches _any_ of these patterns it will _not_ be
-  # sampled.
+  # event's key field (see `key_field`) matches _any_ of these patterns it will
+  # _not_ be sampled.
   #
   # * optional
   # * no default
@@ -2030,9 +2117,15 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If `true` the `field` will be dropped after parsing.
+  # The field names assigned to the resulting tokens, in order.
   #
   # * required
+  # * type: [string]
+  field_names = ["timestamp", "level", "message", "parent.child"]
+
+  # If `true` the `field` will be dropped after parsing.
+  #
+  # * optional
   # * default: true
   # * type: bool
   drop_field = true
@@ -2040,22 +2133,17 @@ end
 
   # The field to apply the split on.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
-
-  # The field names assigned to the resulting tokens, in order.
-  #
-  # * required
-  # * type: [string]
-  field_names = ["timestamp", "level", "message"]
+  field = "parent.child"
 
   # The separator to split the field on. If no separator is given, it will split
   # on all whitespace. 'Whitespace' is defined according to the terms of the
   # Unicode Derived Core Property `White_Space`.
   #
-  # * required
+  # * optional
   # * default: "[whitespace]"
   # * type: [string]
   separator = ","
@@ -2078,6 +2166,7 @@ end
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 # Accepts and outputs `log` events allowing you to route events across parallel streams using logical filters.
 [transforms.swimlanes]
@@ -2104,11 +2193,13 @@ end
   #
 
   [transforms.swimlanes.lanes]
-    [transforms.swimlanes.lanes.`<swimlane_id>`]
+    [transforms.swimlanes.lanes.`[swimlane-id]`]
       # The type of the condition to execute.
       #
-      # * required
+      # * optional
+      # * default: "check_fields"
       # * type: string
+      # * enum: "check_fields", "is_log", and "is_metric"
       type = "check_fields"
       type = "is_log"
       type = "is_metric"
@@ -2138,6 +2229,75 @@ end
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
 
+      # Checks whether a string field contains a string argument.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.contains" = "foo"
+
+      # Checks whether a string field has a string argument prefix.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "environment.prefix" = "staging-"
+
+# Accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
+[transforms.tag_cardinality_limit]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "tag_cardinality_limit"
+  type = "tag_cardinality_limit"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Controls what approach is used internally to keep track of previously seen
+  # tags and deterime when a tag on an incoming metric exceeds the limit.
+  #
+  # * required
+  # * type: string
+  # * enum: "exact" or "probabilistic"
+  mode = "exact"
+  mode = "probabilistic"
+
+  # The size of the cache in bytes to use to detect duplicate tags. The bigger
+  # the cache the less likely it is to have a 'false positive' or a case where we
+  # allow a new value for tag even after we have reached the configured limits.
+  #
+  # * optional
+  # * default: 5120000
+  # * type: int
+  # * unit: bytes
+  # * relevant when mode = "probabilistic"
+  cache_size_per_tag = 5120000
+
+  # Controls what should happen when a metric comes in with a tag that would
+  # exceed the configured limit on cardinality.
+  #
+  # * optional
+  # * default: "drop_tag"
+  # * type: string
+  # * enum: "drop_tag" or "drop_event"
+  limit_exceeded_action = "drop_tag"
+  limit_exceeded_action = "drop_event"
+
+  # How many distinct values to accept for any given key.
+  #
+  # * optional
+  # * default: 500
+  # * type: int
+  value_limit = 500
+
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
@@ -2158,9 +2318,15 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # If `true` the `field` will be dropped after parsing.
+  # The log field names assigned to the resulting tokens, in order.
   #
   # * required
+  # * type: [string]
+  field_names = ["timestamp", "level", "message", "parent.child"]
+
+  # If `true` the `field` will be dropped after parsing.
+  #
+  # * optional
   # * default: true
   # * type: bool
   drop_field = true
@@ -2168,16 +2334,11 @@ end
 
   # The log field to tokenize.
   #
-  # * required
+  # * optional
   # * default: "message"
   # * type: string
   field = "message"
-
-  # The log field names assigned to the resulting tokens, in order.
-  #
-  # * required
-  # * type: [string]
-  field_names = ["timestamp", "level", "message"]
+  field = "parent.child"
 
   #
   # Types
@@ -2197,6 +2358,7 @@ end
     success = "bool"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
+    parent = {child = "int"}
 
 
 # ------------------------------------------------------------------------------
@@ -2224,6 +2386,14 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * required
+  # * type: string
+  # * required when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
   # The group name of the target CloudWatch Logs stream.
   #
   # * required
@@ -2237,7 +2407,7 @@ end
   #
   # * required
   # * type: string
-  # * relevant when host = ""
+  # * required when endpoint = ""
   region = "us-east-1"
 
   # The stream name of the target CloudWatch Logs stream.
@@ -2273,15 +2443,6 @@ end
   create_missing_stream = true
   create_missing_stream = false
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -2297,7 +2458,7 @@ end
   [sinks.aws_cloudwatch_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -2305,7 +2466,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -2316,9 +2477,17 @@ end
   #
 
   [sinks.aws_cloudwatch_logs.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -2327,20 +2496,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -2360,7 +2521,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -2472,6 +2633,14 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * required
+  # * type: string
+  # * required when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
   # A namespace that will isolate different metrics from each other.
   #
   # * required
@@ -2483,7 +2652,7 @@ end
   #
   # * required
   # * type: string
-  # * relevant when host = ""
+  # * required when endpoint = ""
   region = "us-east-1"
 
   # The ARN of an IAM role to assume at startup.
@@ -2492,15 +2661,6 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2517,7 +2677,7 @@ end
   [sinks.aws_cloudwatch_metrics.batch]
     # The maximum size of a batch, in events, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 20
     # * type: int
     # * unit: events
@@ -2525,7 +2685,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -2551,12 +2711,20 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * required
+  # * type: string
+  # * required when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
-  # * relevant when host = ""
+  # * required when endpoint = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Firehose delivery stream.
@@ -2571,15 +2739,6 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2596,7 +2755,7 @@ end
   [sinks.aws_kinesis_firehose.batch]
     # The maximum size of a batch, in events, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
@@ -2604,7 +2763,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -2615,9 +2774,17 @@ end
   #
 
   [sinks.aws_kinesis_firehose.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -2626,20 +2793,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -2659,7 +2818,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -2771,12 +2930,20 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * required
+  # * type: string
+  # * required when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
-  # * relevant when host = ""
+  # * required when endpoint = ""
   region = "us-east-1"
 
   # The stream name of the target Kinesis Logs stream.
@@ -2792,15 +2959,6 @@ end
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # The log field used as the Kinesis record's partition key value.
   #
   # * optional
@@ -2815,7 +2973,7 @@ end
   [sinks.aws_kinesis_streams.batch]
     # The maximum size of a batch, in events, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
@@ -2823,7 +2981,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -2834,9 +2992,17 @@ end
   #
 
   [sinks.aws_kinesis_streams.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -2845,20 +3011,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -2878,7 +3036,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -3004,12 +3162,20 @@ end
   compression = "gzip"
   compression = "none"
 
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * required
+  # * type: string
+  # * required when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
-  # * relevant when host = ""
+  # * required when endpoint = ""
   region = "us-east-1"
 
   # The ARN of an IAM role to assume at startup.
@@ -3018,15 +3184,6 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3037,47 +3194,7 @@ end
   healthcheck = false
 
   #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  #
-  # * required
-  # * default: true
-  # * type: bool
-  filename_append_uuid = true
-  filename_append_uuid = false
-
-  # The filename extension to use in the object name.
-  #
-  # * required
-  # * default: "log"
-  # * type: string
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  #
-  # * required
-  # * default: "%s"
-  # * type: string
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder".
-  #
-  # * optional
-  # * default: "date=%F/"
-  # * type: string
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
-  # Object Attributes
+  # ACL
   #
 
   # Canned ACL to apply to the created objects. For more information, see Canned
@@ -3131,6 +3248,10 @@ end
   grant_write_acp = "person@email.com"
   grant_write_acp = "http://acs.amazonaws.com/groups/global/AllUsers"
 
+  #
+  # Encryption
+  #
+
   # The server-side encryption algorithm used when storing these objects.
   #
   # * optional
@@ -3148,7 +3269,52 @@ end
   # * optional
   # * no default
   # * type: string
+  # * relevant when server_side_encryption = "aws:kms"
   ssekms_key_id = "abcd1234"
+
+  #
+  # Naming
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  filename_append_uuid = true
+  filename_append_uuid = false
+
+  # The filename extension to use in the object name.
+  #
+  # * optional
+  # * default: "log"
+  # * type: string
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * optional
+  # * default: "%s"
+  # * type: string
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder".
+  #
+  # * optional
+  # * default: "date=%F/"
+  # * type: string
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # Storage
+  #
 
   # The storage class for the created objects. See the S3 Storage Classes for
   # more details.
@@ -3165,14 +3331,6 @@ end
   storage_class = "GLACIER"
   storage_class = "DEEP_ARCHIVE"
 
-  [sinks.aws_s3.tags]
-    # A custom tag to be added to the created objects.
-    #
-    # * optional
-    # * no default
-    # * type: string
-    Tag1 = "Value1"
-
   #
   # Batch
   #
@@ -3180,7 +3338,7 @@ end
   [sinks.aws_s3.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -3188,7 +3346,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 300
     # * type: int
     # * unit: seconds
@@ -3199,9 +3357,17 @@ end
   #
 
   [sinks.aws_s3.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -3210,20 +3376,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -3243,7 +3401,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "ndjson"
+    # * enum: "ndjson" or "text"
     codec = "ndjson"
     codec = "text"
 
@@ -3269,6 +3427,18 @@ end
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
+
+  #
+  # Metadata
+  #
+
+  [sinks.aws_s3.tags]
+    # A custom tag to be added to the created objects.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    Tag1 = "Value1"
 
   #
   # Request
@@ -3358,14 +3528,6 @@ end
   # * type: int
   print_amount = 1000
 
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
 # Batches `log` events to Clickhouse via the `HTTP` Interface.
 [sinks.clickhouse]
   #
@@ -3443,7 +3605,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -3451,7 +3613,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -3462,7 +3624,7 @@ end
   [sinks.clickhouse.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -3470,7 +3632,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3481,9 +3643,17 @@ end
   #
 
   [sinks.clickhouse.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -3492,20 +3662,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -3610,7 +3772,7 @@ end
     timeout_secs = 30
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.clickhouse.tls]
@@ -3680,20 +3842,12 @@ end
 
   # The standard stream to write to.
   #
-  # * required
+  # * optional
   # * default: "stdout"
   # * type: string
   # * enum: "stdout" or "stderr"
   target = "stdout"
   target = "stderr"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
 
   #
   # Encoding
@@ -3704,7 +3858,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -3787,7 +3941,7 @@ end
   [sinks.datadog_metrics.batch]
     # The maximum size of a batch, in events, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 20
     # * type: int
     # * unit: events
@@ -3795,7 +3949,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3890,18 +4044,10 @@ end
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
   # Elasticsearch has removed it.
   #
-  # * required
+  # * optional
   # * default: "_doc"
   # * type: string
   doc_type = "_doc"
-
-  # Index name to write events to.
-  #
-  # * required
-  # * default: "vector-%F"
-  # * type: string
-  index = "application-{{ application_id }}-%Y-%m-%d"
-  index = "vector-%Y-%m-%d"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3918,6 +4064,14 @@ end
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
+
+  # Index name to write events to.
+  #
+  # * optional
+  # * default: "vector-%F"
+  # * type: string
+  index = "application-{{ application_id }}-%Y-%m-%d"
+  index = "vector-%Y-%m-%d"
 
   #
   # Auth
@@ -3936,7 +4090,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -3944,7 +4098,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -3955,7 +4109,7 @@ end
   [sinks.elasticsearch.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -3963,7 +4117,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -3974,9 +4128,17 @@ end
   #
 
   [sinks.elasticsearch.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -3985,20 +4147,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -4126,7 +4280,7 @@ end
     timeout_secs = 60
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.elasticsearch.tls]
@@ -4226,9 +4380,9 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "ndjson"
-    codec = "text"
+    # * enum: "ndjson" or "text"
     codec = "ndjson"
+    codec = "text"
 
     # Prevent the sink from encoding the specified labels.
     #
@@ -4304,46 +4458,6 @@ end
   healthcheck = false
 
   #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  #
-  # * required
-  # * default: true
-  # * type: bool
-  filename_append_uuid = true
-  filename_append_uuid = false
-
-  # The filename extension to use in the object name.
-  #
-  # * required
-  # * default: "log"
-  # * type: string
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  #
-  # * required
-  # * default: "%s"
-  # * type: string
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root GCS "folder".
-  #
-  # * optional
-  # * default: "date=%F/"
-  # * type: string
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
   # Object Attributes
   #
 
@@ -4381,13 +4495,53 @@ end
   storage_class = "ARCHIVE"
 
   #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  filename_append_uuid = true
+  filename_append_uuid = false
+
+  # The filename extension to use in the object name.
+  #
+  # * optional
+  # * default: "log"
+  # * type: string
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * optional
+  # * default: "%s"
+  # * type: string
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root GCS "folder".
+  #
+  # * optional
+  # * default: "date=%F/"
+  # * type: string
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
   # Batch
   #
 
   [sinks.gcp_cloud_storage.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10485760
     # * type: int
     # * unit: bytes
@@ -4395,7 +4549,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 300
     # * type: int
     # * unit: seconds
@@ -4406,9 +4560,17 @@ end
   #
 
   [sinks.gcp_cloud_storage.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4417,20 +4579,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -4450,7 +4604,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "ndjson"
+    # * enum: "ndjson" or "text"
     codec = "ndjson"
     codec = "text"
 
@@ -4543,7 +4697,7 @@ end
     timeout_secs = 60
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.gcp_cloud_storage.tls]
@@ -4667,7 +4821,7 @@ end
   [sinks.gcp_pubsub.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10485760
     # * type: int
     # * unit: bytes
@@ -4675,7 +4829,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -4686,9 +4840,17 @@ end
   #
 
   [sinks.gcp_pubsub.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4697,20 +4859,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -4815,7 +4969,7 @@ end
     timeout_secs = 60
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.gcp_pubsub.tls]
@@ -4966,7 +5120,7 @@ end
   [sinks.gcp_stackdriver_logging.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 5242880
     # * type: int
     # * unit: bytes
@@ -4974,7 +5128,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -4985,9 +5139,17 @@ end
   #
 
   [sinks.gcp_stackdriver_logging.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -4996,20 +5158,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -5142,7 +5296,7 @@ end
     zone = "Twilight"
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.gcp_stackdriver_logging.tls]
@@ -5190,6 +5344,173 @@ end
     verify_certificate = true
     verify_certificate = false
 
+# Batches `log` events to Honeycomb via the batch events API.
+[sinks.honeycomb]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "honeycomb"
+  type = "honeycomb"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The team key that will be used to authenticate against Honeycomb.
+  #
+  # * required
+  # * type: string
+  api_key = "${MY_API_KEY}"
+  api_key = "some-api-key"
+
+  # The dataset that Vector will send logs to.
+  #
+  # * required
+  # * type: string
+  dataset = "my-honeycomb-dataset"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Batch
+  #
+
+  [sinks.honeycomb.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 5242880
+    # * type: int
+    # * unit: bytes
+    max_size = 5242880
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.honeycomb.buffer]
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.honeycomb.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
   #
@@ -5217,6 +5538,16 @@ end
   # * type: string
   uri = "https://10.22.212.22:9000/endpoint"
 
+  # The compression strategy used to compress the encoded event data before
+  # outputting.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -5231,20 +5562,6 @@ end
   # * no default
   # * type: string
   healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  #
-  # requests
-  #
-
-  # The compression strategy used to compress the encoded event data before
-  # outputting.
-  #
-  # * optional
-  # * default: "none"
-  # * type: string
-  # * enum: "none" or "gzip"
-  compression = "none"
-  compression = "gzip"
 
   #
   # Auth
@@ -5262,7 +5579,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -5270,7 +5587,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -5281,7 +5598,7 @@ end
   [sinks.http.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -5289,7 +5606,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -5300,9 +5617,17 @@ end
   #
 
   [sinks.http.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -5311,20 +5636,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -5344,7 +5661,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text", "json", and "ndjson"
+    # * enum: "json", "ndjson", and "text"
     codec = "json"
     codec = "ndjson"
     codec = "text"
@@ -5450,7 +5767,7 @@ end
     timeout_secs = 30
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.http.tls]
@@ -5547,7 +5864,7 @@ end
   [sinks.humio_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -5555,7 +5872,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -5566,9 +5883,17 @@ end
   #
 
   [sinks.humio_logs.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -5577,20 +5902,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -5606,6 +5923,14 @@ end
   #
 
   [sinks.humio_logs.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * must be: "json" (if supplied)
+    codec = "json"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
@@ -5814,7 +6139,7 @@ end
   [sinks.influxdb_metrics.batch]
     # The maximum size of a batch, in events, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 20
     # * type: int
     # * unit: events
@@ -5822,7 +6147,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -5913,8 +6238,9 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # A comma delimited list of host and port pairs that the Kafka client should
-  # contact to bootstrap its cluster metadata.
+  # A comma-separated list of host and port pairs that are the addresses of the
+  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+  # initially to bootstrap itself.
   #
   # * required
   # * type: string
@@ -5933,6 +6259,18 @@ end
   # * required
   # * type: string
   topic = "topic-1234"
+
+  # Compression codec to use for compressing message sets
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none", "gzip", "lz4", "snappy", and "zstd"
+  compression = "none"
+  compression = "gzip"
+  compression = "lz4"
+  compression = "snappy"
+  compression = "zstd"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -5969,6 +6307,7 @@ end
     # * no default
     # * type: string
     "client.id" = "${ENV_VAR}"
+    "fetch.error.backoff.ms" = "1000"
     "socket.send.buffer.bytes" = "100"
 
   #
@@ -5976,9 +6315,17 @@ end
   #
 
   [sinks.kafka.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -5987,20 +6334,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -6020,7 +6359,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -6048,7 +6387,7 @@ end
     timestamp_format = "unix"
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.kafka.tls]
@@ -6180,7 +6519,7 @@ end
   [sinks.logdna.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -6188,7 +6527,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -6199,9 +6538,17 @@ end
   #
 
   [sinks.logdna.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -6210,20 +6557,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -6408,7 +6747,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     password = "${PASSWORD_ENV_VAR}"
     password = "password"
 
@@ -6417,7 +6756,7 @@ end
     #
     # * required
     # * type: string
-    # * relevant when strategy = "basic"
+    # * required when strategy = "basic"
     user = "${USERNAME_ENV_VAR}"
     user = "username"
 
@@ -6428,7 +6767,7 @@ end
   [sinks.loki.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -6436,7 +6775,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -6447,9 +6786,17 @@ end
   #
 
   [sinks.loki.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -6458,20 +6805,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -6492,7 +6831,7 @@ end
     # * optional
     # * default: "json"
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -6597,7 +6936,7 @@ end
     timeout_secs = 60
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.loki.tls]
@@ -6715,7 +7054,7 @@ end
   [sinks.new_relic_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 524000
     # * type: int
     # * unit: bytes
@@ -6723,7 +7062,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -6734,9 +7073,17 @@ end
   #
 
   [sinks.new_relic_logs.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -6745,20 +7092,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -6774,6 +7113,14 @@ end
   #
 
   [sinks.new_relic_logs.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * optional
+    # * default: "json"
+    # * type: string
+    # * must be: "json" (if supplied)
+    codec = "json"
+
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
@@ -6862,6 +7209,116 @@ end
     # * unit: seconds
     timeout_secs = 30
 
+# Streams `log` events to Papertrail via Syslog.
+[sinks.papertrail]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "papertrail"
+  type = "papertrail"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The endpoint to stream logs to.
+  #
+  # * required
+  # * type: string
+  endpoint = "logs.papertrailapp.com:12345"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Buffer
+  #
+
+  [sinks.papertrail.buffer]
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.papertrail.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "json" or "text"
+    codec = "json"
+    codec = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
   # The component type. This is a required field that tells Vector which
@@ -6884,22 +7341,6 @@ end
   # * type: string
   address = "0.0.0.0:9598"
 
-  # Default buckets to use for aggregating distribution metrics into histograms.
-  #
-  # * required
-  # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-  # * type: [float]
-  # * unit: seconds
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-
-  # Time interval between set values are reset.
-  #
-  # * required
-  # * default: 60
-  # * type: int
-  # * unit: seconds
-  flush_period_secs = 60
-
   # A prefix that will be added to all metric names.
   # It should follow Prometheus naming conventions.
   #
@@ -6907,13 +7348,21 @@ end
   # * type: string
   namespace = "service"
 
-  # Enables/disables the sink healthcheck upon start.
+  # Default buckets to use for aggregating distribution metrics into histograms.
   #
   # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
+  # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+  # * type: [float]
+  # * unit: seconds
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+
+  # Time interval between set values are reset.
+  #
+  # * optional
+  # * default: 60
+  # * type: int
+  # * unit: seconds
+  flush_period_secs = 60
 
 # Batches `log` events to Sematext via the Elasticsearch API.
 [sinks.sematext_logs]
@@ -6975,7 +7424,7 @@ end
   [sinks.sematext_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 10490000
     # * type: int
     # * unit: bytes
@@ -6983,7 +7432,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -6994,9 +7443,17 @@ end
   #
 
   [sinks.sematext_logs.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -7005,20 +7462,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -7146,7 +7595,7 @@ end
   #
   # * required
   # * type: string
-  # * relevant when mode = "tcp"
+  # * required when mode = "tcp"
   address = "92.12.333.224:5000"
 
   # The type of socket to use.
@@ -7161,7 +7610,7 @@ end
   #
   # * required
   # * type: string
-  # * relevant when mode = "unix"
+  # * required when mode = "unix"
   path = "/path/to/socket"
 
   # Enables/disables the sink healthcheck upon start.
@@ -7177,9 +7626,17 @@ end
   #
 
   [sinks.socket.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -7188,20 +7645,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -7221,7 +7670,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -7249,7 +7698,7 @@ end
     timestamp_format = "unix"
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.socket.tls]
@@ -7356,6 +7805,14 @@ end
   healthcheck = true
   healthcheck = false
 
+  # The name of the log field to be used as the hostname sent to Splunk HEC. This
+  # overrides the global `host_key` option.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host_key = "hostname"
+
   # Fields to be added to Splunk index.
   #
   # * optional
@@ -7371,7 +7828,7 @@ end
   [sinks.splunk_hec.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1049000
     # * type: int
     # * unit: bytes
@@ -7379,7 +7836,7 @@ end
 
     # The maximum age of a batch before it is flushed.
     #
-    # * required
+    # * optional
     # * default: 1
     # * type: int
     # * unit: seconds
@@ -7390,9 +7847,17 @@ end
   #
 
   [sinks.splunk_hec.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -7401,20 +7866,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -7434,7 +7891,7 @@ end
     #
     # * required
     # * type: string
-    # * enum: "text" or "json"
+    # * enum: "json" or "text"
     codec = "json"
     codec = "text"
 
@@ -7527,7 +7984,7 @@ end
     timeout_secs = 60
 
   #
-  # Tls
+  # TLS
   #
 
   [sinks.splunk_hec.tls]
@@ -7652,9 +8109,17 @@ end
   #
 
   [sinks.vector.buffer]
-    # The buffer's type and storage mechanism.
+    # The maximum size of the buffer on the disk.
     #
     # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
     # * default: "memory"
     # * type: string
     # * enum: "memory" or "disk"
@@ -7663,20 +8128,12 @@ end
 
     # The maximum number of events allowed in the buffer.
     #
-    # * required
+    # * optional
     # * default: 500
     # * type: int
     # * unit: events
     # * relevant when type = "memory"
     max_events = 500
-
-    # The maximum size of the buffer on the disk.
-    #
-    # * required
-    # * type: int
-    # * unit: bytes
-    # * relevant when type = "disk"
-    max_size = 104900000
 
     # The behavior when the buffer becomes full.
     #
@@ -7686,3 +8143,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # TLS
+  #
+
+  [sinks.vector.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false

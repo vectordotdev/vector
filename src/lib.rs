@@ -38,3 +38,26 @@ pub use event::Event;
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub fn get_version() -> String {
+    #[cfg(feature = "nightly")]
+    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+    #[cfg(not(feature = "nightly"))]
+    let pkg_version = built_info::PKG_VERSION;
+
+    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
+    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
+        .unwrap()
+        .format("%Y-%m-%d");
+    let built_string = if let Some(commit_hash) = commit_hash {
+        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
+    } else {
+        built_info::TARGET.into()
+    };
+    format!("{} ({})", pkg_version, built_string)
+}
+
+#[allow(unused)]
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}

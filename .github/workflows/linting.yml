@@ -1,0 +1,12 @@
+name: linting
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+jobs:
+  markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@1.0.0
+      - run: "cd tests && make check-markdown"
