@@ -21681,6 +21681,30 @@ module.exports = {
 
       ]
     },
+    "honeycomb": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "honeycomb_sink",
+      "name": "honeycomb",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",

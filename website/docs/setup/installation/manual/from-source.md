@@ -430,6 +430,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-gcp_cloud_storage` | Enables building of [`gcp_cloud_storage` sink][docs.sinks.gcp_cloud_storage].  |
 | `sinks-gcp_pubsub` | Enables building of [`gcp_pubsub` sink][docs.sinks.gcp_pubsub].  |
 | `sinks-gcp_stackdriver_logging` | Enables building of [`gcp_stackdriver_logging` sink][docs.sinks.gcp_stackdriver_logging].  |
+| `sinks-honeycomb` | Enables building of [`honeycomb` sink][docs.sinks.honeycomb].  |
 | `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
 | `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
 | `sinks-influxdb_metrics` | Enables building of [`influxdb_metrics` sink][docs.sinks.influxdb_metrics].  |
@@ -469,6 +470,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.gcp_cloud_storage]: /docs/reference/sinks/gcp_cloud_storage/
 [docs.sinks.gcp_pubsub]: /docs/reference/sinks/gcp_pubsub/
 [docs.sinks.gcp_stackdriver_logging]: /docs/reference/sinks/gcp_stackdriver_logging/
+[docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [docs.sinks.http]: /docs/reference/sinks/http/
 [docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
 [docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/
