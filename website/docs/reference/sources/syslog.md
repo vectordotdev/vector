@@ -411,19 +411,32 @@ will ignore the presence of a client certificate.
 The `syslog` source ingests data through the Syslog protocol and [outputs `log` events](#output).
 For example:
 
+
+Given the following [Syslog 5424][urls.syslog_5424] log line:
+
+```text
+<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!
+```
+
+A `log` event will be produced with the following structure:
+
 ```javascript
 {
-  "appname": "app-name",
-  "facility": "1",
-  "host": "my.host.com",
-  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
-  "msgid": "ID47",
-  "procid": 8710,
   "severity": "notice",
-  "timestamp": "2019-11-01T21:15:47+00:00",
-  "version": 1
+  "facility": "user",
+  "timestamp": "2020-03-13T20:45:38.119Z",
+  "host": "dynamicwireless.name", // controlled via the [`host_key`](#host_key) option,
+  "appname": "non",
+  "procid": "2426",
+  "msgid": "ID931",
+  "iut": "3",
+  "eventSource": "Application",
+  "eventID": "1011",
+  "message": "Try to override the THX port, maybe it will reboot the neural interface!"
 }
 ```
+
+
 
 More detail on the output schema is below.
 
@@ -499,7 +512,7 @@ the key will not be added.
 
 ### host
 
-The hostname extracted from the  Syslog line. If a hostname is not found, then
+The hostname extracted from the Syslog line. If a hostname is not found, then
 Vector will use the upstream hostname. In the case where [`mode`](#mode) = `"unix"` the
 socket path will be used. This key can be renamed via the [`host_key`](#host_key) option.
 
@@ -564,14 +577,14 @@ will not be added.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[8710]}
+  examples={["8710"]}
   groups={[]}
   name={"procid"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
+  type={"string"}
   unit={null}
   >
 
@@ -657,6 +670,32 @@ then Vector will use the current time.
 
 The version extracted from the Syslog line. If a version is not found, then the
 key will not be added.
+
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"custom_field1":"custom value 1"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  >
+
+### `[field-name]`
+
+In addition to the defined fields, any Syslog 5424 structured fields are parsed
+and inserted as root level fields.
 
 
 
