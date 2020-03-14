@@ -200,7 +200,7 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
-            r#"{"greeting": "hello", "name": "bob"}"#.into()
+            r#" {"greeting": "hello", "name": "bob"}    "#.into()
         );
     }
 
