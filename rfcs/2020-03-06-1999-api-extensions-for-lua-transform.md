@@ -110,7 +110,7 @@ The following example illustrates fields manipulations with the new approach.
   inputs = []
   version = "2"
   hooks.process = """
-    function (event)
+    function (event, emit)
       -- add new field (simple)
       event.new_field = "example"
       -- add new field (nested, overwriting the content of "nested" map)
@@ -138,7 +138,7 @@ The following example illustrates fields manipulations with the new approach.
       -- rename field from "original_field" to "another_field"
       event.original_field, event.another_field = nil, event.original_field
 
-      vector.emit(event)
+      emit(event)
     end
   """
   ```
@@ -166,9 +166,9 @@ This config uses Lua functions defined as inline strings. It is easier to get st
   inputs = []
   version = "2"
   hooks.init = """
-    function init ()
+    function init (emit)
       event_counter = 0
-      vector.emit({
+      emit({
         log = {
           message = "starting up"
         }
@@ -176,13 +176,13 @@ This config uses Lua functions defined as inline strings. It is easier to get st
     end
   """
   hooks.process = """
-    function (event)
+    function (event, emit)
       event_counter = event_counter + 1
     end
   """
   hooks.shutdown = """
-    function shutdown ()
-      vector.emit {
+    function shutdown (emit)
+      emit {
         metric = {
           name = "counter_10s",
           counter = {
@@ -191,7 +191,7 @@ This config uses Lua functions defined as inline strings. It is easier to get st
         }
       }
 
-      vector.emit({
+      emit({
         log = {
           message = "shutting down"
         }
@@ -201,8 +201,8 @@ This config uses Lua functions defined as inline strings. It is easier to get st
   [[timers]]
   interval_seconds = 10
   handler = """
-    function ()
-      vector.emit {
+    function (emit)
+      emit {
         metric = {
           name = "counter_10s",
           counter = {
@@ -225,21 +225,21 @@ This version of the config uses the same Lua code as the config using inline Lua
   inputs = []
   version = "2"
   source = """
-    function init ()
+    function init (emit)
       event_counter = 0
-      vector.emit({
+      emit({
         log = {
           message = "starting up"
         }
       }, "auxiliary")
     end
 
-    function process (event)
+    function process (event, emit)
       event_counter = event_counter + 1
     end
 
-    function shutdown ()
-      vector.emit {
+    function shutdown (emit)
+      emit {
         metric = {
           name = "counter_10s",
           counter = {
@@ -248,15 +248,15 @@ This version of the config uses the same Lua code as the config using inline Lua
         }
       }
 
-      vector.emit({
+      emit({
         log = {
           message = "shutting down"
         }
       }, "auxiliary")
     end
 
-    function timer_handler ()
-      vector.emit {
+    function timer_handler (emit)
+      emit {
         metric = {
           name = "counter_10s",
           counter = {
@@ -279,21 +279,21 @@ In this example the code from the `source` of the example above is put into a se
 
 `example_transform.lua`
 ```lua
-function init ()
+function init (emit)
   event_counter = 0
-  vector.emit({
+  emit({
     log = {
       message = "starting up"
     }
   }, "auxiliary")
 end
 
-function process (event)
+function process (event, emit)
   event_counter = event_counter + 1
 end
 
-function shutdown ()
-  vector.emit {
+function shutdown (emit)
+  emit {
     metric = {
       name = "counter_10s",
       counter = {
@@ -302,15 +302,15 @@ function shutdown ()
     }
   }
 
-  vector.emit({
+  emit({
     log = {
       message = "shutting down"
     }
   }, "auxiliary")
 end
 
-function timer_handler ()
-  vector.emit {
+function timer_handler (emit)
+  emit {
     metric = {
       name = "counter_10s",
       counter = {
@@ -345,10 +345,9 @@ It is [recommended](http://lua-users.org/wiki/ModulesTutorial) to create tables 
 
 `example_transform.lua`
 ```lua
-local emit = vector.emit -- to avoid prefixing the emitting function by "vector."
 local example_transform = {}
 local event_counter = 0
-function example_transform.init ()
+function example_transform.init (emit)
   emit({
     log = {
       message = "starting up"
@@ -356,11 +355,11 @@ function example_transform.init ()
   }, "auxiliary")
 end
 
-function example_transform.process (event)
+function example_transform.process (event, emit)
   event_counter = event_counter + 1
 end
 
-function example_transform.shutdown ()
+function example_transform.shutdown (emit)
   emit {
     metric = {
       name = "counter_10s",
@@ -377,7 +376,7 @@ function example_transform.shutdown ()
   }, "auxiliary")
 end
 
-function example_transform.timer_handler ()
+function example_transform.timer_handler (emit)
   emit {
     metric = {
       name = "counter_10s",
@@ -425,54 +424,45 @@ Hooks are user-defined functions which are called on certain events.
 
 * `init` hook is a function with signature
     ```lua
-    function ()
+    function (emit)
       -- ...
     end
    ```
-   which is called when the transform is created.
-
-   The body of `init` hook or any functions called from it can call the emitting function `vector.emit`.
+   which is called when the transform is created. It takes a single argument, `emit` function, which can be used to produce new events from the hook.
 
 * `shutdown` hook is a function with signature
     ```lua
-    function ()
+    function (emit)
       -- ...
     end
     ```
     which is called when the transform is destroyed, for example on Vector's shutdown. After the shutdown is called, no code from the transform would be called.
-
-   The body of `shutdown` hook or any functions called from it can call the emitting function `vector.emit`.
-
 * `process` hook is a function with signature
     ```lua
-    function (event)
+    function (event, emit)
       -- ...
     end
     ```
-    which takes a single argument, the incoming event. It is called immediately when a new event comes to the transform.
-
-    The body of `process` hook or any functions called from it can call the emitting function `vector.emit`.
+    which takes two arguments, an incoming event and the `emit` function. It is called immediately when a new event comes to the transform.
 
 #### Timers
 
 Timers are user-defined functions called on predefined time interval. The specified time interval sets the minimal interval between subsequent invocations of the same timer function.
 
-The timer handler functions have the following signature:
+The timer functions have the following signature:
 
 
 ```lua
-function ()
+function (emit)
   -- ...
 end
 ```
 
-The body of a timer handler or any functions called from it can call the emitting function `vector.emit`.
+The `emit` argument is an emitting function which allows the timer to produce new events.
 
-#### Emitting Function
+#### Emitting Functions
 
-The emitting function is a function called `emit` in a globally exposed module `vector` (can be called as `vector.emit`).
-
-It has the following signature:
+Emitting function is a function that can be passed to a hook or timer. It has the following signature:
 
 ```lua
 function (event, lane)
@@ -483,7 +473,7 @@ end
 Here `event` is an encoded event to be produced by the transform, and `lane` is an optional parameter specifying the output lane. In order to read events produced by the transform on a certain lane, the downstream components have to use the name of the transform suffixed by `.` character and the name of the lane.
 
 **Example**
-> The emitting function is called from a transform component called `example_transform` with `lane` parameter set to `example_lane`. Then the downstream `console` sink have to be defined as the following to be able to read the emitted event:
+> An emitting function is called from a transform component called `example_transform` with `lane` parameter set to `example_lane`. Then the downstream `console` sink have to be defined as the following to be able to read the emitted event:
 >    ```toml
 >    [sinks.example_console]
 >      type = "console"
@@ -491,12 +481,6 @@ Here `event` is an encoded event to be produced by the transform, and `lane` is 
 >      encoding = "text"
 >    ```
 > Other components connected to the same transform, but with different lanes names or without lane names at all would not receive any event.
-
-**Note**
-
-The emitting function can be called from hooks or timer handlers, but not from the initialization code.
-
-The reason why it can be called only from them, but not from the initialization code, is that the initialization code has to evaluated when the transform instance is created from the config, in order to display parsing errors to the user before the processing started. On the other hand, in order to emit events, the [`transform_stream`](https://github.com/timberio/vector/blob/7c7c221b70e56135e93ef893faf4a184d109bf15/src/transforms/mod.rs#L66-L83) function has to be called and the output stream has to be created, which happens later.
 
 ### Event Schema
 
@@ -678,10 +662,10 @@ The new configuration options are the following:
 | `version` | yes | `2` | In order to use the proposed API, the config has to contain `version` option set to `2`. If it is not provided, Vector assumes that [API version 1](https://vector.dev/docs/reference/transforms/lua/) is used. |
 | `search_dirs` | no | `["/etc/vector/lua"]` | A list of directories where [`require`](https://www.lua.org/pil/8.1.html) function would look at if called from any part of the Lua code. |
 | `source` | no | `example_module = require("example_module")` | Lua source evaluated when the transform is created. It can call `require` function or define variables and handler functions inline. It is **not** called for each event like the [`source` parameter in version 1 of the transform](https://vector.dev/docs/reference/transforms/lua/#source) |
-| `hooks`.`init` | no | `example_function` or `function () ... end` | Contains a Lua expression evaluating to `init` hook function. |
-| `hooks`.`shutdown` | no | `example_function` or `function () ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
-| `hooks`.`process` | yes | `example_function` or `function (event) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
-| `timers` | no | `[{interval_seconds = 10, handler = "example_function"}]` or `[{interval_seconds = 10, handler = "function () ... end"}]` | Contains an [array of tables](https://github.com/toml-lang/toml#user-content-array-of-tables). Each table in the array has two fields, `interval_seconds` which can take an integer number of seconds, and `handler`, which is a Lua expression evaluating to a handler function for the timer. |
+| `hooks`.`init` | no | `example_function` or `function (emit) ... end` | Contains a Lua expression evaluating to `init` hook function. |
+| `hooks`.`shutdown` | no | `example_function` or `function (emit) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
+| `hooks`.`process` | yes | `example_function` or `function (event, emit) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
+| `timers` | no | `[{interval_seconds = 10, handler = "example_function"}]` or `[{interval_seconds = 10, handler = "function (emit) ... end"}]` | Contains an [array of tables](https://github.com/toml-lang/toml#user-content-array-of-tables). Each table in the array has two fields, `interval_seconds` which can take an integer number of seconds, and `handler`, which is a Lua expression evaluating to a handler function for the timer. |
 
 ## Sales Pitch
 
