@@ -33,6 +33,7 @@ impl BatchEventsConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct BatchSettings {
     pub size: usize,
     pub timeout: Duration,
@@ -102,6 +103,7 @@ where
     }
 
     pub fn from_settings(inner: S, batch: B, settings: BatchSettings) -> Self {
+        println!("settings: {:?}", settings);
         Self::new_min(inner, batch, settings.size, settings.timeout.into())
     }
 

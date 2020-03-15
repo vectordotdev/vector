@@ -11,7 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
-use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use futures01::{Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::header::HeaderValue;
 use http::{Request, StatusCode};
 use hyper::body::{Body, Payload};
@@ -90,8 +90,14 @@ where
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        if self.slot.is_some() {
+            self.poll_complete()?;
+            return Ok(AsyncSink::NotReady(item));
+        }
+
         if let Some(item) = self.sink.encode_event(item) {
             if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.poll_complete()?;
                 self.slot = Some(item);
             }
         }
@@ -100,6 +106,14 @@ where
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        if let Some(item) = self.slot.take() {
+            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.slot = Some(item);
+                self.inner.poll_complete()?;
+                return Ok(Async::NotReady);
+            }
+        }
+
         self.inner.poll_complete()
     }
 }
