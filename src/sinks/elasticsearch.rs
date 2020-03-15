@@ -168,7 +168,6 @@ impl HttpSink for ElasticSearchCommon {
             &event,
         );
 
-        println!("event: {}", action);
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
 
@@ -223,7 +222,6 @@ impl HttpSink for ElasticSearchCommon {
                 builder.header("Authorization", &auth[..]);
             }
 
-            println!("REQUEST len: {}", events.len());
             builder.body(events).unwrap()
         }
     }
@@ -564,7 +562,6 @@ mod integration_tests {
             .json::<elastic_responses::search::SearchResponse<Value>>()
             .unwrap();
 
-        println!("response {:?}", response);
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
