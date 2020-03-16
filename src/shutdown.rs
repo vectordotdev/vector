@@ -1,8 +1,8 @@
 use crate::runtime;
-use futures01::{future, stream::Stream, Async, Future};
+use futures01::{future, Async, Future};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::timer;
 
@@ -172,17 +172,12 @@ impl ShutdownCoordinator {
     /// notify the shutdown_complete_tripwire for this source before the dealine, then signals
     /// the shutdown_force_trigger for this source to force it to shut down.  Returns whether
     /// or not the source shutdown gracefully.
-    // TODO: The timing and reporting logic is very similar to the logic in
-    // `RunningTopology::stop()`. Once `RunningTopology::stop()` has been updated to utilize the
-    // ShutdownCoordinator, see if some of this logic can be de-duped.
     pub fn shutdown_source_end(
         &mut self,
         rt: &mut runtime::Runtime,
         name: String,
         deadline: Instant,
     ) -> bool {
-        let name2 = name.clone();
-        let name3 = name.clone();
         let shutdown_complete_tripwire =
             self.shutdown_complete_tripwires
                 .remove(&name)
@@ -195,64 +190,26 @@ impl ShutdownCoordinator {
             name
         ));
 
-        let success = shutdown_complete_tripwire.map(move |_| {
-            info!("Source \"{}\" shut down successfully", name);
-        });
+        let success = shutdown_complete_tripwire.map(move |_| true);
         let timeout = timer::Delay::new(deadline)
             .map(move |_| {
                 error!(
                     "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
-                    name2,
+                    name,
                 );
+                false
             })
             .map_err(|err| panic!("Timer error: {:?}", err));
-        let reporter = timer::Interval::new_interval(Duration::from_secs(5))
-            .inspect(move |_| {
-                let time_remaining = if deadline > Instant::now() {
-                    format!(
-                        "{} seconds remaining",
-                        (deadline - Instant::now()).as_secs()
-                    )
-                } else {
-                    "overdue".to_string()
-                };
 
-                info!(
-                    "Still waiting on source \"{}\" to shut down. {}",
-                    name3, time_remaining,
-                );
-            })
-            .filter(|_| false) // Run indefinitely without emitting items
-            .into_future()
-            .map(|_| ())
-            .map_err(|(err, _)| panic!("Timer error: {:?}", err));
-
-        let union = future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
-            Box::new(success),
-            Box::new(timeout),
-            Box::new(reporter),
-        ]);
-
-        // Now block until one of the futures resolves and use the index of the resolved future
-        // to decide whether it was the success or timeout future that resolved first.
-        let index = match rt.block_on(union) {
-            Ok((_, index, _)) => index,
-            Err((err, _, _)) => panic!(
-                "Error from select_all future while waiting for source to shut down: {:?}",
+        let union = success.select(timeout);
+        let success = match rt.block_on(union) {
+            Ok((result, _remaining_future)) => result,
+            Err((err, _)) => panic!(
+                "Error from select future while waiting for source to shut down: {:?}",
                 err
             ),
         };
 
-        let success = if index == 0 {
-            true
-        } else if index == 1 {
-            false
-        } else {
-            panic!(
-                "Neither success nor timeout future finished.  Index finished: {}",
-                index
-            );
-        };
         if success {
             shutdown_force_trigger.disable();
         } else {

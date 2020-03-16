@@ -230,29 +230,47 @@ impl RunningTopology {
         // First pass to tell the sources to shut down.
         for name in &sources_to_remove {
             info!("Removing source {:?}", name);
-
-            self.tasks.remove(name).unwrap().forget();
-
-            self.remove_outputs(name);
-            self.shutdown_source_begin(name);
+            self.shutdown_coordinator.shutdown_source_begin(name);
         }
         for name in &sources_to_change {
             info!("Rebuilding source {:?}", name);
-
-            self.remove_outputs(name);
-            self.shutdown_source_begin(name);
+            self.shutdown_coordinator.shutdown_source_begin(name);
         }
 
         // Second pass to wait for the shutdowns to complete
         // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
         // more like 30-60 seconds.
         info!("Waiting for up to 3 seconds for sources to finish shutting down");
-        let deadline = Instant::now() + Duration::from_secs(3);
+        let source_shutdown_deadline = Instant::now() + Duration::from_secs(3);
         for name in &sources_to_remove {
-            self.shutdown_source_end(rt, name, deadline.clone());
+            self.shutdown_coordinator.shutdown_source_end(
+                rt,
+                name.to_string(),
+                source_shutdown_deadline,
+            );
+            self.source_tasks.remove(name).wait().unwrap();
+
+            // When the source shuts down it closes its output channel, which should cause the
+            // associated 'task' to drain and shut down as well.
+            let task = self.tasks.remove(name).unwrap().wait();
+            if task.is_err() {
+                warn!("Error draining output task for source {}", name);
+            }
+            self.remove_outputs(name);
         }
         for name in &sources_to_change {
-            self.shutdown_source_end(rt, name, deadline);
+            self.shutdown_coordinator.shutdown_source_end(
+                rt,
+                name.to_string(),
+                source_shutdown_deadline,
+            );
+            self.source_tasks.remove(name).wait().unwrap();
+            self.remove_outputs(name);
+
+            // Leave the 'task' running.  For sources the body of the source is the task living
+            // in 'source_tasks'.  The task in 'tasks' is just for piping the source's output
+            // to the components that have it as an input.  The call to `self.spawn_source` will
+            // wind up replacing this task internally.
 
             self.setup_outputs(name, &mut new_pieces);
             self.spawn_source(name, &mut new_pieces, rt);
@@ -269,12 +287,23 @@ impl RunningTopology {
         let (transforms_to_remove, transforms_to_change, transforms_to_add) =
             to_remove_change_add(&self.config.transforms, &new_config.transforms);
 
-        for name in transforms_to_remove {
+        // First pass to signal transforms to shut down
+        for name in &transforms_to_remove {
             info!("Removing transform {:?}", name);
 
-            self.tasks.remove(&name).unwrap().forget();
+            // This drops the output channel to this transform from all of this transform's inputs.
+            // That will cause the input stream for this transform to drain and then close, which
+            // signals the transform to shut down.
+            self.remove_inputs(name);
+        }
 
-            self.remove_inputs(&name);
+        for name in transforms_to_remove {
+            // Wait for transform to drain.
+            let task = self.tasks.remove(&name).unwrap().wait();
+            if task.is_err() {
+                warn!("Error draining task for transform {}", name);
+            }
+
             self.remove_outputs(&name);
         }
 
@@ -290,7 +319,15 @@ impl RunningTopology {
         for name in transforms_to_change {
             info!("Rebuilding transform {:?}", name);
 
+            // Signal existing version of transform to shut down.
             self.replace_inputs(&name, &mut new_pieces);
+
+            // Wait for transform to drain.
+            let task = self.tasks.remove(&name).unwrap().wait();
+            if task.is_err() {
+                warn!("Error draining task for transform {}", name);
+            }
+
             self.spawn_transform(&name, &mut new_pieces, rt);
         }
 
@@ -308,16 +345,32 @@ impl RunningTopology {
         for name in sinks_to_remove {
             info!("Removing sink {:?}", name);
 
-            self.tasks.remove(&name).unwrap().forget();
-
+            // This drops the output channel to this sink from all of this sink's inputs.
+            // That will cause the input stream for this sink to drain and then close, which
+            // signals the sink to shut down.
             self.remove_inputs(&name);
+
+            // Wait for sink to drain.
+            let task = self.tasks.remove(&name).unwrap().wait();
+            if task.is_err() {
+                warn!("Error draining task for sink {}", name);
+            }
         }
 
         for name in sinks_to_change {
             info!("Rebuilding sink {:?}", name);
 
-            self.spawn_sink(&name, &mut new_pieces, rt);
+            // Signal existing version of sink to shut down.
             self.replace_inputs(&name, &mut new_pieces);
+
+            // Wait for sink to drain.
+            let task = self.tasks.remove(&name).unwrap().wait();
+            if task.is_err() {
+                warn!("Error draining task for sink {}", name);
+            }
+
+            // Spawn new version of sink.
+            self.spawn_sink(&name, &mut new_pieces, rt);
         }
 
         for name in sinks_to_add {
@@ -384,19 +437,6 @@ impl RunningTopology {
             name.to_string(),
             oneshot::spawn(source_task, &rt.executor()),
         );
-    }
-
-    /// Informs a Source that it should shut down, but does not wait for the shutdown to complete.
-    fn shutdown_source_begin(&mut self, name: &str) {
-        self.shutdown_coordinator.shutdown_source_begin(name);
-    }
-
-    /// Waits for the Source to finish shutting down until a given deadline and then forcibly shuts
-    /// down the source if it hasn't finished by then.
-    fn shutdown_source_end(&mut self, rt: &mut runtime::Runtime, name: &str, deadline: Instant) {
-        self.shutdown_coordinator
-            .shutdown_source_end(rt, name.to_string(), deadline);
-        self.source_tasks.remove(name).wait().unwrap();
     }
 
     fn remove_outputs(&mut self, name: &str) {
