@@ -46,6 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   end
   """ # required
   search_dirs = ["/etc/vector/lua"] # optional, no default
+  version = "1" # optional, default
 ```
 
 ## Options
@@ -102,6 +103,31 @@ A list of directories search when loading a Lua file via the `require` function.
 The inline Lua source to evaluate.
 
  See [Global Variables](#global-variables) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={"1"}
+  enumValues={{"1":"transform API version 1"}}
+  examples={["1"]}
+  groups={[]}
+  name={"version"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### version
+
+transform API version
+
+
 
 
 </Field>

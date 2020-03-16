@@ -122,6 +122,7 @@ scopes:
   - gcp_cloud_storage sink
   - gcp_pubsub sink
   - gcp_stackdriver_logging sink
+  - honeycomb sink
   - http sink
   - humio_logs sink
   - influxdb_metrics sink

@@ -303,6 +303,7 @@ sinks = [
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
+  "sinks-honeycomb",
   "sinks-http",
   "sinks-humio_logs",
   "sinks-influxdb_metrics",
@@ -330,6 +331,7 @@ sinks-datadog_metrics = []
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
+sinks-honeycomb = ["sinks-http"]
 sinks-http = ["bytesize"]
 sinks-humio_logs = ["sinks-splunk_hec"]
 sinks-influxdb_metrics = []
