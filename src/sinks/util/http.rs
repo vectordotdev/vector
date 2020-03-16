@@ -37,6 +37,19 @@ pub trait HttpSink: Send + Sync + 'static {
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>>;
 }
 
+/// Provides a simple wrapper around internal tower and
+/// batching sinks for http.
+///
+/// This type wraps some `HttpSink` and some `Batch` type
+/// and will apply request, batch and tls settings. Internally,
+/// it holds an Arc reference to the `HttpSink`. It then exposes
+/// a `Sink` interface that can be returned from `SinkConfig`.
+///
+/// Implementation details we require to buffer a single item due
+/// to how `Sink` works. This is because we must "encode" the type
+/// to be able to send it to the inner batch type and sink. Because of
+/// this we must provide a single buffer slot. To ensure the buffer is
+/// fully flushed make sure `poll_complete` returns ready.
 pub struct BatchedHttpSink<T, B: Batch>
 where
     B::Output: Clone,

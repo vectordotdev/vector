@@ -1,10 +1,11 @@
 use crate::{
+    dns::Resolver,
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
     sinks::util::{
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpClient, HttpSink},
         BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -13,7 +14,6 @@ use chrono::{DateTime, Utc};
 use futures01::Future;
 use http::{uri::InvalidUri, StatusCode, Uri};
 use hyper;
-use hyper_openssl::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -23,6 +23,7 @@ use std::sync::atomic::{
     AtomicI64,
     Ordering::{Acquire, Release},
 };
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -109,7 +110,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = healthcheck(self.clone())?;
+        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
 
         let batch = self.batch.unwrap_or(20, 1);
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -162,18 +163,17 @@ impl HttpSink for DatadogSink {
     }
 }
 
-fn healthcheck(config: DatadogConfig) -> crate::Result<super::Healthcheck> {
+fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
     let uri = format!("{}/api/v1/validate?api_key={}", config.host, config.api_key)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = hyper::Client::builder().build(https);
+    let mut client = HttpClient::new(resolver, None)?;
 
     let healthcheck = client
-        .request(request)
+        .call(request)
         .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
