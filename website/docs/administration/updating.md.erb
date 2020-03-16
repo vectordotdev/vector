@@ -6,17 +6,17 @@ description: How to update Vector to a newer version.
 Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides it's own "Updating" section:
 
----
+## Installation Method
 <%- metadata.installation.to_h.slice(:containers, :package_managers).each do |category, methods| -%>
 
-**<%= category.to_s.humanize %>**
+### <%= category.to_s.humanize %>
 
 <%- methods.each do |method| -%>
 <Jump to="[[[docs.<%= category %>.<%= method["id"] %>#updating]]]"><%= method["name"] %></Jump>
 <%- end -%>
 <%- end -%>
 
-**Manual**
+### Manual
 
 <Jump to="[[[docs.manual.from_archives#updating]]]">Updating from archives</Jump>
 <Jump to="[[[docs.manual.from_source#updating]]]">Updating from source</Jump>

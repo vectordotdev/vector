@@ -3739,6 +3739,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "syslog"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a5d8ef1b679c07976f3ee336a436453760c470f54b5e7237556728b8589515d"
+dependencies = [
+ "error-chain",
+ "libc",
+ "log",
+ "time",
+]
+
+[[package]]
 name = "syslog_loose"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4734,6 +4746,7 @@ dependencies = [
  "string_cache",
  "strip-ansi-escapes",
  "structopt",
+ "syslog",
  "syslog_loose",
  "tempfile",
  "tokio",

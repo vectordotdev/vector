@@ -10,13 +10,23 @@ requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "sampler") %>
 
+[transforms.sampler.options.key_field]
+type = "string"
+common = false
+examples = ["message"]
+required = false
+description = """\
+The name of the log field to use to determine if the event should be passed. \
+This defaults to the [global `message_key` option][docs.reference.global-options#message_key].\
+"""
+
 [transforms.sampler.options.pass_list]
 type = "[string]"
 common = true
 examples = [["[error]", "field2"]]
 description = """\
 A list of regular expression patterns to exclude events from sampling. \
-If an event's `"message"` key matches _any_ of these patterns it will \
+If an event's key field (see `key_field`) matches _any_ of these patterns it will \
 _not_ be sampled.\
 """
 

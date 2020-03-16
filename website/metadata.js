@@ -21705,6 +21705,30 @@ module.exports = {
 
       ]
     },
+    "honeycomb": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "honeycomb_sink",
+      "name": "honeycomb",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "http": {
       "beta": false,
       "delivery_guarantee": "at_least_once",
@@ -21867,6 +21891,30 @@ module.exports = {
       ],
       "service_providers": [
         "New Relic"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "papertrail": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "papertrail_sink",
+      "name": "papertrail",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
       ],
       "status": "beta",
       "type": "sink",

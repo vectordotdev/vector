@@ -58,7 +58,11 @@ import Field from '@site/src/components/Field';
 
 ### data_dir
 
-The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
+The directory used for persisting Vector state, such as on-disk buffers, file
+checkpoints, and more. Please make sure the Vector project has write
+permissions to this dir.
+
+ See [Data Directory](#data-directory) for more info.
 
 
 </Field>
@@ -81,7 +85,12 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
 
 ### dns_servers
 
-The list of DNS servers Vector will use to resolve DNS requests. When set Vector will ignore the system configuration and use only the list of DNS servers provided. If this option is not set then Vector will attempt to use the system configuration.
+The list of DNS servers Vector will use to resolve DNS requests. When set
+Vector will ignore the system configuration and use only the list of DNS
+servers provided. If this option is not set then Vector will attempt to use the
+system configuration.
+
+
 
 
 </Field>
@@ -104,7 +113,9 @@ The list of DNS servers Vector will use to resolve DNS requests. When set Vector
 
 ### log_schema
 
-The default log schema that all Vector components operate on. See the [log data model page][docs.data-model.log] for more info.
+The default log schema that all Vector components operate on. See the [log data
+model page][docs.data-model.log] for more info.
+
 
 
 <Fields filters={false}>
@@ -127,7 +138,10 @@ The default log schema that all Vector components operate on. See the [log data 
 
 #### host_key
 
-The key used to hold the log host. See the [log data model page][docs.data-model.log#host] for more info.
+The key used to hold the log host. See the [log data model
+page][docs.data-model.log#host] for more info.
+
+
 
 
 </Field>
@@ -150,7 +164,10 @@ The key used to hold the log host. See the [log data model page][docs.data-model
 
 #### message_key
 
-The key used to hold the log message. See the [log data model page][docs.data-model.log#message] for more info.
+The key used to hold the log message. See the [log data model
+page][docs.data-model.log#message] for more info.
+
+
 
 
 </Field>
@@ -173,7 +190,10 @@ The key used to hold the log message. See the [log data model page][docs.data-mo
 
 #### timestamp_key
 
-The key used to represent when the log was generated. See the [log data model page][docs.data-model.log#timestamp] for more info.
+The key used to represent when the log was generated. See the [log data model
+page][docs.data-model.log#timestamp] for more info.
+
+
 
 
 </Field>

@@ -25,6 +25,8 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
+#[cfg(feature = "sinks-honeycomb")]
+pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
 pub mod http;
 #[cfg(feature = "sinks-humio_logs")]
@@ -39,6 +41,8 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
+#[cfg(feature = "sinks-papertrail")]
+pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sinks-sematext_logs")]

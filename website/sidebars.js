@@ -237,6 +237,8 @@ module.exports = {
             
               "reference/sinks/gcp_stackdriver_logging",
             
+              "reference/sinks/honeycomb",
+            
               "reference/sinks/http",
             
               "reference/sinks/humio_logs",
@@ -250,6 +252,8 @@ module.exports = {
               "reference/sinks/loki",
             
               "reference/sinks/new_relic_logs",
+            
+              "reference/sinks/papertrail",
             
               "reference/sinks/prometheus",
             

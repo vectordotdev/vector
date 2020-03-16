@@ -10,6 +10,14 @@ requirements = {}
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "lua") %>
 
+[transforms.lua.options.version]
+type = "string"
+common = true
+required = false
+description = "transform API version"
+default = "1"
+enum = { 1 = "transform API version 1" }
+
 [transforms.lua.options.source]
 type = "string"
 common = true
