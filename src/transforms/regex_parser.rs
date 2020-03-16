@@ -22,7 +22,7 @@ pub struct RegexParserConfig {
     pub drop_field: bool,
     pub drop_failed: bool,
     pub target_field: Option<Atom>,
-    #[derivative(Default(value = "false"))]
+    #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
     pub types: HashMap<Atom, String>,
 }
@@ -334,7 +334,10 @@ mod tests {
         let log = do_transform(
             message,
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
-            r#"target_field = "message""#,
+            r#"
+               target_field = "message"
+               overwrite_target = false
+            "#,
         )
         .unwrap();
 
@@ -350,7 +353,6 @@ mod tests {
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
             r#"
                target_field = "message"
-               overwrite_target = true
                drop_field = false
             "#,
         )

@@ -1910,10 +1910,10 @@ end
   # target, it will only be overwritten if this is set to `true`.
   #
   # * optional
-  # * default: false
+  # * default: true
   # * type: bool
-  overwrite_target = false
   overwrite_target = true
+  overwrite_target = false
 
   # If this setting is present, the parsed fields will be inserted into the log
   # as a sub-object with this name. If a field with the same name already exists,

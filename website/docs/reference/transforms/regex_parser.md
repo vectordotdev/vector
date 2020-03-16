@@ -70,7 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   drop_field = true # optional, default
   field = "message" # optional, default
-  overwrite_target = false # optional, default
+  overwrite_target = true # optional, default
   target_field = "root_field" # optional, no default
 
   # Types
@@ -142,9 +142,9 @@ The log field to parse. See [Failed Parsing](#failed-parsing) and [Field Notatio
 
 <Field
   common={false}
-  defaultValue={false}
+  defaultValue={true}
   enumValues={null}
-  examples={[false,true]}
+  examples={[true,false]}
   groups={[]}
   name={"overwrite_target"}
   path={null}
