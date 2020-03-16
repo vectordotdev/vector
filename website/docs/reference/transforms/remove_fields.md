@@ -35,6 +35,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
   fields = ["field1", "field2", "parent.child"] # required
+  drop_empty = false # optional, default
 ```
 
 ## Options
@@ -44,6 +45,32 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"drop_empty"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### drop_empty
+
+If set to `true`, after removing fields, remove any parent objects that are now
+empty.
+
+
+
+
+</Field>
 
 
 <Field

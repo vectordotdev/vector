@@ -35,6 +35,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   type = "rename_fields" # required
   inputs = ["my-source-id"] # required
+  drop_empty = false # optional, default
 
   # Fields
   fields.old_field_name = "new_field_name" # example
@@ -48,6 +49,32 @@ import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
+
+
+<Field
+  common={true}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"drop_empty"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### drop_empty
+
+If set to `true`, after renaming fields, remove any parent objects of the old
+field that are now empty.
+
+
+
+
+</Field>
 
 
 <Field

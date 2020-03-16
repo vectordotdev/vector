@@ -12,11 +12,13 @@ use toml::value::Value as TomlValue;
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
-    pub fields: IndexMap<String, TomlValue>,
+    fields: IndexMap<String, TomlValue>,
+    drop_empty: Option<bool>,
 }
 
 pub struct RenameFields {
     fields: IndexMap<Atom, Atom>,
+    drop_empty: bool,
 }
 
 inventory::submit! {
@@ -26,7 +28,10 @@ inventory::submit! {
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
     fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RenameFields::new(self.fields.clone())?))
+        Ok(Box::new(RenameFields::new(
+            self.fields.clone(),
+            self.drop_empty.unwrap_or(false),
+        )?))
     }
 
     fn input_type(&self) -> DataType {
@@ -43,12 +48,13 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<String, TomlValue>) -> crate::Result<Self> {
+    pub fn new(fields: IndexMap<String, TomlValue>, drop_empty: bool) -> crate::Result<Self> {
         Ok(RenameFields {
             fields: fields
                 .into_iter()
                 .map(|kv| flatten(kv, None))
                 .collect::<crate::Result<_>>()?,
+            drop_empty,
         })
     }
 }
@@ -93,7 +99,7 @@ impl Transform for RenameFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            if let Some(v) = log.remove(&old_key) {
+            if let Some(v) = log.remove_prune(&old_key, self.drop_empty) {
                 log.insert(new_key.clone(), v)
             }
         }
@@ -117,7 +123,7 @@ mod tests {
         fields.insert("to_move".into(), "moved".into());
         fields.insert("not_present".into(), "should_not_exist".into());
 
-        let mut transform = RenameFields::new(fields).unwrap();
+        let mut transform = RenameFields::new(fields, false).unwrap();
 
         let new_event = transform.transform(event).unwrap();
 
