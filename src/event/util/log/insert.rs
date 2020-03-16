@@ -42,10 +42,10 @@ where
 {
     match (path_iter.next(), path_iter.peek()) {
         (Some(PathComponent::Index(current)), None) => {
-            while values.len() < current {
+            while values.len() <= current {
                 values.push(Value::Null);
             }
-            values.insert(current, value);
+            values[current] = value;
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Key(_))) => {
             if let Some(Value::Map(map)) = values.get_mut(current) {
@@ -53,10 +53,10 @@ where
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
-                while values.len() < current {
+                while values.len() <= current {
                     values.push(Value::Null);
                 }
-                values.insert(current, Value::Map(map));
+                values[current] = Value::Map(map);
             }
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Index(next))) => {
@@ -65,10 +65,10 @@ where
             } else {
                 let mut array = Vec::with_capacity(next + 1);
                 array_insert(&mut array, path_iter, value);
-                while values.len() < current {
+                while values.len() <= current {
                     values.push(Value::Null);
                 }
-                values.insert(current, Value::Array(array));
+                values[current] = Value::Array(array);
             }
         }
         _ => return,
@@ -101,11 +101,12 @@ mod test {
     fn test_insert_array() {
         let mut fields = BTreeMap::new();
         insert(&mut fields, "a.b[0].c[2]".into(), Value::Integer(10));
+        insert(&mut fields, "a.b[0].c[0]".into(), Value::Integer(5));
 
         let expected = fields_from_json(json!({
             "a": {
                 "b": [{
-                    "c": [null, null, 10]
+                    "c": [5, null, 10]
                 }]
             }
         }));
