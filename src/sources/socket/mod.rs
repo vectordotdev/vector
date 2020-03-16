@@ -296,10 +296,9 @@ mod test {
         );
 
         // Now signal to the Source to shut down.
-        shutdown.shutdown_source_begin(source_name);
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -349,10 +348,9 @@ mod test {
             );
         }
 
-        shutdown.shutdown_source_begin(source_name);
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
@@ -517,10 +515,9 @@ mod test {
         );
 
         // Now signal to the Source to shut down.
-        shutdown.shutdown_source_begin(source_name);
-        let deadline = Instant::now() + Duration::from_secs(1000);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -557,10 +554,9 @@ mod test {
             );
         }
 
-        shutdown.shutdown_source_begin(source_name);
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.

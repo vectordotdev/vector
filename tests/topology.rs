@@ -3,15 +3,19 @@ extern crate tracing;
 
 pub mod support;
 
-use crate::support::{sink, sink_failing_healthcheck, source, transform};
-use futures01::{
-    future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::oneshot,
+use crate::support::{
+    sink, sink_failing_healthcheck, sink_with_buffer_size, source, transform, MockSourceConfig,
 };
-use std::iter;
+use futures01::{
+    future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::mpsc::SendError,
+    sync::oneshot,
+};
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
+use std::time::Duration;
+use std::{iter, thread};
 use vector::event::{self, Event};
 use vector::test_util::{runtime, shutdown_on_idle, trace_init};
 use vector::topology;
@@ -37,6 +41,63 @@ fn into_message(event: Event) -> String {
         .get(&event::log_schema().message_key())
         .unwrap()
         .to_string_lossy()
+}
+
+#[test]
+fn topology_shutdown_while_active() {
+    let source_event_counter = Arc::new(AtomicUsize::new(0));
+    let source_event_total = source_event_counter.clone();
+
+    let mut rt = runtime();
+    let (in1, rx) = futures01::sync::mpsc::channel(1000);
+
+    let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
+    let transform1 = transform(" transformed", 0.0);
+    let (out1, sink1) = sink_with_buffer_size(10);
+
+    let mut config = Config::empty();
+    config.add_source("in1", source1);
+    config.add_transform("t1", &["in1"], transform1);
+    config.add_sink("out1", &["t1"], sink1);
+
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+
+    let pump_future = iter_ok::<_, SendError<vector::event::Event>>(iter::from_fn(move || {
+        Some(Event::from("test"))
+    }))
+    .forward(in1);
+    let pump_handle = oneshot::spawn(pump_future, &rt.executor());
+
+    // Wait until at least 100 events have been seen by the source so we know the pump is running
+    // and pushing events through the pipeline.
+    while source_event_total.load(Ordering::SeqCst) < 100 {
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    // Now shut down the RunningTopology while Events are still being processed.
+    let stop_complete = oneshot::spawn(topology.stop(), &rt.executor());
+
+    // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
+    // as the source should shut down and close its output channel.
+    let processed_events = out1.collect().wait().unwrap();
+    assert_eq!(
+        processed_events.len(),
+        source_event_total.load(Ordering::Relaxed)
+    );
+    for event in processed_events {
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            "test transformed".into()
+        );
+    }
+
+    rt.block_on(stop_complete).unwrap();
+
+    // We expect the pump to fail with an error since we shut down the source it was sending to
+    // while it was running.
+    let _err: SendError<Event> = rt.block_on(pump_handle).unwrap_err();
+
+    shutdown_on_idle(rt);
 }
 
 #[test]
