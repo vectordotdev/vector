@@ -60,6 +60,7 @@ import TabItem from '@theme/TabItem';
     ```bat
     msiexec /i vector-x64.msi /quiet
     ```
+
 3.  Navigate to the Vector directory:
 
     ```bat
@@ -89,7 +90,7 @@ Once you've found the version you'd like to install you can re-follow the
 
 The Vector configuration file is placed in:
 
-```
+```text
 %ProgramFiles%\Vector\config\vector.toml
 ```
 

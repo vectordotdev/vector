@@ -34,6 +34,9 @@ check-fmt: ## Checks code formatting correctness
 	@scripts/run.sh checker scripts/check-style.sh
 	@scripts/run.sh checker cargo fmt -- --check
 
+check-markdown: ## Check Markdown style
+	@scripts/run.sh checker-markdown markdownlint .
+
 check-generate: ## Checks for pending `make generate` changes
 	@scripts/run.sh checker scripts/check-generate.sh
 

@@ -6,7 +6,7 @@ use crate::{
             encoding::{
                 skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
             },
-            http::{https_client, HttpRetryLogic, HttpService},
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
             BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::HashMap;
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -135,21 +136,21 @@ impl StackdriverConfig {
             .expect("Unexpected encoded wrapper format")
             + SPLICE_OFFSET;
 
-        let http_service = HttpService::builder(cx.resolver())
-            .tls_settings(tls_settings)
-            .build(move |mut logs: Vec<u8>| {
-                logs.pop(); // Strip the trailing comma
+        let build_request = move |mut logs: Vec<u8>| {
+            logs.pop(); // Strip the trailing comma
 
-                let mut body = wrapper.clone().into_bytes();
-                body.splice(wrapper_splice..wrapper_splice, logs);
+            let mut body = wrapper.clone().into_bytes();
+            body.splice(wrapper_splice..wrapper_splice, logs);
 
-                let mut request = make_request(body);
-                if let Some(creds) = creds.as_ref() {
-                    creds.apply(&mut request);
-                }
+            let mut request = make_request(body);
+            if let Some(creds) = creds.as_ref() {
+                creds.apply(&mut request);
+            }
 
-                request
-            });
+            request
+        };
+
+        let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
 
         let sink = request
             .batch_sink(HttpRetryLogic, http_service, cx.acker())
@@ -170,16 +171,15 @@ impl StackdriverConfig {
             creds.apply(&mut request);
         }
 
-        let client = https_client(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
+        let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
         let creds = creds.clone();
-        let healthcheck =
-            client
-                .request(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    creds,
-                    HealthcheckError::NotFound.into(),
-                ));
+        let healthcheck = client
+            .call(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                creds,
+                HealthcheckError::NotFound.into(),
+            ));
 
         Ok(Box::new(healthcheck))
     }

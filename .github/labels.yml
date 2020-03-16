@@ -243,6 +243,9 @@
 - name: "transform: concat"
   description: Anything `concat` transform related
   color: 54a0ff
+- name: "transform: dedupe"
+  description: Anything `dedupe` transform related
+  color: 54a0ff
 - name: "transform: field_filter"
   description: Anything `field_filter` transform related
   color: 54a0ff
@@ -287,6 +290,9 @@
   color: 54a0ff
 - name: "transform: swimlanes"
   description: Anything `swimlanes` transform related
+  color: 54a0ff
+- name: "transform: tag_cardinality_limit"
+  description: Anything `tag_cardinality_limit` transform related
   color: 54a0ff
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
@@ -334,6 +340,9 @@
 - name: "sink: gcp_stackdriver_logging"
   description: Anything `gcp_stackdriver_logging` sink related
   color: 4ddbfb
+- name: "sink: honeycomb"
+  description: Anything `honeycomb` sink related
+  color: 4ddbfb
 - name: "sink: http"
   description: Anything `http` sink related
   color: 4ddbfb
@@ -354,6 +363,9 @@
   color: 4ddbfb
 - name: "sink: new_relic_logs"
   description: Anything `new_relic_logs` sink related
+  color: 4ddbfb
+- name: "sink: papertrail"
+  description: Anything `papertrail` sink related
   color: 4ddbfb
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related

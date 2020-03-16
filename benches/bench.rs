@@ -499,6 +499,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         &["parser"],
                         transforms::sampler::SamplerConfig {
                             rate: 10,
+                            key_field: None,
                             pass_list: vec![],
                         },
                     );

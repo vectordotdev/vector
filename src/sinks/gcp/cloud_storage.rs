@@ -5,7 +5,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{https_client, HttpsClient},
+            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
             SinkExt, TowerRequestConfig,
@@ -38,7 +38,7 @@ const BASE_URL: &str = "https://storage.googleapis.com/";
 #[derive(Clone)]
 struct GcsSink {
     bucket: String,
-    client: HttpsClient,
+    client: HttpClient,
     creds: Option<GcpCredentials>,
     base_url: String,
     settings: RequestSettings,
@@ -171,7 +171,7 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = GcsSink::new(self, &cx)?;
+        let mut sink = GcsSink::new(self, &cx)?;
         let healthcheck = sink.healthcheck()?;
         let service = sink.service(self, &cx)?;
 
@@ -202,7 +202,7 @@ impl GcsSink {
         let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = https_client(cx.resolver(), tls)?;
+        let client = HttpClient::new(cx.resolver(), tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
@@ -244,7 +244,7 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(&self) -> crate::Result<Healthcheck> {
+    fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
         let mut builder = Request::builder();
         builder.method(Method::HEAD);
         builder.uri(self.base_url.parse::<Uri>()?);
@@ -256,7 +256,7 @@ impl GcsSink {
 
         let healthcheck =
             self.client
-                .request(request)
+                .call(request)
                 .map_err(Into::into)
                 .and_then(healthcheck_response(
                     self.creds.clone(),
@@ -273,7 +273,7 @@ impl GcsSink {
 impl Service<RequestWrapper> for GcsSink {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
-    type Future = hyper::client::ResponseFuture;
+    type Future = HttpClientFuture;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -308,7 +308,7 @@ impl Service<RequestWrapper> for GcsSink {
             creds.apply(&mut request);
         }
 
-        self.client.request(request)
+        self.client.call(request)
     }
 }
 

@@ -1450,6 +1450,60 @@ dns_servers = ["0.0.0.0:53"]
   joiner = "_"
   joiner = "+"
 
+# Accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache.
+[transforms.dedupe]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "dedupe"
+  type = "dedupe"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  #
+  # Cache
+  #
+
+  [transforms.dedupe.cache]
+    # The number of recent Events to cache and compare new incoming Events against.
+    #
+    # * optional
+    # * default: 5000
+    # * type: int
+    num_events = 5000
+
+  #
+  # Fields
+  #
+
+  [transforms.dedupe.fields]
+    # The field names to ignore when deciding if an Event is a duplicate.
+    # Incompatible with the `fields.match` option.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    ignore = ["field1", "parent.child_field"]
+
+    # The field names considered when deciding if an Event is a duplicate. This can
+    # also be globally set via the global `log_schema` options.Incompatible with
+    # the `fields.ignore` option.
+    #
+    # * optional
+    # * default: ["timestamp", "host", "message"]
+    # * type: [string]
+    match = ["field1", "parent.child_field"]
+
 # Accepts and outputs `log` events allowing you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type. This is a required field that tells Vector which
@@ -1815,6 +1869,14 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
+  # transform API version
+  #
+  # * optional
+  # * default: "1"
+  # * type: string
+  # * must be: "1" (if supplied)
+  version = "1"
+
 # Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]
   # The component type. This is a required field that tells Vector which
@@ -2045,9 +2107,17 @@ end
   # * type: int
   rate = 10
 
+  # The name of the log field to use to determine if the event should be passed.
+  # This defaults to the global `message_key` option.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  key_field = "message"
+
   # A list of regular expression patterns to exclude events from sampling. If an
-  # event's `"message"` key matches _any_ of these patterns it will _not_ be
-  # sampled.
+  # event's key field (see `key_field`) matches _any_ of these patterns it will
+  # _not_ be sampled.
   #
   # * optional
   # * no default
@@ -2201,6 +2271,59 @@ end
       # * type: string
       # * relevant when type = "check_fields"
       "environment.prefix" = "staging-"
+
+# Accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
+[transforms.tag_cardinality_limit]
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "tag_cardinality_limit"
+  type = "tag_cardinality_limit"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # Controls what approach is used internally to keep track of previously seen
+  # tags and deterime when a tag on an incoming metric exceeds the limit.
+  #
+  # * required
+  # * type: string
+  # * enum: "exact" or "probabilistic"
+  mode = "exact"
+  mode = "probabilistic"
+
+  # The size of the cache in bytes to use to detect duplicate tags. The bigger
+  # the cache the less likely it is to have a 'false positive' or a case where we
+  # allow a new value for tag even after we have reached the configured limits.
+  #
+  # * optional
+  # * default: 5120000
+  # * type: int
+  # * unit: bytes
+  # * relevant when mode = "probabilistic"
+  cache_size_per_tag = 5120000
+
+  # Controls what should happen when a metric comes in with a tag that would
+  # exceed the configured limit on cardinality.
+  #
+  # * optional
+  # * default: "drop_tag"
+  # * type: string
+  # * enum: "drop_tag" or "drop_event"
+  limit_exceeded_action = "drop_tag"
+  limit_exceeded_action = "drop_event"
+
+  # How many distinct values to accept for any given key.
+  #
+  # * optional
+  # * default: 500
+  # * type: int
+  value_limit = 500
 
 # Accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
@@ -5248,6 +5371,173 @@ end
     verify_certificate = true
     verify_certificate = false
 
+# Batches `log` events to Honeycomb via the batch events API.
+[sinks.honeycomb]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "honeycomb"
+  type = "honeycomb"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The team key that will be used to authenticate against Honeycomb.
+  #
+  # * required
+  # * type: string
+  api_key = "${MY_API_KEY}"
+  api_key = "some-api-key"
+
+  # The dataset that Vector will send logs to.
+  #
+  # * required
+  # * type: string
+  dataset = "my-honeycomb-dataset"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Batch
+  #
+
+  [sinks.honeycomb.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 5242880
+    # * type: int
+    # * unit: bytes
+    max_size = 5242880
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.honeycomb.buffer]
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.honeycomb.request]
+    # The maximum number of in-flight requests allowed at any given time.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: int
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests.
+    #
+    # * optional
+    # * default: -1
+    # * type: int
+    retry_attempts = -1
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: int
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 60
+
 # Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
   #
@@ -6946,6 +7236,116 @@ end
     # * unit: seconds
     timeout_secs = 30
 
+# Streams `log` events to Papertrail via Syslog.
+[sinks.papertrail]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "papertrail"
+  type = "papertrail"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The endpoint to stream logs to.
+  #
+  # * required
+  # * type: string
+  endpoint = "logs.papertrailapp.com:12345"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  #
+  # Buffer
+  #
+
+  [sinks.papertrail.buffer]
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: int
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: int
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Encoding
+  #
+
+  [sinks.papertrail.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "json" or "text"
+    codec = "json"
+    codec = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
   # The component type. This is a required field that tells Vector which
@@ -7432,6 +7832,14 @@ end
   healthcheck = true
   healthcheck = false
 
+  # The name of the log field to be used as the hostname sent to Splunk HEC. This
+  # overrides the global `host_key` option.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  host_key = "hostname"
+
   # Fields to be added to Splunk index.
   #
   # * optional
@@ -7762,3 +8170,70 @@ end
     # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
+
+  #
+  # TLS
+  #
+
+  [sinks.vector.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_path` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_path = "/path/to/host_certificate.key"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false

@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{https_client, Auth, BatchedHttpSink, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
@@ -19,6 +19,7 @@ use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -243,10 +244,10 @@ fn healthcheck(
         auth.apply(&mut request);
     }
 
-    let client = https_client(resolver, tls_settings)?;
+    let mut client = HttpClient::new(resolver, tls_settings)?;
 
     let healthcheck = client
-        .request(request)
+        .call(request)
         .map_err(|err| err.into())
         .and_then(|response| {
             use hyper::StatusCode;

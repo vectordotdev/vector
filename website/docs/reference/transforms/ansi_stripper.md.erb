@@ -19,7 +19,7 @@
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= fields(component.env_vars_list) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%-end %>
 ## How It Works [[sort]]

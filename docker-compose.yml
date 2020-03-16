@@ -123,6 +123,16 @@ services:
       user: $USER
       command: ./scripts/check-style.sh
 
+    check-markdown:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/checker-markdown/Dockerfile
+      volumes:
+        - $PWD:$PWD
+      working_dir: $PWD
+      user: $USER
+      command: markdownlint .
+
     check-generate:
       build:
         context: .
