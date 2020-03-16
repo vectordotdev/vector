@@ -84,15 +84,15 @@ fn encode_event(
     let log = event.as_mut_log();
 
     if let Some(message) = log.remove(&log_schema().message_key()) {
-        log.insert("message".into(), message);
+        log.insert("message", message);
     }
 
     if let Some(timestamp) = log.remove(&log_schema().timestamp_key()) {
-        log.insert("date".into(), timestamp);
+        log.insert("date", timestamp);
     }
 
     if let Some(host) = log.remove(&log_schema().host_key()) {
-        log.insert("host".into(), host);
+        log.insert("host", host);
     }
 
     if let Some(bytes) = util::encode_event(event, encoding) {
