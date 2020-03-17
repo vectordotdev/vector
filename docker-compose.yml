@@ -524,7 +524,6 @@ services:
       command: bin/pulsar standalone
       ports:
         - "6650:6650"
-        - "8080:8080"
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:

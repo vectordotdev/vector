@@ -12,15 +12,13 @@ use pulsar::{
     proto::CommandSendReceipt, Authentication, Producer, ProducerOptions, Pulsar, SubType,
 };
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::{collections::HashSet, path::PathBuf};
+use snafu::{ResultExt, Snafu};
+use std::collections::HashSet;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("creating pulsar producer failed: {}", source))]
-    PulsarSinkFailed { source: pulsar::Error },
-    #[snafu(display("invalid path: {:?}", path))]
-    InvalidPath { path: PathBuf },
+    CreatePulsarSink { source: pulsar::Error },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -29,14 +27,13 @@ pub struct PulsarSinkConfig {
     topic: String,
     encoding: Encoding,
     batch_size: Option<u32>,
-    #[serde(flatten)]
     auth: Option<AuthConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AuthConfig {
-    auth_name: String,  // "token"
-    auth_token: String, // <jwt token>
+    name: String,  // "token"
+    token: String, // <jwt token>
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
@@ -46,7 +43,7 @@ pub enum Encoding {
     Json,
 }
 
-pub struct PulsarSink {
+struct PulsarSink {
     topic: String,
     encoding: Encoding,
     producer: Producer,
@@ -59,7 +56,7 @@ pub struct PulsarSink {
     acker: Acker,
 }
 
-pub type SendFuture =
+type SendFuture =
     Box<dyn Future<Item = CommandSendReceipt, Error = pulsar::Error> + 'static + Send>;
 
 inventory::submit! {
@@ -90,10 +87,12 @@ impl PulsarSink {
         exec: TaskExecutor,
     ) -> crate::Result<Self> {
         let auth = config.auth.map(|auth| Authentication {
-            name: auth.auth_name,
-            data: auth.auth_token.as_bytes().to_vec(),
+            name: auth.name,
+            data: auth.token.as_bytes().to_vec(),
         });
-        let pulsar = Pulsar::new(config.address.parse()?, auth, exec).wait()?;
+        let pulsar = Pulsar::new(config.address.parse()?, auth, exec)
+            .wait()
+            .context(CreatePulsarSink)?;
         let producer = pulsar.producer(Some(ProducerOptions {
             batch_size: config.batch_size,
             ..ProducerOptions::default()

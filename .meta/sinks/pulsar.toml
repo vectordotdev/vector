@@ -20,9 +20,7 @@ type = "string"
 common = true
 examples = ["127.0.0.1:6650"]
 required = true
-description = """\
-A host and port pair that the pulsar client should connect to.
-"""
+description = "A host and port pair that the pulsar client should connect to."
 
 [sinks.pulsar.options.topic]
 type = "string"
@@ -36,27 +34,20 @@ type = "int"
 common = false
 examples = [1000, 5]
 required = false
-description = """\
-An optional batch size for sending messages. Cannot exceeed `4294967295`.
-"""
-
-[sinks.pulsar.options.pulsar]
-type = "table"
-common = true
-description = "An optional auth token that can be passed to pulsar"
+description = "An optional batch size for sending messages. Cannot exceeed `4294967295`"
 
 [sinks.pulsar.options.auth]
 type = "table"
 common = false
 description = "Options for the authentication strategy."
 
-[sinks.pulsar.options.auth.children.auth_name]
+[sinks.pulsar.options.auth.children.name]
 type = "string"
 examples = ["${NAME_ENV_VAR}", "name123"]
 required = false
 description = "The basic authentication name."
 
-[sinks.pulsar.options.auth.children.auth_token]
+[sinks.pulsar.options.auth.children.token]
 type = "string"
 examples = ["${TOKEN_ENV_VAR}", "123456789"]
 required = false

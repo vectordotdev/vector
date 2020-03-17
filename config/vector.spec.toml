@@ -7215,15 +7215,13 @@ end
   # * type: string
   topic = "topic-1234"
 
-  # An optional batch size for sending messages. Cannot exceeed `4294967295`.
+  # An optional batch size for sending messages. Cannot exceeed `4294967295`
   #
   # * optional
   # * no default
   # * type: int
   batch_size = 1000
   batch_size = 5
-
-  [sinks.pulsar.pulsar]
 
   #
   # Auth
@@ -7235,16 +7233,16 @@ end
     # * optional
     # * no default
     # * type: string
-    auth_name = "${NAME_ENV_VAR}"
-    auth_name = "name123"
+    name = "${NAME_ENV_VAR}"
+    name = "name123"
 
     # The basic authentication password.
     #
     # * optional
     # * no default
     # * type: string
-    auth_token = "${TOKEN_ENV_VAR}"
-    auth_token = "123456789"
+    token = "${TOKEN_ENV_VAR}"
+    token = "123456789"
 
   #
   # Encoding

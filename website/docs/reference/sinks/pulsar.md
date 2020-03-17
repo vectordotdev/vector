@@ -1,7 +1,7 @@
 ---
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
-description: "The Vector [`pulsar`](#pulsar) sink streams `log` events to Apache Pulsar via the Pulsar protocol."
+description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+pulsar%22
@@ -15,7 +15,7 @@ title: "Apache Pulsar Sink"
 unsupported_operating_systems: []
 ---
 
-The Vector [`pulsar`](#pulsar) sink
+The Vector `pulsar` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to [Apache
 Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 
@@ -49,7 +49,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   address = "127.0.0.1:6650" # required
   topic = "topic-1234" # required
-  pulsar = nil # optional, no default
 
   # Encoding
   encoding.codec = "json" # required
@@ -66,11 +65,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   address = "127.0.0.1:6650" # required
   topic = "topic-1234" # required
   batch_size = 1000 # optional, no default
-  pulsar = nil # optional, no default
 
   # Auth
-  auth.auth_name = "${NAME_ENV_VAR}" # optional, no default
-  auth.auth_token = "${TOKEN_ENV_VAR}" # optional, no default
+  auth.name = "${NAME_ENV_VAR}" # optional, no default
+  auth.token = "${TOKEN_ENV_VAR}" # optional, no default
 
   # Encoding
   encoding.codec = "json" # required
@@ -146,7 +144,7 @@ Options for the authentication strategy.
   enumValues={null}
   examples={["${NAME_ENV_VAR}","name123"]}
   groups={[]}
-  name={"auth_name"}
+  name={"name"}
   path={"auth"}
   relevantWhen={null}
   required={false}
@@ -155,7 +153,7 @@ Options for the authentication strategy.
   unit={null}
   >
 
-#### auth_name
+#### name
 
 The basic authentication name.
 
@@ -171,7 +169,7 @@ The basic authentication name.
   enumValues={null}
   examples={["${TOKEN_ENV_VAR}","123456789"]}
   groups={[]}
-  name={"auth_token"}
+  name={"token"}
   path={"auth"}
   relevantWhen={null}
   required={false}
@@ -180,7 +178,7 @@ The basic authentication name.
   unit={null}
   >
 
-#### auth_token
+#### token
 
 The basic authentication password.
 
@@ -212,7 +210,7 @@ The basic authentication password.
 
 ### batch_size
 
-An optional batch size for sending messages. Cannot exceeed `4294967295`.
+An optional batch size for sending messages. Cannot exceeed `4294967295`
 
 
 
@@ -353,31 +351,6 @@ How to format event timestamps.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"pulsar"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### pulsar
-
-An optional auth token that can be passed to pulsar
-
- See [Streaming](#streaming) for more info.
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["topic-1234"]}
   groups={[]}
   name={"topic"}
@@ -435,7 +408,7 @@ If you'd like to disable health checks for this sink you can set the
 
 ### Streaming
 
-The [`pulsar`](#pulsar) sink streams data on a real-time
+The `pulsar` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
 
