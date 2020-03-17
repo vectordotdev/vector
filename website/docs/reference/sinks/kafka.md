@@ -27,6 +27,17 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
      website/docs/reference/sinks/kafka.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Kafka version >= 0.8 is required.
+
+
+</Alert>
+
 ## Configuration
 
 import Tabs from '@theme/Tabs';
@@ -104,19 +115,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* Kafka version >= 0.8 is required.
-
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 

@@ -38,8 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   value = "/var/log/nginx.log" # required
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';

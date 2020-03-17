@@ -27,6 +27,18 @@ ingests data through the [Docker engine daemon][urls.docker_daemon] and
      website/docs/reference/sources/docker.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Docker API version >= 1.24 is required.
+* The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
+
+
+</Alert>
+
 ## Configuration
 
 import Tabs from '@theme/Tabs';
@@ -69,20 +81,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* Docker API version >= 1.24 is required.
-* The [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this source to work. See the [Docker Integration Strategy section](#docker-integration-strategy) for more info.
-
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 

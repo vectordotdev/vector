@@ -37,8 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   fields = ["field1", "field2", "parent.child"] # required
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
