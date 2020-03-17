@@ -1,22 +1,15 @@
 use super::Transform;
 use crate::{
-    conditions::{CheckFieldsConfig, Condition, ConditionConfig},
+    conditions::{AnyCondition, Condition},
     event::Event,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-enum FilterCondition {
-    FromType(Box<dyn ConditionConfig>),
-    NoTypeCondition(CheckFieldsConfig),
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct FilterConfig {
-    condition: FilterCondition,
+    condition: AnyCondition,
 }
 
 inventory::submit! {
@@ -26,10 +19,7 @@ inventory::submit! {
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Filter::new(match &self.condition {
-            FilterCondition::FromType(c) => c.build()?,
-            FilterCondition::NoTypeCondition(c) => c.build()?,
-        })))
+        Ok(Box::new(Filter::new(self.condition.build()?)))
     }
 
     fn input_type(&self) -> DataType {
