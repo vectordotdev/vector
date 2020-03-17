@@ -1,6 +1,6 @@
 module.exports = {
   title: 'Vector',
-  tagline: 'A High-Performance, Logs, Metrics, & Events Router',
+  tagline: 'A lightweight and ultra-fast tool for building observability pipelines',
   url: 'https://vector.dev',
   baseUrl: '/',
   favicon: 'img/favicon.ico',
@@ -124,9 +124,6 @@ module.exports = {
         href: 'https://timber.io/',
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
-    },
-    googleAnalytics: {
-      trackingID: 'UA-79173230-9',
     },
     algolia: {
       apiKey: '2356c5cb76b57b43624c6450b0a031cc',

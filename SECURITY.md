@@ -14,7 +14,7 @@ That's why we apply widely accepted best practices when it comes to security.
 This document will describe these practices and aims to be as transparent as
 possible on our security efforts.
 
-<!-- MarkdownTOC autolink="true" style="ordered" -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Project Structure](#project-structure)
    1. [Transparency](#transparency)

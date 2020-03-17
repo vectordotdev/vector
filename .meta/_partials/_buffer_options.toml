@@ -1,14 +1,18 @@
 <%- groups ||= [] -%>
+<%- common ||= false -%>
 [<%= namespace %>.buffer]
 type = "table"
-groups = <%= groups.to_json %>
+category = "Buffer"
+common = <%= common.to_toml %>
+groups = <%= groups.to_toml %>
 description = "Configures the sink specific buffer behavior."
 
 [<%= namespace %>.buffer.children.max_events]
 type = "int"
+common = true
 default = 500
+groups = <%= groups.to_toml %>
 relevant_when = {type = "memory"}
-required = true
 unit = "events"
 description = """\
 The maximum number of [events][docs.data-model] allowed in the buffer.\
@@ -16,7 +20,9 @@ The maximum number of [events][docs.data-model] allowed in the buffer.\
 
 [<%= namespace %>.buffer.children.max_size]
 type = "int"
+common = false
 examples = [104900000]
+groups = <%= groups.to_toml %>
 relevant_when = {type = "disk"}
 required = true
 unit = "bytes"
@@ -24,8 +30,9 @@ description = "The maximum size of the buffer on the disk."
 
 [<%= namespace %>.buffer.children.type]
 type = "string"
+common = true
 default = "memory"
-required = true
+groups = <%= groups.to_toml %>
 sort = 1
 description = "The buffer's type and storage mechanism."
 
@@ -35,7 +42,9 @@ disk = "Stores the sink's buffer on disk. This is less performant, but durable. 
 
 [<%= namespace %>.buffer.children.when_full]
 type = "string"
+common = false
 default = "block"
+groups = <%= groups.to_toml %>
 description = "The behavior when the buffer becomes full."
 
 [<%= namespace %>.buffer.children.when_full.enum]

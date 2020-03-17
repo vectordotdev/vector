@@ -1,9 +1,11 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     event::{self, Event},
+    serde::to_string,
     sinks::{
         util::{
-            http::{https_client, HttpsClient},
+            encoding::{EncodingConfig, EncodingConfiguration},
+            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
             SinkExt, TowerRequestConfig,
@@ -36,7 +38,7 @@ const BASE_URL: &str = "https://storage.googleapis.com/";
 #[derive(Clone)]
 struct GcsSink {
     bucket: String,
-    client: HttpsClient,
+    client: HttpClient,
     creds: Option<GcpCredentials>,
     base_url: String,
     settings: RequestSettings,
@@ -48,7 +50,7 @@ enum GcsError {
     BucketNotFound { bucket: String },
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GcsSinkConfig {
     bucket: String,
@@ -59,7 +61,7 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
     compression: Compression,
     #[serde(default)]
     batch: BatchBytesConfig,
@@ -68,6 +70,26 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     auth: GcpAuthConfig,
     tls: Option<TlsOptions>,
+}
+
+#[cfg(test)]
+fn default_config(e: Encoding) -> GcsSinkConfig {
+    GcsSinkConfig {
+        bucket: Default::default(),
+        acl: Default::default(),
+        storage_class: Default::default(),
+        metadata: Default::default(),
+        key_prefix: Default::default(),
+        filename_time_format: Default::default(),
+        filename_append_uuid: Default::default(),
+        filename_extension: Default::default(),
+        encoding: e.into(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        auth: Default::default(),
+        tls: Default::default(),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
@@ -102,11 +124,9 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 enum Encoding {
-    #[derivative(Default)]
     Text,
     Ndjson,
 }
@@ -145,13 +165,13 @@ impl Compression {
 }
 
 inventory::submit! {
-    SinkDescription::new::<GcsSinkConfig>(NAME)
+    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
 }
 
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = GcsSink::new(self, &cx)?;
+        let mut sink = GcsSink::new(self, &cx)?;
         let healthcheck = sink.healthcheck()?;
         let service = sink.service(self, &cx)?;
 
@@ -182,7 +202,7 @@ impl GcsSink {
         let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = https_client(cx.resolver(), tls)?;
+        let client = HttpClient::new(cx.resolver(), tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
@@ -224,7 +244,7 @@ impl GcsSink {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(&self) -> crate::Result<Healthcheck> {
+    fn healthcheck(&mut self) -> crate::Result<Healthcheck> {
         let mut builder = Request::builder();
         builder.method(Method::HEAD);
         builder.uri(self.base_url.parse::<Uri>()?);
@@ -236,7 +256,7 @@ impl GcsSink {
 
         let healthcheck =
             self.client
-                .request(request)
+                .call(request)
                 .map_err(Into::into)
                 .and_then(healthcheck_response(
                     self.creds.clone(),
@@ -253,7 +273,7 @@ impl GcsSink {
 impl Service<RequestWrapper> for GcsSink {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
-    type Future = hyper::client::ResponseFuture;
+    type Future = HttpClientFuture;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -288,13 +308,8 @@ impl Service<RequestWrapper> for GcsSink {
             creds.apply(&mut request);
         }
 
-        self.client.request(request)
+        self.client.call(request)
     }
-}
-
-fn to_string(value: impl Serialize) -> String {
-    let value = serde_json::to_value(value).unwrap();
-    value.as_str().unwrap().into()
 }
 
 #[derive(Clone, Debug)]
@@ -360,7 +375,7 @@ impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
         let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
-        let content_type = HeaderValue::from_str(config.encoding.content_type()).unwrap();
+        let content_type = HeaderValue::from_str(config.encoding.codec.content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
@@ -405,10 +420,11 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     key_prefix: &Template,
-    encoding: &Encoding,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -419,16 +435,15 @@ fn encode_event(
             );
         })
         .ok()?;
-
     let log = event.into_log();
-    let bytes = match encoding {
+    let bytes = match encoding.codec {
         Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        &Encoding::Text => {
+        Encoding::Text => {
             let mut bytes = log
                 .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
@@ -479,8 +494,12 @@ mod tests {
     fn gcs_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes =
-            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
+        let bytes = encode_event(
+            message.clone().into(),
+            &batch_time_format,
+            &Encoding::Text.into(),
+        )
+        .unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -494,7 +513,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
@@ -517,7 +536,7 @@ mod tests {
             filename_extension: extension.map(Into::into),
             filename_append_uuid: Some(uuid),
             compression: compression,
-            ..Default::default()
+            ..default_config(Encoding::Ndjson)
         })
         .expect("Could not create request settings")
     }

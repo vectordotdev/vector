@@ -1,5 +1,6 @@
 pub mod batch;
 pub mod buffer;
+pub mod encoding;
 pub mod http;
 pub mod retries;
 #[cfg(feature = "rusoto_core")]
@@ -15,6 +16,7 @@ pub mod uri;
 use crate::buffers::Acker;
 use crate::event::{self, Event};
 use bytes::Bytes;
+use encoding::{EncodingConfig, EncodingConfiguration};
 use futures01::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
@@ -46,10 +48,11 @@ pub enum Encoding {
 * the given encoding.  If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
+pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
 
-    let b = match encoding {
+    let b = match encoding.codec {
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log

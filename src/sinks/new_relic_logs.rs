@@ -1,6 +1,9 @@
 use crate::{
-    sinks::http::{Encoding, HttpMethod, HttpSinkConfig},
-    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
+    sinks::http::{HttpMethod, HttpSinkConfig},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfigWithDefault},
+        BatchBytesConfig, Compression, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
@@ -25,12 +28,14 @@ pub enum NewRelicLogsRegion {
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+#[derivative(Default)]
 pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
-
+    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
 
@@ -40,6 +45,27 @@ pub struct NewRelicLogsConfig {
 
 inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Json,
+}
+
+impl Into<crate::sinks::http::Encoding> for Encoding {
+    fn into(self) -> crate::sinks::http::Encoding {
+        crate::sinks::http::Encoding::Json
+    }
+}
+
+// There is another one of these in `util::encoding`, but this one is specialized for New Relic.
+/// For encodings, answers "Is it possible to skip serializing this value, because it's the
+/// default?"
+pub(crate) fn skip_serializing_if_default(e: &EncodingConfigWithDefault<Encoding>) -> bool {
+    e.codec == Encoding::default()
 }
 
 #[typetag::serde(name = "new_relic_logs")]
@@ -97,14 +123,17 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: Some(headers),
             compression: Some(Compression::None),
-            encoding: Encoding::Json,
+            encoding: EncodingConfig {
+                codec: self.encoding.codec.clone().into(),
+                only_fields: self.encoding.only_fields.clone(),
+                except_fields: self.encoding.except_fields.clone(),
+                timestamp_format: self.encoding.timestamp_format.clone(),
+            },
 
             batch,
             request,
 
             tls: None,
-
-            ..Default::default()
         })
     }
 }
@@ -148,7 +177,7 @@ mod tests {
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding, Encoding::Json);
+        assert_eq!(http_config.encoding.codec, Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(5u64) as usize)
@@ -179,7 +208,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding, Encoding::Json);
+        assert_eq!(http_config.encoding.codec, Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)
@@ -216,7 +245,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding, Encoding::Json);
+        assert_eq!(http_config.encoding.codec, Encoding::Json.into());
         assert_eq!(
             http_config.batch.max_size,
             Some(bytesize::mib(8u64) as usize)

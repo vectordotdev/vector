@@ -88,6 +88,7 @@ scopes:
   - aws_ec2_metadata transform
   - coercer transform
   - concat transform
+  - dedupe transform
   - field_filter transform
   - geoip transform
   - grok_parser transform
@@ -104,6 +105,7 @@ scopes:
   - sampler transform
   - split transform
   - swimlanes transform
+  - tag_cardinality_limit transform
   - tokenizer transform
 
   # sinks
@@ -121,6 +123,7 @@ scopes:
   - gcp_cloud_storage sink
   - gcp_pubsub sink
   - gcp_stackdriver_logging sink
+  - honeycomb sink
   - http sink
   - humio_logs sink
   - influxdb_metrics sink
@@ -128,6 +131,7 @@ scopes:
   - logdna sink
   - loki sink
   - new_relic_logs sink
+  - papertrail sink
   - prometheus sink
   - sematext_logs sink
   - socket sink

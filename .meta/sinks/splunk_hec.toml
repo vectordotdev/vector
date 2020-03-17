@@ -15,7 +15,11 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
 
 <%= render("_partials/_batch_options.toml", namespace: "sinks.splunk_hec.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
-<%= render("_partials/_buffer_options.toml", namespace: "sinks.splunk_hec.options") %>
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.splunk_hec.options",
+  common: false
+) %>
 
 <%= render(
   "_partials/_request_options.toml",
@@ -30,18 +34,10 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
   timeout_secs: 60
 ) %>
 
-[sinks.splunk_hec.options.encoding]
-type = "string"
-category = "requests"
-common = true
-required = true
-description = """\
-The encoding format used to serialize the events before outputting.\
-"""
-
-[sinks.splunk_hec.options.encoding.enum]
-json = "Each event is encoded into JSON and the payload is new line delimited."
-text = "Each event is encoded into text via the `message` key and the payload is new line delimited."
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.splunk_hec.options",
+  encodings: ["json", "text"]
+) %>
 
 [sinks.splunk_hec.options.host]
 type = "string"
@@ -49,6 +45,16 @@ common = true
 examples = ["http://my-splunk-host.com"]
 required = true
 description = "Your Splunk HEC host."
+
+[sinks.splunk_hec.options.host_key]
+type = "string"
+common = true
+examples = ["hostname"]
+required = false
+description = """\
+The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the \
+[global `host_key` option][docs.reference.global-options#host_key].\
+"""
 
 [sinks.splunk_hec.options.token]
 type = "string"
@@ -65,4 +71,4 @@ relevant_when = {encoding = "json"}
 required = false
 description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify: true) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>

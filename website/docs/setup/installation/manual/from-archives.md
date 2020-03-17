@@ -48,7 +48,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -104,7 +104,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -160,7 +160,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -216,7 +216,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -272,7 +272,7 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.8.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
@@ -303,6 +303,7 @@ import TabItem from '@theme/TabItem';
     ```bat
     cd vector-x86_64-pc-windows-msvc
     ```
+
 4.  Start Vector:
 
     ```bat
@@ -318,7 +319,7 @@ import TabItem from '@theme/TabItem';
 
 The Vector configuration file is located at:
 
-```
+```text
 config/vector.toml
 ```
 
@@ -331,7 +332,7 @@ Vector in the [Configuration][docs.configuration] section.
 We highly recommend creating a [data directory][docs.global-options#data_dir]
 that Vector can use:
 
-```
+```bash
 mkdir /var/lib/vector
 ```
 

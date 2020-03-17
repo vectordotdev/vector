@@ -12,6 +12,7 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
+    pub key_field: Option<Atom>,
     #[serde(default)]
     pub pass_list: Vec<String>,
 }
@@ -24,7 +25,9 @@ inventory::submit! {
 impl TransformConfig for SamplerConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
-            .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
+            .map::<Box<dyn Transform>, _>(|regex_set| {
+                Box::new(Sampler::new(self.rate, self.key_field.clone(), regex_set))
+            })
             .context(super::InvalidRegex)?)
     }
 
@@ -43,12 +46,18 @@ impl TransformConfig for SamplerConfig {
 
 pub struct Sampler {
     rate: u64,
+    key_field: Atom,
     pass_list: RegexSet,
 }
 
 impl Sampler {
-    pub fn new(rate: u64, pass_list: RegexSet) -> Self {
-        Self { rate, pass_list }
+    pub fn new(rate: u64, key_field: Option<Atom>, pass_list: RegexSet) -> Self {
+        let key_field = key_field.unwrap_or_else(|| event::log_schema().message_key().clone());
+        Self {
+            rate,
+            key_field,
+            pass_list,
+        }
     }
 }
 
@@ -56,7 +65,7 @@ impl Transform for Sampler {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
-            .get(&event::log_schema().message_key())
+            .get(&self.key_field)
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 
@@ -90,7 +99,7 @@ mod tests {
         let num_events = 10000;
 
         let events = random_events(num_events);
-        let mut sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(2, None, RegexSet::new(&["na"]).unwrap());
         let total_passed = events
             .into_iter()
             .filter_map(|event| sampler.transform(event))
@@ -100,7 +109,7 @@ mod tests {
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
 
         let events = random_events(num_events);
-        let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
         let total_passed = events
             .into_iter()
             .filter_map(|event| sampler.transform(event))
@@ -113,7 +122,7 @@ mod tests {
     #[test]
     fn consistely_samples_the_same_events() {
         let events = random_events(1000);
-        let mut sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(2, None, RegexSet::new(&["na"]).unwrap());
 
         let first_run = events
             .clone()
@@ -131,7 +140,18 @@ mod tests {
     #[test]
     fn always_passes_events_matching_pass_list() {
         let event = Event::from("i am important");
-        let mut sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
+        let mut sampler = Sampler::new(0, None, RegexSet::new(&["important"]).unwrap());
+        let iterations = 0..1000;
+        let total_passed = iterations
+            .filter_map(|_| sampler.transform(event.clone()))
+            .count();
+        assert_eq!(total_passed, 1000);
+    }
+
+    #[test]
+    fn handles_key_field() {
+        let event = Event::from("nananana");
+        let mut sampler = Sampler::new(0, Some("timestamp".into()), RegexSet::new(&[":"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations
             .filter_map(|_| sampler.transform(event.clone()))
@@ -142,7 +162,7 @@ mod tests {
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
         let events = random_events(10000);
-        let mut sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(10, None, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
             .filter(|s| {
@@ -155,7 +175,7 @@ mod tests {
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
 
         let events = random_events(10000);
-        let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
             .filter(|s| {
@@ -168,7 +188,7 @@ mod tests {
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());
 
         // If the event passed the regex check, don't include the sampling rate
-        let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
         let event = Event::from("nananana");
         let passing = sampler.transform(event).unwrap();
         assert!(passing.as_log().get(&Atom::from("sample_rate")).is_none());

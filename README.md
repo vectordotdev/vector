@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/docs/setup/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.0<a/>
+    <a href="https://vector.dev/docs/setup/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.2<a/>
   </strong>
 </p>
 
@@ -25,13 +25,13 @@ Vector is a lightweight and ultra-fast tool for building observability
 pipelines. Compared to Logstash and friends, Vector [improves throughput by
 ~10X while significanly reducing CPU and memory usage](#performance).
 
-#### Principles
+### Principles
 
 * **Reliability First.** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
 * **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
 * **Single Responsibility.** - Vector is a _data router_, it does not plan to become a distributed processing framework.
 
-#### Who should use Vector?
+### Who should use Vector?
 
 * You _SHOULD_ use Vector to replace Logstash, Fluent*, Telegraf, Beats, or similar tools.
 * You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
@@ -41,7 +41,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * You _SHOULD NOT_ use Vector to replace Kafka. Vector is designed to work with Kafka!
 * You _SHOULD NOT_ use Vector for non-observability data such as analytics data.
 
-#### Community
+### Community
 
 * Vector is **downloaded over 100,000 times per day**.
 * Vector's largest user **processes over 10TB daily**.
@@ -51,37 +51,38 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 ## [Documentation](https://vector.dev/docs/)
 
-#### About
+### About
 
 * [**Concepts**][docs.concepts]
 * [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
-#### Setup
+### Setup
 
 * [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 * [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
 
-#### Reference
+### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [17 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [21 more...][docs.sinks]
+* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [18 more...][docs.transforms]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], [gcp_pubsub][docs.sinks.gcp_pubsub], and [23 more...][docs.sinks]
 
-#### Administration
+### Administration
 
 * [**Process management**][docs.process-management]
 * [**Monitoring**][docs.monitoring]
 * [**Updating**][docs.updating]
 * [**Validating**][docs.validating]
 
-#### Resources
+### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.8.0 (latest)][urls.v0.8.0]
+* [**Releases**][urls.vector_releases] - [v0.8.2 (latest)][urls.v0.8.2]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
+* **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
 
 ## Performance
@@ -119,7 +120,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 ## The Little Details
 
-#### Data Model
+### Data Model
 
 * **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon).
 * **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
@@ -127,13 +128,13 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Metrics interoperability** - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperability between systems.
 * **Metrics aggregation** - Aggregated [histgorams][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
 
-#### Control Flow
+### Control Flow
 
 * **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
 * **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
 * **Dynamic partitioning** - Create [dynamic partitions on the fly][docs.sinks.aws_s3#partitioning] with Vector's [templating syntax][docs.reference.templating].
 
-#### Data Processing
+### Data Processing
 
 * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
 * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
@@ -141,7 +142,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
 
-#### Operations
+### Operations
 
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
@@ -152,7 +153,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
 * **TLS support** - All relevant Vector components offer TLS options for secure communication.
 
-#### Reliability
+### Reliability
 
 * **Memory safety** - Vector is built in Rust and is [memory safe][urls.rust_memory_safety], avoiding a large class of memory related errors.
 * **Decoupled buffer design** - Buffers are per-[sink][docs.sinks]; a bad sink won't bring the entire pipeline to a halt.
@@ -162,7 +163,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.
 * **Robust disk buffering** - Vector uses `leveldb` for robust data durability across restarts.
 
-#### UX
+### UX
 
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
 * **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
@@ -194,7 +195,7 @@ Or use your own [preferred method][docs.installation].
 ---
 
 <p align="center">
-  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong>
+  Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
 
@@ -265,14 +266,17 @@ Or use your own [preferred method][docs.installation].
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
-[urls.v0.8.0]: https://vector.dev/releases/0.8.0/download
+[urls.v0.8.2]: https://vector.dev/releases/0.8.2/download
 [urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community
-[urls.vector_enriching_transforms]: https://vector.dev/components?functions[]=enrich
-[urls.vector_parsing_transforms]: https://vector.dev/components?functions[]=parse
+[urls.vector_enriching_transforms]: https://vector.dev/components?functions%5B%5D=enrich
+[urls.vector_parsing_transforms]: https://vector.dev/components?functions%5B%5D=parse
+[urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

@@ -36,7 +36,7 @@ brew install vector@X.X.X
 
 The Vector configuration file is placed in:
 
-```
+```text
 /usr/local/etc/vector/vector.toml
 ```
 
