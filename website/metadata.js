@@ -22601,6 +22601,28 @@ module.exports = {
 
       ]
     },
+    "filter": {
+      "beta": true,
+      "delivery_guarantee": null,
+      "description": "Accepts log events and allows you to select events based on a set of logical conditions.",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "filter",
+      "id": "filter_transform",
+      "name": "filter",
+      "operating_systems": [
+
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "geoip": {
       "beta": true,
       "delivery_guarantee": null,

@@ -59,6 +59,7 @@
 /src/transforms/add_tags.rs @lukesteensen
 /src/transforms/ansi_stripper.rs @lukesteensen
 /src/transforms/coercer.rs @bruceg
+/src/transforms/filter.rs @bruceg
 /src/transforms/field_filter.rs @lukesteensen
 /src/transforms/geoip.rs @lukesteensen
 /src/transforms/grok_parser.rs @lukesteensen
