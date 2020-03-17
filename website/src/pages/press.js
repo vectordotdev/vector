@@ -34,7 +34,7 @@ function Contact() {
               <AnchoredH3 id="connect">Description</AnchoredH3>
 
               <p>
-                Vector is a high-performance, open-source tool for building flexible and robust pipelines for observability data.
+                Vector is a lightweight and ultra-fast tool for building observability pipelines.
               </p>
 
               <AnchoredH3 id="connect">Bio</AnchoredH3>

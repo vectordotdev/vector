@@ -2,7 +2,7 @@
 
 # vector -Startup script for the Vector router
 #
-# description: A High-Performance Logs, Metrics, and Events Router
+# description: A lightweight and ultra-fast tool for building observability pipelines
 # processname: vector
 # config:      /etc/vector/vector.toml
 # pidfile:     /var/run/vector.pid
@@ -13,8 +13,8 @@
 # Required-Stop:     $network $local_fs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: A High-Performance Logs, Metrics, and Events Router
-# Description:       A High-Performance Logs, Metrics, and Events Router
+# Short-Description: A lightweight and ultra-fast tool for building observability pipelines
+# Description:       A lightweight and ultra-fast tool for building observability pipelines
 ### END INIT INFO
 
 # This script is based off of https://bash.cyberciti.biz/guide//etc/init.d
