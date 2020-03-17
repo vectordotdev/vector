@@ -26,7 +26,6 @@ pub struct PulsarSinkConfig {
     address: String,
     topic: String,
     encoding: Encoding,
-    batch_size: Option<u32>,
     auth: Option<AuthConfig>,
 }
 
@@ -93,10 +92,7 @@ impl PulsarSink {
         let pulsar = Pulsar::new(config.address.parse()?, auth, exec)
             .wait()
             .context(CreatePulsarSink)?;
-        let producer = pulsar.producer(Some(ProducerOptions {
-            batch_size: config.batch_size,
-            ..ProducerOptions::default()
-        }));
+        let producer = pulsar.producer(Some(ProducerOptions::default()));
 
         Ok(Self {
             topic: config.topic,
@@ -233,7 +229,6 @@ mod integration_tests {
             address: "127.0.0.1:6650".to_owned(),
             topic: topic.clone(),
             encoding: Encoding::Text,
-            batch_size: None,
             auth: None,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
