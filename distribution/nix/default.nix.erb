@@ -59,7 +59,7 @@ rustPlatform.buildRustPackage rec {
   checkPhase = "TZDIR=${tzdata}/share/zoneinfo cargo test --no-default-features --features ${lib.concatStringsSep "," features},disable-resolv-conf -- --test-threads 1";
 
   meta = with stdenv.lib; {
-    description = "A high-performance logs, metrics, and events router";
+    description = "A lightweight and ultra-fast tool for building observability pipelines";
     homepage    = "https://github.com/timberio/vector";
     license     = with licenses; [ asl20 ];
     maintainers = with maintainers; [ thoughtpolice ];

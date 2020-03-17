@@ -7,7 +7,7 @@ issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+lab
 min_version: null
 service_name: "LUA"
 sidebar_label: "lua|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua
 status: "beta"
 title: "LUA Transform"
 ---
@@ -46,9 +46,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
   end
   """ # required
   search_dirs = ["/etc/vector/lua"] # optional, no default
+  version = "1" # optional, default
 ```
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 
@@ -102,6 +101,31 @@ A list of directories search when loading a Lua file via the `require` function.
 The inline Lua source to evaluate.
 
  See [Global Variables](#global-variables) for more info.
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={"1"}
+  enumValues={{"1":"transform API version 1"}}
+  examples={["1"]}
+  groups={[]}
+  name={"version"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### version
+
+transform API version
+
+
 
 
 </Field>

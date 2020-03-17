@@ -1,22 +1,22 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::{Event, LogEvent},
+    event::Event,
     sinks::{
         util::{
             encoding::{
                 skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
             },
-            http::{HttpBatchService, HttpClient, HttpRetryLogic},
-            BatchBytesConfig, Buffer, SinkExt, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{stream::iter_ok, Future, Sink};
-use http::{Method, Uri};
-use hyper::{Body, Request};
+use futures01::Future;
+use http::{Request, Uri};
+use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -49,6 +49,12 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Clone, Debug)]
+struct StackdriverSink {
+    config: StackdriverConfig,
+    creds: Option<GcpCredentials>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -100,10 +106,28 @@ lazy_static! {
 impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
-        let sink = self.service(&cx, &creds)?;
-        let healthcheck = self.healthcheck(&cx, &creds)?;
 
-        Ok((sink, healthcheck))
+        let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+
+        let sink = StackdriverSink {
+            config: self.clone(),
+            creds,
+        };
+
+        let healthcheck = self.healthcheck(&cx, sink.clone())?;
+
+        let sink = BatchedHttpSink::new(
+            sink,
+            JsonArrayBuffer::default(),
+            request,
+            batch,
+            tls_settings,
+            &cx,
+        );
+
+        Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -115,85 +139,60 @@ impl SinkConfig for StackdriverConfig {
     }
 }
 
-impl StackdriverConfig {
-    fn service(
-        &self,
-        cx: &SinkContext,
-        creds: &Option<GcpCredentials>,
-    ) -> crate::Result<RouterSink> {
-        let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
-        let encoding = self.encoding.clone();
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let creds = creds.clone();
+impl HttpSink for StackdriverSink {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
 
-        // We need to cap the maximum length of the encoded request, so
-        // we encode each event into JSON separately and then splice the
-        // result into a relatively short wrapper.
-        let wrapper = self.write_request();
-        let wrapper_splice = wrapper
-            .find(SPLICE_MAGIC)
-            .expect("Unexpected encoded wrapper format")
-            + SPLICE_OFFSET;
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.config.encoding.apply_rules(&mut event);
 
-        let build_request = move |mut logs: Vec<u8>| {
-            logs.pop(); // Strip the trailing comma
+        let entry = serde_json::json!({
+            "jsonPayload": event.into_log(),
+        });
 
-            let mut body = wrapper.clone().into_bytes();
-            body.splice(wrapper_splice..wrapper_splice, logs);
-
-            let mut request = make_request(body);
-            if let Some(creds) = creds.as_ref() {
-                creds.apply(&mut request);
-            }
-
-            request
-        };
-
-        let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
-
-        let sink = request
-            .batch_sink(HttpRetryLogic, http_service, cx.acker())
-            .batched_with_min(Buffer::new(false), &batch)
-            .with_flat_map(move |event| iter_ok(Some(encode_event(event, &encoding))));
-
-        Ok(Box::new(sink))
+        Some(entry)
     }
 
-    fn healthcheck(
-        &self,
-        cx: &SinkContext,
-        creds: &Option<GcpCredentials>,
-    ) -> crate::Result<Healthcheck> {
-        let mut request = make_request(Body::from(self.write_request().into_bytes()));
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let events = serde_json::json!({
+            "log_name": self.config.log_name(),
+            "entries": events,
+            "resource": {
+                "type": self.config.resource.type_,
+                "labels": self.config.resource.labels,
+            }
+        });
 
-        if let Some(creds) = creds.as_ref() {
+        let body = serde_json::to_vec(&events).unwrap();
+
+        let mut request = Request::post(URI.clone())
+            .header("Content-Type", "application/json")
+            .body(body)
+            .unwrap();
+
+        if let Some(creds) = &self.creds {
             creds.apply(&mut request);
         }
 
+        request
+    }
+}
+
+impl StackdriverConfig {
+    fn healthcheck(&self, cx: &SinkContext, sink: StackdriverSink) -> crate::Result<Healthcheck> {
+        let request = sink.build_request(vec![]).map(Body::from);
+
         let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
-        let creds = creds.clone();
+
         let healthcheck = client
             .call(request)
             .map_err(Into::into)
             .and_then(healthcheck_response(
-                creds,
+                sink.creds.clone(),
                 HealthcheckError::NotFound.into(),
             ));
 
         Ok(Box::new(healthcheck))
-    }
-
-    fn write_request(&self) -> String {
-        let request = WriteRequest {
-            log_name: self.log_name(),
-            entries: vec![],
-            resource: MonitoredResource {
-                type_: self.resource.type_.clone(),
-                labels: self.resource.labels.clone(),
-            },
-        };
-        serde_json::to_string(&request).expect("Encoding write request failed")
     }
 
     fn log_name(&self) -> String {
@@ -207,58 +206,15 @@ impl StackdriverConfig {
     }
 }
 
-fn make_request<T>(body: T) -> Request<T> {
-    let mut builder = Request::builder();
-    builder.method(Method::POST);
-    builder.uri(URI.clone());
-    builder.header("Content-Type", "application/json");
-    builder.body(body).unwrap()
-}
-
-fn encode_event(mut event: Event, encoding: &EncodingConfigWithDefault<Encoding>) -> Vec<u8> {
-    encoding.apply_rules(&mut event);
-    let entry = LogEntry {
-        json_payload: event.into_log(),
-    };
-    let mut json = serde_json::to_vec(&entry).unwrap();
-    json.push(b',');
-    json
-}
-
-// This is the magic search string within a JSON encoded
-// `WriteRequest`. The batched entries will be spliced into the array.
-const SPLICE_MAGIC: &str = "\"entries\":[]";
-const SPLICE_OFFSET: usize = 11;
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WriteRequest {
-    log_name: String,
-    entries: Vec<LogEntry>,
-    resource: MonitoredResource,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct LogEntry {
-    json_payload: LogEvent,
-}
-
-#[derive(Serialize)]
-struct MonitoredResource {
-    #[serde(rename = "type")]
-    type_: String,
-    labels: HashMap<String, String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{event::LogEvent, test_util::runtime};
+    use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
     #[test]
-    fn valid_write_request() {
+    fn encode_valid() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -268,30 +224,80 @@ mod tests {
         "#,
         )
         .unwrap();
-        let request = config.write_request();
-        request
-            .find("\"entries\":[]")
-            .expect("Could not find required entries list");
-    }
 
-    #[test]
-    fn encode_valid1() {
+        let sink = StackdriverSink {
+            config,
+            creds: None,
+        };
+
         let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let body = encode_event(log.into(), &Encoding::Default.into());
-        let body = String::from_utf8_lossy(&body);
-        assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}},");
+        let json = sink.encode_event(Event::from(log)).unwrap();
+        let body = serde_json::to_string(&json).unwrap();
+        assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}}");
     }
 
     #[test]
-    fn encode_valid2() {
-        let log1 = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
-        let log2 = LogEvent::from_iter([("message", "killroy was here")].iter().map(|&s| s));
-        let mut event = encode_event(log1.into(), &Encoding::Default.into());
-        event.extend(encode_event(log2.into(), &Encoding::Default.into()));
-        let body = String::from_utf8_lossy(&event);
+    fn correct_request() {
+        let config: StackdriverConfig = toml::from_str(
+            r#"
+           project_id = "project"
+           log_id = "testlogs"
+           resource.type = "generic_node"
+           resource.namespace = "office"
+        "#,
+        )
+        .unwrap();
+
+        let sink = StackdriverSink {
+            config,
+            creds: None,
+        };
+
+        let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
+        let log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let event1 = sink.encode_event(Event::from(log1)).unwrap();
+        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+
+        let json1 = serde_json::to_string(&event1).unwrap();
+        let json2 = serde_json::to_string(&event2).unwrap();
+        let raw1 = RawValue::from_string(json1).unwrap();
+        let raw2 = RawValue::from_string(json2).unwrap();
+
+        let events = vec![raw1, raw2];
+
+        let request = sink.build_request(events);
+
+        let (parts, body) = request.into_parts();
+
+        let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
+
         assert_eq!(
-            body,
-            "{\"jsonPayload\":{\"message\":\"hello world\"}},{\"jsonPayload\":{\"message\":\"killroy was here\"}},"
+            &parts.uri.to_string(),
+            "https://logging.googleapis.com/v2/entries:write"
+        );
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "entries": [
+                    {
+                        "jsonPayload": {
+                            "message": "hello"
+                        }
+                    },
+                    {
+                        "jsonPayload": {
+                            "message": "world"
+                        }
+                    }
+                ],
+                "log_name": "projects/project/logs/testlogs",
+                "resource": {
+                    "labels": {
+                        "namespace": "office",
+                    },
+                    "type": "generic_node"
+                }
+            })
         );
     }
 
