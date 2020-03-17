@@ -27,6 +27,17 @@ events](#output).
      website/docs/reference/sources/journald.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
+* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
+
+</Alert>
+
 ## Configuration
 
 import Tabs from '@theme/Tabs';
@@ -68,19 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
-* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 
@@ -423,6 +421,14 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+
+### Non-ASCII messages
+
+When `journald` has stored a message that is not strict ASCII,
+`journalctl` will output it in an alternate format to prevent data
+loss. Vector handles this alternate format by translating such messages
+into UTF-8 in "lossy" mode, where characters that are not valid UTF-8
+are replaced with the Unicode replacement character, `�`.
 
 ### User permissions
 

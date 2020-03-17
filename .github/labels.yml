@@ -340,6 +340,9 @@
 - name: "sink: gcp_stackdriver_logging"
   description: Anything `gcp_stackdriver_logging` sink related
   color: 4ddbfb
+- name: "sink: honeycomb"
+  description: Anything `honeycomb` sink related
+  color: 4ddbfb
 - name: "sink: http"
   description: Anything `http` sink related
   color: 4ddbfb

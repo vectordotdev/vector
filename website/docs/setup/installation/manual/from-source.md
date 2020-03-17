@@ -58,13 +58,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 2.  Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
     on your system.
 
-3.  Create the `vector` directory
-
-    ```bash
-    mkdir vector
-    ```
-
-4.  Download Vector's Source
+3.  Download Vector's Source
 
     <Tabs
       className="mini"
@@ -78,7 +72,7 @@ The following steps should be used to compile Vector directly on Linux based sys
 
     ```bash
     mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8.X | \
+      curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v0.8 | \
       tar xzf - -C vector --strip-components=1
     ```
 
@@ -94,13 +88,13 @@ The following steps should be used to compile Vector directly on Linux based sys
     </TabItem>
     </Tabs>
 
-5.  Change into the `vector` directory
+4.  Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-6.  Compile Vector
+5.  Compile Vector
 
     ```bash
     [FEATURES="<flag1>,<flag2>,..."] make build
@@ -115,7 +109,7 @@ The following steps should be used to compile Vector directly on Linux based sys
     on your Mac, your target triple is `x86_64-apple-darwin`, and the Vector
     binary will be located at `target/x86_64-apple-darwin/release/vector`.
 
-7.  Start Vector
+6.  Start Vector
 
     Finally, start vector:
 
@@ -436,6 +430,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-gcp_cloud_storage` | Enables building of [`gcp_cloud_storage` sink][docs.sinks.gcp_cloud_storage].  |
 | `sinks-gcp_pubsub` | Enables building of [`gcp_pubsub` sink][docs.sinks.gcp_pubsub].  |
 | `sinks-gcp_stackdriver_logging` | Enables building of [`gcp_stackdriver_logging` sink][docs.sinks.gcp_stackdriver_logging].  |
+| `sinks-honeycomb` | Enables building of [`honeycomb` sink][docs.sinks.honeycomb].  |
 | `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
 | `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
 | `sinks-influxdb_metrics` | Enables building of [`influxdb_metrics` sink][docs.sinks.influxdb_metrics].  |
@@ -476,6 +471,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.gcp_cloud_storage]: /docs/reference/sinks/gcp_cloud_storage/
 [docs.sinks.gcp_pubsub]: /docs/reference/sinks/gcp_pubsub/
 [docs.sinks.gcp_stackdriver_logging]: /docs/reference/sinks/gcp_stackdriver_logging/
+[docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [docs.sinks.http]: /docs/reference/sinks/http/
 [docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
 [docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/

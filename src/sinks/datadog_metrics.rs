@@ -1,21 +1,28 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    dns::Resolver,
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
     sinks::util::{
-        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
-        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        http::{BatchedHttpSink, HttpClient, HttpSink},
+        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures01::{Future, Poll};
-use http::{uri::InvalidUri, Method, StatusCode, Uri};
+use futures01::Future;
+use http::{uri::InvalidUri, StatusCode, Uri};
 use hyper;
-use hyper_openssl::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::sync::atomic::{
+    AtomicI64,
+    Ordering::{Acquire, Release},
+};
 use tower::Service;
 
 #[derive(Debug, Snafu)]
@@ -27,13 +34,6 @@ enum BuildError {
 #[derive(Clone)]
 struct DatadogState {
     last_sent_timestamp: i64,
-}
-
-#[derive(Clone)]
-struct DatadogSvc {
-    config: DatadogConfig,
-    state: DatadogState,
-    inner: HttpBatchService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -49,6 +49,12 @@ pub struct DatadogConfig {
     pub request: TowerRequestConfig,
 }
 
+struct DatadogSink {
+    config: DatadogConfig,
+    last_sent_timestamp: AtomicI64,
+    uri: Uri,
+}
+
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         retry_attempts: Some(5),
@@ -56,14 +62,14 @@ lazy_static! {
     };
 }
 
-pub fn default_host() -> String {
-    String::from("https://api.datadoghq.com")
-}
-
 // https://docs.datadoghq.com/api/?lang=bash#post-timeseries-points
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogRequest {
     series: Vec<DatadogMetric>,
+}
+
+pub fn default_host() -> String {
+    String::from("https://api.datadoghq.com")
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -104,9 +110,25 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = DatadogSvc::new(self.clone(), cx)?;
-        let healthcheck = DatadogSvc::healthcheck(self.clone())?;
-        Ok((sink, healthcheck))
+        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
+
+        let batch = self.batch.unwrap_or(20, 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let uri = format!("{}/api/v1/series?api_key={}", self.host, self.api_key)
+            .parse::<Uri>()
+            .context(super::UriParseError)?;
+        let timestamp = Utc::now().timestamp();
+
+        let sink = DatadogSink {
+            config: self.clone(),
+            uri,
+            last_sent_timestamp: AtomicI64::new(timestamp),
+        };
+
+        let sink = BatchedHttpSink::new(sink, MetricBuffer::new(), request, batch, None, &cx);
+
+        Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -118,82 +140,47 @@ impl SinkConfig for DatadogConfig {
     }
 }
 
-impl DatadogSvc {
-    pub fn new(config: DatadogConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
-        let batch = config.batch.unwrap_or(20, 1);
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+impl HttpSink for DatadogSink {
+    type Input = Event;
+    type Output = Vec<Metric>;
 
-        let uri = format!("{}/api/v1/series?api_key={}", config.host, config.api_key)
-            .parse::<Uri>()
-            .context(super::UriParseError)?;
-
-        let build_request = move |body: Vec<u8>| {
-            let mut builder = hyper::Request::builder();
-            builder.method(Method::POST);
-            builder.uri(uri.clone());
-
-            builder.header("Content-Type", "application/json");
-            builder.body(body).unwrap()
-        };
-
-        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
-
-        let datadog_http_service = DatadogSvc {
-            config,
-            state: DatadogState {
-                last_sent_timestamp: Utc::now().timestamp(),
-            },
-            inner: http_service,
-        };
-
-        let sink = request
-            .batch_sink(HttpRetryLogic, datadog_http_service, cx.acker())
-            .batched_with_min(MetricBuffer::new(), &batch);
-
-        Ok(Box::new(sink))
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+        Some(event)
     }
 
-    fn healthcheck(config: DatadogConfig) -> crate::Result<super::Healthcheck> {
-        let uri = format!("{}/api/v1/validate?api_key={}", config.host, config.api_key)
-            .parse::<Uri>()
-            .context(super::UriParseError)?;
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let now = Utc::now().timestamp();
+        let interval = now - self.last_sent_timestamp.load(Acquire);
+        self.last_sent_timestamp.store(now, Release);
 
-        let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+        let input = encode_events(events, interval, &self.config.namespace);
+        let body = serde_json::to_vec(&input).unwrap();
 
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client = hyper::Client::builder().build(https);
-
-        let healthcheck = client
-            .request(request)
-            .map_err(|err| err.into())
-            .and_then(|response| match response.status() {
-                StatusCode::OK => Ok(()),
-                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-            });
-
-        Ok(Box::new(healthcheck))
+        http::Request::get(self.uri.clone())
+            .header("Content-Type", "application/json")
+            .body(body)
+            .unwrap()
     }
 }
 
-impl Service<Vec<Metric>> for DatadogSvc {
-    type Response = HttpResponse;
-    type Error = HttpError;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+fn healthcheck(config: DatadogConfig, resolver: Resolver) -> crate::Result<super::Healthcheck> {
+    let uri = format!("{}/api/v1/validate?api_key={}", config.host, config.api_key)
+        .parse::<Uri>()
+        .context(super::UriParseError)?;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.inner.poll_ready()
-    }
+    let request = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let now = Utc::now().timestamp();
-        let interval = now - self.state.last_sent_timestamp;
-        self.state.last_sent_timestamp = now;
+    let mut client = HttpClient::new(resolver, None)?;
 
-        let input = encode_events(items, interval, &self.config.namespace);
-        let body = serde_json::to_vec(&input).unwrap();
+    let healthcheck = client
+        .call(request)
+        .map_err(|err| err.into())
+        .and_then(|response| match response.status() {
+            StatusCode::OK => Ok(()),
+            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+        });
 
-        self.inner.call(body)
-    }
+    Ok(Box::new(healthcheck))
 }
 
 fn encode_tags(tags: BTreeMap<String, String>) -> Vec<String> {
@@ -274,7 +261,7 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
 }
 
 fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
-    let series: Vec<_> = events
+    let series = events
         .into_iter()
         .filter_map(|event| {
             let fullname = encode_namespace(namespace, &event.name);
@@ -372,7 +359,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
             }
         })
         .flatten()
-        .collect();
+        .collect::<Vec<_>>();
 
     DatadogRequest { series }
 }

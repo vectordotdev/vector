@@ -52,7 +52,7 @@ impl GcpAuthConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GcpCredentials {
     creds: Credentials,
     scope: Scope,

@@ -87,5 +87,7 @@ field\.with\.dots
 
 The above name will be treated literally.
 
+The `\` character, if used literally, must be escaped with a `\` as well.
+
 
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/

@@ -75,7 +75,7 @@ type = "string"
 examples = ["my.host.com"]
 required = true
 description = """\
-The hostname extracted from the  Syslog line. If a hostname is not found, then \
+The hostname extracted from the Syslog line. If a hostname is not found, then \
 Vector will use the upstream hostname. In the case where `mode` = `"unix"` the \
 socket path will be used. This key can be renamed via the `host_key` option.\
 """
@@ -105,8 +105,8 @@ key will not be added.\
 """
 
 [sources.syslog.output.log.fields.procid]
-type = "int"
-examples = [8710]
+type = "string"
+examples = ["8710"]
 description = """\
 The procid extracted from the Syslog line. If a procid is not found, then the \
 key will not be added.\
@@ -136,3 +136,42 @@ description = """\
 The version extracted from the Syslog line. If a version is not found, then \
 the key will not be added.\
 """
+
+[sources.syslog.output.log.fields."`[field-name]`"]
+type = "*"
+examples = [
+  {custom_field1 = "custom value 1"},
+]
+description = """\
+In addition to the defined fields, any Syslog 5424 structured fields are \
+parsed and inserted as root level fields.
+"""
+
+[[sources.syslog.output.log.examples]]
+label = "RFC5424"
+body = """\
+Given the following [Syslog 5424][urls.syslog_5424] log line:
+
+```text
+<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut=\"3\" eventSource= \"Application\" eventID=\"1011\"] Try to override the THX port, maybe it will reboot the neural interface!
+```
+
+A `log` event will be produced with the following structure:
+
+```javascript
+{
+  "severity": "notice",
+  "facility": "user",
+  "timestamp": "2020-03-13T20:45:38.119Z",
+  "host": "dynamicwireless.name", // controlled via the `host_key` option,
+  "appname": "non",
+  "procid": "2426",
+  "msgid": "ID931",
+  "iut": "3",
+  "eventSource": "Application",
+  "eventID": "1011",
+  "message": "Try to override the THX port, maybe it will reboot the neural interface!"
+}
+```
+"""
+

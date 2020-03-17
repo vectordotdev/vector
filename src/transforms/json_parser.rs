@@ -186,6 +186,25 @@ mod test {
     }
 
     #[test]
+    fn json_parser_parse_raw_with_whitespace() {
+        let mut parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
+            ..Default::default()
+        });
+
+        let event = Event::from(r#" {"greeting": "hello", "name": "bob"}    "#);
+
+        let event = parser.transform(event).unwrap();
+
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            r#" {"greeting": "hello", "name": "bob"}    "#.into()
+        );
+    }
+
+    #[test]
     fn json_parser_parse_field() {
         let mut parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),

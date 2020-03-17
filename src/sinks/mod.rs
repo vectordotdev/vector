@@ -25,6 +25,8 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
+#[cfg(feature = "sinks-honeycomb")]
+pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
 pub mod http;
 #[cfg(feature = "sinks-humio_logs")]

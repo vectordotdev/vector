@@ -235,6 +235,8 @@ module.exports = {
             
               "reference/sinks/gcp_stackdriver_logging",
             
+              "reference/sinks/honeycomb",
+            
               "reference/sinks/http",
             
               "reference/sinks/humio_logs",

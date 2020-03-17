@@ -64,7 +64,7 @@
 /src/transforms/grok_parser.rs @lukesteensen
 /src/transforms/json_parser.rs @LucioFranco
 /src/transforms/log_to_metric.rs @lukesteensen
-/src/transforms/lua.rs @a-rodin
+/src/transforms/lua/ @a-rodin
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
 /src/transforms/remove_fields.rs @LucioFranco

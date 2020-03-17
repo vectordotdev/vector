@@ -24,6 +24,19 @@ AWS EC2 instance metadata.
      website/docs/reference/transforms/aws_ec2_metadata.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+
+
+* Network access is required for this component to function correctly. See the
+  [Network Access section](#network-access) for more info.
+
+</Alert>
+
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
@@ -39,21 +52,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   namespace = "" # optional, default
   refresh_interval_secs = 10 # optional, default
 ```
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-
-
-* Network access is required for this component to function correctly. See the
-  [Network Access section](#network-access) for more info.
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 

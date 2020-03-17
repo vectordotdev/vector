@@ -17,4 +17,4 @@ ENV PATH="$PATH:/root/.cargo/bin"
 RUN rustup component add rustfmt
 
 # Install `remarshal`
-RUN pip3 install remarshal
+RUN pip3 install remarshal==0.11.2

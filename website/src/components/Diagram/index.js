@@ -133,7 +133,7 @@ function Diagram({className, height, width}) {
   return (
     <svg className={classnames(className, 'diagram')} viewBox={`0 0 683 294`} version="1.1" xmlns="http://www.w3.org/2000/svg">
       <title>Vector Diagram</title>
-      <desc>A High-Performance, Logs, Metrics, and Events Router</desc>
+      <desc>A lightweight and ultra-fast tool for building observability pipelines</desc>
       <defs>
         <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="diagram-gradient-1">
           <stop stopColor="#10E7FF" offset="0%"></stop>

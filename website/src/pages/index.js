@@ -436,7 +436,7 @@ function Home() {
   }, []);
 
   return (
-    <Layout description={siteConfig.description}>
+    <Layout title={`${siteConfig.title} - ${siteConfig.tagline}`} description={siteConfig.tagline}>
       <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (

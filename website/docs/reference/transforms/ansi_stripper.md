@@ -37,8 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   field = "message" # optional, default
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';

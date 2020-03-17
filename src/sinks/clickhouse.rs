@@ -3,14 +3,14 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, HttpBatchService, HttpClient, HttpRetryLogic, Response},
+        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
         retries::{RetryAction, RetryLogic},
-        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{stream::iter_ok, Future, Sink};
+use futures01::Future;
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Request};
@@ -58,9 +58,26 @@ pub enum Encoding {
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let healthcheck = healthcheck(cx.resolver(), &self)?;
-        let sink = clickhouse(self.clone(), cx)?;
 
-        Ok((sink, healthcheck))
+        let gzip = match self.compression.unwrap_or(Compression::Gzip) {
+            Compression::None => false,
+            Compression::Gzip => true,
+        };
+
+        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+
+        let sink = BatchedHttpSink::new(
+            self.clone(),
+            Buffer::new(gzip),
+            request,
+            batch,
+            tls_settings,
+            &cx,
+        );
+
+        Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -72,69 +89,47 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
-    let host = config.host.clone();
-    let database = config.database.clone().unwrap_or("default".into());
-    let table = config.table.clone();
+impl HttpSink for ClickhouseConfig {
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
 
-    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
-        Compression::None => false,
-        Compression::Gzip => true,
-    };
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
 
-    let batch = config.batch.unwrap_or(bytesize::mib(10u64), 1);
-    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let mut body =
+            serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+        body.push(b'\n');
 
-    let auth = config.auth.clone();
+        Some(body)
+    }
 
-    let uri = encode_uri(&host, &database, &table)?;
-    let tls_settings = TlsSettings::from_options(&config.tls)?;
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let database = if let Some(database) = &self.database {
+            database.as_str()
+        } else {
+            "default"
+        };
 
-    let build_request = move |body: Vec<u8>| {
+        let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
+
         let mut builder = hyper::Request::builder();
         builder.method(Method::POST);
         builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/x-ndjson");
 
-        if gzip {
+        if let Compression::Gzip = self.compression.unwrap_or(Compression::Gzip) {
             builder.header("Content-Encoding", "gzip");
         }
 
-        let mut request = builder.body(body).unwrap();
+        let mut request = builder.body(events).unwrap();
 
-        if let Some(auth) = &auth {
+        if let Some(auth) = &self.auth {
             auth.apply(&mut request);
         }
 
         request
-    };
-
-    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
-
-    let sink = request
-        .batch_sink(
-            ClickhouseRetryLogic {
-                inner: HttpRetryLogic,
-            },
-            http_service,
-            cx.acker(),
-        )
-        .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |event: Event| iter_ok(encode_event(event, &config.encoding)));
-
-    Ok(Box::new(sink))
-}
-
-fn encode_event(
-    mut event: Event,
-    encoding: &EncodingConfigWithDefault<Encoding>,
-) -> Option<Vec<u8>> {
-    encoding.apply_rules(&mut event);
-    let mut body =
-        serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
-    body.push(b'\n');
-    Some(body)
+    }
 }
 
 fn healthcheck(resolver: Resolver, config: &ClickhouseConfig) -> crate::Result<super::Healthcheck> {
