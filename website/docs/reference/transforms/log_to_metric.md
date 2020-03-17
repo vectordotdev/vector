@@ -44,8 +44,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     tags.env = "${ENV}" # optional
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
