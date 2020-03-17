@@ -155,7 +155,7 @@ impl WatchClient {
 
     fn build_watch_stream(
         &mut self,
-        request: Request<Body>,
+        request: Request<hyper::Body>,
     ) -> impl Stream<Item = (Pod, PodEvent), Error = RuntimeError> {
         let mut decoder = Decoder::default();
 

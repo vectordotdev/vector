@@ -229,7 +229,10 @@ it can degrade performance.
 
 ### VECTOR_NODE_NAME
 
-Node's name whose pod's logs should be enriched. Either this or `node_name` field must be defined. Defined automatically when using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
+Node's name whose pod's logs should be enriched. Either this or `node_name`
+field must be defined. Defined automatically when using [predefined Kubernetes
+config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
+
 
 
 

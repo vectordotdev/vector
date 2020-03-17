@@ -28,6 +28,7 @@ dns_servers = ["0.0.0.0:53"] # optional, no default
 
 # Log schema
 log_schema.host_key = "host" # optional, default
+log_schema.kubernetes_key = "kubernetes" # optional, default
 log_schema.message_key = "message" # optional, default
 log_schema.timestamp_key = "timestamp" # optional, default
 ```
@@ -165,6 +166,8 @@ page][docs.data-model.log#host] for more info.
 #### kubernetes_key
 
 The key under which Kubernetes related fields are nested.
+
+
 
 
 </Field>
