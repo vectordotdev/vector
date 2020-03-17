@@ -7390,11 +7390,13 @@ end
   # * type: string
   topic = "topic-1234"
 
-  # An optional batch size for sending messages. Cannot exceeed `4294967295`
+  # An optional batch size, in events, for sending messages. Cannot exceeed
+  # `4294967295`
   #
   # * optional
   # * no default
   # * type: int
+  # * unit: events
   batch_size = 1000
   batch_size = 5
 

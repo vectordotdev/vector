@@ -34,7 +34,8 @@ type = "int"
 common = false
 examples = [1000, 5]
 required = false
-description = "An optional batch size for sending messages. Cannot exceeed `4294967295`"
+unit = "events"
+description = "An optional batch size, in events, for sending messages. Cannot exceeed `4294967295`"
 
 [sinks.pulsar.options.auth]
 type = "table"

@@ -64,7 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   address = "127.0.0.1:6650" # required
   topic = "topic-1234" # required
-  batch_size = 1000 # optional, no default
+  batch_size = 1000 # optional, no default, events
 
   # Auth
   auth.name = "${NAME_ENV_VAR}" # optional, no default
@@ -79,8 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 
@@ -205,12 +203,13 @@ The basic authentication password.
   required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"events"}
   >
 
 ### batch_size
 
-An optional batch size for sending messages. Cannot exceeed `4294967295`
+An optional batch size, in events, for sending messages. Cannot exceeed
+`4294967295`
 
 
 
