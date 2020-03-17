@@ -422,6 +422,14 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### Non-ASCII messages
+
+When `journald` has stored a message that is not strict ASCII,
+`journalctl` will output it in an alternate format to prevent data
+loss. Vector handles this alternate format by translating such messages
+into UTF-8 in "lossy" mode, where characters that are not valid UTF-8
+are replaced with the Unicode replacement character, `�`.
+
 ### User permissions
 
 If you run Vector from a non-root user, you need to add that user to the

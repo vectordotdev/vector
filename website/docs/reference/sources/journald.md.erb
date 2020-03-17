@@ -59,4 +59,12 @@ For example, if the user is named `vector`, it can be done by running
 usermod -aG systemd-journal vector
 ```
 
+### Non-ASCII messages
+
+When `journald` has stored a message that is not strict ASCII,
+`journalctl` will output it in an alternate format to prevent data
+loss. Vector handles this alternate format by translating such messages
+into UTF-8 in "lossy" mode, where characters that are not valid UTF-8
+are replaced with the Unicode replacement character, `�`.
+
 <%= component_sections(component) %>
