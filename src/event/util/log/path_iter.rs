@@ -32,6 +32,7 @@ impl<'a> PathIter<'a> {
 enum PathIterState {
     Empty,
     Key(String),
+    KeyEscape(String), // escape mode inside keys entered into after `\` character
     Index(usize),
     Dot,
     OpeningBracket,
@@ -60,6 +61,7 @@ impl<'a> Iterator for PathIter<'a> {
             self.state = match mem::take(&mut self.state) {
                 Empty => match c {
                     Some('.') | Some('[') | Some(']') | None => Invalid,
+                    Some('\\') => KeyEscape(String::new()),
                     Some(c) => Key(c.to_string()),
                 },
                 Key(mut s) => match c {
@@ -72,6 +74,7 @@ impl<'a> Iterator for PathIter<'a> {
                         OpeningBracket
                     }
                     Some(']') => Invalid,
+                    Some('\\') => KeyEscape(s),
                     None => {
                         res = Some(Some(PathComponent::Key(s.into())));
                         End
@@ -80,6 +83,13 @@ impl<'a> Iterator for PathIter<'a> {
                         s.push(c);
                         Key(s)
                     }
+                },
+                KeyEscape(mut s) => match c {
+                    Some(c) if c == '.' || c == '[' || c == ']' || c == '\\' => {
+                        s.push(c);
+                        Key(s)
+                    }
+                    _ => Invalid,
                 },
                 Index(i) => match c {
                     Some(c) if c >= '0' && c <= '9' => Index(10 * i + (c as usize - '0' as usize)),
@@ -91,6 +101,7 @@ impl<'a> Iterator for PathIter<'a> {
                 },
                 Dot => match c {
                     Some('.') | Some('[') | Some(']') | None => Invalid,
+                    Some('\\') => KeyEscape(String::new()),
                     Some(c) => Key(c.to_string()),
                 },
                 OpeningBracket => match c {
@@ -135,6 +146,7 @@ mod test {
             "flying.squirrels.are.everywhere",
             "flying.squirrel[137][0].tail",
             "flying[0].squirrel[1]",
+            "flying\\[0\\]\\.squirrel[1].\\\\tail\\\\",
         ];
 
         let expected = vec![
@@ -157,6 +169,11 @@ mod test {
                 Key("squirrel".into()),
                 Index(1),
             ],
+            vec![
+                Key("flying[0].squirrel".into()),
+                Index(1),
+                Key("\\tail\\".into()),
+            ],
         ];
 
         for (i, e) in inputs.into_iter().zip(expected) {
@@ -174,6 +191,7 @@ mod test {
             ".",
             ".flying[0]",
             "",
+            "invalid\\ escaping",
         ];
 
         for i in inputs.into_iter() {
