@@ -495,7 +495,7 @@ mod kube_tests {
         let (sender, receiver) = channel();
 
         // May pickup other pods, which is fine.
-        let client =
+        let mut client =
             ClientConfig::load_kube_config(Resolver::new(Vec::new(), rt.executor()).unwrap())
                 .expect("Kubernetes configuration file not present.")
                 .build()
