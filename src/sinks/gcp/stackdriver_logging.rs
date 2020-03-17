@@ -210,10 +210,11 @@ impl StackdriverConfig {
 mod tests {
     use super::*;
     use crate::{event::LogEvent, test_util::runtime};
+    use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
     #[test]
-    fn encode_valid1() {
+    fn encode_valid() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -233,6 +234,71 @@ mod tests {
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}}");
+    }
+
+    #[test]
+    fn correct_request() {
+        let config: StackdriverConfig = toml::from_str(
+            r#"
+           project_id = "project"
+           log_id = "testlogs"
+           resource.type = "generic_node"
+           resource.namespace = "office"
+        "#,
+        )
+        .unwrap();
+
+        let sink = StackdriverSink {
+            config,
+            creds: None,
+        };
+
+        let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
+        let log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let event1 = sink.encode_event(Event::from(log1)).unwrap();
+        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+
+        let json1 = serde_json::to_string(&event1).unwrap();
+        let json2 = serde_json::to_string(&event2).unwrap();
+        let raw1 = RawValue::from_string(json1).unwrap();
+        let raw2 = RawValue::from_string(json2).unwrap();
+
+        let events = vec![raw1, raw2];
+
+        let request = sink.build_request(events);
+
+        let (parts, body) = request.into_parts();
+
+        let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
+
+        assert_eq!(
+            &parts.uri.to_string(),
+            "https://logging.googleapis.com/v2/entries:write"
+        );
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "entries": [
+                    {
+                        "jsonPayload": {
+                            "message": "hello"
+                        }
+                    },
+                    {
+                        "jsonPayload": {
+                            "message": "world"
+                        }
+                    }
+                ],
+                "log_name": "projects/project/logs/testlogs",
+                "resource": {
+                    "labels": {
+                        "namespace": "office",
+                    },
+                    "type": "generic_node"
+                }
+            })
+        );
     }
 
     #[test]
