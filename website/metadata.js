@@ -22604,9 +22604,10 @@ module.exports = {
     "filter": {
       "beta": true,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to select events based on a set of logical conditions.",
+      "description": "Accepts log and metric events and allows you to select events based on a set of logical conditions.",
       "event_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "function_category": "filter",
       "id": "filter_transform",
