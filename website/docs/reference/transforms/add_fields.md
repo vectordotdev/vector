@@ -47,8 +47,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   fields.list_field = ["first", "second", "third"] # example
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';

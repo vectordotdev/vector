@@ -7,7 +7,7 @@ issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+lab
 min_version: null
 service_name: "LUA"
 sidebar_label: "lua|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
+source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua
 status: "beta"
 title: "LUA Transform"
 ---
@@ -48,8 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   search_dirs = ["/etc/vector/lua"] # optional, no default
   version = "1" # optional, default
 ```
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 

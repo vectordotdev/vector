@@ -41,8 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   scrape_interval_secs = 1 # required
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';

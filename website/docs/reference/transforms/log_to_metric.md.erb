@@ -2,6 +2,12 @@
 
 <%= component_header(component) %>
 
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
 ## Configuration
 
 import CodeHeader from '@site/src/components/CodeHeader';
@@ -20,8 +26,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     tags.host = "{{host}}" # optional
     tags.env = "${ENV}" # optional
 ```
-
-## Options
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 

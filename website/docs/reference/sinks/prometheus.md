@@ -27,6 +27,17 @@ The Vector `prometheus` sink
      website/docs/reference/sinks/prometheus.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Prometheus version >= 1.0 is required.
+
+
+</Alert>
+
 ## Configuration
 
 import Tabs from '@theme/Tabs';
@@ -69,19 +80,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* Prometheus version >= 1.0 is required.
-
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 

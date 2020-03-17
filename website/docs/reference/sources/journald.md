@@ -27,6 +27,17 @@ events](#output).
      website/docs/reference/sources/journald.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
+* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
+
+</Alert>
+
 ## Configuration
 
 import Tabs from '@theme/Tabs';
@@ -68,19 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
-* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 
