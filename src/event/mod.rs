@@ -107,7 +107,7 @@ impl LogEvent {
         util::log::get_mut(&mut self.fields, key)
     }
 
-    pub fn get_mut_flat(&mut self, key: &Atom) -> Option<&mut Value> {
+    pub fn get_flat_mut(&mut self, key: &Atom) -> Option<&mut Value> {
         self.fields.get_mut(key)
     }
 
