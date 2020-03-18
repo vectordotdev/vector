@@ -6,44 +6,41 @@ use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
 pub fn remove(fields: &mut BTreeMap<Atom, Value>, path: &str) -> Option<Value> {
-    let mut path_iter = PathIter::new(path).peekable();
+    remove_map(fields, PathIter::new(path).peekable())
+}
 
-    let key = match path_iter.next() {
-        Some(PathComponent::Key(key)) => key,
-        _ => return None,
-    };
-
-    match path_iter.peek() {
-        None => fields.remove(&key),
-        Some(_) => match fields.get_mut(&key) {
-            None => None,
-            Some(value) => value_remove(value, path_iter),
-        },
+/// Recursively iterate through the path, and remove the last path
+/// element. This is the top-level function which can remove from any
+/// type of `Value`.
+fn remove_rec(value: &mut Value, path: Peekable<PathIter>) -> Option<Value> {
+    match value {
+        Value::Map(map) => remove_map(map, path),
+        Value::Array(map) => remove_array(map, path),
+        _ => None,
     }
 }
 
-fn value_remove<I>(mut value: &mut Value, mut path_iter: Peekable<I>) -> Option<Value>
-where
-    I: Iterator<Item = PathComponent>,
-{
-    loop {
-        value = match (path_iter.next(), value) {
-            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match path_iter.peek() {
-                None => return map.remove(key),
-                Some(_) => match map.get_mut(key) {
-                    None => return None,
-                    Some(value) => value,
-                },
-            },
-            (Some(PathComponent::Index(index)), Value::Array(array)) => match path_iter.peek() {
-                None => return array_remove(array, index),
-                Some(_) => match array.get_mut(index) {
-                    None => return None,
-                    Some(value) => value,
-                },
-            },
-            _ => return None,
-        }
+fn remove_array(array: &mut Vec<Value>, mut path: Peekable<PathIter>) -> Option<Value> {
+    match path.next()? {
+        PathComponent::Index(index) => match path.peek() {
+            None => return array_remove(array, index),
+            Some(_) => array
+                .get_mut(index)
+                .and_then(|value| remove_rec(value, path)),
+        },
+        _ => return None,
+    }
+}
+
+fn remove_map(fields: &mut BTreeMap<Atom, Value>, mut path: Peekable<PathIter>) -> Option<Value> {
+    match path.next()? {
+        PathComponent::Key(key) => match path.peek() {
+            None => fields.remove(&key),
+            Some(_) => fields
+                .get_mut(&key)
+                .and_then(|value| remove_rec(value, path)),
+        },
+        _ => return None,
     }
 }
 
