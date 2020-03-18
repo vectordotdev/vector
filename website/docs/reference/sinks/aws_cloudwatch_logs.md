@@ -53,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   group_name = "{{ file }}" # required
   region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "{{ instance_id }}" # required
+  stream_name = "{{ host }}" # required
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   healthcheck = true # optional, default
@@ -75,7 +75,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
   group_name = "{{ file }}" # required
   region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "{{ instance_id }}" # required
+  stream_name = "{{ host }}" # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
@@ -562,7 +562,7 @@ this option will make [`region`](#region) moot.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["{{ file }}","ec2/{{ instance_id }}","group-name"]}
+  examples={["{{ file }}","ec2/{{ host }}","group-name"]}
   groups={[]}
   name={"group_name"}
   path={null}
@@ -849,7 +849,7 @@ duplicate data downstream.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["{{ instance_id }}","%Y-%m-%d","stream-name"]}
+  examples={["{{ host }}","%Y-%m-%d","stream-name"]}
   groups={[]}
   name={"stream_name"}
   path={null}
@@ -1089,7 +1089,7 @@ values derived from the event's data. This syntax accepts
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
   group_name = "{{ file }}"
-  group_name = "ec2/{{ instance_id }}"
+  group_name = "ec2/{{ host }}"
   group_name = "group-name"
   # ...
 ```
