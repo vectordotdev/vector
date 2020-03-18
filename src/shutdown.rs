@@ -11,7 +11,7 @@ use tokio::timer;
 /// of each Source to ensure that at least one copy of this handle remains alive for the entire
 /// lifetime of the Source.
 #[derive(Clone, Debug)]
-struct ShutdownSignalToken {
+pub struct ShutdownSignalToken {
     _shutdown_complete: Arc<Trigger>,
 }
 
