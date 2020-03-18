@@ -23,11 +23,11 @@ impl TransformConfig for FilterConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log // Can be `Any` once issue #421 is finished
     }
 
     fn transform_type(&self) -> &'static str {
