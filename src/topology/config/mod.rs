@@ -4,6 +4,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, Metric},
     runtime::TaskExecutor,
+    shutdown::ShutdownSignal,
     sinks, sources, transforms,
 };
 use component::ComponentDescription;
@@ -127,6 +128,7 @@ pub trait SourceConfig: core::fmt::Debug {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<sources::Source>;
 

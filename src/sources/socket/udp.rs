@@ -1,5 +1,7 @@
 use crate::event::Event;
+use crate::shutdown::ShutdownSignal;
 use crate::sources::Source;
+use crate::stream::StreamExt;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
@@ -25,7 +27,12 @@ impl UdpConfig {
     }
 }
 
-pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> Source {
+pub fn udp(
+    address: SocketAddr,
+    host_key: Atom,
+    shutdown: ShutdownSignal,
+    out: mpsc::Sender<Event>,
+) -> Source {
     let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     Box::new(
@@ -41,6 +48,7 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> Sou
             // UDP processes messages per packet, where messages are separated by newline.
             // And stretch to end of packet.
             UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
+                .take_until(shutdown)
                 .map(move |(line, addr): (Bytes, _)| {
                     let mut event = Event::from(line);
 
