@@ -10,12 +10,12 @@ use tokio::timer;
 /// corresponding Source has completed executing and may be cleaned up.  It is the responsibility
 /// of each Source to ensure that at least one copy of this handle remains alive for the entire
 /// lifetime of the Source.
-#[derive(Clone)]
-pub struct ShutdownCompleteHandle {
+#[derive(Clone, Debug)]
+struct ShutdownSignalToken {
     _shutdown_complete: Arc<Trigger>,
 }
 
-impl ShutdownCompleteHandle {
+impl ShutdownSignalToken {
     fn new(shutdown_complete: Trigger) -> Self {
         Self {
             _shutdown_complete: Arc::new(shutdown_complete),
@@ -24,7 +24,7 @@ impl ShutdownCompleteHandle {
 }
 
 /// Passed to each Source to coordinate the global shutdown process.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ShutdownSignal {
     /// This will be triggered when global shutdown has begun, and is a sign to the Source to begin
     /// its shutdown process.
@@ -33,11 +33,11 @@ pub struct ShutdownSignal {
     /// When a Source allows this to go out of scope it informs the global shutdown coordinator that
     /// this Source's local shutdown process is complete.
     /// Optional only so that `poll()` can move the handle out and return it.
-    shutdown_complete: Option<ShutdownCompleteHandle>,
+    shutdown_complete: Option<ShutdownSignalToken>,
 }
 
 impl Future for ShutdownSignal {
-    type Item = ShutdownCompleteHandle;
+    type Item = ShutdownSignalToken;
     type Error = ();
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
         match self.begin_shutdown.poll() {
@@ -52,7 +52,7 @@ impl ShutdownSignal {
     pub fn new(begin_shutdown: Tripwire, shutdown_complete: Trigger) -> Self {
         Self {
             begin_shutdown,
-            shutdown_complete: Some(ShutdownCompleteHandle::new(shutdown_complete)),
+            shutdown_complete: Some(ShutdownSignalToken::new(shutdown_complete)),
         }
     }
 
@@ -61,7 +61,7 @@ impl ShutdownSignal {
         let (trigger, tripwire) = Tripwire::new();
         Self {
             begin_shutdown: tripwire,
-            shutdown_complete: Some(ShutdownCompleteHandle::new(trigger)),
+            shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
 }
