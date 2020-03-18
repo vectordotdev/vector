@@ -2407,7 +2407,7 @@ end
   # * required
   # * type: string
   group_name = "{{ file }}"
-  group_name = "ec2/{{ instance_id }}"
+  group_name = "ec2/{{ host }}"
   group_name = "group-name"
 
   # The AWS region of the target service. If `endpoint` is provided it will
@@ -2422,7 +2422,7 @@ end
   #
   # * required
   # * type: string
-  stream_name = "{{ instance_id }}"
+  stream_name = "{{ host }}"
   stream_name = "%Y-%m-%d"
   stream_name = "stream-name"
 
