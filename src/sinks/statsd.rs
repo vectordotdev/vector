@@ -318,6 +318,8 @@ mod test {
 
     #[test]
     fn test_send_to_statsd() {
+        crate::test_util::trace_init();
+
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
