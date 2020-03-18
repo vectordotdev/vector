@@ -1579,7 +1579,7 @@ dns_servers = ["0.0.0.0:53"]
     "message.eq" = "this is the content to match against"
 
     # Check whether a field exists or does not exist, depending on the provided
-    # valuebeing `true` or `false` respectively.
+    # value being `true` or `false` respectively.
     #
     # * optional
     # * no default
@@ -2297,7 +2297,7 @@ end
       "message.eq" = "this is the content to match against"
 
       # Check whether a field exists or does not exist, depending on the provided
-      # valuebeing `true` or `false` respectively.
+      # value being `true` or `false` respectively.
       #
       # * optional
       # * no default
