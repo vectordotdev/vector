@@ -5,40 +5,54 @@ use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 ///
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
-pub fn remove(fields: &mut BTreeMap<Atom, Value>, path: &str) -> Option<Value> {
-    remove_map(fields, PathIter::new(path).peekable())
+pub fn remove(fields: &mut BTreeMap<Atom, Value>, path: &str, prune: bool) -> Option<Value> {
+    remove_map(fields, PathIter::new(path).peekable(), prune).map(|(value, _)| value)
 }
 
 /// Recursively iterate through the path, and remove the last path
 /// element. This is the top-level function which can remove from any
 /// type of `Value`.
-fn remove_rec(value: &mut Value, path: Peekable<PathIter>) -> Option<Value> {
+fn remove_rec(value: &mut Value, path: Peekable<PathIter>, prune: bool) -> Option<(Value, bool)> {
     match value {
-        Value::Map(map) => remove_map(map, path),
-        Value::Array(map) => remove_array(map, path),
+        Value::Map(map) => remove_map(map, path, prune),
+        Value::Array(map) => remove_array(map, path, prune),
         _ => None,
     }
 }
 
-fn remove_array(array: &mut Vec<Value>, mut path: Peekable<PathIter>) -> Option<Value> {
+fn remove_array(
+    array: &mut Vec<Value>,
+    mut path: Peekable<PathIter>,
+    prune: bool,
+) -> Option<(Value, bool)> {
     match path.next()? {
         PathComponent::Index(index) => match path.peek() {
-            None => return array_remove(array, index),
+            None => return array_remove(array, index).map(|v| (v, false)),
             Some(_) => array
                 .get_mut(index)
-                .and_then(|value| remove_rec(value, path)),
+                .and_then(|value| Some((remove_rec(value, path, prune)?.0, false))),
         },
         _ => return None,
     }
 }
 
-fn remove_map(fields: &mut BTreeMap<Atom, Value>, mut path: Peekable<PathIter>) -> Option<Value> {
+fn remove_map(
+    fields: &mut BTreeMap<Atom, Value>,
+    mut path: Peekable<PathIter>,
+    prune: bool,
+) -> Option<(Value, bool)> {
     match path.next()? {
         PathComponent::Key(key) => match path.peek() {
-            None => fields.remove(&key),
-            Some(_) => fields
-                .get_mut(&key)
-                .and_then(|value| remove_rec(value, path)),
+            None => fields.remove(&key).map(|v| (v, fields.len() == 0)),
+            Some(_) => {
+                let (result, empty) = fields
+                    .get_mut(&key)
+                    .and_then(|value| remove_rec(value, path, prune))?;
+                if prune && empty {
+                    fields.remove(&key);
+                }
+                Some((result, fields.len() == 0))
+            }
         },
         _ => return None,
     }
@@ -76,8 +90,11 @@ mod test {
         let mut fields = fields_from_json(json!({
             "field": 123
         }));
-        assert_eq!(remove(&mut fields, "field"), Some(Value::Integer(123)));
-        assert_eq!(remove(&mut fields, "field"), None);
+        assert_eq!(
+            remove(&mut fields, "field", false),
+            Some(Value::Integer(123))
+        );
+        assert_eq!(remove(&mut fields, "field", false), None);
     }
 
     #[test]
@@ -107,8 +124,18 @@ mod test {
         ];
 
         for (query, expected_first, expected_second) in queries.iter() {
-            assert_eq!(remove(&mut fields, query), *expected_first, "{}", query);
-            assert_eq!(remove(&mut fields, query), *expected_second, "{}", query);
+            assert_eq!(
+                remove(&mut fields, query, false),
+                *expected_first,
+                "{}",
+                query
+            );
+            assert_eq!(
+                remove(&mut fields, query, false),
+                *expected_second,
+                "{}",
+                query
+            );
         }
     }
 }

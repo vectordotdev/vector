@@ -116,25 +116,11 @@ impl LogEvent {
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key)
+        util::log::remove(&mut self.fields, &key, false)
     }
 
-    pub fn remove_prune(&mut self, key: &Atom, drop_empty: bool) -> Option<Value> {
-        let value = util::log::remove(&mut self.fields, &key);
-        if drop_empty && value.is_some() {
-            if let Some(dot) = key.find('.') {
-                // Recursively remove empty parent objects
-                let parent = Atom::from(&key[..dot]);
-                if let Some(parent_ref) = util::log::get_mut(&mut self.fields, &parent) {
-                    if let Value::Map(map) = parent_ref {
-                        if map.len() == 0 {
-                            self.remove_prune(&parent, drop_empty);
-                        }
-                    }
-                }
-            }
-        }
-        value
+    pub fn remove_prune(&mut self, key: &Atom, prune: bool) -> Option<Value> {
+        util::log::remove(&mut self.fields, &key, prune)
     }
 
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = Atom> + 'a {
