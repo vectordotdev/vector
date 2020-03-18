@@ -69,10 +69,10 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   type = "aws_kinesis_firehose" # required
   inputs = ["my-source-id"] # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
 
   # Batch
@@ -482,7 +482,7 @@ How to format event timestamps.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}

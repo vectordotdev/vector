@@ -4,7 +4,7 @@
 <Tabs
   block={true}
   select={true}
-  defaultValue="aws_s3"
+  defaultValue={<%= (default_sink ? default_sink.name : nil).to_json %>}
   values={<%= sinks.collect { |sink| {label: sink.title, value: sink.name } }.to_json %>}>
 <%- sinks.each do |sink| -%>
 <TabItem value=<%= sink.name.to_json %>>

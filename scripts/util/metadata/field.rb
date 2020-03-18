@@ -29,9 +29,9 @@ class Field
     @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
-    @examples = hash["examples"] || []
+    @examples = (hash["examples"] || []).freeze
     @field_path_notation = hash["field_path_notation"] == true
-    @groups = hash["groups"] || []
+    @groups = (hash["groups"] || []).freeze
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]

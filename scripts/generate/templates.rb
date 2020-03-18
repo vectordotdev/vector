@@ -109,7 +109,7 @@ class Templates
       end
 
     sink_example =
-      ConfigExampleWriter.new(sink.options_list, table_path: ["sinks", "out"]) do |option|
+      ConfigExampleWriter.new(sink.options_list, table_path: ["sinks", "out"], values: {inputs: ["in"]}) do |option|
         option.required?
       end
 
@@ -146,7 +146,7 @@ class Templates
     end
   end
 
-  def create_config_command(source: nil, sink: nil)
+  def create_config_command(source: nil, sink: nil, default_sink: nil)
     if source.nil? && sink.nil?
       raise ArgumentError.new("You must supply at least one source or sink")
     end
@@ -168,7 +168,7 @@ class Templates
         end
     end
 
-    render("#{partials_path}/_create_config_command.md", binding)
+    render("#{partials_path}/_create_config_command.md", binding).strip
   end
 
   def docker_docs

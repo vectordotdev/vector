@@ -67,7 +67,7 @@ superior because it is:
    <Tabs
      block={true}
      select={true}
-     defaultValue="aws_s3"
+     defaultValue={"console"}
      values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
@@ -79,8 +79,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "aws_cloudwatch_logs" # required
-     inputs = ["my-source-id"] # required
-     endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+     inputs = ["in"] # required
      group_name = "{{ file }}" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
@@ -112,8 +111,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "aws_kinesis_firehose" # required
-     inputs = ["my-source-id"] # required
-     endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+     inputs = ["in"] # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "my-stream" # required
 
@@ -144,8 +142,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "aws_kinesis_streams" # required
-     inputs = ["my-source-id"] # required
-     endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
+     inputs = ["in"] # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "my-stream" # required
 
@@ -176,10 +173,9 @@ superior because it is:
    [sinks.out]
      # General
      type = "aws_s3" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      bucket = "my-bucket" # required
      compression = "gzip" # required
-     endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
      region = "us-east-1" # required, required when endpoint = ""
 
      # Encoding
@@ -208,7 +204,7 @@ superior because it is:
 
    [sinks.out]
      type = "blackhole" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      print_amount = 1000 # required
    ' > vector.toml
    ```
@@ -234,7 +230,7 @@ superior because it is:
 
    [sinks.out]
      type = "clickhouse" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      host = "http://localhost:8123" # required
      table = "mytable" # required
    ' > vector.toml
@@ -262,7 +258,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "console" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
 
      # Encoding
      encoding.codec = "json" # required
@@ -290,7 +286,7 @@ superior because it is:
 
    [sinks.out]
      type = "elasticsearch" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
    ' > vector.toml
    ```
 
@@ -316,7 +312,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "file" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      path = "vector-%Y-%m-%d.log" # required
 
      # Encoding
@@ -346,7 +342,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "gcp_cloud_storage" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      bucket = "my-bucket" # required
      compression = "gzip" # required
      credentials_path = "/path/to/credentials.json" # required
@@ -377,7 +373,7 @@ superior because it is:
 
    [sinks.out]
      type = "gcp_pubsub" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      project = "vector-123456" # required
      topic = "this-is-a-topic" # required
    ' > vector.toml
@@ -404,7 +400,7 @@ superior because it is:
 
    [sinks.out]
      type = "gcp_stackdriver_logging" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      credentials_path = "/path/to/credentials.json" # required
      log_id = "vector-logs" # required
      project_id = "vector-123456" # required
@@ -432,7 +428,7 @@ superior because it is:
 
    [sinks.out]
      type = "honeycomb" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      api_key = "${MY_API_KEY}" # required
      dataset = "my-honeycomb-dataset" # required
    ' > vector.toml
@@ -460,7 +456,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "http" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      uri = "https://10.22.212.22:9000/endpoint" # required
 
      # Encoding
@@ -489,7 +485,7 @@ superior because it is:
 
    [sinks.out]
      type = "humio_logs" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      token = "${TOKEN_ENV_VAR}" # required
    ' > vector.toml
    ```
@@ -516,7 +512,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "kafka" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
      key_field = "user_id" # required
      topic = "topic-1234" # required
@@ -547,7 +543,7 @@ superior because it is:
 
    [sinks.out]
      type = "logdna" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
      hostname = "my-local-machine" # required
    ' > vector.toml
@@ -575,7 +571,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "loki" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      endpoint = "http://localhost:3100" # required
 
      # Labels
@@ -605,7 +601,7 @@ superior because it is:
 
    [sinks.out]
      type = "new_relic_logs" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
    ' > vector.toml
    ```
 
@@ -631,7 +627,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "papertrail" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      endpoint = "logs.papertrailapp.com:12345" # required
 
      # Encoding
@@ -660,7 +656,7 @@ superior because it is:
 
    [sinks.out]
      type = "sematext_logs" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
    ' > vector.toml
    ```
@@ -687,7 +683,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "socket" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      address = "92.12.333.224:5000" # required, required when mode = "tcp"
      mode = "tcp" # required
      path = "/path/to/socket" # required, required when mode = "unix"
@@ -719,7 +715,7 @@ superior because it is:
    [sinks.out]
      # General
      type = "splunk_hec" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      host = "http://my-splunk-host.com" # required
      token = "${TOKEN_ENV_VAR}" # required
 
@@ -749,7 +745,7 @@ superior because it is:
 
    [sinks.out]
      type = "vector" # required
-     inputs = ["my-source-id"] # required
+     inputs = ["in"] # required
      address = "92.12.333.224:5000" # required
    ' > vector.toml
    ```
@@ -767,7 +763,6 @@ superior because it is:
 
    </TabItem>
    </Tabs>
-
 
 2. ### Start Vector as a container
 

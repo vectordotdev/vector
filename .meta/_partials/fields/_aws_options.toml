@@ -10,7 +10,6 @@ type = "string"
 common = false
 examples = ["127.0.0.0:5000/path/to/service"]
 relevant_when = {region = ""}
-required = true
 description = "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
 
 [<%= namespace %>.region]

@@ -55,7 +55,7 @@ superior because it is:
 
 1. ### Configure Vector
 
-<%= create_config_command(source: metadata.sources.docker).indent(3) %>
+<%= create_config_command(source: metadata.sources.docker, default_sink: metadata.sinks.console).indent(3) %>
 
 2. ### Start Vector as a container
 

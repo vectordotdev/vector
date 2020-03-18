@@ -92,9 +92,9 @@ class Templates
       end
     end
 
-    attr_reader :array, :block, :fields, :key_path, :table_path
+    attr_reader :array, :block, :fields, :key_path, :table_path, :values
 
-    def initialize(fields, array: false, key_path: [], table_path: [], &block)
+    def initialize(fields, array: false, key_path: [], table_path: [], values: nil, &block)
       if !fields.is_a?(Array)
         raise ArgumentError.new("fields must be an array")
       end
@@ -108,6 +108,7 @@ class Templates
       @key_path = key_path
       @table_path = table_path
       @block = block
+      @values = values || {}
     end
 
     def categories
@@ -119,8 +120,8 @@ class Templates
     end
 
     private
-      def build_child_writer(fields, array: false, key_path: [], table_path: [])
-        self.class.new(fields, array: array, key_path: key_path, table_path: table_path, &@block)
+      def build_child_writer(fields, array: false, key_path: [], table_path: [], values: nil)
+        self.class.new(fields, array: array, key_path: key_path, table_path: table_path, values: values, &block)
       end
 
       def field_tags(field, default: true, enum: true, example: false, optionality: true, relevant_when: true, type: true, short: false, unit: true)
