@@ -36,7 +36,7 @@ criterion_main!(
     buffering::buffers,
     http::http,
     batch::batch,
-    files::files,
+    /* files::files, */
     lua::lua,
     event::event
 );

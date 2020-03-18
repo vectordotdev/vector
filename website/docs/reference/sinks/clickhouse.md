@@ -27,6 +27,17 @@ The Vector `clickhouse` sink
      website/docs/reference/sinks/clickhouse.md.erb
 -->
 
+## Requirements
+
+import Alert from '@site/src/components/Alert';
+
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* Clickhouse version >= 1.1.54378 is required.
+
+
+</Alert>
+
 ## Configuration
 
 import Tabs from '@theme/Tabs';
@@ -115,19 +126,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Requirements
-
-import Alert from '@site/src/components/Alert';
-
-<Alert icon={false} type="danger" classNames="list--warnings">
-
-* Clickhouse version >= 1.1.54378 is required.
-
-
-</Alert>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 
