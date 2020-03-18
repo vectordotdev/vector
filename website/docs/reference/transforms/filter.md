@@ -267,7 +267,7 @@ The `filter` transform accepts and [outputs `log` events](#output) allowing you 
 For example:
 
 
-The `filter` transform is a simple conditional ????.
+The `filter` transform is a simple conditional match, forwarding only those messages that pass all the conditions.
 In this example, we drop all events that do not come from the host `gerry`:
 
 <CodeHeader fileName="vector.toml" />
