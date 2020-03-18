@@ -560,7 +560,7 @@ services:
       environment:
         - PUBSUB_PROJECT1=testproject,topic1:subscription1
     loki:
-      image: grafana/loki
+      image: grafana/loki:master-89263b0-amd64
       ports:
         - "3100:3100"
       command: -config.file=/etc/loki/loki-config.yaml
