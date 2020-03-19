@@ -7,94 +7,104 @@
 
 use super::context::EngineContext;
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
-use std::ffi::CString;
+use std::ffi::{CString, CStr};
 use std::slice;
 use std::io::Write;
 use toml::Value;
 use std::convert::TryFrom;
 use std::str::FromStr;
+use std::os::raw::c_char;
+use tracing::{trace, event, Level};
+
+struct GuestPointer(*const c_char);
 
 #[lucet_hostcall]
 #[no_mangle]
-pub unsafe fn hint_field_length(vmctx: &mut Vmctx, field: *const u8, len: usize) -> usize {
+#[instrument(skip(vmctx))]
+pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
+    event!(Level::TRACE, "recieved hostcall");
     let mut hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
-
-    let byte_slice = &vmctx.heap()[field as usize..field as usize + len];
-    let field_str = std::str::from_utf8(byte_slice).expect("Didn't get UTF-8");
-
+    let mut heap = vmctx.heap_mut();
+    let field_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
+    let field_str = field_cstr.to_str().unwrap_or("Broke to str");
     let mut event = hostcall_context.event.as_ref().unwrap();
-    let value = event.as_log().get(&field_str.clone().to_string().into());
-    match value {
+
+    let value = event.as_log().get(&field_str.into());
+    let ret = match value {
         None => 0,
         Some(v) => {
             let serialized_value = serde_json::to_string(v).unwrap();
-            let len = serialized_value.as_bytes().len();
-            println!("Hinting {:#?}", len);
+            let serialized_cstring = CString::new(serialized_value).unwrap();
+            let serialized_bytes = serialized_cstring.into_bytes_with_nul();
+            let len = serialized_bytes.len();
+            event!(Level::TRACE, "hinting length {:#?}", len);
             len
         },
-    }
+    };
+    event!(Level::TRACE, "returning from hostcall");
+    ret
 }
 
 #[lucet_hostcall]
 #[no_mangle]
-pub unsafe fn foo(vmctx: &mut Vmctx) {
-    let mut hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
-    println!("{:#?}", hostcall_context.event);
-}
-
-#[lucet_hostcall]
-#[no_mangle]
+#[instrument(skip(vmctx))]
 pub unsafe fn get(
     vmctx: &mut Vmctx,
-    key: *const u8,
-    key_len: usize,
-    value_bytes: *const u8,
-    value_len: usize,
+    key_ptr: *const c_char,
+    value_ptr: *const c_char,
 ) -> usize {
+    event!(Level::TRACE, "recieved hostcall");
     let mut hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
-    let mut heap = &mut vmctx.heap_mut();
+    let mut heap = vmctx.heap_mut();
 
-    let byte_slice= &heap[key as usize..key as usize + key_len];
-    let key_str = std::str::from_utf8(byte_slice).expect("Didn't get UTF-8");
+    let key_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
+    let key_str = key_cstr.to_str().unwrap_or("Broke to str");
 
     let mut event = hostcall_context.event.as_ref().unwrap();
     let maybe_value = event.as_log()
-        .get(&key_str.clone().to_string().into());
+        .get(&key_str.into());
 
-    match maybe_value {
+    let ret = match maybe_value {
         None => 0,
         Some(v) => {
             let serialized_value = serde_json::to_string(v).unwrap();
-            println!("Returning {:?} (into buffer of size {:#?})", serialized_value, value_len);
-            let mut byte_slice = &mut heap[value_bytes as usize..value_bytes as usize + value_len];
-            let wrote = byte_slice.write(serialized_value.as_bytes()).expect("Write to known buffer failed.");
+            println!("Returning {:?}", serialized_value);
+            let serialized_cstring = CString::new(serialized_value).unwrap();
+            let serialized_bytes = serialized_cstring.into_bytes_with_nul();
+            let mut byte_slice = &mut heap[value_ptr as usize..];
+            let wrote = byte_slice.write(serialized_bytes.as_ref()).expect("Write to known buffer failed.");
             println!("Wrote bytes {:?}", wrote);
             wrote
         }
-    }
+    };
+
+    event!(Level::TRACE, "returning from hostcall");
+    ret
 }
 
 #[lucet_hostcall]
 #[no_mangle]
+#[instrument(skip(vmctx))]
 pub unsafe fn insert(
     vmctx: &mut Vmctx,
-    key: *const u8,
-    key_len: usize,
-    value: *const u8,
-    value_len: usize,
+    key_ptr: *const c_char,
+    value_ptr: *const c_char,
 ) {
+    event!(Level::TRACE, "recieved hostcall");
+
     let mut hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
-    let mut heap = &mut vmctx.heap_mut();
+    let mut heap = vmctx.heap_mut();
 
-    let key_slice= &heap[key as usize..key as usize + key_len];
-    let key_str = std::str::from_utf8(key_slice).expect("Didn't get UTF-8");
+    let key_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
+    let key_str = key_cstr.to_str().unwrap_or("Broke to str");
+    let mut event = hostcall_context.event.as_ref().unwrap();
 
-    let value_slice= &heap[value as usize..value as usize + value_len];
-    let value_str = std::str::from_utf8(&value_slice).expect("Didn't get UTF-8");
-    let value = serde_json::Value::from_str(value_str).expect("Didn't get value");
-
-    println!("Inserting {:?} (hinted len: {:#?})", value, value_len);
+    let value_cstr = CStr::from_ptr(heap[value_ptr as usize..].as_mut_ptr() as *mut c_char);
+    let value_str = value_cstr.to_str().unwrap_or("Broke to str");
+    let value_val = serde_json::Value::from_str(value_str).unwrap_or("Broke on value into".into());
 
     let mut event = hostcall_context.event.as_mut().unwrap();
-    event.as_mut_log().insert(key_str, value);
+    event.as_mut_log().insert(key_str, value_val);
+
+    event!(Level::TRACE, "returning from hostcall");
 }

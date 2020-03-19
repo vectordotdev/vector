@@ -1775,10 +1775,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "inspect"
-version = "0.1.0"
-
-[[package]]
 name = "inventory"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3263,6 +3259,7 @@ dependencies = [
 name = "protobuf"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "prost 0.6.1",
  "prost-build 0.6.1",
  "serde",

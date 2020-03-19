@@ -91,7 +91,7 @@ $(ENGINE_TEST_MODULES): ensure-has-wasm-toolchain ### Build the target test modu
 	cargo +nightly build --target wasm32-wasi --release
 
 test-engine: build-engine-test-modules  ### Run engine tests.
-	cargo test --no-default-features --features engine engine
+	cargo test --no-default-features --features engine engine -- --nocapture
 
 clean: ## Remove build artifacts
 	@cargo clean
