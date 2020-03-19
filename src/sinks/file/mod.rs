@@ -126,6 +126,8 @@ impl FileSink {
                 }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
                     match result {
+                        // We do not poll map when it's empty, so we should
+                        // never reach this branch.
                         None => unreachable!(),
                         Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
