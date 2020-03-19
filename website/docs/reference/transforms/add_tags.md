@@ -41,8 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tags.env_tag = "${ENV_VAR}" # example
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';

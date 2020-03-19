@@ -31,6 +31,7 @@ macro_rules! assert_downcast_matches {
 }
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
+
 pub fn next_addr() -> SocketAddr {
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -241,6 +242,64 @@ pub fn shutdown_on_idle(runtime: Runtime) {
             .timeout(std::time::Duration::from_secs(10)),
     )
     .unwrap()
+}
+
+#[derive(Debug)]
+pub struct CollectN<S>
+where
+    S: Stream,
+{
+    stream: Option<S>,
+    remaining: usize,
+    items: Option<Vec<S::Item>>,
+}
+
+impl<S: Stream> CollectN<S> {
+    pub fn new(s: S, n: usize) -> Self {
+        Self {
+            stream: Some(s),
+            remaining: n,
+            items: Some(Vec::new()),
+        }
+    }
+}
+
+impl<S> Future for CollectN<S>
+where
+    S: Stream,
+{
+    type Item = (S, Vec<S::Item>);
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
+        let stream = self.stream.take();
+        if stream.is_none() {
+            panic!("Stream is missing");
+        }
+        let mut stream = stream.unwrap();
+
+        loop {
+            if self.remaining == 0 {
+                return Ok(Async::Ready((stream, self.items.take().unwrap())));
+            }
+            match stream.poll() {
+                Ok(Async::Ready(Some(e))) => {
+                    self.items.as_mut().unwrap().push(e);
+                    self.remaining -= 1;
+                }
+                Ok(Async::Ready(None)) => {
+                    return Ok(Async::Ready((stream, self.items.take().unwrap())));
+                }
+                Ok(Async::NotReady) => {
+                    self.stream.replace(stream);
+                    return Ok(Async::NotReady);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]

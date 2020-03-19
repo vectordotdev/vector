@@ -11,9 +11,7 @@ use crate::{
 };
 use futures::compat::Compat;
 use futures01::{
-    future::{self, poll_fn, IntoFuture},
-    stream::FuturesUnordered,
-    Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
+    future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
@@ -214,18 +212,14 @@ impl Sink for KafkaSink {
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
     let consumer: BaseConsumer = config.to_rdkafka().unwrap().create().unwrap();
 
-    let check = poll_fn(move || {
-        tokio_threadpool::blocking(|| {
-            consumer
-                .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
-                .map(|_| ())
-                .map_err(|err| err.into())
-        })
-    })
-    .map_err(|err| err.into())
-    .and_then(|result| result.into_future());
+    let check = tokio02::task::block_in_place(|| {
+        consumer
+            .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
+            .map(|_| ())
+            .map_err(|err| err.into())
+    });
 
-    Box::new(check)
+    Box::new(future::result(check))
 }
 
 fn encode_event(

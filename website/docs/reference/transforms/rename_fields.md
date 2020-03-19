@@ -41,8 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   fields.parent.old_child_name = "parent.new_child_name" # example
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
