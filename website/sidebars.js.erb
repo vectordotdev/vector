@@ -30,21 +30,21 @@ module.exports = {
             <%= metadata.links.fetch_id("docs.installation").to_json %>,
             {
               type: 'category',
-              label: 'Containers',
+              label: 'Package Managers',
               items: [
-                <%= metadata.links.fetch_id("docs.installation.containers").to_json %>,
-                <%- metadata.installation.containers.each do |container| -%>
-                  <%= metadata.links.fetch_id("docs.installation.containers.#{container.id}").to_json %>,
+                <%= metadata.links.fetch_id("docs.installation.package-managers").to_json %>,
+                <%- metadata.installation.package_managers_list.each do |package_manager| -%>
+                  <%= metadata.links.fetch_id("docs.installation.package-managers.#{package_manager.name}").to_json %>,
                 <%- end -%>
               ],
             },
             {
               type: 'category',
-              label: 'Package Managers',
+              label: 'Platforms',
               items: [
-                <%= metadata.links.fetch_id("docs.installation.package-managers").to_json %>,
-                <%- metadata.installation.package_managers.each do |package_manager| -%>
-                  <%= metadata.links.fetch_id("docs.installation.package_managers.#{package_manager.id}").to_json %>,
+                <%= metadata.links.fetch_id("docs.installation.platforms").to_json %>,
+                <%- metadata.installation.platforms_list.each do |platform| -%>
+                  <%= metadata.links.fetch_id("docs.installation.platforms.#{platform.name}").to_json %>,
                 <%- end -%>
               ],
             },
@@ -53,8 +53,8 @@ module.exports = {
               label: 'Operating Systems',
               items: [
                 <%= metadata.links.fetch_id("docs.installation.operating-systems").to_json %>,
-                <%- metadata.installation.operating_systems.each do |operating_system| -%>
-                  <%= metadata.links.fetch_id("docs.installation.operating_systems.#{operating_system.id}").to_json %>,
+                <%- metadata.installation.operating_systems_list.each do |operating_system| -%>
+                  <%= metadata.links.fetch_id("docs.installation.operating-systems.#{operating_system.name}").to_json %>,
                 <%- end -%>
               ],
             },
@@ -82,6 +82,15 @@ module.exports = {
                 <%= metadata.links.fetch_id("docs.deployment.roles").to_json %>,
                 <%= metadata.links.fetch_id("docs.deployment.roles.agent").to_json %>,
                 <%= metadata.links.fetch_id("docs.deployment.roles.service").to_json %>,
+              ]
+            },
+            {
+              type: 'category',
+              label: 'Strategies',
+              items: [
+                <%= metadata.links.fetch_id("docs.deployment.strategies").to_json %>,
+                <%= metadata.links.fetch_id("docs.deployment.strategies.dedicated-container").to_json %>,
+                <%= metadata.links.fetch_id("docs.deployment.strategies.sidecar").to_json %>,
               ]
             },
             <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,

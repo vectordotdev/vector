@@ -1,0 +1,43 @@
+[installation.operating_systems.amazon-linux]
+title = "Amazon Linux"
+package_manager = "RPM"
+os = "Linux"
+
+[installation.operating_systems.centos]
+title = "CentOS"
+package_manager = "RPM"
+os = "Linux"
+
+[installation.operating_systems.debian]
+title = "Debian"
+package_manager = "DPKG"
+os = "Linux"
+
+[installation.operating_systems.macos]
+title = "MacOS"
+package_manager = "Homebrew"
+os = "Linux"
+
+[installation.operating_systems.nixos]
+title = "NixOS"
+package_manager = "nix"
+os = "Linux"
+
+[installation.operating_systems.raspbian]
+title = "Raspbian"
+package_manager = "DPKG"
+os = "Linux"
+
+[installation.operating_systems.rhel]
+title = "RHEL"
+package_manager = "RPM"
+os = "Linux"
+
+[installation.operating_systems.ubuntu]
+title = "Ubuntu"
+package_manager = "DPKG"
+os = "Linux"
+
+[installation.operating_systems.windows]
+title = "Windows"
+os = "Windows"

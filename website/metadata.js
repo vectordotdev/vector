@@ -4,244 +4,261 @@ module.exports = {
     "metric"
   ],
   "installation": {
-    "containers": [
-      {
+    "downloads": {
+      "x86_64-unknown-linux-musl-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
+        "file_type": "tar.gz",
+        "os": "Linux",
+        "title": "Linux (x86_64)",
+        "type": "archive",
+        "name": "x86_64-unknown-linux-musl-tar-gz"
+      },
+      "aarch64-unknown-linux-musl-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARM64",
+        "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
+        "file_type": "tar.gz",
+        "os": "Linux",
+        "title": "Linux (ARM64)",
+        "type": "archive",
+        "name": "aarch64-unknown-linux-musl-tar-gz"
+      },
+      "armv7-unknown-linux-musleabihf-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARMv7",
+        "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
+        "file_type": "tar.gz",
+        "os": "Linux",
+        "title": "Linux (ARMv7)",
+        "type": "archive",
+        "name": "armv7-unknown-linux-musleabihf-tar-gz"
+      },
+      "x86_64-apple-darwin-tar-gz": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64-apple-darwin.tar.gz",
+        "file_type": "tar.gz",
+        "os": "MacOS",
+        "title": "MacOS (x86_64)",
+        "type": "archive",
+        "name": "x86_64-apple-darwin-tar-gz"
+      },
+      "x86_64-pc-windows-msvc-zip": {
+        "package_manager": null,
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64-pc-windows-msvc.zip",
+        "file_type": "zip",
+        "os": "Windows",
+        "title": "Windows (x86_64, 7+)",
+        "type": "archive",
+        "name": "x86_64-pc-windows-msvc-zip"
+      },
+      "x64-msi": {
+        "package_manager": "MSI",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x64.msi",
+        "file_type": "msi",
+        "os": "Windows",
+        "title": "Windows (x86_64, 7+)",
+        "type": "package",
+        "name": "x64-msi"
+      },
+      "amd64-deb": {
+        "package_manager": "DPKG",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-amd64.deb",
+        "file_type": "deb",
+        "os": "Linux",
+        "title": "Deb (x86_64)",
+        "type": "package",
+        "name": "amd64-deb"
+      },
+      "arm64-deb": {
+        "package_manager": "DPKG",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARM64",
+        "file_name": "vector-arm64.deb",
+        "file_type": "deb",
+        "os": "Linux",
+        "title": "Deb (ARM64)",
+        "type": "package",
+        "name": "arm64-deb"
+      },
+      "armhf-deb": {
+        "package_manager": "DPKG",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARMv7",
+        "file_name": "vector-armhf.deb",
+        "file_type": "deb",
+        "os": "Linux",
+        "title": "Deb (ARMv7)",
+        "type": "package",
+        "name": "armhf-deb"
+      },
+      "x86_64-rpm": {
+        "package_manager": "RPM",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "x86_64",
+        "file_name": "vector-x86_64.rpm",
+        "file_type": "rpm",
+        "os": "Linux",
+        "title": "RPM (x86_64)",
+        "type": "package",
+        "name": "x86_64-rpm"
+      },
+      "aarch64-rpm": {
+        "package_manager": "RPM",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARM64",
+        "file_name": "vector-aarch64.rpm",
+        "file_type": "rpm",
+        "os": "Linux",
+        "title": "RPM (ARM64)",
+        "type": "package",
+        "name": "aarch64-rpm"
+      },
+      "armv7hl-rpm": {
+        "package_manager": "RPM",
+        "available_on_latest": true,
+        "available_on_nightly": true,
+        "arch": "ARMv7",
+        "file_name": "vector-armv7hl.rpm",
+        "file_type": "rpm",
+        "os": "Linux",
+        "title": "RPM (ARMv7)",
+        "type": "package",
+        "name": "armv7hl-rpm"
+      }
+    },
+    "operating_systems": {
+      "amazon-linux": {
+        "title": "Amazon Linux",
+        "package_manager": "RPM",
+        "os": "Linux",
+        "name": "amazon-linux"
+      },
+      "centos": {
+        "title": "CentOS",
+        "package_manager": "RPM",
+        "os": "Linux",
+        "name": "centos"
+      },
+      "debian": {
+        "title": "Debian",
+        "package_manager": "DPKG",
+        "os": "Linux",
+        "name": "debian"
+      },
+      "macos": {
+        "title": "MacOS",
+        "package_manager": "Homebrew",
+        "os": "Linux",
+        "name": "macos"
+      },
+      "nixos": {
+        "title": "NixOS",
+        "package_manager": "nix",
+        "os": "Linux",
+        "name": "nixos"
+      },
+      "raspbian": {
+        "title": "Raspbian",
+        "package_manager": "DPKG",
+        "os": "Linux",
+        "name": "raspbian"
+      },
+      "rhel": {
+        "title": "RHEL",
+        "package_manager": "RPM",
+        "os": "Linux",
+        "name": "rhel"
+      },
+      "ubuntu": {
+        "title": "Ubuntu",
+        "package_manager": "DPKG",
+        "os": "Linux",
+        "name": "ubuntu"
+      },
+      "windows": {
+        "title": "Windows",
+        "os": "Windows",
+        "name": "windows"
+      }
+    },
+    "package_managers": {
+      "dpkg": {
+        "title": "DPKG",
         "archs": [
           "x86_64",
           "ARM64",
           "ARMv7"
         ],
-        "id": "docker",
-        "name": "Docker",
+        "name": "dpkg"
+      },
+      "homebrew": {
+        "title": "Homebrew",
+        "archs": [
+          "x86_64"
+        ],
+        "name": "homebrew"
+      },
+      "nix": {
+        "title": "Nix",
+        "archs": [
+          "x86_64"
+        ],
+        "name": "nix"
+      },
+      "rpm": {
+        "title": "RPM",
+        "archs": [
+          "x86_64"
+        ],
+        "name": "rpm"
+      },
+      "msi": {
+        "title": "MSI",
+        "archs": [
+          "x86_64"
+        ],
+        "name": "msi"
+      }
+    },
+    "platforms": {
+      "docker": {
+        "title": "Docker",
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
         "oss": [
           "Linux",
           "MacOS"
-        ]
+        ],
+        "name": "docker"
       }
-    ],
-    "downloads": [
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64-unknown-linux-musl.tar.gz",
-        "file_type": "tar.gz",
-        "name": "Linux (x86_64)",
-        "os": "Linux",
-        "type": "archive"
-      },
-      {
-        "arch": "ARM64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-aarch64-unknown-linux-musl.tar.gz",
-        "file_type": "tar.gz",
-        "name": "Linux (ARM64)",
-        "os": "Linux",
-        "type": "archive"
-      },
-      {
-        "arch": "ARMv7",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-armv7-unknown-linux-musleabihf.tar.gz",
-        "file_type": "tar.gz",
-        "name": "Linux (ARMv7)",
-        "os": "Linux",
-        "type": "archive"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64-apple-darwin.tar.gz",
-        "file_type": "tar.gz",
-        "name": "MacOS (x86_64)",
-        "os": "MacOS",
-        "type": "archive"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64-pc-windows-msvc.zip",
-        "file_type": "zip",
-        "name": "Windows (x86_64, 7+)",
-        "os": "Windows",
-        "type": "archive"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x64.msi",
-        "file_type": "msi",
-        "name": "Windows (x86_64, 7+)",
-        "os": "Windows",
-        "package_manager": "MSI",
-        "type": "package"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-amd64.deb",
-        "file_type": "deb",
-        "name": "Deb (x86_64)",
-        "os": "Linux",
-        "package_manager": "DPKG",
-        "type": "package"
-      },
-      {
-        "arch": "ARM64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-arm64.deb",
-        "file_type": "deb",
-        "name": "Deb (ARM64)",
-        "os": "Linux",
-        "package_manager": "DPKG",
-        "type": "package"
-      },
-      {
-        "arch": "ARMv7",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-armhf.deb",
-        "file_type": "deb",
-        "name": "Deb (ARMv7)",
-        "os": "Linux",
-        "package_manager": "DPKG",
-        "type": "package"
-      },
-      {
-        "arch": "x86_64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-x86_64.rpm",
-        "file_type": "rpm",
-        "name": "RPM (x86_64)",
-        "os": "Linux",
-        "package_manager": "RPM",
-        "type": "package"
-      },
-      {
-        "arch": "ARM64",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-aarch64.rpm",
-        "file_type": "rpm",
-        "name": "RPM (ARM64)",
-        "os": "Linux",
-        "package_manager": "RPM",
-        "type": "package"
-      },
-      {
-        "arch": "ARMv7",
-        "available_on_latest": true,
-        "available_on_nightly": true,
-        "file_name": "vector-armv7hl.rpm",
-        "file_type": "rpm",
-        "name": "RPM (ARMv7)",
-        "os": "Linux",
-        "package_manager": "RPM",
-        "type": "package"
-      }
-    ],
-    "operating_systems": [
-      {
-        "id": "amazon-linux",
-        "name": "Amazon Linux",
-        "os": "Linux",
-        "package_manager": "RPM"
-      },
-      {
-        "id": "centos",
-        "name": "CentOS",
-        "os": "Linux",
-        "package_manager": "RPM"
-      },
-      {
-        "id": "debian",
-        "name": "Debian",
-        "os": "Linux",
-        "package_manager": "DPKG"
-      },
-      {
-        "id": "macos",
-        "name": "MacOS",
-        "os": "Linux",
-        "package_manager": "Homebrew"
-      },
-      {
-        "id": "nixos",
-        "name": "NixOS",
-        "os": "Linux",
-        "package_manager": "nix"
-      },
-      {
-        "id": "raspbian",
-        "name": "Raspbian",
-        "os": "Linux",
-        "package_manager": "DPKG"
-      },
-      {
-        "id": "rhel",
-        "name": "RHEL",
-        "os": "Linux",
-        "package_manager": "RPM"
-      },
-      {
-        "id": "ubuntu",
-        "name": "Ubuntu",
-        "os": "Linux",
-        "package_manager": "DPKG"
-      },
-      {
-        "id": "windows",
-        "name": "Windows",
-        "os": "Windows"
-      }
-    ],
-    "package_managers": [
-      {
-        "archs": [
-          "x86_64",
-          "ARM64",
-          "ARMv7"
-        ],
-        "id": "dpkg",
-        "name": "DPKG"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "homebrew",
-        "name": "Homebrew"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "nix",
-        "name": "Nix"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "rpm",
-        "name": "RPM"
-      },
-      {
-        "archs": [
-          "x86_64"
-        ],
-        "id": "msi",
-        "name": "MSI"
-      }
-    ]
+    }
   },
   "latest_post": {
     "author_github": "https://github.com/Jeffail",

@@ -59,7 +59,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 ### Setup
 
-* [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
+* [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 * [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
@@ -203,7 +203,6 @@ Or use your own [preferred method][docs.installation].
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.concepts]: https://vector.dev/docs/about/concepts/
 [docs.configuration]: https://vector.dev/docs/setup/configuration/
-[docs.containers]: https://vector.dev/docs/setup/installation/containers/
 [docs.data-model.log#timestamps]: https://vector.dev/docs/about/data-model/log/#timestamps
 [docs.data-model.log#types]: https://vector.dev/docs/about/data-model/log/#types
 [docs.data-model.log]: https://vector.dev/docs/about/data-model/log/
@@ -224,6 +223,7 @@ Or use your own [preferred method][docs.installation].
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems/
 [docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
+[docs.platforms]: https://vector.dev/docs/setup/installation/platforms/
 [docs.process-management#reloading]: https://vector.dev/docs/administration/process-management/#reloading
 [docs.process-management#starting]: https://vector.dev/docs/administration/process-management/#starting
 [docs.process-management]: https://vector.dev/docs/administration/process-management/

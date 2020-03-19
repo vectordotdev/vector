@@ -176,6 +176,10 @@ class Templates
     render("#{partials_path}/_docker_docs.md")
   end
 
+  def downloads_urls(downloads)
+    render("#{partials_path}/_downloads_urls.md", binding)
+  end
+
   def encoding_description(encoding)
     case encoding
     when "json"

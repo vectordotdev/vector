@@ -44,7 +44,7 @@ metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 release = metadata.latest_release
 
 if release_exists?(release)
-  error!(
+  Printer.error!(
     <<~EOF
     It looks like release v#{release.version} has already been released. A tag for this release already exists.
 
@@ -52,11 +52,11 @@ if release_exists?(release)
     EOF
   )
 else
-  title("Committing and tagging release")
+  Printer.title("Committing and tagging release")
 
   bump_cargo_version(release.version)
 
-  success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
+  Printer.success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
 
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
@@ -93,7 +93,7 @@ else
     system(command)
 
     if !$?.success?
-      error!(
+      Printer.error!(
         <<~EOF
         Command failed!
 

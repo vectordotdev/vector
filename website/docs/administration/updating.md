@@ -16,13 +16,9 @@ method. Each installation guide provides it's own "Updating" section:
 
 ## Installation Method
 
-### Containers
+### Package managers
 
 import Jump from '@site/src/components/Jump';
-
-<Jump to="/docs/setup/installation/containers/docker/#updating">Docker</Jump>
-
-### Package managers
 
 <Jump to="/docs/setup/installation/package-managers/dpkg/#updating">DPKG</Jump>
 <Jump to="/docs/setup/installation/package-managers/homebrew/#updating">Homebrew</Jump>

@@ -132,7 +132,7 @@ end
 # Header
 #
 
-title("Generating files...")
+Printer.title("Generating files...")
 
 #
 # Setup
@@ -241,11 +241,11 @@ erb_paths.
 
     if current_content != content
       action = dry_run ? "Will be changed" : "Changed"
-      say("#{action} - #{target_file}", color: :green)
+      Printer.say("#{action} - #{target_file}", color: :green)
       File.write(target_path, content) if !dry_run
     else
       action = dry_run ? "Will not be changed" : "Not changed"
-      say("#{action} - #{target_file}", color: :blue)
+      Printer.say("#{action} - #{target_file}", color: :blue)
     end
   end
 
@@ -257,7 +257,7 @@ end
 # Post process individual docs
 #
 
-title("Post processing generated files...")
+Printer.title("Post processing generated files...")
 
 docs =
   Dir.glob("#{DOCS_ROOT}/**/*.md").to_a +
@@ -271,9 +271,9 @@ docs.each do |doc|
 
   if original_content != new_content
     File.write(doc, new_content)
-    say("Processed - #{path}", color: :green)
+    Printer.say("Processed - #{path}", color: :green)
   else
-    say("Not changed - #{path}", color: :blue)
+    Printer.say("Not changed - #{path}", color: :blue)
   end
 end
 
@@ -285,14 +285,14 @@ check_urls =
   if ENV.key?("CHECK_URLS")
     ENV.fetch("CHECK_URLS") == "true"
   else
-    title("Checking URLs...")
-    get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+    Printer.title("Checking URLs...")
+    Printer.get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
   end
 
 if check_urls
   Parallel.map(metadata.links.values.to_a.sort, in_threads: 50) do |id, value|
     if !link_valid?(value)
-      error!(
+      Printer.error!(
         <<~EOF
         Link `#{id}` invalid!
 
@@ -302,7 +302,7 @@ if check_urls
         EOF
       )
     else
-      say("Valid - #{id} - #{value}", color: :green)
+      Printer.say("Valid - #{id} - #{value}", color: :green)
     end
   end
 end

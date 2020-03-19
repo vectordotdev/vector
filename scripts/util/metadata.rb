@@ -7,6 +7,7 @@ require_relative "metadata/batching_sink"
 require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
+require_relative "metadata/installation"
 require_relative "metadata/links"
 require_relative "metadata/post"
 require_relative "metadata/release"
@@ -65,7 +66,7 @@ class Metadata
             begin
               Template.render(file)
             rescue Exception => e
-              error!(
+              Printer.error!(
                 <<~EOF
                 The follow metadata file failed to load:
 
@@ -111,7 +112,7 @@ class Metadata
             error_messages << "+ #{errors.size} errors"
           end
 
-          error!(
+          Printer.error!(
             <<~EOF
             The metadata schema is invalid. This means the the resulting
             hash from the `/.meta/**/*.toml` files violates the defined
@@ -141,8 +142,8 @@ class Metadata
 
   def initialize(hash, docs_root, guides_root, pages_root)
     @data_model = DataModel.new(hash.fetch("data_model"))
-    @installation = OpenStruct.new()
-    @options = hash.fetch("options").to_struct_with_name(Field)
+    @installation = Installation.new(hash.fetch("installation"))
+    @options = hash.fetch("options").to_struct_with_name(constructor: Field)
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
@@ -152,14 +153,6 @@ class Metadata
     # domains
 
     @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
-
-    # installation
-
-    installation_hash = hash.fetch("installation")
-    @installation.containers = installation_hash.fetch("containers").collect { |h| OpenStruct.new(h) }
-    @installation.downloads = installation_hash.fetch("downloads").collect { |h| OpenStruct.new(h) }
-    @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
-    @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
     # posts
 
@@ -240,7 +233,7 @@ class Metadata
 
     # env vars
 
-    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
 
     components.each do |component|
       component.env_vars.to_h.each do |key, val|
@@ -258,15 +251,6 @@ class Metadata
 
   def components
     @components ||= sources_list + transforms_list + sinks_list
-  end
-
-  def downloads(arch: nil, os: nil, package_manager: nil, type: nil)
-    downloads = installation.downloads
-    downloads = downloads.select { |d| d.arch && d.arch.downcase == arch.to_s.downcase } if arch
-    downloads = downloads.select { |d| d.os && d.os.downcase == os.to_s.downcase } if os
-    downloads = downloads.select { |d| d.package_manager && d.package_manager.downcase == package_manager.to_s.downcase } if package_manager
-    downloads = downloads.select { |d| d.type && d.type.downcase == type.to_s.downcase } if type
-    downloads
   end
 
   def env_vars_list
@@ -334,9 +318,9 @@ class Metadata
   end
 
   def platforms
-    @platforms ||= installation.containers +
-      installation.operating_systems +
-      installation.package_managers
+    @platforms ||= installation.operating_systems_list +
+      installation.package_managers_list +
+      installation.platforms_list
   end
 
   def previous_minor_releases(release)

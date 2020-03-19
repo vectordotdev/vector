@@ -44,6 +44,8 @@ delayed. Generally new Vector releases are made available within a few days.
 
     </CodeExplanation>
 
+    [Looking for a specific version?](#versions)
+
 2.  ### Start Vector
 
     ```bash
@@ -60,7 +62,49 @@ delayed. Generally new Vector releases are made available within a few days.
 
 </div>
 
-### Previous Versions
+## Configuring
+
+The [Vector nix package][urls.vector_nix_package] does not install any
+configuration files by default. You'll need to create a
+[Vector configuration file][docs.configuration] and pass it to Vector via the
+`--config` flag when [starting][docs.process-management#starting] Vector.
+
+## Deploying
+
+How you deploy Vector is largely dependent on your use case and environment.
+Please see the [deployment section][docs.deployment] for more info on how to
+deploy Vector.
+
+## Administering
+
+The Vector nix package does not use Systemd by default, but Vector does provide
+a [Systemd service file][urls.vector_systemd_file] that you can use as a
+starting point. How you manage the Vector process is up to you, and the
+process administration section covers how to do this:
+
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/docs/administration/">Administration</Jump>
+
+## Uninstalling
+
+```bash
+nix-env --uninstall vector
+```
+
+## Updating
+
+```bash
+nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --upgrade vector
+```
+
+## Package
+
+### Architectures
+
+Vector's Nix packages only support the X86_64 architecture.
+
+### Versions
 
 Installing previous versions of Vector through `nix` is possible, but not
 straightforward. For example, installing Vector `0.7.1` can be achieved with
@@ -103,38 +147,14 @@ def nix_versions
 end
 ```
 
-## Configuring
+### Source Files
 
-The [Vector nix package][urls.vector_nix_package] does not install any
-configuration files by default. You'll need to create a
-[Vector configuration file][docs.configuration] and pass it to Vector via the
-`--config` flag when [starting][docs.process-management#starting] Vector.
-
-## Administering
-
-The Vector nix package does not use Systemd by default, but Vector does provide
-a [Systemd service file][urls.vector_systemd_file] that you can use as a
-starting point. How you manage the Vector process is up to you, and the
-process administration section covers how to do this:
-
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/docs/administration/">Administration</Jump>
-
-## Uninstalling
-
-```bash
-nix-env --uninstall vector
-```
-
-## Updating
-
-```bash
-nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --upgrade vector
-```
+Vector's Nix source files are located in the
+[Nix repo][urls.vector_nix_package].
 
 
 [docs.configuration]: /docs/setup/configuration/
+[docs.deployment]: /docs/setup/deployment/
 [docs.process-management#starting]: /docs/administration/process-management/#starting
 [urls.nix]: https://nixos.org/nix/
 [urls.nixos]: https://nixos.org/

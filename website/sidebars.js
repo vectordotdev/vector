@@ -30,22 +30,22 @@ module.exports = {
             "setup/installation",
             {
               type: 'category',
-              label: 'Containers',
-              items: [
-                "setup/installation/containers",
-                  "setup/installation/containers/docker",
-              ],
-            },
-            {
-              type: 'category',
               label: 'Package Managers',
               items: [
                 "setup/installation/package-managers",
                   "setup/installation/package-managers/dpkg",
                   "setup/installation/package-managers/homebrew",
+                  "setup/installation/package-managers/msi",
                   "setup/installation/package-managers/nix",
                   "setup/installation/package-managers/rpm",
-                  "setup/installation/package-managers/msi",
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Platforms',
+              items: [
+                "setup/installation/platforms",
+                  "setup/installation/platforms/docker",
               ],
             },
             {
@@ -58,8 +58,8 @@ module.exports = {
                   "setup/installation/operating-systems/debian",
                   "setup/installation/operating-systems/macos",
                   "setup/installation/operating-systems/nixos",
-                  "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/rhel",
+                  "setup/installation/operating-systems/raspbian",
                   "setup/installation/operating-systems/ubuntu",
                   "setup/installation/operating-systems/windows",
               ],
@@ -88,6 +88,15 @@ module.exports = {
                 "setup/deployment/roles",
                 "setup/deployment/roles/agent",
                 "setup/deployment/roles/service",
+              ]
+            },
+            {
+              type: 'category',
+              label: 'Strategies',
+              items: [
+                "setup/deployment/strategies",
+                "setup/deployment/strategies/dedicated-container",
+                "setup/deployment/strategies/sidecar",
               ]
             },
             "setup/deployment/topologies",

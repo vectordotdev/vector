@@ -18,11 +18,11 @@ import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 
-We recommend installing Vector through a supported [container
-platform][docs.containers], [package manager][docs.package_managers], or
-pre-built [archive][docs.from_archives], if possible. These handle permissions,
-directory creation, and other intricacies covered in the [Next
-Steps](#next-steps) section.
+We recommend installing Vector through a supported [platform][docs.platforms],
+[package manager][docs.package_managers], or pre-built
+[archive][docs.from_archives], if possible. These handle permissions, directory
+creation, and other intricacies covered in the [Next Steps](#next-steps)
+section.
 
 </Alert>
 
@@ -472,11 +472,11 @@ features one has to pass a comma-separated list of component features.
 
 
 [docs.configuration]: /docs/setup/configuration/
-[docs.containers]: /docs/setup/installation/containers/
 [docs.from_archives]: /docs/setup/installation/manual/from-archives/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary/#buffer
 [docs.package_managers]: /docs/setup/installation/package-managers/
+[docs.platforms]: /docs/setup/installation/platforms/
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sinks.aws_cloudwatch_metrics]: /docs/reference/sinks/aws_cloudwatch_metrics/
 [docs.sinks.aws_kinesis_firehose]: /docs/reference/sinks/aws_kinesis_firehose/

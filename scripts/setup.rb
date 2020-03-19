@@ -24,12 +24,6 @@ Bundler.require(:default)
 require_relative "util"
 
 #
-# Includes
-#
-
-include Printer
-
-#
 # Constants
 #
 

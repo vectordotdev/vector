@@ -1,4 +1,6 @@
-# Subdomain reedirects
+#
+# Subdomains
+#
 
 [[redirects]]
   from = "https://vector-project.netlify.com/*"
@@ -11,6 +13,22 @@
   to = "https://gitter.im/timberio-vector/community"
   status = 302
   force = true
+
+[[redirects]]
+  from = "https://sh.vector.dev/*"
+  to = "http://sh.vector.dev.s3-website-us-east-1.amazonaws.com/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://test-results.vector.dev/*"
+  to = "http://test-results.vector.dev.s3-website-us-east-1.amazonaws.com/:splat"
+  status = 200
+  force = true
+
+#
+# Old docs site
+#
 
 [[redirects]]
   from = "https://docs.vector.dev/usage/administration/stopping"
@@ -48,19 +66,9 @@
   status = 301
   force = true
 
-[[redirects]]
-  from = "https://sh.vector.dev/*"
-  to = "http://sh.vector.dev.s3-website-us-east-1.amazonaws.com/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "https://test-results.vector.dev/*"
-  to = "http://test-results.vector.dev.s3-website-us-east-1.amazonaws.com/:splat"
-  status = 200
-  force = true
-
-# Internal page redirects
+#
+# Internal redirects
+#
 
 [[redirects]]
   from = "/docs/"
@@ -83,6 +91,18 @@
 [[redirects]]
   from = "/docs/reference/sources/udp/"
   to = "/docs/reference/sources/socket/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/installation/containers/"
+  to = "/docs/setup/installation/platforms/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/installation/containers/docker/"
+  to = "/docs/setup/installation/platforms/docker"
   status = 301
   force = true
 

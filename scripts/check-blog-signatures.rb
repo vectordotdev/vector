@@ -24,7 +24,7 @@ FileUtils::remove_dir gpg_base_dir, true
 
 # check signatures for all blog posts
 metadata.posts.each do |post|
-  say("Checking #{post.path}...")
+  Printer.say("Checking #{post.path}...")
   github_username = post.author_github.rpartition("/").last
 
   # directory with keyring for the given author
@@ -46,7 +46,7 @@ metadata.posts.each do |post|
   # verify the signature for the post
   res = system("gpg", "--homedir", keyring_dir, "--verify", "#{ROOT_DIR}/#{post.path}.sig")
   if not res
-    error!("Cannot verify GPG signature for #{post.path}")
+    Printer.error!("Cannot verify GPG signature for #{post.path}")
     exit 1
   end
 end

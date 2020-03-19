@@ -1,0 +1,4 @@
+[installation.platforms.docker]
+title = "Docker"
+archs = ["x86_64", "ARM64", "ARMv7"]
+oss = ["Linux", "MacOS"]

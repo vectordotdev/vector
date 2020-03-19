@@ -40,21 +40,21 @@ scopes:
   - website
 
   # platforms
-  - docker platform
-  - amazon linux platform
+  - amazon-linux platform
   - centos platform
   - debian platform
   - macos platform
   - nixos platform
-  - raspbian platform
   - rhel platform
+  - raspbian platform
   - ubuntu platform
   - windows platform
   - dpkg platform
   - homebrew platform
+  - msi platform
   - nix platform
   - rpm platform
-  - msi platform
+  - docker platform
 
   # providers
   - aws provider

@@ -26,8 +26,12 @@ class Hash
 
     each do |key, val|
       new_hash[key] =
-        if block_given? && val.is_a?(Hash) && (should_have_keys.empty? || (should_have_keys - val.keys).empty?)
-          yield(key, val)
+        if val.is_a?(Hash) && (should_have_keys.empty? || (should_have_keys - val.keys).empty?)
+          if block_given?
+            yield(key, val)
+          else
+            val.to_struct(should_have_keys: should_have_keys)
+          end
         else
           val
         end
@@ -36,9 +40,22 @@ class Hash
     AccessibleHash.new(new_hash)
   end
 
-  def to_struct_with_name(constructor, should_have_keys: [])
+  def to_struct_with_name(constructor: nil, ensure_keys: [], should_have_keys: [])
     to_struct(should_have_keys: should_have_keys) do |key, hash|
-      constructor.new(hash.merge({"name" => key}))
+      new_hash = {}
+
+      ensure_keys.each do |key|
+        new_hash[key] = nil
+      end
+
+      new_hash.merge!(hash)
+      new_hash["name"] = key
+
+      if constructor
+        constructor.new(new_hash)
+      else
+        new_hash.to_struct
+      end
     end
   end
 end

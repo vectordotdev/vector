@@ -8,7 +8,7 @@ Vector can be installed on Red Hat Enterprise Linux through the following method
 
 import InstallationPlatformChoices from '@site/src/components/InstallationPlatformChoices';
 
-<InstallationPlatformChoices docker={true} os="Linux" packageManager="RPM" />
+<InstallationPlatformChoices docker={true} os="linux" packageManager="rpm" />
 
 
 

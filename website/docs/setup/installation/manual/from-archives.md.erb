@@ -4,7 +4,7 @@ sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---
 
-<%- downloads = metadata.downloads(type: :archive) -%>
+<%- downloads = metadata.installation.select_downloads(type: :archive) -%>
 <%- download_tabs = downloads.collect { |d| {label: d.name, value: d.file_name} } -%>
 
 This page covers installing Vector from a pre-built archive. These archives
@@ -12,10 +12,10 @@ contain the `vector` binary as well as supporting configuration files.
 
 <Alert type="warning">
 
-We recommend installing Vector through a supported [container
-platform][docs.containers] or [package manager][docs.package_managers], if
-possible. These handle permissions, directory creation, and other
-intricacies covered in the [Next Steps](#next-steps) section.
+We recommend installing Vector through a supported [platform][docs.platforms]
+or [package manager][docs.package_managers], if possible. These handle
+permissions, directory creation, and other intricacies covered in the
+[Next Steps](#next-steps) section.
 
 </Alert>
 

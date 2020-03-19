@@ -13,7 +13,7 @@ instructions for your preferred method:
 
 * [DPKG][docs.package-managers.dpkg] (select the ARM tab)
 * [RPM][docs.package-managers.rpm] (select the ARM tab)
-* [Docker][docs.containers.docker] (select the ARM tab)
+* [Docker][docs.platforms.docker] (select the ARM tab)
 * [From archives][docs.manual.from-archives]
 * [Or, download the files directly][pages.releases]
 
@@ -30,7 +30,7 @@ required.
 
 In addition to providing archives for these architectures, we went the extra
 mile to ensure [DPKG][docs.package-managers.dpkg],
-[RPM][docs.package-managers.rpm], and [Docker][docs.containers.docker] support
+[RPM][docs.package-managers.rpm], and [Docker][docs.platforms.docker] support
 them as well.
 
 ## Usecases
@@ -59,10 +59,10 @@ your flexibility, and in the case of AWS, can have direct cost implications.
 Supporting these platforms, properly, is Vector's core competency.
 
 
-[docs.containers.docker]: /docs/setup/installation/containers/docker/
 [docs.manual.from-archives]: /docs/setup/installation/manual/from-archives/
 [docs.package-managers.dpkg]: /docs/setup/installation/package-managers/dpkg/
 [docs.package-managers.rpm]: /docs/setup/installation/package-managers/rpm/
+[docs.platforms.docker]: /docs/setup/installation/platforms/docker/
 [pages.index#performance]: /#performance
 [pages.releases]: /releases/
 [urls.arm]: https://en.wikipedia.org/wiki/ARM_architecture

@@ -17,22 +17,24 @@ function getInstallation() {
 function ArchChoices({arch, docker, os, packageManager}) {
   const {containers, downloads, package_managers: packageManagers} = getInstallation();
 
-  const archiveDownload = downloads.filter(download => (
+  const archiveDownload = Object.values(downloads).filter(download => (
     download.arch.toLowerCase() == arch.toLowerCase() &&
       download.os.toLowerCase() == os.toLowerCase() &&
       download.type == "archive")
   )[0];
 
-  const dockerContainer = containers.find(c => c.id == "docker");
-  const dockerSupported = dockerContainer.archs.includes(arch) && dockerContainer.oss.includes(os);
-  const packageManagerSupported = packageManager && packageManagers.find(p => p.name == packageManager).archs.includes(arch);
+  console.log(Object.values(downloads))
+
+  const dockerSupported = platforms.docker.archs.map(arch => arch.toLowerCase()).includes(arch) &&
+    platforms.docker.oss.map(os => os.toLowerCase()).includes(os);
+  const packageManagerSupported = packageManager && packageManagers[packageManager].archs.includes(arch);
 
   return (
     <div>
       {packageManagerSupported && <Jump to={`/docs/setup/installation/package-managers/${packageManager.toLowerCase()}/?arch=${arch}`}>
         <i className="feather icon-package"></i> {packageManager} ({arch}) <span className="badge badge--primary">recommended</span>
       </Jump>}
-      {!packageManagerSupported && dockerSupported && <Jump to="/docs/setup/installation/containers/docker/">
+      {!packageManagerSupported && dockerSupported && <Jump to="/docs/setup/installation/platforms/docker/">
         <i className="feather icon-terminal"></i> Docker ({arch}) <span className="badge badge--primary">recommended</span>
       </Jump>}
       {!packageManagerSupported && !dockerSupported && <Jump to={`/docs/setup/installation/manual/from-archives/?file_name=${archiveDownload.file_name}`}>
@@ -41,7 +43,7 @@ function ArchChoices({arch, docker, os, packageManager}) {
 
       <p>Alternatively, you can use your preferred method:</p>
 
-      {(packageManagerSupported && dockerSupported) && <Jump to="/docs/setup/installation/containers/docker/" size="sm">
+      {(packageManagerSupported && dockerSupported) && <Jump to="/docs/setup/installation/platforms/docker/" size="sm">
         <i className="feather icon-package"></i> Docker ({arch})
       </Jump>}
 
@@ -58,7 +60,7 @@ function ArchChoices({arch, docker, os, packageManager}) {
 
 function InstallationPlatformChoices({docker, os, packageManager}) {
   const {downloads} = getInstallation();
-  const archiveDownloads = downloads.filter(download => (download.os.toLowerCase() == os.toLowerCase() && download.type == "archive"));
+  const archiveDownloads = Object.values(downloads).filter(download => (download.os.toLowerCase() == os.toLowerCase() && download.type == "archive"));
   const archs = archiveDownloads.map(download => download.arch);
 
   return (

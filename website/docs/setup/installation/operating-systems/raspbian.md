@@ -9,7 +9,7 @@ through the following method:
 
 import {ArchChoices} from '@site/src/components/InstallationPlatformChoices';
 
-<ArchChoices arch="ARMv7" docker={true} os="Linux" packageManager="DPKG" />
+<ArchChoices arch="armv7" docker={true} os="linux" packageManager="dpkg" />
 
 
 

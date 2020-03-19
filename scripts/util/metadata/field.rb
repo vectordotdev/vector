@@ -24,7 +24,7 @@ class Field
     :unit
 
   def initialize(hash)
-    @children = (hash["children"] || {}).to_struct_with_name(self.class)
+    @children = (hash["children"] || {}).to_struct_with_name(constructor: self.class)
     @common = hash["common"]
     @default = hash["default"]
     @description = hash.fetch("description")

@@ -56,6 +56,8 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
+    [Looking for a specific version?](#versions)
+
 2.  ### Install the Vector `.msi` package using `msiexec` command
 
     ```bat
@@ -100,6 +102,12 @@ A full spec is located at `%ProgramFiles%\Vector\config\vector.spec.toml` and ex
 located in `%ProgramFiles%\Vector\config\examples\*`. You can learn more about configuring
 Vector in the [Configuration][docs.configuration] section.
 
+## Deploying
+
+How you deploy Vector is largely dependent on your use case and environment.
+Please see the [deployment section][docs.deployment] for more info on how to
+deploy Vector.
+
 ## Administering
 
 Vector can be managed as a [Windows Service][urls.windows_service]:
@@ -119,7 +127,45 @@ msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet
 Follow the [install](#install) steps again, downloading the latest version of
 Vector.
 
+## Package
+
+### Architectures
+
+Vector's MSI packages only support the X86_64 architecture.
+
+### Versions
+
+Vector's MSI packages can be downloaded with the following URLs. Note that
+Vector maintains special URLS that are automatically updated whenever Vector is
+[released][urls.vector_releases]:
+
+<Tabs
+  className="mini"
+  defaultValue="x86_64"
+  values={[{"label":"x86_64","value":"x86_64"}]}>
+<TabItem value="x86_64">
+
+| Version          | URL                                                                                               |
+|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Latest major     | `https://packages.timber.io/vector/latest/vector-x64.msi`               |
+| Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-x64.msi`            |
+| Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-x64.msi`      |
+| Specific version | `https://packages.timber.io/vector/<MAJOR.MINOR.PATCH>/vector-x64.msi`  |
+| Latest nightly   | `https://packages.timber.io/vector/nightly/latest/vector-x64.msi`       |
+| Specific nightly | `https://packages.timber.io/vector/nightly/<YYYY-MM-DD>/vector-x64.msi` |
+
+</TabItem>
+</Tabs>
+
+
+### Source Files
+
+Vector's MSI source files are located in
+[Vector's repo][urls.vector_msi_source_files].
+
 
 [docs.configuration]: /docs/setup/configuration/
+[docs.deployment]: /docs/setup/deployment/
+[urls.vector_msi_source_files]: https://github.com/timberio/vector/tree/master/distribution/msi
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.windows_service]: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service

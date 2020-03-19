@@ -1,6 +1,6 @@
 ---
 title: Topologies
-description: Example topologies for Vector
+description: The various topologies that Vector can accomplish and when to use each.
 ---
 
 Vector can be deployed to form a variety of topologies. This section showcases

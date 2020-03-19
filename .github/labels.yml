@@ -114,50 +114,50 @@
   description: Needs a light specification before work can begin
   color: feca57
 
-- name: "platform: docker"
-  description: Anything Docker related
-  color: ff9ff3
-- name: "platform: amazon linux"
-  description: Anything Amazon Linux related
+- name: "platform: amazon-linux"
+  description: Anything amazon-linux related
   color: ff9ff3
 - name: "platform: centos"
-  description: Anything CentOS related
+  description: Anything centos related
   color: ff9ff3
 - name: "platform: debian"
-  description: Anything Debian related
+  description: Anything debian related
   color: ff9ff3
 - name: "platform: macos"
-  description: Anything MacOS related
+  description: Anything macos related
   color: ff9ff3
 - name: "platform: nixos"
-  description: Anything NixOS related
-  color: ff9ff3
-- name: "platform: raspbian"
-  description: Anything Raspbian related
+  description: Anything nixos related
   color: ff9ff3
 - name: "platform: rhel"
-  description: Anything RHEL related
+  description: Anything rhel related
+  color: ff9ff3
+- name: "platform: raspbian"
+  description: Anything raspbian related
   color: ff9ff3
 - name: "platform: ubuntu"
-  description: Anything Ubuntu related
+  description: Anything ubuntu related
   color: ff9ff3
 - name: "platform: windows"
-  description: Anything Windows related
+  description: Anything windows related
   color: ff9ff3
 - name: "platform: dpkg"
-  description: Anything DPKG related
+  description: Anything dpkg related
   color: ff9ff3
 - name: "platform: homebrew"
-  description: Anything Homebrew related
-  color: ff9ff3
-- name: "platform: nix"
-  description: Anything Nix related
-  color: ff9ff3
-- name: "platform: rpm"
-  description: Anything RPM related
+  description: Anything homebrew related
   color: ff9ff3
 - name: "platform: msi"
-  description: Anything MSI related
+  description: Anything msi related
+  color: ff9ff3
+- name: "platform: nix"
+  description: Anything nix related
+  color: ff9ff3
+- name: "platform: rpm"
+  description: Anything rpm related
+  color: ff9ff3
+- name: "platform: docker"
+  description: Anything docker related
   color: ff9ff3
 
 - name: "provider: aws"

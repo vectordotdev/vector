@@ -1,5 +1,6 @@
 ---
 title: Vector Deployment Roles
+description: The various deployment roles Vector can serve.
 sidebar_label: hidden
 hide_pagination: true
 ---

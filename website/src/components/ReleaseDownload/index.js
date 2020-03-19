@@ -72,7 +72,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
       <div>
         <div>Containers</div>
         <div>
-          {containers.map((container, idx) => (
+          {Object.values(containers).map((container, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
               <Link to={`/docs/setup/installation/containers/${container.id}/`}> {container.name}</Link>
@@ -83,7 +83,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
       <div>
         <div>Package Managers</div>
         <div>
-          {packageManagers.map((packageManager, idx) => (
+          {Object.values(packageManagers).map((packageManager, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
               <Link to={`/docs/setup/installation/package-managers/${packageManager.id}/`}>{packageManager.name}</Link>
@@ -94,7 +94,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
       <div>
         <div>Operating Systems</div>
         <div>
-          {operatingSystems.map((operatingSystem, idx) => (
+          {Object.values(operatingSystems).map((operatingSystem, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
               <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}/`}>{operatingSystem.name}</Link>
@@ -120,8 +120,8 @@ function ReleaseDownload({version}) {
   const {metadata: {installation: installation, latest_release: latestRelease, releases}} = siteConfig.customFields;
   const {downloads} = installation;
 
-  const latestDownloads = downloads.filter(download => download.available_on_latest);
-  const nightlyDownloads = downloads.filter(download => download.available_on_nightly);
+  const latestDownloads = Object.values(downloads).filter(download => download.available_on_latest);
+  const nightlyDownloads = Object.values(downloads).filter(download => download.available_on_nightly);
   const nightlyDate = new Date().toISOString().substr(0,10);
 
   const oldReleases = Object.values(releases).slice(0);

@@ -17,6 +17,8 @@ used on MacOS systems.
    brew tap timberio/brew && brew install vector
    ```
 
+   [Looking for a specific version?](#versions)
+
 2. ### Start Vector
 
    ```bash
@@ -26,15 +28,6 @@ used on MacOS systems.
    That's it! Proceed to [configure](#configuring) Vector for your use case.
 
 </div>
-
-### Previous Versions
-
-Historical Vector versions can be found in the [releases][urls.vector_releases].
-Once you've found the version you'd like to install you can specify it with:
-
-```bash
-brew install vector@X.X.X
-```
 
 ## Configuring
 
@@ -47,6 +40,12 @@ The Vector configuration file is placed in:
 A full spec is located at `/usr/local/etc/vector/vector.spec.toml` and examples
 are located in `/usr/local/etc/vector/examples/*`. You can learn more about
 configuring Vector in the [Configuration][docs.configuration] section.
+
+## Deploying
+
+How you deploy Vector is largely dependent on your use case and environment.
+Please see the [deployment section][docs.deployment] for more info on how to
+deploy Vector.
 
 ## Administering
 
@@ -69,8 +68,35 @@ brew remove vector
 brew update && brew upgrade vector
 ```
 
+## Package
+
+### Architectures
+
+Vector's Homebrew packages only support the X86_64 arhcitecture.
+
+### Versions
+
+Historical Vector versions can be found in the [releases][urls.vector_releases].
+Once you've found the version you'd like to install you can specify it with:
+
+```bash
+brew install vector@X.X.X
+```
+
+Due to limitations of Homebrew, Vector cannot pin specific major or minor
+versions. If this is a requirement, then we recommend installing Vector
+directly [from an archive][docs.manual.from-archives].
+
+### Source Files
+
+Vector's Homebrew source files are located in
+[Vector's brew repo][urls.vector_homebrew_source_files].
+
 
 [docs.configuration]: /docs/setup/configuration/
+[docs.deployment]: /docs/setup/deployment/
+[docs.manual.from-archives]: /docs/setup/installation/manual/from-archives/
 [urls.homebrew]: https://brew.sh/
 [urls.homebrew_services]: https://github.com/Homebrew/homebrew-services
+[urls.vector_homebrew_source_files]: https://github.com/timberio/homebrew-brew/blob/master/Formula/vector.rb
 [urls.vector_releases]: https://vector.dev/releases/latest

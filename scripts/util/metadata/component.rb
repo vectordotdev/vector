@@ -25,7 +25,7 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
-    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
     @features = hash["features"] || []
     @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
@@ -36,7 +36,7 @@ class Component
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
-    @options = (hash["options"] || {}).to_struct_with_name(Field)
+    @options = (hash["options"] || {}).to_struct_with_name(constructor: Field)
 
     # Operating Systems
 

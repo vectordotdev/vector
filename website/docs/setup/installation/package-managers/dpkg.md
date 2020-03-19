@@ -57,6 +57,8 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
+    [Looking for a specific version?](#versions)
+
 2.  ### Install the downloaded package
 
     ```bash
@@ -101,6 +103,8 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
     </Tabs>
+
+    [Looking for a specific version?](#versions)
 
 2.  ### Install the downloaded package
 
@@ -147,6 +151,8 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
+    [Looking for a specific version?](#versions)
+
 2.  ### Install the downloaded package
 
     ```bash
@@ -167,15 +173,9 @@ import TabItem from '@theme/TabItem';
 
 That's it! Proceed to [configure](#configuring) Vector for your use case.
 
-### Previous Versions
-
-Historical Vector versions can be found in the [releases][urls.vector_releases].
-Once you've found the version you'd like to install you can re-follow the
-[install](#install) steps with the URL to the Vector `.deb` file.
-
 ## Configuring
 
-The Vector configuration file is placed in:
+The Vector configuration file is located at:
 
 ```text
 etc/vector/vector.toml
@@ -184,6 +184,12 @@ etc/vector/vector.toml
 A full spec is located at `/etc/vector/vector.spec.toml` and examples are
 located in `/etc/vector/examples/*`. You can learn more about configuring
 Vector in the [Configuration][docs.configuration] section.
+
+## Deploying
+
+How you deploy Vector is largely dependent on your use case and environment.
+Please see the [deployment section][docs.deployment] for more info on how to
+deploy Vector.
 
 ## Administering
 
@@ -201,11 +207,75 @@ sudo dpkg -r vector
 
 ## Updating
 
-Follow the [install](#install) steps again, downloading the latest version of
-Vector.
+Follow the [install](#install) steps again, downloading the
+[latest version](#latest-version) of Vector.
+
+## Package
+
+### Architectures
+
+Vector's DPKG packages are multi-arch and support the
+x86_64, ARM64, and ARMv7
+architectures. The architecture name is prepended to the artifact file name.
+
+### Versions
+
+Vector's DPKG packages can be downloaded with the following URLs. Note that
+Vector maintains special URLS that are automatically updated whenever Vector is
+[released][urls.vector_releases]:
+
+<Tabs
+  className="mini"
+  defaultValue="x86_64"
+  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
+<TabItem value="x86_64">
+
+| Version          | URL                                                                                               |
+|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Latest major     | `https://packages.timber.io/vector/latest/vector-amd64.deb`               |
+| Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-amd64.deb`            |
+| Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-amd64.deb`      |
+| Specific version | `https://packages.timber.io/vector/<MAJOR.MINOR.PATCH>/vector-amd64.deb`  |
+| Latest nightly   | `https://packages.timber.io/vector/nightly/latest/vector-amd64.deb`       |
+| Specific nightly | `https://packages.timber.io/vector/nightly/<YYYY-MM-DD>/vector-amd64.deb` |
+
+</TabItem>
+<TabItem value="ARM64">
+
+| Version          | URL                                                                                               |
+|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Latest major     | `https://packages.timber.io/vector/latest/vector-arm64.deb`               |
+| Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-arm64.deb`            |
+| Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-arm64.deb`      |
+| Specific version | `https://packages.timber.io/vector/<MAJOR.MINOR.PATCH>/vector-arm64.deb`  |
+| Latest nightly   | `https://packages.timber.io/vector/nightly/latest/vector-arm64.deb`       |
+| Specific nightly | `https://packages.timber.io/vector/nightly/<YYYY-MM-DD>/vector-arm64.deb` |
+
+</TabItem>
+<TabItem value="ARMv7">
+
+| Version          | URL                                                                                               |
+|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Latest major     | `https://packages.timber.io/vector/latest/vector-armhf.deb`               |
+| Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-armhf.deb`            |
+| Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-armhf.deb`      |
+| Specific version | `https://packages.timber.io/vector/<MAJOR.MINOR.PATCH>/vector-armhf.deb`  |
+| Latest nightly   | `https://packages.timber.io/vector/nightly/latest/vector-armhf.deb`       |
+| Specific nightly | `https://packages.timber.io/vector/nightly/<YYYY-MM-DD>/vector-armhf.deb` |
+
+</TabItem>
+</Tabs>
+
+
+### Source Files
+
+Vector's DPKG source files are located in
+[Vector's repo][urls.vector_debian_source_files].
 
 
 [docs.configuration]: /docs/setup/configuration/
+[docs.deployment]: /docs/setup/deployment/
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.vector_debian_source_files]: https://github.com/timberio/vector/tree/master/distribution/debian
 [urls.vector_releases]: https://vector.dev/releases/latest

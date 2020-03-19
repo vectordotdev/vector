@@ -544,10 +544,9 @@ and you must determine which tradeoffs are appropriate. Docker is one of these
 circumstances.
 
 Second, if you have a large container-based deployment you should consider using
-a container orchestrator like Kubernetes. These platforms provide alternate log
-collection means that side-step the Docker logging problems. For supported
-platforms see Vector's
-[Containers installation section][docs.installation.containers].
+a platform Kubernetes. These platforms provide alternate log collection means
+that side-step the Docker logging problems. For supported platforms see Vector's
+[Platforms installation section][docs.installation.platforms].
 
 Finally, if you cannot use a container orchestrator then you can configure a
 compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
@@ -595,7 +594,7 @@ that we use to determine if an event is partial via the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[docs.installation.containers]: /docs/setup/installation/containers/
+[docs.installation.platforms]: /docs/setup/installation/platforms/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.sources.syslog]: /docs/reference/sources/syslog/
