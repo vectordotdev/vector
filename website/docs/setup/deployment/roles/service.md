@@ -45,7 +45,7 @@ For example:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 data_dir = "/var/lib/vector"

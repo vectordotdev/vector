@@ -72,7 +72,7 @@ configured `value_limit`.
 
 For example, given this configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.cardinality_protection]

@@ -52,6 +52,8 @@
   --ifm-color-primary-light: #51EBFB;
   --ifm-color-primary-lighter: #6AF0FD;
   --ifm-color-primary-lightest: #83F5FF;
+  --ifm-color-purple: #9988ff;
+  --ifm-color-purple-rgb: 153, 136 ,255;
   --ifm-color-secondary: var(--ifm-color-emphasis-100);
   --ifm-color-success: #00ff7f;
   --ifm-color-success-rgb: 0, 255, 127;
@@ -193,6 +195,10 @@ article header h1 {
 .badge.badge--primary {
   --ifm-badge-background-color: rgba(var(--ifm-color-primary-rgb), 0.2);
   --ifm-badge-color: var(--ifm-color-primary);
+}
+.badge.badge--purple {
+  --ifm-badge-background-color: rgba(var(--ifm-color-purple-rgb), 0.25);
+  --ifm-badge-color: var(--ifm-color-purple);
 }
 .badge.badge--rounded {
   border-radius: 1em;
@@ -1346,11 +1352,15 @@ div.section-list.section-list--hover > .section:hover {
  * it.
  */
 
+.steps {
+  padding-top: 7px;
+}
+
 .steps > ol {
   border-left: 1px solid var(--ifm-hr-border-color);
   counter-reset: sections-counter;
   list-style: none;
-  margin-left: 0.75em;
+  margin-left: 1em;
   padding-left: 1.75em;
 }
 .steps > ol > li {

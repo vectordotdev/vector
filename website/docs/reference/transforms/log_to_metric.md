@@ -4,7 +4,6 @@ description: "The Vector `log_to_metric` transform accepts `log` events but outp
 event_types: ["log","metric"]
 function_category: "convert"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-min_version: null
 service_name: "Log to Metric"
 sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
@@ -29,7 +28,7 @@ or more metrics.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.log_to_metric]

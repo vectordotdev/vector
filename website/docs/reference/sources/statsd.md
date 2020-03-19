@@ -5,7 +5,6 @@ description: "The Vector `statsd` source ingests data through the StatsD UDP pro
 event_types: ["metric"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Statsd"
 sidebar_label: "statsd|[\"metric\"]"
@@ -31,7 +30,7 @@ events](#output).
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]

@@ -2,18 +2,17 @@
 title = "Journald"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
+features = [
+  "Collect Journald/Systemd logs.",
+  "Filter which Systemd units you collect them from.",
+  "Checkpoint your position to ensure data is not lost.",
+  "Enrich your logs with useful Systemd context."
+]
 function_category = "collect"
 only_operating_systems = ["Linux"]
 output_types = ["log"]
-requirements.additional = """\
-* The `journald` source requires the presence of the `journalctl` binary. \
-This ensures that this source works across all platforms. Please see the \
-["Communication strategy"](#communication-strategy) section for more info.
-* If you run Vector from a non-root user, you need to add that user to the \
-`systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
-section for more info.\
-"""
+requirements.journalctl = true
 through_description = "log records from journald"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "journald") %>

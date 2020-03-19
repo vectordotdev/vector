@@ -40,9 +40,10 @@ import TabItem from '@theme/TabItem';
 
 
 <TabItem value="vector-x86_64-unknown-linux-musl.tar.gz">
+<div className="steps steps--h3">
 
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -72,20 +73,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -93,12 +94,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</div>
 </TabItem>
 
 <TabItem value="vector-aarch64-unknown-linux-musl.tar.gz">
+<div className="steps steps--h3">
 
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -128,20 +131,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -149,12 +152,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</div>
 </TabItem>
 
 <TabItem value="vector-armv7-unknown-linux-musleabihf.tar.gz">
+<div className="steps steps--h3">
 
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -184,20 +189,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -205,12 +210,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</div>
 </TabItem>
 
 <TabItem value="vector-x86_64-apple-darwin.tar.gz">
+<div className="steps steps--h3">
 
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -240,20 +247,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -261,12 +268,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</div>
 </TabItem>
 
 <TabItem value="vector-x86_64-pc-windows-msvc.zip">
+<div className="steps steps--h3">
 
 
-1.  Download Vector release archive (latest):
+1.  ### Download Vector release archive (latest)
 
     <Tabs
       className="mini"
@@ -292,24 +301,25 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Extract files from the archive:
+2.  ### Extract files from the archive
 
     ```bat
     powershell Expand-Archive vector-x86_64-pc-windows-msvc.zip .
     ```
 
-3.  Navigate to the Vector directory:
+3.  ### Navigate to the Vector directory
 
     ```bat
     cd vector-x86_64-pc-windows-msvc
     ```
 
-4.  Start Vector:
+4.  ### Start Vector
 
     ```bat
     .\bin\vector --config config\vector.toml
     ```
 
+</div>
 </TabItem>
 </Tabs>
 
@@ -347,7 +357,7 @@ you can use to specify the path of your directory.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 data_dir = "/var/lib/vector" # default

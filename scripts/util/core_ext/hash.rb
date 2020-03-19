@@ -26,14 +26,10 @@ class Hash
 
     each do |key, val|
       new_hash[key] =
-        if val.is_a?(Hash) && (should_have_keys.empty? || (should_have_keys - val.keys).empty?)
-          if block_given?
-            yield(key, val)
-          else
-            val
-          end
+        if block_given? && val.is_a?(Hash) && (should_have_keys.empty? || (should_have_keys - val.keys).empty?)
+          yield(key, val)
         else
-          val.to_struct(should_have_keys: should_have_keys, &block)
+          val
         end
     end
 

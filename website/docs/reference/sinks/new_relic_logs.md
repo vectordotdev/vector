@@ -5,7 +5,6 @@ description: "The Vector `new_relic_logs` sink batches `log` events to New Relic
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+new_relic_logs%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "New Relic Logs"
 sidebar_label: "new_relic_logs|[\"log\"]"
@@ -43,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -62,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]

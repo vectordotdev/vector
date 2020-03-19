@@ -104,7 +104,7 @@ The <%= option_names(component.field_path_notation_options).to_sentence %> optio
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
@@ -234,7 +234,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]

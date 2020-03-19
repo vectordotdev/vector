@@ -4,7 +4,6 @@ description: "The Vector `json_parser` transform accepts and outputs `log` event
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
-min_version: null
 service_name: "JSON Parser"
 sidebar_label: "json_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
@@ -39,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -53,7 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -324,7 +323,7 @@ The [`field`](#field) and [`target_field`](#target_field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_json_parser_transform_id]

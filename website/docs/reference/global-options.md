@@ -19,7 +19,7 @@ Vector as a whole and set defaults for component options.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 # General

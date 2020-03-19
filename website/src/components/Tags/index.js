@@ -6,8 +6,8 @@ import classnames from 'classnames';
 import {enrichTags} from '@site/src/exports/tags';
 import styles from './styles.module.css';
 
-function Tags({tags, valuesOnly}) {
-  const enrichedTags = enrichTags(tags);
+function Tags({colorProfile, tags, valuesOnly}) {
+  const enrichedTags = enrichTags(tags, colorProfile);
 
   return (
     <div className={styles.tags}>

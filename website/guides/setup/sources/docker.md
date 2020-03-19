@@ -1,22 +1,22 @@
 ---
 id: "setup/sources/docker"
-title: "Collect Docker logs & send them anywhere"
-description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
-category: "setup"
-tags: ["category: setup", "source: docker"]
+title: "Collect your Docker logs and send them anywhere"
+description: "A guide to quickly, and correctly, collect your Docker logs and send them anywhere."
+tags: ["category: setup","source: docker"]
 ---
 
-> "I just wanna, like, collect my Docker logs and grep them -- why is all of
-> this so complicated?"
+> "I just wanna, like, collect my Docker logs and send them anywhere -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to collect your Docker logs? Sounds simple! Sadly, it is not. Fear
-not! This guide will get you up and running **in minutes**, all without
-becoming a Docker logging expert.
+So you want to collect your Docker logs and send them anywhere? Sounds simple! Sadly, it is not.
+When you account for x, y, and z, you quickly realize this is no easy endaevor.
+Especially for high volume product environments! Fear not! This guide will get
+you up and running in minutes.
 
 import Alert from '@site/src/components/Alert';
 import CodeExplanation from '@site/src/components/CodeExplanation';
+import CodeHeader from '@site/src/components/CodeHeader';
 import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -40,20 +40,21 @@ import TabItem from '@theme/TabItem';
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
 
-## How This Guide Works
+## Deployment Strategy
 
 <SVG src="/img/tutorials/sources/docker.svg" />
 
 ---
 
-The diagram above demonstrates our Docker logging strategy. It uses
-[Vector][urls.vector_website] as a dedicated logging container. This is
-superior because it is:
+For this guide we'll be using Vector, which is a lightweight and ultra-fast
+utility for building observability pipelines. We'll deploy Vector as a dedicated
+Logging container. This has a number of advantages:
 
-1. **Dependency free.** You do not need to install anything on the host.
-2. **Easy to scale.** Simply deploy more logging containers as necessary.
-3. **Fast & reliable.** Built in [Rust][urls.rust], Vector is [blistering fast and memory efficient][urls.vector_performance].
-4. **Flexible.** Vector includes a robust set of [transforms][docs.transforms] to process your data.
+1. **Same workflow** - Vector is deploy as a container like your other services.
+1. **Dependency free** - You do not need to install anything on the host.
+1. **Easy to scale** - Simply deploy more logging containers as necessary.
+1. **Fast & reliable** - Built in [Rust][urls.rust], Vector is [blistering fast and memory efficient][urls.vector_performance].
+1. **Flexible** - Vector includes a robust set of [transforms][docs.transforms] to process your data.
 
 
 ## A Simple Step-By-Step Tutorial
@@ -70,6 +71,8 @@ superior because it is:
      defaultValue={"console"}
      values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -103,6 +106,8 @@ superior because it is:
    </TabItem>
    <TabItem value="aws_kinesis_firehose">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -134,6 +139,8 @@ superior because it is:
    </TabItem>
    <TabItem value="aws_kinesis_streams">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -164,6 +171,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="aws_s3">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -197,6 +206,8 @@ superior because it is:
    </TabItem>
    <TabItem value="blackhole">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -222,6 +233,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="clickhouse">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -249,6 +262,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="console">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -279,6 +294,8 @@ superior because it is:
    </TabItem>
    <TabItem value="elasticsearch">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -303,6 +320,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="file">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -333,6 +352,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="gcp_cloud_storage">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -366,6 +387,8 @@ superior because it is:
    </TabItem>
    <TabItem value="gcp_pubsub">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -392,6 +415,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="gcp_stackdriver_logging">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -421,6 +446,8 @@ superior because it is:
    </TabItem>
    <TabItem value="honeycomb">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -447,6 +474,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="http">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -478,6 +507,8 @@ superior because it is:
    </TabItem>
    <TabItem value="humio_logs">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -503,6 +534,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="kafka">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -536,6 +569,8 @@ superior because it is:
    </TabItem>
    <TabItem value="logdna">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -562,6 +597,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="loki">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -594,6 +631,8 @@ superior because it is:
    </TabItem>
    <TabItem value="new_relic_logs">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -618,6 +657,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="papertrail">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -649,6 +690,8 @@ superior because it is:
    </TabItem>
    <TabItem value="sematext_logs">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -674,6 +717,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="socket">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -707,6 +752,8 @@ superior because it is:
    </TabItem>
    <TabItem value="splunk_hec">
 
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
    ```bash
    echo '
    [sources.in]
@@ -737,6 +784,8 @@ superior because it is:
 
    </TabItem>
    <TabItem value="vector">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
 
    ```bash
    echo '
@@ -799,4 +848,3 @@ superior because it is:
 [guides.index]: /guides
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
-[urls.vector_website]: https://vector.dev

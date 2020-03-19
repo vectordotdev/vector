@@ -28,7 +28,9 @@ delayed. Generally new Vector releases are made available within a few days.
 
 ## Install
 
-1.  Install Vector
+<div className="steps steps--h3">
+
+1.  ### Install Vector
 
     ```bash
     nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
@@ -42,7 +44,7 @@ delayed. Generally new Vector releases are made available within a few days.
 
     </CodeExplanation>
 
-2.  Start Vector
+2.  ### Start Vector
 
     ```bash
     vector --config /path/to/vector.toml
@@ -55,6 +57,8 @@ delayed. Generally new Vector releases are made available within a few days.
       successfully start Vector.
 
     </CodeExplanation>
+
+</div>
 
 ### Previous Versions
 

@@ -42,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.foo]
@@ -74,7 +74,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.foo]

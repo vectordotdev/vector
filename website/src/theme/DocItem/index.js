@@ -82,7 +82,7 @@ function OperatingSystemsStatus({operatingSystems, unsupportedOperatingSystems})
   return operatingSystemsEls;
 }
 
-function Statuses({deliveryGuarantee, eventTypes, minVersion, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, eventTypes, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
@@ -125,10 +125,6 @@ function Statuses({deliveryGuarantee, eventTypes, minVersion, operatingSystems, 
             <i className="feather icon-cpu"></i> <OperatingSystemsStatus operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
           </Link>
         </div>}
-      {minVersion &&
-        <div className="text--primary">
-          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {serviceName} versions</> : <>{serviceName} >= {minVersion}</>}
-        </div>}
     </div>
   );
 }
@@ -159,7 +155,6 @@ function DocItem(props) {
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
       issues_url: issuesUrl,
-      min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
       service_name: serviceName,
@@ -229,7 +224,6 @@ function DocItem(props) {
                   <Statuses
                     deliveryGuarantee={deliveryGuarantee}
                     eventTypes={eventTypes}
-                    minVersion={minVersion}
                     operatingSystems={operatingSystems}
                     serviceName={serviceName}
                     status={status}

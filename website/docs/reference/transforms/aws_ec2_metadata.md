@@ -4,7 +4,6 @@ description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` 
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
-min_version: null
 service_name: "AWS EC2 Metadata"
 sidebar_label: "aws_ec2_metadata|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/aws_ec2_metadata.rs
@@ -31,9 +30,8 @@ import Alert from '@site/src/components/Alert';
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 
-
-* Network access is required for this component to function correctly. See the
-  [Network Access section](#network-access) for more info.
+* Network access is required for this component to function correctly. See
+  ["How it works"](#how-it-works) for more info.
 
 </Alert>
 
@@ -41,7 +39,7 @@ import Alert from '@site/src/components/Alert';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]

@@ -15,7 +15,7 @@ writing and executing a unit test for the following config:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="example.toml" />
+<CodeHeader text="example.toml" />
 
 ```toml
 [sources.over_tcp]

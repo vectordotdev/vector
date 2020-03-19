@@ -4,7 +4,6 @@ description: "The Vector `add_fields` transform accepts and outputs `log` events
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
-min_version: null
 service_name: "Add Fields"
 sidebar_label: "add_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
@@ -28,7 +27,7 @@ fields.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -119,7 +118,7 @@ For example:
 
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_transform]

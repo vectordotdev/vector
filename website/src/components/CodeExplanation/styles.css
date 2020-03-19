@@ -5,6 +5,7 @@
   color: var(--ifm-color-primary);
   font-size: 0.85em;
   font-weight: 500;
+  margin-bottom: var(--ifm-spacing-vertical);
   padding: var(--ifm-pre-padding);
 }
 
@@ -37,6 +38,10 @@
   color: var(--ifm-color-primary);
   cursor: pointer;
   font-size: 0.9em;
+}
+
+.code-explanation--toggle:hover {
+  color: var(--ifm-heading-color);
 }
 
 .markdown .code-explanation {

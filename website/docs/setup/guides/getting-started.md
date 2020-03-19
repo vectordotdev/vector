@@ -31,7 +31,7 @@ unstructured Apache logs over TCP using a [`socket` source][docs.sources.socket]
 and then writes them to an [`elasticsearch` sink][docs.sinks.elasticsearch].
 We'll do this all without having to setup a local Elasticsearch cluster:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 # Consume data
@@ -98,7 +98,7 @@ Let's place our new transform in between our existing source and sink:
 
 <TabItem value="diff">
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```diff
  # Consume data
@@ -127,7 +127,7 @@ Let's place our new transform in between our existing source and sink:
 </TabItem>
 <TabItem value="new_result">
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 # Consume data
@@ -178,7 +178,7 @@ config just like you would for regular code:
 
 <TabItem value="diff">
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```diff
  # Write the data
@@ -210,7 +210,7 @@ config just like you would for regular code:
 </TabItem>
 <TabItem value="new_result">
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 # Consume data

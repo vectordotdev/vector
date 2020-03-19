@@ -7,7 +7,6 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
-min_version = "0"
 requirements = {}
 service_providers = ["InfluxData"]
 write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API"

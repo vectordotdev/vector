@@ -23,7 +23,7 @@ function BlogPostPage(props) {
   const {date: dateString, tags} = metadata;
   const readingStats = readingTime(BlogPostContents.toString());
   const date = new Date(Date.parse(dateString));
-  const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
+  const domainTag = enrichTags(tags, 'blog').find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
   const newPost = fetchNewPost();
 
@@ -39,7 +39,7 @@ function BlogPostPage(props) {
             <Avatar github={author_github} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
             <h1>{title}</h1>
             <div className={styles.headerTags}>
-              <Tags tags={tags} />
+              <Tags colorProfile="blog" tags={tags} />
             </div>
           </div>
         </header>

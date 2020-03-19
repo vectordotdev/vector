@@ -27,8 +27,9 @@ import TabItem from '@theme/TabItem';
   urlKey="arch"
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"},{"label":"ARMv7","value":"ARMv7"}]}>
 <TabItem value="x86_64">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.rpm` file:
+1.  ### Download the Vector `.rpm` file
 
     <Tabs
       className="mini"
@@ -54,13 +55,13 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the Vector `.rpm` package directly:
+2.  ### Install the Vector `.rpm` package directly
 
     ```bash
     sudo rpm -i vector-x86_64.rpm
     ```
 
-3.  Start Vector:
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
@@ -68,10 +69,12 @@ import TabItem from '@theme/TabItem';
 
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
+</div>
 </TabItem>
 <TabItem value="ARM64">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.rpm` file:
+1.  ### Download the Vector `.rpm` file
 
     <Tabs
       className="mini"
@@ -97,13 +100,13 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the Vector `.rpm` package directly:
+2.  ### Install the Vector `.rpm` package directly
 
     ```bash
     sudo rpm -i vector-aarch64.rpm
     ```
 
-3.  Start Vector:
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
@@ -111,10 +114,12 @@ import TabItem from '@theme/TabItem';
 
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
+</div>
 </TabItem>
 <TabItem value="ARMv7">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.rpm` file:
+1.  ### Download the Vector `.rpm` file
 
     <Tabs
       className="mini"
@@ -140,13 +145,13 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the Vector `.rpm` package directly:
+2.  ### Install the Vector `.rpm` package directly
 
     ```bash
     sudo rpm -i vector-armv7hl.rpm
     ```
 
-3.  Start Vector:
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
@@ -154,6 +159,7 @@ import TabItem from '@theme/TabItem';
 
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
+</div>
 </TabItem>
 </Tabs>
 

@@ -5,7 +5,6 @@ description: "The Vector `splunk_hec` source ingests data through the Splunk HTT
 event_types: ["log"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+splunk_hec%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
@@ -42,7 +41,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -54,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]

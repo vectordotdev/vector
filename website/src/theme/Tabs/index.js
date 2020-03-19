@@ -14,7 +14,7 @@ import queryString from 'query-string';
 
 function ListSwitcher({block, centered, className, style, values, selectedValue, setSelectedValue}) {
   return (
-    <div className={centered ? "tabs--centered" : ""}>
+    <div className={centered ? "tabs--centered" : null}>
       <ul
         className={classnames('tabs', className, {
           'tabs--block': block,

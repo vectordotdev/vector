@@ -4,7 +4,6 @@ description: "The Vector `split` transform accepts and outputs `log` events allo
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22
-min_version: null
 service_name: "Split"
 sidebar_label: "split|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/split.rs
@@ -28,7 +27,7 @@ value on a _literal_ separator and zip the tokens into ordered field names.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -287,7 +286,7 @@ The [`field`](#field) and [`field_names`](#field_names) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_split_transform_id]

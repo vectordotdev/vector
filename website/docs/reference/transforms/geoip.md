@@ -4,7 +4,6 @@ description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` e
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
-min_version: null
 service_name: "GeoIP"
 sidebar_label: "geoip|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/geoip.rs
@@ -28,7 +27,7 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -383,7 +382,7 @@ The [`source`](#source) and [`target`](#target) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_geoip_transform_id]

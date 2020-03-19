@@ -4,7 +4,6 @@ description: "The Vector [`merge`](#merge) transform accepts and outputs `log` e
 event_types: ["log"]
 function_category: "aggregate"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+merge%22
-min_version: null
 service_name: "Merge"
 sidebar_label: "merge|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/merge.rs
@@ -28,7 +27,7 @@ events into a single event.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -149,7 +148,7 @@ import TabItem from '@theme/TabItem';
 
 Given the following _default_ configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.merge_events]
@@ -159,7 +158,7 @@ Given the following _default_ configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
+<CodeHeader text="first log event" />
 
 ```javascript
 {
@@ -172,7 +171,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
+<CodeHeader text="second log event" />
 
 ```javascript
 {
@@ -185,7 +184,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
+<CodeHeader text="third log event" />
 
 ```javascript
 {
@@ -213,7 +212,7 @@ Notice that `custom_string_field` and `custom_int_field` were not overridden. Th
 
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.merge_events]
@@ -224,7 +223,7 @@ Given the following configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
+<CodeHeader text="first log event" />
 
 ```javascript
 {
@@ -237,7 +236,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
+<CodeHeader text="second log event" />
 
 ```javascript
 {
@@ -250,7 +249,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
+<CodeHeader text="third log event" />
 
 ```javascript
 {
@@ -299,7 +298,7 @@ The [`merge_fields`](#merge_fields), [`partial_event_marker_field`](#partial_eve
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_merge_transform_id]

@@ -5,7 +5,6 @@ description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud 
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_pubsub%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "GCP PubSub"
 sidebar_label: "gcp_pubsub|[\"log\"]"
@@ -43,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -56,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]

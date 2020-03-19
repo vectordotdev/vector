@@ -56,7 +56,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_transform]

@@ -24,7 +24,7 @@ function BlogListPage(props) {
   const context = useDocusaurusContext();
   const {siteConfig = {title: siteTitle}} = context;
   const {metadata: {post_tags: postTags}} = siteConfig.customFields;
-  const enrichedTags = enrichTags(postTags);
+  const enrichedTags = enrichTags(postTags, 'blog');
   const typeTags = enrichedTags.filter(tag => tag.category == 'type');
   const domainTags = enrichedTags.filter(tag => tag.category == 'domain');
   const isBlogOnlyMode = metadata.permalink === '/';

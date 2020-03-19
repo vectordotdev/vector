@@ -43,7 +43,7 @@ Given the following input:
 
 And the following configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.<transform-id>]

@@ -4,7 +4,6 @@ description: "The Vector `coercer` transform accepts and outputs `log` events al
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22
-min_version: null
 service_name: "Coercer"
 sidebar_label: "coercer|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
@@ -39,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -59,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -197,7 +196,7 @@ Given the following input:
 
 And the following configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.<transform-id>]

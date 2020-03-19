@@ -7,7 +7,6 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-min_version = "0"
 requirements = {}
 write_to_description = "[Loki][urls.loki]"
 

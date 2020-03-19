@@ -1,52 +1,21 @@
 <%- source = metadata.sources.docker -%>
----
-id: "setup/sources/docker"
-title: "Collect Docker logs & send them anywhere"
-description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
-category: "setup"
-tags: ["category: setup", "source: docker"]
----
+<%= setup_guide("setup/sources/#{source.name}", source: source) %>
 
-> "I just wanna, like, collect my Docker logs and grep them -- why is all of
-> this so complicated?"
->
-> — developers
-
-So you want to collect your Docker logs? Sounds simple! Sadly, it is not. Fear
-not! This guide will get you up and running **in minutes**, all without
-becoming a Docker logging expert.
-
-import Alert from '@site/src/components/Alert';
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import SVG from 'react-inlinesvg';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
-## What We'll Accomplish In This Guide
-
-<ol className="list--checks list--lg list--semi-bold list--primary list--flush">
-  <li>Collect Docker container logs.</li>
-  <li>Filter which containers you collect them from.</li>
-  <li>Automatically merge logs that Docker splits.</li>
-  <li>Enrich your logs with useful Docker context.</li>
-  <li>Send your logs to one or more destinations</li>
-  <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
-</ol>
-
-## How This Guide Works
+## Deployment Strategy
 
 <SVG src="/img/tutorials/sources/docker.svg" />
 
 ---
 
-The diagram above demonstrates our Docker logging strategy. It uses
-[Vector][urls.vector_website] as a dedicated logging container. This is
-superior because it is:
+For this guide we'll be using Vector, which is a lightweight and ultra-fast
+utility for building observability pipelines. We'll deploy Vector as a dedicated
+Logging container. This has a number of advantages:
 
-1. **Dependency free.** You do not need to install anything on the host.
-2. **Easy to scale.** Simply deploy more logging containers as necessary.
-3. **Fast & reliable.** Built in [Rust][urls.rust], Vector is [blistering fast and memory efficient][urls.vector_performance].
-4. **Flexible.** Vector includes a robust set of [transforms][docs.transforms] to process your data.
+1. **Same workflow** - Vector is deploy as a container like your other services.
+1. **Dependency free** - You do not need to install anything on the host.
+1. **Easy to scale** - Simply deploy more logging containers as necessary.
+1. **Fast & reliable** - Built in [Rust][urls.rust], Vector is [blistering fast and memory efficient][urls.vector_performance].
+1. **Flexible** - Vector includes a robust set of [transforms][docs.transforms] to process your data.
 
 
 ## A Simple Step-By-Step Tutorial

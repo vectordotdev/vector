@@ -4,7 +4,6 @@ description: "The Vector `ansi_stripper` transform accepts and outputs `log` eve
 event_types: ["log"]
 function_category: "sanitize"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
-min_version: null
 service_name: "ANSI Stripper"
 sidebar_label: "ansi_stripper|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/ansi_stripper.rs
@@ -28,7 +27,7 @@ ANSI escape sequences from the specified field.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -96,7 +95,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_ansi_stripper_transform_id]

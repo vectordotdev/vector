@@ -1,9 +1,32 @@
+<%- requirements = component.requirements -%>
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-<%= component.requirements.additional %>
+<%- if requirements.clickhouse -%>
+* Clickhouse version `<%= requirements.clickhouse %>` is required.
+<%- end -%>
+<%- if requirements.docker_api -%>
+* Docker API `<%= requirements.docker_api %>` is required.
+* In order for the Docker API to work properly, the
+  [`json-file`][urls.docker_logging_driver_json_file] (default) or
+  [`journald`][urls.docker_logging_driver_journald] Docker logging driver
+  must be enabled for this component to work. See
+  ["How it works"](#how-it-works) for more info.
+<%- end -%>
+<%- if requirements.journalctl -%>
+* The `journalctl` binary is required.
+* The Vector user must be part of the `systemd-journal` group in order to
+  execute the `journalctl` binary. See ["How it works"](#how-it-works) for more
+  info.
+<%- end -%>
+<%- if requirements.kafka -%>
+* Kafka version `<%= requirements.kafka %>` is required.
+<%- end -%>
+<%- if requirements.prometheus -%>
+* Prometheus version `<%= requirements.prometheus %>` is required.
+<%- end -%>
 <%- if component.requirements.network %>
-* Network access is required for this component to function correctly. See the
-  [Network Access section](#network-access) for more info.
+* Network access is required for this component to function correctly. See
+  ["How it works"](#how-it-works) for more info.
 <%- end -%>
 
 </Alert>

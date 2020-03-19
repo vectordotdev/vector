@@ -55,7 +55,7 @@ label = "Default"
 body = """\
 Given the following _default_ configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.merge_events]
@@ -65,7 +65,7 @@ Given the following _default_ configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
+<CodeHeader text="first log event" />
 
 ```javascript
 {
@@ -78,7 +78,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
+<CodeHeader text="second log event" />
 
 ```javascript
 {
@@ -91,7 +91,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
+<CodeHeader text="third log event" />
 
 ```javascript
 {
@@ -120,7 +120,7 @@ label = "With Merge Fields"
 body = """\
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.merge_events]
@@ -131,7 +131,7 @@ Given the following configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
+<CodeHeader text="first log event" />
 
 ```javascript
 {
@@ -144,7 +144,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
+<CodeHeader text="second log event" />
 
 ```javascript
 {
@@ -157,7 +157,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
+<CodeHeader text="third log event" />
 
 ```javascript
 {

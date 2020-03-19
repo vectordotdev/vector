@@ -28,8 +28,9 @@ import TabItem from '@theme/TabItem';
 
 
 <TabItem value="x86_64">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.msi` file:
+1.  ### Download the Vector `.msi` file
 
     <Tabs
       className="mini"
@@ -55,19 +56,19 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the Vector `.msi` package using `msiexec` command:
+2.  ### Install the Vector `.msi` package using `msiexec` command
 
     ```bat
     msiexec /i vector-x64.msi /quiet
     ```
 
-3.  Navigate to the Vector directory:
+3.  ### Navigate to the Vector directory
 
     ```bat
     cd "C:\Program Files\Vector"
     ```
 
-4.  Start Vector:
+4.  ### Start Vector
 
     ```bat
     .\bin\vector --config config\vector.toml
@@ -75,6 +76,7 @@ import TabItem from '@theme/TabItem';
 
     That's it! Proceed to [configure](#configuring) Vector for your use case.
 
+</div>
 </TabItem>
 
 

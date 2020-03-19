@@ -5,7 +5,6 @@ description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Servic
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "AWS S3"
 sidebar_label: "aws_s3|[\"log\"]"
@@ -43,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -73,7 +72,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -1485,7 +1484,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sinks.my_aws_s3_sink_id]

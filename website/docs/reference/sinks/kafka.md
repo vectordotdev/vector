@@ -5,7 +5,6 @@ description: "The Vector `kafka` sink streams `log` events to Apache Kafka via t
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
-min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Kafka"
 sidebar_label: "kafka|[\"log\"]"
@@ -33,8 +32,7 @@ import Alert from '@site/src/components/Alert';
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Kafka version >= 0.8 is required.
-
+* Kafka version `>= 0.8` is required.
 
 </Alert>
 
@@ -53,7 +51,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -73,7 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]

@@ -5,7 +5,6 @@ description: "The Vector `syslog` source ingests data through the Syslog protoco
 event_types: ["log"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Syslog"
 sidebar_label: "syslog|[\"log\"]"
@@ -41,7 +40,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -54,7 +53,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]

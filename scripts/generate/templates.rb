@@ -5,6 +5,7 @@ require "active_support/core_ext/string/output_safety"
 require_relative "templates/config_example_writer"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
+require_relative "templates/setup_guide"
 
 # Renders templates in the templates sub-dir
 #
@@ -433,25 +434,8 @@ class Templates
     content
   end
 
-  def setup_guide(id, tutorial, source: nil, sink: nil)
-    if source.nil? && sink.nil?
-      raise ArgumentError.new("You must supply at least a source or a sink")
-    end
-
-    features = []
-
-    if source
-      features += source.features
-    else
-      features << "Collect your logs from one or more sources"
-    end
-
-    if sink
-      features += sink.features
-    else
-      features << "Send your logs to one or more destinations"
-    end
-
+  def setup_guide(id, source: nil, sink: nil)
+    guide = SetupGuide.new(source: source, sink: sink)
     render("#{partials_path}/_setup_guide.md", binding).strip
   end
 

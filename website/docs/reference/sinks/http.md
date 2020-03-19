@@ -5,7 +5,6 @@ description: "The Vector `http` sink batches `log` events to a generic HTTP endp
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "HTTP"
 sidebar_label: "http|[\"log\"]"
@@ -42,7 +41,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -74,7 +73,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]

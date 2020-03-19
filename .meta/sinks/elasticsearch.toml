@@ -7,7 +7,6 @@ egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-min_version = "0"
 requirements = {}
 service_providers = ["AWS", "Elastic"]
 write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"

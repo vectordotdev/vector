@@ -48,7 +48,7 @@ be configured to use `disk` based buffers:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
 
 ```toml
 [sinks.my_sink_id]

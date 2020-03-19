@@ -194,10 +194,27 @@
     },
     "requirements": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "additional": {
+        "clickhouse": {
           "type": "string",
-          "description": "Additional free-form requirements. Markdown is supported and they should be in list format."
+          "description": "The minimum Docker API version required."
+        },
+        "docker_api": {
+          "type": "string",
+          "description": "The minimum Docker API version required."
+        },
+        "journalctl": {
+          "type": "boolean",
+          "description": "If the `journalctl` binary is required."
+        },
+        "kafka": {
+          "type": "string",
+          "description": "The minimum Kafka version required."
+        },
+        "prometheus": {
+          "type": "string",
+          "description": "The minimum Kafka version required."
         },
         "network": {
           "type": "boolean",
@@ -282,10 +299,6 @@
             "type": "string",
             "enum": ["log", "metric"]
           }
-        },
-        "min_version": {
-          "type": "string",
-          "description": "The minimum version supported for the system this component interfaces with."
         },
         "options": {
           "$ref": "#/definitions/fields",
@@ -387,10 +400,6 @@
             "collect",
             "receive"
           ]
-        },
-        "min_version": {
-          "type": "string",
-          "description": "The minimum version supported for the system this component interfaces with."
         },
         "only_operating_systems": {
           "$ref": "#/definitions/operating_systems",

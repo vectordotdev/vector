@@ -1,11 +1,10 @@
 ---
-delivery_guarantee: "best_effort"
+delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
 event_types: ["log"]
 function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
-min_version: null
 operating_systems: ["Linux"]
 service_name: "Journald"
 sidebar_label: "journald|[\"log\"]"
@@ -33,8 +32,10 @@ import Alert from '@site/src/components/Alert';
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* The `journald` source requires the presence of the [`journalctl`](#journalctl) binary. This ensures that this source works across all platforms. Please see the ["Communication strategy"](#communication-strategy) section for more info.
-* If you run Vector from a non-root user, you need to add that user to the `systemd-journal` group. Please see the ["User permissions"](#user-permissions) section for more info.
+* The [`journalctl`](#journalctl) binary is required.
+* The Vector user must be part of the `systemd-journal` group in order to
+  execute the [`journalctl`](#journalctl) binary. See ["How it works"](#how-it-works) for more
+  info.
 
 </Alert>
 
@@ -53,7 +54,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -65,7 +66,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]

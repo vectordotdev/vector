@@ -4,7 +4,6 @@ description: "The Vector `grok_parser` transform accepts and outputs `log` event
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
-min_version: null
 service_name: "Grok Parser"
 sidebar_label: "grok_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
@@ -28,7 +27,7 @@ log field value with [Grok][urls.grok].
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -224,7 +223,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_grok_parser_transform_id]

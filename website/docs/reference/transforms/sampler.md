@@ -4,7 +4,6 @@ description: "The Vector `sampler` transform accepts and outputs `log` events al
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
-min_version: null
 service_name: "Sampler"
 sidebar_label: "sampler|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
@@ -39,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -52,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]

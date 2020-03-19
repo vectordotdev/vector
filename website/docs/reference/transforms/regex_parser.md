@@ -4,7 +4,6 @@ description: "The Vector `regex_parser` transform accepts and outputs `log` even
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
-min_version: null
 service_name: "Regex Parser"
 sidebar_label: "regex_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
@@ -28,7 +27,7 @@ log field's value with a [Regular Expression][urls.regex].
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -269,7 +268,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_regex_parser_transform_id]

@@ -9,6 +9,8 @@
 <%- sinks.each do |sink| -%>
 <TabItem value=<%= sink.name.to_json %>>
 
+<CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
 ```bash
 echo '
 <%= config_pipeline_example(metadata.sources.docker, sink) %>

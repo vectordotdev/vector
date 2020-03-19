@@ -29,8 +29,9 @@ import TabItem from '@theme/TabItem';
 
 
 <TabItem value="x86_64">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.deb` package
+1.  ### Download the Vector `.deb` package
 
     <Tabs
       className="mini"
@@ -56,24 +57,26 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the downloaded package
+2.  ### Install the downloaded package
 
     ```bash
     sudo dpkg -i vector-amd64.deb
     ```
 
-3.  Start Vector
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
     ```
 
+</div>
 </TabItem>
 
 
 <TabItem value="ARM64">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.deb` package
+1.  ### Download the Vector `.deb` package
 
     <Tabs
       className="mini"
@@ -99,24 +102,26 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the downloaded package
+2.  ### Install the downloaded package
 
     ```bash
     sudo dpkg -i vector-arm64.deb
     ```
 
-3.  Start Vector
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
     ```
 
+</div>
 </TabItem>
 
 
 <TabItem value="ARMv7">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.deb` package
+1.  ### Download the Vector `.deb` package
 
     <Tabs
       className="mini"
@@ -142,18 +147,19 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the downloaded package
+2.  ### Install the downloaded package
 
     ```bash
     sudo dpkg -i vector-armhf.deb
     ```
 
-3.  Start Vector
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
     ```
 
+</div>
 </TabItem>
 
 

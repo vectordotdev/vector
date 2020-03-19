@@ -9,19 +9,23 @@ used on MacOS systems.
 
 ## Install
 
-1. Add the Timber tap and install `vector`:
+<div className="steps steps--h3">
+
+1. ### Add the Timber tap and install `vector`
 
    ```bash
    brew tap timberio/brew && brew install vector
    ```
 
-2. Start Vector:
+2. ### Start Vector
 
    ```bash
    brew services start vector
    ```
 
    That's it! Proceed to [configure](#configuring) Vector for your use case.
+
+</div>
 
 ### Previous Versions
 

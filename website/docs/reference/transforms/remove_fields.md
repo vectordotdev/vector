@@ -4,7 +4,6 @@ description: "The Vector `remove_fields` transform accepts and outputs `log` eve
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_fields%22
-min_version: null
 service_name: "Remove Fields"
 sidebar_label: "remove_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_fields.rs
@@ -39,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -148,7 +147,7 @@ The [`fields`](#fields) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_remove_fields_transform_id]

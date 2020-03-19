@@ -25,7 +25,7 @@ vector --config /etc/vector/vector.toml
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 # Set global options
@@ -107,7 +107,7 @@ found at `/etc/vector/vector.toml`.
 Vector will interpolate environment variables within your configuration file
 with the following syntax:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.add_host]
@@ -163,7 +163,7 @@ interpolation:
 
 For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sinks.es_cluster]

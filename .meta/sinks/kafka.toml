@@ -7,8 +7,7 @@ egress_method = "streaming"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-min_version = "0.8"
-requirements = {}
+requirements.kafka = ">= 0.8"
 service_providers = ["AWS", "Confluent"]
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
 

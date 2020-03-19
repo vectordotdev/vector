@@ -64,7 +64,7 @@ function GuidePage(props) {
           </div>
           <h1>{title}</h1>
           <div className={styles.credit}>Written, with <i className="feather icon-heart"></i>, by the <Link to="/community/#team">Vector team</Link>, last updated March 22, 2020</div>
-          <Tags tags={tags} />
+          <Tags colorProfile="guides" tags={tags} />
         </div>
       </header>
       <main className="container container--narrow margin-vert--xl">

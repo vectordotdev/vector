@@ -4,7 +4,6 @@ description: "The Vector `tag_cardinality_limit` transform accepts and outputs `
 event_types: ["metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tag_cardinality_limit%22
-min_version: null
 service_name: "Tag Cardinality Limit"
 sidebar_label: "tag_cardinality_limit|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tag_cardinality_limit.rs
@@ -39,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -53,7 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -192,7 +191,7 @@ configured [`value_limit`](#value_limit).
 
 For example, given this configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.cardinality_protection]

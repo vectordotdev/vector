@@ -7,8 +7,7 @@ egress_method = "exposing"
 function_category = "transmit"
 healthcheck = false
 input_types = ["metric"]
-min_version = "1.0"
-requirements = {}
+requirements.prometheus = ">= 1.0"
 write_to_description = "[Prometheus][urls.prometheus] metrics service"
 
 <%= render(

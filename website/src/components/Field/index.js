@@ -76,7 +76,7 @@ function Examples({name, path, values}) {
 
   return (
     <div>
-      <CodeHeader fileName="vector.toml" />
+      <CodeHeader text="vector.toml" />
 
       <CodeBlock className="language-toml">
         {code}

@@ -252,7 +252,6 @@ module.exports = {
     "permalink": "https://vector.dev/blog/prometheus-source",
     "tags": [
       "type: announcement",
-      "event type: metrics",
       "domain: sources",
       "source: prometheus"
     ],
@@ -371,7 +370,6 @@ module.exports = {
     "platform: kubernetes",
     "domain: transforms",
     "transform: ec2_metadata",
-    "event type: metrics",
     "domain: sources",
     "source: prometheus"
   ],
@@ -479,7 +477,6 @@ module.exports = {
       "permalink": "https://vector.dev/blog/prometheus-source",
       "tags": [
         "type: announcement",
-        "event type: metrics",
         "domain: sources",
         "source: prometheus"
       ],
@@ -16294,7 +16291,6 @@ module.exports = {
           "permalink": "https://vector.dev/blog/prometheus-source",
           "tags": [
             "type: announcement",
-            "event type: metrics",
             "domain: sources",
             "source: prometheus"
           ],
@@ -22166,7 +22162,7 @@ module.exports = {
     },
     "journald": {
       "beta": true,
-      "delivery_guarantee": "best_effort",
+      "delivery_guarantee": "at_least_once",
       "description": "Ingests data through log records from journald and outputs log events.",
       "event_types": [
         "log"
@@ -22190,7 +22186,7 @@ module.exports = {
     "kafka": {
       "beta": true,
       "delivery_guarantee": "at_least_once",
-      "description": "Ingests data through Kafka 0.9 or later and outputs log events.",
+      "description": "Ingests data through Kafka and outputs log events.",
       "event_types": [
         "log"
       ],

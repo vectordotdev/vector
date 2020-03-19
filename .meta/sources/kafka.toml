@@ -4,10 +4,9 @@ beta = true
 common = true
 delivery_guarantee = "at_least_once"
 function_category = "collect"
-min_version = "0.8"
 output_types = ["log"]
-requirements = {}
-through_description = "Kafka 0.9 or later"
+requirements.kafka = ">= 0.8"
+through_description = "Kafka"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "kafka") %>
 

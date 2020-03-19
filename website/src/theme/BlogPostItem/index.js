@@ -25,7 +25,7 @@ function BlogPostItem(props) {
   const {author_github, title} = frontMatter;
   const readingStats = readingTime(children.toString());
   const date = new Date(Date.parse(dateString));
-  const domainTag = enrichTags(tags).find(tag => tag.category == 'domain');
+  const domainTag = enrichTags(tags, 'blog').find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
 
   return (
@@ -34,7 +34,7 @@ function BlogPostItem(props) {
         <h2>{title}</h2>
         <div className="blog-post-item--subtitle">{description}</div>
         <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
-        <Tags tags={tags} />
+        <Tags colorProfile="blog" tags={tags} />
       </article>
     </Link>
   );

@@ -46,7 +46,7 @@ label = "Generic"
 body = """\
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_transform]

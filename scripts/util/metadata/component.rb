@@ -1,7 +1,6 @@
 #encoding: utf-8
 
 require_relative "field"
-require_relative "requirements"
 
 class Component
   include Comparable
@@ -12,7 +11,6 @@ class Component
     :features,
     :function_category,
     :id,
-    :min_version,
     :name,
     :operating_systems,
     :options,
@@ -30,22 +28,15 @@ class Component
     @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
     @features = hash["features"] || []
     @function_category = hash.fetch("function_category").downcase
-    @min_version = hash["min_version"]
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
-    @requirements = Requirements.new(hash["requirements"] || {})
+    @requirements = OpenStruct.new(hash["requirements"] || {})
     @service_name = hash["service_name"] || hash.fetch("title")
     @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
     @options = (hash["options"] || {}).to_struct_with_name(Field)
-
-    # Requirements
-
-    if @min_version && @min_version != "0" && (!@requirements.additional || !@requirements.additional.include?(@min_version))
-      @requirements.additional = "* #{@service_name} version >= #{@min_version} is required.\n#{@requirements.additional}"
-    end
 
     # Operating Systems
 

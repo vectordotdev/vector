@@ -7,7 +7,6 @@ description: <%= "The Vector `#{component.name}` #{component.type} #{component_d
 event_types: <%= component.event_types.to_json %>
 function_category: <%= component.function_category.to_json %>
 issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
-min_version: <%= component.min_version.to_json %>
 <%- if !component.transform? -%>
 operating_systems: <%= component.operating_systems.to_json %>
 <%- end -%>

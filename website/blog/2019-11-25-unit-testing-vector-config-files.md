@@ -22,7 +22,7 @@ transform][docs.transforms.regex_parser] to parse log lines:
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sources.my_logs]

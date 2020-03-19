@@ -4,7 +4,6 @@ description: "The Vector `swimlanes` transform accepts and outputs `log` events 
 event_types: ["log"]
 function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
-min_version: null
 service_name: "Swimlanes"
 sidebar_label: "swimlanes|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/swimlanes.rs
@@ -28,7 +27,7 @@ parallel streams using logical filters.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -283,7 +282,7 @@ import TabItem from '@theme/TabItem';
 
 The `swimlanes` transform, in it's simplest form, can act as a simple if/else stream splitter. For example, we can route events from the host `gerry` to a sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.splitting_gerrys]
@@ -315,7 +314,7 @@ This syntax makes it easy to create arbitrary numbers of swimlanes, each with th
 
 To follow up with the previous `If/Else` example, let's say we want to split a log stream based on all of the log `level` values:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.level_splitter]

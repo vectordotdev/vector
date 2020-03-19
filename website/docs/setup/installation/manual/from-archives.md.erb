@@ -32,10 +32,11 @@ import TabItem from '@theme/TabItem';
 
 <%- downloads.each do |download| %>
 <TabItem value="<%= download.file_name %>">
+<div className="steps steps--h3">
 
 <%- if download.os.downcase == "windows" -%>
 
-1.  Download Vector release archive (latest):
+1.  ### Download Vector release archive (latest)
 
     <Tabs
       className="mini"
@@ -61,19 +62,19 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Extract files from the archive:
+2.  ### Extract files from the archive
 
     ```bat
     powershell Expand-Archive <%= download.file_name %> .
     ```
 
-3.  Navigate to the Vector directory:
+3.  ### Navigate to the Vector directory
 
     ```bat
     cd <%= download.file_name.split(".").first %>
     ```
 
-4.  Start Vector:
+4.  ### Start Vector
 
     ```bat
     .\bin\vector --config config\vector.toml
@@ -81,7 +82,7 @@ import TabItem from '@theme/TabItem';
 
 <%- else -%>
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -111,20 +112,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -133,6 +134,7 @@ import TabItem from '@theme/TabItem';
     ```
 
 <%- end -%>
+</div>
 </TabItem>
 <%- end -%>
 </Tabs>

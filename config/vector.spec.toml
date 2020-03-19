@@ -484,7 +484,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   units = ["ntpd", "sysinit.target"]
 
-# Ingests data through Kafka 0.9 or later and outputs `log` events.
+# Ingests data through Kafka and outputs `log` events.
 [sources.kafka]
   #
   # General

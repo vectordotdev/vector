@@ -5,7 +5,6 @@ description: "The Vector `blackhole` sink streams `log` and `metric` events to a
 event_types: ["log","metric"]
 function_category: "test"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Blackhole"
 sidebar_label: "blackhole|[\"log\",\"metric\"]"
@@ -32,7 +31,7 @@ data, designed for testing and benchmarking purposes.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]

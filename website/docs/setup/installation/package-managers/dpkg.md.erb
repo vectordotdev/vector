@@ -23,8 +23,9 @@ import TabItem from '@theme/TabItem';
 
 <%- downloads.each do |download| %>
 <TabItem value="<%= download.arch %>">
+<div className="steps steps--h3">
 
-1.  Download the Vector `.deb` package
+1.  ### Download the Vector `.deb` package
 
     <Tabs
       className="mini"
@@ -50,18 +51,19 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Install the downloaded package
+2.  ### Install the downloaded package
 
     ```bash
     sudo dpkg -i <%= download.file_name %>
     ```
 
-3.  Start Vector
+3.  ### Start Vector
 
     ```bash
     sudo systemctl start vector
     ```
 
+</div>
 </TabItem>
 
 <%- end -%>

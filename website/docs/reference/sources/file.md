@@ -5,7 +5,6 @@ description: "The Vector [`file`](#file) source ingests data through one or more
 event_types: ["log"]
 function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
 service_name: "File"
 sidebar_label: "file|[\"log\"]"
@@ -42,7 +41,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
@@ -59,7 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]

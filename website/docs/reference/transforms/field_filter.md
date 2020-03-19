@@ -4,7 +4,6 @@ description: "The Vector `field_filter` transform accepts and outputs `log` even
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
-min_version: null
 service_name: "Field Filter"
 sidebar_label: "field_filter|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
@@ -28,7 +27,7 @@ events by a log field's value.
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -132,7 +131,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_field_filter_transform_id]

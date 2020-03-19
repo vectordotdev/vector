@@ -4,7 +4,6 @@ description: "The Vector `rename_fields` transform accepts and outputs `log` eve
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
-min_version: null
 service_name: "Rename Fields"
 sidebar_label: "rename_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/rename_fields.rs
@@ -39,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
 import CodeHeader from '@site/src/components/CodeHeader';
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -182,7 +181,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_transform]
