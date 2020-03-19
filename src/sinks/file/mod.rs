@@ -131,11 +131,7 @@ impl FileSink {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.flush().await {
-                                error!(
-                                    message = "Failed to flush file.",
-                                    path = ?path.get_ref(),
-                                    %error,
-                                );
+                                error!(message = "Failed to flush file.", ?path, %error);
                             }
                             drop(expired_file); // ignore close error
                         }
