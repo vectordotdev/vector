@@ -6,9 +6,9 @@ use futures::channel::mpsc;
 use futures::compat::CompatSink;
 use futures01::sink::Sink;
 
-/// This function provides the compatiblity with our old interfaces.
+/// This function provides the compatibility with our old interfaces.
 ///
-/// There are serveral aspects to it:
+/// There are several aspects to it:
 ///
 /// 1. We use pull-based interface now, before we used push-based interface.
 ///    Practically this means we're using `Stream` now instead of `Sink`.
@@ -42,7 +42,7 @@ pub type OldSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Se
 /// adapter won't be required.
 ///
 /// Spawns the polling loop at the background and returns
-/// a current-topolgy-compatible sink.
+/// a current-topology-compatible sink.
 ///
 /// Among other things, this adapter maintains backpressure through the sink, as
 /// it'll only go as fast as `streaming_sink` is able to poll items, without any
