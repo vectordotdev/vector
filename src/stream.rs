@@ -52,7 +52,7 @@ pub trait StreamExt: Stream {
     /// use tokio::prelude::*;
     ///
     /// let listener = tokio::net::TcpListener::bind(&"0.0.0.0:0".parse().unwrap()).unwrap();
-    /// let (tx, rx) = futures::sync::oneshot::channel();
+    /// let (tx, rx) = futures01::sync::oneshot::channel();
     ///
     /// let mut rt = tokio::runtime::Runtime::new().unwrap();
     /// rt.spawn(
