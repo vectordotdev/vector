@@ -230,9 +230,9 @@ async fn write_event_to_file(
 
 #[async_trait]
 impl StreamingSink for FileSink {
-    async fn run<'a>(
-        &'a mut self,
-        input: impl Stream<Item = Event> + Send + Sync + 'a,
+    async fn run(
+        &mut self,
+        input: impl Stream<Item = Event> + Send + Sync + 'static,
     ) -> crate::Result<()> {
         FileSink::run(self, input).await
     }
