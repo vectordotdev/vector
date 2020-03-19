@@ -11,8 +11,7 @@ use futures01::future;
 use serde::{Deserialize, Serialize};
 use tokio02::io::{self, AsyncWriteExt};
 
-// TODO: move streaming sink into a shared location.
-use super::file::streaming_sink::{self, StreamingSink};
+use super::streaming_sink::{self, StreamingSink};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]

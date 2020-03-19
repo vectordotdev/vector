@@ -1,6 +1,8 @@
 use futures01::{Future, Sink};
 use snafu::Snafu;
 
+pub mod streaming_sink;
+
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
