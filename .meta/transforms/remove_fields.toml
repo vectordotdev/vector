@@ -20,7 +20,6 @@ description = "The log field names to drop."
 
 [transforms.remove_fields.options.drop_empty]
 type = "bool"
-common = true
 required = false
 default = false
 description = "If set to `true`, after removing fields, remove any parent objects that are now empty."

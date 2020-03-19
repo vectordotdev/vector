@@ -26,7 +26,30 @@ one or more log fields.
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  type = "remove_fields" # required
+  inputs = ["my-source-id"] # required
+  fields = ["field1", "field2", "parent.child"] # required
+```
+
+</TabItem>
+<TabItem value="advanced">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -38,6 +61,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   drop_empty = false # optional, default
 ```
 
+</TabItem>
+</Tabs>
+
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
@@ -46,7 +72,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}

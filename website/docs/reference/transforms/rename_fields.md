@@ -26,7 +26,34 @@ log fields.
 
 ## Configuration
 
+import Tabs from '@theme/Tabs';
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+import TabItem from '@theme/TabItem';
+
+<TabItem value="common">
+
 import CodeHeader from '@site/src/components/CodeHeader';
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  # General
+  type = "rename_fields" # required
+  inputs = ["my-source-id"] # required
+
+  # Fields
+  fields.old_field_name = "new_field_name" # example
+  fields.parent.old_child_name = "parent.new_child_name" # example
+```
+
+</TabItem>
+<TabItem value="advanced">
 
 <CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -42,6 +69,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   fields.parent.old_child_name = "parent.new_child_name" # example
 ```
 
+</TabItem>
+</Tabs>
+
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
@@ -50,7 +80,7 @@ import Field from '@site/src/components/Field';
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={false}
   enumValues={null}
   examples={[false,true]}
