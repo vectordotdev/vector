@@ -48,14 +48,12 @@ pub type OldSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Se
 /// it'll only go as fast as `streaming_sink` is able to poll items, without any
 /// buffering.
 pub fn adapt_to_topology(
-    _cx: &mut SinkContext,
+    cx: &mut SinkContext,
     mut streaming_sink: impl StreamingSink + 'static,
 ) -> sinks::RouterSink {
     let (stream, sink) = sink_interface_compat();
 
-    // TODO: use the runtime from the passed `SinkContext` when it's added
-    // there.
-    tokio02::spawn(async move {
+    cx.executor().spawn_std(async move {
         streaming_sink
             .run(stream)
             .await
