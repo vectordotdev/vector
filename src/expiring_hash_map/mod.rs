@@ -68,7 +68,7 @@ where
         self.map.get_mut(k).map(|&mut (ref mut v, _)| v)
     }
 
-    /// Reset the dealine for a key, and return a mut ref to the value.
+    /// Reset the deadline for a key, and return a mut ref to the value.
     pub fn reset_at<Q>(&mut self, k: &Q, when: Instant) -> Option<&mut V>
     where
         K: Borrow<Q>,
@@ -112,7 +112,7 @@ where
     /// a spinlock on the first value insertion.
     ///
     /// We currently don't offer an API that would allow simply waiting for
-    /// expiried items regardless of what state the [`ExpiringHashMap`] is.
+    /// expired items regardless of what state the [`ExpiringHashMap`] is.
     /// This is a deliberate design decision, we went with it for the following
     /// reasons:
     /// 1. Use of `async fn`. One of the benefits of this API is that it relies
@@ -131,7 +131,7 @@ where
     ///    works.
     ///    The "queue"-like API would, pretty much, be simply waiting expired
     ///    items to appear. In the case of empty [`ExpiringHashMap`], we would
-    ///    wait indefinetly - or until an item is inserted. This would be
+    ///    wait indefinitely - or until an item is inserted. This would be
     ///    possible to carry on, for instance, from a sibling branch of a
     ///    `select` statement, so the borrowing rules won't be a problem here.
     /// 3. We went over the following alternative signature:
@@ -140,13 +140,13 @@ where
     ///    ```
     ///    This captures the API restrictions a bit better, and should provide
     ///    less possibilities to misuse the API.
-    ///    We didn't pick this one becuase it's not an `async fn` and we wanted
-    ///    this, see (1) of this list. Furtherore, instead of doing a
+    ///    We didn't pick this one because it's not an `async fn` and we wanted
+    ///    this, see (1) of this list. Furthermore, instead of doing a
     ///    `select { _ = map.next_expired(), if !map.is_empty() => { ... } }`
     ///    users would have to do
     ///    `let exp = map.next_expired(); select { _ = exp.unwrap(), if exp.is_some() => { ... } }`,
     ///    which is less readable and a bit harder to understand. Although it
-    ///    has a possiblity of a nicer generalization if `select` macro
+    ///    has a possibility of a nicer generalization if `select` macro
     ///    supported a `Some(future)` kind of pattern matching, we decided to go
     ///    with other solution for now.
     ///
