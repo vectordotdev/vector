@@ -91,12 +91,12 @@ messages
 And in the `internal_events` module, we would add the following:
 
 ```rust
-pub struct FileEventReceived {
-    pub file: &str,
+pub struct FileEventReceived<'a> {
+    pub file: &'a str,
     pub byte_size: usize,
 }
 
-impl InternalEvent for EventProcessed {
+impl InternalEvent for FileEventReceived<'_> {
     fn emit_logs(&self) {
         trace!(
             message = "Received one event.",
