@@ -180,7 +180,7 @@ above and something like the following:
 
 ```rust
 pub struct EventReceived {
-    pub source_type: &str,
+    pub source_type: &'static str,
     pub byte_size: usize,
 }
 ```
@@ -189,8 +189,8 @@ Or even:
 
 ```rust
 pub struct EventProcessed {
-    pub component_kind: &str,
-    pub component_type: &str,
+    pub component_kind: &'static str,
+    pub component_type: &'static str,
     pub byte_size: usize,
 }
 ```
