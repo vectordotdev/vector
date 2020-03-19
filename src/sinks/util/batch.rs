@@ -33,7 +33,7 @@ impl BatchEventsConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BatchSettings {
     pub size: usize,
     pub timeout: Duration,
@@ -220,7 +220,7 @@ where
                 // We have data to send, so check if we should send it and either attempt the send
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
-                if self.should_send() {
+                if dbg!(self.should_send()) {
                     try_ready!(self.poll_send());
                 } else {
                     self.inner.poll_complete()?;

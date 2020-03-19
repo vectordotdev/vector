@@ -6,6 +6,7 @@ pub mod retries;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
+pub mod sink;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
@@ -31,6 +32,7 @@ pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
+pub use sink::StreamSink;
 pub use uri::UriSerde;
 
 /**
@@ -75,8 +77,8 @@ pub trait SinkExt<T>
 where
     Self: Sink<SinkItem = T> + Sized,
 {
-    fn stream_ack(self, acker: Acker) -> StreamAck<Self> {
-        StreamAck::new(self, acker)
+    fn stream_ack(self, acker: Acker) -> StreamSink<Self> {
+        StreamSink::new(self, acker)
     }
 
     fn batched(self, batch: T, limit: usize) -> BatchSink<T, Self>
@@ -113,52 +115,6 @@ where
 }
 
 impl<T, S> SinkExt<T> for S where S: Sink<SinkItem = T> + Sized {}
-
-pub struct StreamAck<T> {
-    inner: T,
-    acker: Acker,
-    pending: usize,
-}
-
-impl<T: Sink> StreamAck<T> {
-    pub fn new(inner: T, acker: Acker) -> Self {
-        Self {
-            inner,
-            acker,
-            pending: 0,
-        }
-    }
-}
-
-impl<T: Sink> Sink for StreamAck<T> {
-    type SinkItem = T::SinkItem;
-    type SinkError = T::SinkError;
-
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let res = self.inner.start_send(item);
-
-        if let Ok(AsyncSink::Ready) = res {
-            self.pending += 1;
-
-            if self.pending >= 10000 {
-                self.poll_complete()?;
-            }
-        }
-
-        res
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        let res = self.inner.poll_complete();
-
-        if let Ok(Async::Ready(_)) = res {
-            self.acker.ack(self.pending);
-            self.pending = 0;
-        }
-
-        res
-    }
-}
 
 pub type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
 
