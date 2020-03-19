@@ -45,14 +45,14 @@ impl TlsSettings {
     /// Generate a filled out settings struct from the given optional
     /// option set, interpreted as client options. If `options` is
     /// `None`, the result is set to defaults (ie empty).
-    pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
+    pub fn from_options(options: &Option<TlsOptions>) -> Result<Self> {
         Self::from_options_base(options, false)
     }
 
     pub(super) fn from_options_base(
         options: &Option<TlsOptions>,
         for_server: bool,
-    ) -> crate::Result<Self> {
+    ) -> Result<Self> {
         let default = TlsOptions::default();
         let options = options.as_ref().unwrap_or(&default);
 
@@ -87,12 +87,12 @@ impl TlsSettings {
                     // Certificate file is DER encoded PKCS#12 archive
                     Ok(pkcs12) => {
                         // Verify password
-                        pkcs12.parse(&key_pass)?;
+                        pkcs12.parse(&key_pass).context(ParsePkcs12)?;
                         Some(IdentityStore(cert_data, key_pass.to_string()))
                     }
-                    Err(err) => {
+                    Err(source) => {
                         if options.key_path.is_none() {
-                            return Err(err.into());
+                            return Err(TlsError::ParsePkcs12 { source });
                         }
                         // Identity is a PEM encoded certficate+key pair
                         let crt = load_x509(crt_path)?;
@@ -135,7 +135,7 @@ impl TlsSettings {
         })
     }
 
-    pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> crate::Result<()> {
+    pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> Result<()> {
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
         } else {
@@ -187,7 +187,7 @@ impl MaybeTlsSettings {
     /// should be interpreted as being for a TLS server, which requires
     /// an identity certificate and changes the certificate verification
     /// default to false.
-    pub fn from_config(config: &Option<TlsConfig>, for_server: bool) -> crate::Result<Self> {
+    pub fn from_config(config: &Option<TlsConfig>, for_server: bool) -> Result<Self> {
         match config {
             None => Ok(Self::Raw(())), // No config, no TLS settings
             Some(config) => match config.enabled.unwrap_or(false) {
@@ -213,7 +213,7 @@ impl From<TlsSettings> for MaybeTlsSettings {
 }
 
 /// Load a private key from a named file
-fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey<Private>> {
+fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
     match pass_phrase {
         None => Ok(PKey::private_key_from_der(&data)
@@ -228,14 +228,14 @@ fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey
 }
 
 /// Load an X.509 certificate from a named file
-fn load_x509(filename: &Path) -> crate::Result<X509> {
+fn load_x509(filename: &Path) -> Result<X509> {
     let data = open_read(filename, "certificate")?;
     Ok(X509::from_der(&data)
         .or_else(|_| X509::from_pem(&data))
         .with_context(|| X509ParseError { filename })?)
 }
 
-fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
+fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
     let mut text = Vec::<u8>::new();
 
     File::open(filename)
@@ -249,7 +249,6 @@ fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::assert_downcast_matches;
 
     const TEST_PKCS12: &str = "tests/data/localhost.p12";
     const TEST_PEM_CRT: &str = "tests/data/localhost.crt";
@@ -308,7 +307,7 @@ mod test {
         };
         let error = TlsSettings::from_options(&Some(options))
             .expect_err("from_options failed to check certificate");
-        assert_downcast_matches!(error, TlsError, TlsError::MissingCrtKeyFile);
+        assert!(matches!(error, TlsError::MissingCrtKeyFile));
 
         let options = TlsOptions {
             crt_path: Some(TEST_PEM_CRT.into()),
@@ -340,7 +339,7 @@ mod test {
         let config = make_config(Some(true), false, false);
         let error = MaybeTlsSettings::from_config(&Some(config), true)
             .expect_err("from_config failed to check for a certificate");
-        assert_downcast_matches!(error, TlsError, TlsError::MissingRequiredIdentity);
+        assert!(matches!(error, TlsError::MissingRequiredIdentity));
     }
 
     #[test]

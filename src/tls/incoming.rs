@@ -22,7 +22,7 @@ enum MaybeTlsIncomingState<S> {
 }
 
 impl<I: Stream> MaybeTlsIncoming<I> {
-    pub(crate) fn new(incoming: I, acceptor: Option<SslAcceptor>) -> crate::Result<Self> {
+    pub(crate) fn new(incoming: I, acceptor: Option<SslAcceptor>) -> Result<Self> {
         Ok(Self {
             incoming,
             acceptor,
@@ -80,7 +80,7 @@ impl<I: Stream + Debug> Debug for MaybeTlsIncoming<I> {
 }
 
 impl TlsSettings {
-    pub(crate) fn acceptor(&self) -> crate::Result<SslAcceptor> {
+    pub(crate) fn acceptor(&self) -> Result<SslAcceptor> {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity.into()),
             Some(_) => {
@@ -94,8 +94,8 @@ impl TlsSettings {
 }
 
 impl MaybeTlsSettings {
-    pub(crate) fn bind(&self, addr: &SocketAddr) -> crate::Result<MaybeTlsIncoming<Incoming>> {
-        let listener = TcpListener::bind(addr)?;
+    pub(crate) fn bind(&self, addr: &SocketAddr) -> Result<MaybeTlsIncoming<Incoming>> {
+        let listener = TcpListener::bind(addr).context(TcpBind)?;
         let incoming = listener.incoming();
 
         let acceptor = match self {

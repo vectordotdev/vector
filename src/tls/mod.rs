@@ -6,7 +6,7 @@ use openssl::{
 };
 use snafu::{ResultExt, Snafu};
 use std::fmt::Debug;
-use std::io::Read;
+use std::io::{Error as IoError, Read};
 use std::path::PathBuf;
 #[cfg(feature = "sources-tls")]
 use tokio::net::TcpStream;
@@ -19,19 +19,21 @@ mod settings;
 pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
+pub type Result<T> = std::result::Result<T, TlsError>;
+
 #[derive(Debug, Snafu)]
 pub enum TlsError {
     #[snafu(display("Could not open {} file {:?}: {}", note, filename, source))]
     FileOpenFailed {
         note: &'static str,
         filename: PathBuf,
-        source: std::io::Error,
+        source: IoError,
     },
     #[snafu(display("Could not read {} file {:?}: {}", note, filename, source))]
     FileReadFailed {
         note: &'static str,
         filename: PathBuf,
-        source: std::io::Error,
+        source: IoError,
     },
     #[snafu(display("Could not build TLS connector: {}", source))]
     TlsBuildConnector { source: ErrorStack },
@@ -84,11 +86,13 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("PKCS#12 parse failed: {}", source))]
+    ParsePkcs12 { source: ErrorStack },
+    #[snafu(display("TCP bind failed: {}", source))]
+    TcpBind { source: IoError },
 }
 
-pub(crate) fn tls_connector_builder(
-    settings: MaybeTlsSettings,
-) -> crate::Result<SslConnectorBuilder> {
+pub(crate) fn tls_connector_builder(settings: MaybeTlsSettings) -> Result<SslConnectorBuilder> {
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnector)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
@@ -96,7 +100,7 @@ pub(crate) fn tls_connector_builder(
     Ok(builder)
 }
 
-pub(crate) fn tls_connector(settings: MaybeTlsSettings) -> crate::Result<ConnectConfiguration> {
+pub(crate) fn tls_connector(settings: MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let verify_hostname = settings
         .tls()
         .map(|settings| settings.verify_hostname)
