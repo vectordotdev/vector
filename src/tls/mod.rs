@@ -16,10 +16,8 @@ mod incoming;
 mod maybe_tls;
 mod settings;
 
-#[cfg(any(feature = "sources-tls", feature = "sources-http"))]
-pub(crate) use incoming::MaybeTlsSettings;
 pub(crate) use maybe_tls::MaybeTls;
-pub use settings::{TlsConfig, TlsOptions, TlsSettings};
+pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
 #[derive(Debug, Snafu)]
 pub enum TlsError {
@@ -89,18 +87,18 @@ pub enum TlsError {
 }
 
 pub(crate) fn tls_connector_builder(
-    settings: Option<TlsSettings>,
+    settings: MaybeTlsSettings,
 ) -> crate::Result<SslConnectorBuilder> {
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnector)?;
-    if let Some(settings) = settings {
+    if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
     }
     Ok(builder)
 }
 
-pub(crate) fn tls_connector(settings: Option<TlsSettings>) -> crate::Result<ConnectConfiguration> {
+pub(crate) fn tls_connector(settings: MaybeTlsSettings) -> crate::Result<ConnectConfiguration> {
     let verify_hostname = settings
-        .as_ref()
+        .tls()
         .map(|settings| settings.verify_hostname)
         .unwrap_or(true);
     let configure = tls_connector_builder(settings)?

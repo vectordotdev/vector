@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
-    tls::{tls_connector, MaybeTls, TlsConfig, TlsSettings},
+    tls::{tls_connector, MaybeTls, MaybeTlsSettings, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -53,7 +53,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
 
-        let tls = TlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
         let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(host, port, cx.resolver());
@@ -66,7 +66,7 @@ pub struct TcpSink {
     host: String,
     port: u16,
     resolver: Resolver,
-    tls: Option<TlsSettings>,
+    tls: MaybeTlsSettings,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
     span: tracing::Span,
@@ -85,7 +85,7 @@ type TcpOrTlsStream =
     MaybeTls<FramedWrite<TcpStream, BytesCodec>, FramedWrite<SslStream<TcpStream>, BytesCodec>>;
 
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver, tls: Option<TlsSettings>) -> Self {
+    pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
         let span = info_span!("connection", %host, %port);
         Self {
             host,
@@ -149,8 +149,8 @@ impl TcpSink {
                     Ok(Async::Ready(socket)) => {
                         debug!(message = "connected");
                         self.backoff = Self::fresh_backoff();
-                        match self.tls {
-                            Some(ref tls) => match tls_connector(Some(tls.clone())) {
+                        match self.tls.tls() {
+                            Some(_) => match tls_connector(self.tls.clone()) {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
                                     connector.connect_async(&self.host, socket),
                                 ),
@@ -254,7 +254,7 @@ pub fn raw_tcp(
     port: u16,
     cx: SinkContext,
     encoding: EncodingConfig<Encoding>,
-    tls: Option<TlsSettings>,
+    tls: MaybeTlsSettings,
 ) -> RouterSink {
     Box::new(
         TcpSink::new(host, port, cx.resolver(), tls)

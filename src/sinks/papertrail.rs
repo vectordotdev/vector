@@ -6,7 +6,7 @@ use crate::{
         uri::UriSerde,
         Encoding,
     },
-    tls::TlsSettings,
+    tls::{MaybeTlsSettings, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
@@ -42,7 +42,7 @@ impl SinkConfig for PapertrailConfig {
             host.clone(),
             port,
             cx.resolver(),
-            Some(TlsSettings::default()),
+            MaybeTlsSettings::Tls(TlsSettings::default()),
         );
         let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
 

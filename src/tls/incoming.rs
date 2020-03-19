@@ -93,19 +93,7 @@ impl TlsSettings {
     }
 }
 
-pub(crate) type MaybeTlsSettings = MaybeTls<(), TlsSettings>;
-
 impl MaybeTlsSettings {
-    pub(crate) fn from_config(
-        config: &Option<TlsConfig>,
-        require_ident: bool,
-    ) -> crate::Result<Self> {
-        Ok(match TlsSettings::from_config(config, require_ident)? {
-            None => Self::Raw(()),
-            Some(tls) => Self::Tls(tls),
-        })
-    }
-
     pub(crate) fn bind(&self, addr: &SocketAddr) -> crate::Result<MaybeTlsIncoming<Incoming>> {
         let listener = TcpListener::bind(addr)?;
         let incoming = listener.incoming();

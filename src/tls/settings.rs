@@ -42,32 +42,6 @@ pub struct TlsSettings {
 pub struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
-    /// Generate an optional settings struct from the given optional
-    /// configuration reference. If `config` is `None`, TLS is
-    /// disabled. The `for_server` parameter indicates the options
-    /// should be interpreted as being for a TLS server, which requires
-    /// an identity certificate and changes the certificate verification
-    /// default to false.
-    pub fn from_config(
-        config: &Option<TlsConfig>,
-        for_server: bool,
-    ) -> crate::Result<Option<Self>> {
-        match config {
-            None => Ok(None), // No config, no TLS settings
-            Some(config) => match config.enabled.unwrap_or(false) {
-                false => Ok(None), // Explicitly disabled, still no TLS settings
-                true => {
-                    let tls = Self::from_options_base(&Some(config.options.clone()), for_server)?;
-                    match (for_server, &tls.identity) {
-                        // Servers require an identity certificate
-                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
-                        _ => Ok(Some(tls)),
-                    }
-                }
-            },
-        }
-    }
-
     /// Generate a filled out settings struct from the given optional
     /// option set, interpreted as client options. If `options` is
     /// `None`, the result is set to defaults (ie empty).
@@ -75,7 +49,10 @@ impl TlsSettings {
         Self::from_options_base(options, false)
     }
 
-    fn from_options_base(options: &Option<TlsOptions>, for_server: bool) -> crate::Result<Self> {
+    pub(super) fn from_options_base(
+        options: &Option<TlsOptions>,
+        for_server: bool,
+    ) -> crate::Result<Self> {
         let default = TlsOptions::default();
         let options = options.as_ref().unwrap_or(&default);
 
@@ -201,6 +178,40 @@ impl Debug for TlsSettings {
     }
 }
 
+pub type MaybeTlsSettings = MaybeTls<(), TlsSettings>;
+
+impl MaybeTlsSettings {
+    /// Generate an optional settings struct from the given optional
+    /// configuration reference. If `config` is `None`, TLS is
+    /// disabled. The `for_server` parameter indicates the options
+    /// should be interpreted as being for a TLS server, which requires
+    /// an identity certificate and changes the certificate verification
+    /// default to false.
+    pub fn from_config(config: &Option<TlsConfig>, for_server: bool) -> crate::Result<Self> {
+        match config {
+            None => Ok(Self::Raw(())), // No config, no TLS settings
+            Some(config) => match config.enabled.unwrap_or(false) {
+                false => Ok(Self::Raw(())), // Explicitly disabled, still no TLS settings
+                true => {
+                    let tls =
+                        TlsSettings::from_options_base(&Some(config.options.clone()), for_server)?;
+                    match (for_server, &tls.identity) {
+                        // Servers require an identity certificate
+                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
+                        _ => Ok(Self::Tls(tls)),
+                    }
+                }
+            },
+        }
+    }
+}
+
+impl From<TlsSettings> for MaybeTlsSettings {
+    fn from(tls: TlsSettings) -> Self {
+        Self::Tls(tls)
+    }
+}
+
 /// Load a private key from a named file
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
@@ -310,22 +321,24 @@ mod test {
 
     #[test]
     fn from_config_none() {
-        assert!(TlsSettings::from_config(&None, true).unwrap().is_none());
-        assert!(TlsSettings::from_config(&None, false).unwrap().is_none());
+        assert!(MaybeTlsSettings::from_config(&None, true).unwrap().is_raw());
+        assert!(MaybeTlsSettings::from_config(&None, false)
+            .unwrap()
+            .is_raw());
     }
 
     #[test]
     fn from_config_not_enabled() {
-        assert!(settings_from_config(None, false, false, true).is_none());
-        assert!(settings_from_config(None, false, false, false).is_none());
-        assert!(settings_from_config(Some(false), false, false, true).is_none());
-        assert!(settings_from_config(Some(false), false, false, false).is_none());
+        assert!(settings_from_config(None, false, false, true).is_raw());
+        assert!(settings_from_config(None, false, false, false).is_raw());
+        assert!(settings_from_config(Some(false), false, false, true).is_raw());
+        assert!(settings_from_config(Some(false), false, false, false).is_raw());
     }
 
     #[test]
     fn from_config_fails_without_certificate() {
         let config = make_config(Some(true), false, false);
-        let error = TlsSettings::from_config(&Some(config), true)
+        let error = MaybeTlsSettings::from_config(&Some(config), true)
             .expect_err("from_config failed to check for a certificate");
         assert_downcast_matches!(error, TlsError, TlsError::MissingRequiredIdentity);
     }
@@ -333,7 +346,7 @@ mod test {
     #[test]
     fn from_config_with_certificate() {
         let config = settings_from_config(Some(true), true, true, true);
-        assert!(config.is_some());
+        assert!(config.is_tls());
     }
 
     fn settings_from_config(
@@ -341,9 +354,9 @@ mod test {
         set_crt: bool,
         set_key: bool,
         for_server: bool,
-    ) -> Option<TlsSettings> {
+    ) -> MaybeTlsSettings {
         let config = make_config(enabled, set_crt, set_key);
-        TlsSettings::from_config(&Some(config), for_server)
+        MaybeTlsSettings::from_config(&Some(config), for_server)
             .expect("Failed to generate settings from config")
     }
 

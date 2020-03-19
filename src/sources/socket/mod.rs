@@ -7,7 +7,7 @@ use super::util::TcpSource;
 use crate::{
     event::{self, Event},
     shutdown::ShutdownSignal,
-    tls::TlsSettings,
+    tls::MaybeTlsSettings,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use futures01::sync::mpsc;
@@ -80,7 +80,7 @@ impl SourceConfig for SocketConfig {
                 let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
-                let tls = TlsSettings::from_config(&config.tls, true)?;
+                let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 tcp.run(
                     config.address,
                     config.shutdown_timeout_secs,
