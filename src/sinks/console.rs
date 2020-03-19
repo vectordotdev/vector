@@ -118,12 +118,8 @@ impl StreamingSink for WriterSink {
         let output = &mut self.output;
         pin_mut!(output);
         pin_mut!(input);
-        loop {
-            let event = match input.next().await {
-                Some(v) => v,
-                None => break,
-            };
-            write_event_to_output(&mut output, event, &self.encoding).await?;
+        while let Some(event) = input.next().await {
+            write_event_to_output(&mut output, event, &self.encoding).await?
         }
         Ok(())
     }
