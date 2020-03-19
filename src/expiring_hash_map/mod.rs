@@ -163,7 +163,8 @@ where
     ///
     /// loop {
     ///     tokio::select! {
-    ///         // Avoid spin lock!
+    ///         // You need to ensure that this branch is disabled if the map
+    ///         // is empty! Not doing this will result in a spinlock.
     ///         val = map.next_expired(), if !map.is_empty() => match val {
     ///             None => unreachable!(), // we never poll the empty map in the first place!
     ///             Some(Ok((val, _))) => {
