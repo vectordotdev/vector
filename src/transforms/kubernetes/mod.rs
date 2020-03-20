@@ -269,11 +269,7 @@ impl MetadataClient {
             self.metadata.clear(uid.clone());
 
             // Insert field values for this pod.
-            for (field, value) in self
-                .fields
-                .iter()
-                .flat_map(|field| field.extract(&pod).unwrap_or_default())
-            {
+            for (field, value) in self.fields.iter().filter_map(|field| field.extract(&pod)) {
                 self.metadata
                     .insert(uid.clone(), Box::new((field, FieldValue(value))));
             }
@@ -380,7 +376,7 @@ impl Field {
     }
 
     /// Extracts this field from Pod
-    fn extract(self, pod: &Pod) -> Option<Vec<(Atom, Value)>> {
+    fn extract(self, pod: &Pod) -> Option<(Atom, Value)> {
         use Field::*;
 
         Some(match self {
@@ -404,16 +400,19 @@ impl Field {
         })
     }
 
-    fn field(self, data: impl Into<Value>) -> Vec<(Atom, Value)> {
-        vec![(Self::with_prefix(&self.name()).into(), data.into())]
+    fn field(self, data: impl Into<Value>) -> (Atom, Value) {
+        (Self::with_prefix(&self.name()).into(), data.into())
     }
 
-    fn collection(self, map: &BTreeMap<String, String>) -> Vec<(Atom, Value)> {
-        let prefix_key = Self::with_prefix(&self.name()) + ".";
-
-        map.iter()
-            .map(|(key, value)| ((prefix_key.clone() + key).into(), value.into()))
-            .collect()
+    fn collection(self, map: &BTreeMap<String, String>) -> (Atom, Value) {
+        (
+            Self::with_prefix(&self.name()).into(),
+            Value::Map(
+                map.iter()
+                    .map(|(key, value)| (key.as_str().into(), value.into()))
+                    .collect(),
+            ),
+        )
     }
 
     fn with_prefix(name: &str) -> String {
