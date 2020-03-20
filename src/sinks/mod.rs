@@ -47,6 +47,8 @@ pub mod new_relic_logs;
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
 pub mod prometheus;
+#[cfg(feature = "sinks-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sinks-sematext_logs")]
 pub mod sematext_logs;
 #[cfg(feature = "sinks-socket")]

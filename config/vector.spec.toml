@@ -7372,6 +7372,81 @@ end
   # * unit: seconds
   flush_period_secs = 60
 
+# Streams `log` events to Apache Pulsar via the Pulsar protocol.
+[sinks.pulsar]
+  #
+  # General
+  #
+
+  # A host and port pair that the pulsar client should connect to.
+  #
+  # * required
+  # * type: string
+  address = "127.0.0.1:6650"
+
+  # The Pulsar topic name to write events to.
+  #
+  # * required
+  # * type: string
+  topic = "topic-1234"
+
+  #
+  # Auth
+  #
+
+  [sinks.pulsar.auth]
+    # The basic authentication name.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    name = "${NAME_ENV_VAR}"
+    name = "name123"
+
+    # The basic authentication password.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    token = "${TOKEN_ENV_VAR}"
+    token = "123456789"
+
+  #
+  # Encoding
+  #
+
+  [sinks.pulsar.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "json" or "text"
+    codec = "json"
+    codec = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
 # Batches `log` events to Sematext via the Elasticsearch API.
 [sinks.sematext_logs]
   #

@@ -440,6 +440,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-new_relic_logs` | Enables building of [`new_relic_logs` sink][docs.sinks.new_relic_logs].  |
 | `sinks-papertrail` | Enables building of [`papertrail` sink][docs.sinks.papertrail].  |
 | `sinks-prometheus` | Enables building of [`prometheus` sink][docs.sinks.prometheus].  |
+| `sinks-pulsar` | Enables building of [`pulsar` sink][docs.sinks.pulsar].  |
 | `sinks-sematext_logs` | Enables building of [`sematext_logs` sink][docs.sinks.sematext_logs].  |
 | `sinks-socket` | Enables building of [`socket` sink][docs.sinks.socket].  |
 | `sinks-splunk_hec` | Enables building of [`splunk_hec` sink][docs.sinks.splunk_hec].  |
@@ -480,6 +481,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.new_relic_logs]: /docs/reference/sinks/new_relic_logs/
 [docs.sinks.papertrail]: /docs/reference/sinks/papertrail/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
+[docs.sinks.pulsar]: /docs/reference/sinks/pulsar/
 [docs.sinks.sematext_logs]: /docs/reference/sinks/sematext_logs/
 [docs.sinks.socket]: /docs/reference/sinks/socket/
 [docs.sinks.splunk_hec]: /docs/reference/sinks/splunk_hec/

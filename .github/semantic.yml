@@ -132,6 +132,7 @@ scopes:
   - new_relic_logs sink
   - papertrail sink
   - prometheus sink
+  - pulsar sink
   - sematext_logs sink
   - socket sink
   - splunk_hec sink

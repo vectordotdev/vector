@@ -150,6 +150,7 @@ getset = "0.1.0"
 lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
+pulsar = { version = "0.3.0", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -321,6 +322,7 @@ sinks = [
   "sinks-splunk_hec",
   "sinks-statsd",
   "sinks-vector",
+  "sinks-pulsar"
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_cloudwatch"]
@@ -349,6 +351,7 @@ sinks-papertrail = ["sinks-socket"]
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = []
 sinks-vector = []
+sinks-pulsar = ["pulsar"]
 
 # Identifies that the build is a nightly build
 nightly = []
@@ -369,6 +372,7 @@ docker = [
   "s3-integration-tests",
   "influxdb-integration-tests",
   "splunk-integration-tests",
+  "pulsar-integration-tests",
 ]
 clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
@@ -384,6 +388,7 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 influxdb-integration-tests = []
+pulsar-integration-tests = []
 
 kubernetes = ["kubernetes-integration-tests"]
 kubernetes-integration-tests = []
