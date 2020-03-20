@@ -2406,9 +2406,8 @@ end
   #
   # * required
   # * type: string
-  group_name = "{{ file }}"
-  group_name = "ec2/{{ host }}"
   group_name = "group-name"
+  group_name = "{{ file }}"
 
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
