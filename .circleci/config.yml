@@ -845,7 +845,8 @@ workflows:
           <<: *master-filters
       - test-stable
       # - test-stable-kubernetes
-      - test-x86_64-pc-windows-msvc
+      - test-x86_64-pc-windows-msvc:
+          <<: *prerelease-filters
 
       # Build & verify
 
