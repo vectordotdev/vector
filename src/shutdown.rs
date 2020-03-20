@@ -65,13 +65,13 @@ impl ShutdownSignal {
     }
 }
 
-pub struct ShutdownCoordinator {
+pub struct SourceShutdownCoordinator {
     shutdown_begun_triggers: HashMap<String, Trigger>,
     shutdown_force_triggers: HashMap<String, Trigger>,
     shutdown_complete_tripwires: HashMap<String, Tripwire>,
 }
 
-impl ShutdownCoordinator {
+impl SourceShutdownCoordinator {
     pub fn new() -> Self {
         Self {
             shutdown_begun_triggers: HashMap::new(),
@@ -181,7 +181,7 @@ impl ShutdownCoordinator {
                 name
             ));
 
-            let source_complete = ShutdownCoordinator::shutdown_source_complete(
+            let source_complete = SourceShutdownCoordinator::shutdown_source_complete(
                 shutdown_complete_tripwire,
                 shutdown_force_trigger,
                 name,
@@ -224,7 +224,7 @@ impl ShutdownCoordinator {
             "shutdown_force_trigger for source '{}' not found in the ShutdownCoordinator",
             name
         ));
-        ShutdownCoordinator::shutdown_source_complete(
+        SourceShutdownCoordinator::shutdown_source_complete(
             shutdown_complete_tripwire,
             shutdown_force_trigger,
             name.to_owned(),
@@ -267,14 +267,14 @@ impl ShutdownCoordinator {
 #[cfg(test)]
 mod test {
     use crate::runtime;
-    use crate::shutdown::ShutdownCoordinator;
+    use crate::shutdown::SourceShutdownCoordinator;
     use futures01::future::Future;
     use std::time::{Duration, Instant};
 
     #[test]
     fn shutdown_coordinator_shutdown_source_clean() {
         let mut rt = runtime::Runtime::new().unwrap();
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let name = "test";
 
         let (shutdown_signal, _) = shutdown.register_source(name);
@@ -291,7 +291,7 @@ mod test {
     #[test]
     fn shutdown_coordinator_shutdown_source_force() {
         let mut rt = runtime::Runtime::new().unwrap();
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let name = "test";
 
         let (_shutdown_signal, force_shutdown_tripwire) = shutdown.register_source(name);

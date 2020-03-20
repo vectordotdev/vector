@@ -11,7 +11,7 @@ use crate::topology::builder::Pieces;
 
 use crate::buffers;
 use crate::runtime;
-use crate::shutdown::ShutdownCoordinator;
+use crate::shutdown::SourceShutdownCoordinator;
 use futures01::{
     future,
     sync::{mpsc, oneshot},
@@ -30,7 +30,7 @@ pub struct RunningTopology {
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
-    shutdown_coordinator: ShutdownCoordinator,
+    shutdown_coordinator: SourceShutdownCoordinator,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
@@ -56,7 +56,7 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_coordinator: ShutdownCoordinator::new(),
+        shutdown_coordinator: SourceShutdownCoordinator::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
