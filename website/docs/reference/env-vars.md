@@ -236,7 +236,6 @@ config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-
 
 
 
-
 </Field>
 
 

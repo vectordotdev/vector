@@ -75,7 +75,8 @@ import Alert from '@site/src/components/Alert';
 
 Vector must be run inside a Kubernetes cluster for this transform to work. See [Connecting To The Kubernetes API server section](#connecting-to-the-kubernetes-api-server) for more info.
 
-Vector must be given authorization to `watch` resource `pods`. In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] [RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default. 
+Vector must be given authorization to `watch` resource `pods`. In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] [RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
+
 
 * Network access is required for this component to function correctly. See the
   [Network Access section](#network-access) for more info.
@@ -248,7 +249,6 @@ Field containg Pod UID to which log belongs.
 Node's name whose pod's logs should be enriched. Either this or [`node_name`](#node_name)
 field must be defined. Defined automatically when using [predefined Kubernetes
 config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
-
 
 
 
