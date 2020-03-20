@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::event::{self, metric::MetricValue, Event, Value};
+use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
+use vector::stream::StreamExt;
 use vector::topology::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
     TransformContext,
@@ -58,6 +60,7 @@ impl SourceConfig for MockSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: Sender<Event>,
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
@@ -67,6 +70,7 @@ impl SourceConfig for MockSourceConfig {
                 .unwrap()
                 .take()
                 .unwrap()
+                .take_until(shutdown)
                 .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
                 .map(|_| info!("finished sending"))
         });

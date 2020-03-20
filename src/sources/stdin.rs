@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -38,6 +39,7 @@ impl SourceConfig for StdinConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         Ok(stdin_source(

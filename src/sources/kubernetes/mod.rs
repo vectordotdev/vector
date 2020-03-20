@@ -8,6 +8,7 @@ mod message_parser;
 use self::applicable_transform::ApplicableTransform;
 use crate::{
     event::{self, Event, Value},
+    shutdown::ShutdownSignal,
     sources::Source,
     topology::config::{DataType, GlobalOptions, SourceConfig},
     transforms::{
@@ -52,6 +53,7 @@ impl SourceConfig for KubernetesConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<Source> {
         // Kubernetes source uses 'file source' and various transforms to implement
@@ -64,7 +66,7 @@ impl SourceConfig for KubernetesConfig {
         let now = TimeFilter::new();
 
         let (file_recv, file_source) =
-            file_source_builder::FileSourceBuilder::new(self).build(name, globals)?;
+            file_source_builder::FileSourceBuilder::new(self).build(name, globals, shutdown)?;
 
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;

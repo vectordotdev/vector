@@ -51,7 +51,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-id"] # required
-  group_name = "{{ file }}" # required
+  group_name = "group-name" # required
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "{{ host }}" # required
   create_missing_group = true # optional, default
@@ -73,7 +73,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-id"] # required
   endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
-  group_name = "{{ file }}" # required
+  group_name = "group-name" # required
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "{{ host }}" # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
@@ -562,7 +562,7 @@ this option will make [`region`](#region) moot.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["{{ file }}","ec2/{{ host }}","group-name"]}
+  examples={["group-name","{{ file }}"]}
   groups={[]}
   name={"group_name"}
   path={null}
@@ -1088,9 +1088,8 @@ values derived from the event's data. This syntax accepts
 ```toml
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
-  group_name = "{{ file }}"
-  group_name = "ec2/{{ host }}"
   group_name = "group-name"
+  group_name = "{{ file }}"
   # ...
 ```
 

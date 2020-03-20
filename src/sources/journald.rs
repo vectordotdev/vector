@@ -1,6 +1,7 @@
 use crate::{
     event,
     event::{Event, LogEvent, Value},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
@@ -60,6 +61,7 @@ impl SourceConfig for JournaldConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;

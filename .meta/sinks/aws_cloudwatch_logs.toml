@@ -48,9 +48,8 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
 type = "string"
 common = true
 examples = [
+  "group-name",
   "{{ file }}",
-  "ec2/{{ host }}",
-  "group-name"
 ]
 required = true
 partition_key = true

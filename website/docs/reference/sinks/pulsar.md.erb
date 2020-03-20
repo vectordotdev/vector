@@ -1,0 +1,25 @@
+<%- component = metadata.sinks.pulsar -%>
+
+<%= component_header(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
