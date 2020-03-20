@@ -6,7 +6,10 @@ use futures01::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use vector::event::{self, metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
@@ -19,7 +22,11 @@ use vector::topology::config::{
 use vector::transforms::Transform;
 
 pub fn sink() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures01::sync::mpsc::channel(10);
+    sink_with_buffer_size(10)
+}
+
+pub fn sink_with_buffer_size(size: usize) -> (Receiver<Event>, MockSinkConfig) {
+    let (tx, rx) = futures01::sync::mpsc::channel(size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
@@ -44,12 +51,25 @@ pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
 pub struct MockSourceConfig {
     #[serde(skip)]
     receiver: Arc<Mutex<Option<Receiver<Event>>>>,
+    #[serde(skip)]
+    event_counter: Option<Arc<AtomicUsize>>,
 }
 
 impl MockSourceConfig {
     pub fn new(receiver: Receiver<Event>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: None,
+        }
+    }
+
+    pub fn new_with_event_counter(
+        receiver: Receiver<Event>,
+        event_counter: Arc<AtomicUsize>,
+    ) -> Self {
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: Some(event_counter),
         }
     }
 }
@@ -64,6 +84,7 @@ impl SourceConfig for MockSourceConfig {
         out: Sender<Event>,
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
+        let event_counter = self.event_counter.clone();
         let source = future::lazy(move || {
             wrapped
                 .lock()
@@ -71,6 +92,12 @@ impl SourceConfig for MockSourceConfig {
                 .take()
                 .unwrap()
                 .take_until(shutdown)
+                .map(move |x| {
+                    if let Some(counter) = &event_counter {
+                        counter.fetch_add(1, Ordering::Relaxed);
+                    }
+                    x
+                })
                 .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
                 .map(|_| info!("finished sending"))
         });

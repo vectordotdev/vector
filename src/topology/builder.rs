@@ -3,7 +3,7 @@ use super::{
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::{buffers, dns::Resolver, runtime, shutdown::ShutdownCoordinator};
+use crate::{buffers, dns::Resolver, runtime, shutdown::SourceShutdownCoordinator};
 use futures01::{
     future::{lazy, Either},
     sync::mpsc,
@@ -18,7 +18,7 @@ pub struct Pieces {
     pub tasks: HashMap<String, Task>,
     pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
-    pub shutdown_coordinator: ShutdownCoordinator,
+    pub shutdown_coordinator: SourceShutdownCoordinator,
 }
 
 pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
@@ -96,7 +96,7 @@ pub fn build_pieces(
     let mut tasks = HashMap::new();
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
-    let mut shutdown_coordinator = ShutdownCoordinator::new();
+    let mut shutdown_coordinator = SourceShutdownCoordinator::new();
 
     let mut errors = vec![];
     let mut warnings = vec![];

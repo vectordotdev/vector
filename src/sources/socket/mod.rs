@@ -125,7 +125,7 @@ mod test {
     use super::SocketConfig;
     use crate::event;
     use crate::runtime;
-    use crate::shutdown::{ShutdownCoordinator, ShutdownSignal};
+    use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::test_util::{
         block_on, collect_n, next_addr, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
@@ -276,7 +276,7 @@ mod test {
         let (tx, rx) = mpsc::channel(2);
         let addr = next_addr();
 
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
@@ -298,10 +298,9 @@ mod test {
         );
 
         // Now signal to the Source to shut down.
-        shutdown.shutdown_source_begin(source_name);
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -318,7 +317,7 @@ mod test {
 
         let addr = next_addr();
 
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
@@ -351,10 +350,9 @@ mod test {
             );
         }
 
-        shutdown.shutdown_source_begin(source_name);
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
@@ -397,7 +395,7 @@ mod test {
     fn init_udp_with_shutdown(
         sender: mpsc::Sender<event::Event>,
         source_name: &str,
-        shutdown: &mut ShutdownCoordinator,
+        shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, runtime::Runtime, oneshot::SpawnHandle<(), ()>) {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
         init_udp_inner(sender, source_name, shutdown_signal)
@@ -506,7 +504,7 @@ mod test {
         let (tx, rx) = mpsc::channel(2);
         let source_name = "udp_shutdown_simple";
 
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let (address, mut rt, source_handle) =
             init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
@@ -519,10 +517,9 @@ mod test {
         );
 
         // Now signal to the Source to shut down.
-        shutdown.shutdown_source_begin(source_name);
-        let deadline = Instant::now() + Duration::from_secs(1000);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -534,7 +531,7 @@ mod test {
         let (tx, rx) = mpsc::channel(10);
         let source_name = "udp_shutdown_infinite_stream";
 
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let (address, mut rt, source_handle) =
             init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
@@ -559,10 +556,9 @@ mod test {
             );
         }
 
-        shutdown.shutdown_source_begin(source_name);
         let deadline = Instant::now() + Duration::from_secs(10);
-        let shutdown_success =
-            shutdown.shutdown_source_end(&mut rt, source_name.to_string(), deadline);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
