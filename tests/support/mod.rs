@@ -27,18 +27,16 @@ use vector::topology::config::{
 };
 use vector::transforms::Transform;
 
-pub fn sink() -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
-    sink_with_buffer_size(10)
-}
-
-pub fn sink_with_buffer_size(size: usize) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
-    let (tx, rx) = futures01::sync::mpsc::channel(size);
+pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
+    let (tx, rx) = futures01::sync::mpsc::channel(channel_size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
 
-pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
-    let (tx, rx) = futures01::sync::mpsc::channel(10);
+pub fn sink_failing_healthcheck(
+    channel_size: usize,
+) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
+    let (tx, rx) = futures01::sync::mpsc::channel(channel_size);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
