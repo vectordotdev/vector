@@ -2010,6 +2010,15 @@ end
   # * type: [string]
   fields = ["field1", "field2", "parent.child"]
 
+  # If set to `true`, after removing fields, remove any parent objects that are
+  # now empty.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  drop_empty = false
+  drop_empty = true
+
 # Accepts and outputs `metric` events allowing you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type. This is a required field that tells Vector which
@@ -2051,6 +2060,15 @@ end
   # * required
   # * type: [string]
   inputs = ["my-source-id"]
+
+  # If set to `true`, after renaming fields, remove any parent objects of the old
+  # field that are now empty.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  drop_empty = false
+  drop_empty = true
 
   #
   # Fields
