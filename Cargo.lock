@@ -2652,7 +2652,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e88e791717775769b9d714d457b62381ec84746158de058910381997b3d1793"
 dependencies = [
  "bit-vec 0.6.1",
- "bytes",
+ "bytes 0.4.12",
  "chrono",
  "crc",
  "futures 0.1.29",
@@ -2664,7 +2664,7 @@ dependencies = [
  "prost-derive",
  "rand 0.7.3",
  "regex",
- "tokio",
+ "tokio 0.1.22",
  "tokio-codec",
  "trust-dns-resolver",
  "url 2.1.1",
