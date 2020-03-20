@@ -12,6 +12,8 @@ use vector::{buffers::BufferConfig, runtime, sinks, sources};
 
 #[test]
 fn test_buffering() {
+    vector::test_util::trace_init();
+
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
 
@@ -97,6 +99,8 @@ fn test_buffering() {
 
 #[test]
 fn test_max_size() {
+    vector::test_util::trace_init();
+
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
 
@@ -185,6 +189,8 @@ fn test_max_size() {
 
 #[test]
 fn test_max_size_resume() {
+    vector::test_util::trace_init();
+
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
 
@@ -246,6 +252,8 @@ fn test_max_size_resume() {
 #[test]
 #[ignore]
 fn test_reclaim_disk_space() {
+    vector::test_util::trace_init();
+
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
 
