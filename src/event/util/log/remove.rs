@@ -137,5 +137,46 @@ mod test {
                 query
             );
         }
+        assert_eq!(
+            fields,
+            fields_from_json(json!({
+                "a": {
+                    "b": {},
+                    "array": [
+                        null,
+                        null,
+                        {},
+                        [],
+                    ],
+                },
+            }))
+        );
+    }
+
+    #[test]
+    fn remove_prune() {
+        let mut fields = fields_from_json(json!({
+            "a": {
+                "b": {
+                    "c": 5
+                },
+                "d": 4,
+            }
+        }));
+
+        assert_eq!(remove(&mut fields, "a.d", true), Some(Value::Integer(4)));
+        assert_eq!(
+            fields,
+            fields_from_json(json!({
+                "a": {
+                    "b": {
+                        "c": 5
+                    }
+                }
+            }))
+        );
+
+        assert_eq!(remove(&mut fields, "a.b.c", true), Some(Value::Integer(5)));
+        assert_eq!(fields, fields_from_json(json!({})));
     }
 }
