@@ -2,8 +2,7 @@ use super::{
     CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, Result, TcpBind,
     TlsError, TlsSettings,
 };
-use futures01::Poll;
-use futures01::{try_ready, Async, Future, Stream};
+use futures01::{try_ready, Async, Future, Poll, Stream};
 use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::fmt::{self, Debug, Formatter};
@@ -116,6 +115,10 @@ impl MaybeTlsListener {
     pub(crate) fn incoming(self) -> MaybeTlsIncoming<Incoming> {
         let incoming = self.listener.incoming();
         MaybeTlsIncoming::new(incoming, self.acceptor)
+    }
+
+    pub(crate) fn local_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {
+        self.listener.local_addr()
     }
 }
 
