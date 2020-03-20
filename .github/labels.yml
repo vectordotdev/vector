@@ -370,6 +370,9 @@
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
   color: 4ddbfb
+- name: "sink: pulsar"
+  description: Anything `pulsar` sink related
+  color: 4ddbfb
 - name: "sink: sematext_logs"
   description: Anything `sematext_logs` sink related
   color: 4ddbfb

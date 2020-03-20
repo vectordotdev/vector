@@ -4,12 +4,14 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, Sink};
+use async_trait::async_trait;
+use futures::pin_mut;
+use futures::stream::{Stream, StreamExt};
+use futures01::future;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    codec::{FramedWrite, LinesCodec},
-    io,
-};
+use tokio02::io::{self, AsyncWriteExt};
+
+use super::streaming_sink::{self, StreamingSink};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -45,18 +47,17 @@ inventory::submit! {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
-        let output: Box<dyn io::AsyncWrite + Send> = match self.target {
+        let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
             Target::Stdout => Box::new(io::stdout()),
             Target::Stderr => Box::new(io::stderr()),
         };
 
-        let sink = FramedWrite::new(output, LinesCodec::new())
-            .stream_ack(cx.acker())
-            .sink_map_err(|_| ())
-            .with(move |event| encode_event(event, &encoding));
+        let sink = WriterSink { output, encoding };
+        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
+        let sink = sink.stream_ack(cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }
@@ -70,13 +71,14 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Result<String, ()> {
+fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Result<String, serde_json::Error> {
     encoding.apply_rules(&mut event);
     match event {
         Event::Log(log) => match encoding.codec {
-            Encoding::Json => {
-                serde_json::to_string(&log).map_err(|e| panic!("Error encoding: {}", e))
-            }
+            Encoding::Json => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log
                     .get(&event::log_schema().message_key())
@@ -85,7 +87,40 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Result
                 Ok(s)
             }
         },
-        Event::Metric(metric) => serde_json::to_string(&metric).map_err(|_| ()),
+        Event::Metric(metric) => serde_json::to_string(&metric),
+    }
+}
+
+async fn write_event_to_output(
+    mut output: impl io::AsyncWrite + Send + Unpin,
+    event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Result<(), std::io::Error> {
+    let mut buf =
+        encode_event(event, encoding).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+    buf.push('\n');
+    output.write_all(buf.as_bytes()).await?;
+    Ok(())
+}
+
+struct WriterSink {
+    output: Box<dyn io::AsyncWrite + Send + Sync + Unpin>,
+    encoding: EncodingConfig<Encoding>,
+}
+
+#[async_trait]
+impl StreamingSink for WriterSink {
+    async fn run(
+        &mut self,
+        input: impl Stream<Item = Event> + Send + Sync + 'static,
+    ) -> crate::Result<()> {
+        let output = &mut self.output;
+        pin_mut!(output);
+        pin_mut!(input);
+        while let Some(event) = input.next().await {
+            write_event_to_output(&mut output, event, &self.encoding).await?
+        }
+        Ok(())
     }
 }
 
@@ -100,8 +135,8 @@ mod test {
     fn encodes_raw_logs() {
         let event = Event::from("foo");
         assert_eq!(
-            Ok("foo".to_string()),
-            encode_event(event, &EncodingConfig::from(Encoding::Text))
+            "foo",
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 
@@ -114,8 +149,8 @@ mod test {
         log.insert("a", Value::from("0"));
 
         let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
-        let expected = r#"{"a":"0","x":"23","z":25}"#.to_string();
-        assert_eq!(encoded, Ok(expected));
+        let expected = r#"{"a":"0","x":"23","z":25}"#;
+        assert_eq!(encoded.unwrap(), expected);
     }
 
     #[test]
@@ -136,8 +171,8 @@ mod test {
             value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
-            encode_event(event, &EncodingConfig::from(Encoding::Text))
+            r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 
@@ -153,8 +188,8 @@ mod test {
             },
         });
         assert_eq!(
-            Ok(r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#.to_string()),
-            encode_event(event, &EncodingConfig::from(Encoding::Text))
+            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 
@@ -171,8 +206,8 @@ mod test {
             },
         });
         assert_eq!(
-            Ok(r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#.to_string()),
-            encode_event(event, &EncodingConfig::from(Encoding::Text))
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 }

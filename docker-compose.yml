@@ -465,6 +465,7 @@ services:
         - zookeeper
         - kafka
         - splunk
+        - pulsar
         - elasticsearch
         - elasticsearch-tls
         - clickhouse
@@ -518,6 +519,11 @@ services:
         KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
       volumes:
         - ./tests/data/localhost.p12:/certs/localhost.p12:ro
+    pulsar:
+      image: apachepulsar/pulsar
+      command: bin/pulsar standalone
+      ports:
+        - "6650:6650"
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:

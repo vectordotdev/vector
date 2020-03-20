@@ -136,7 +136,11 @@ impl LogEvent {
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key)
+        util::log::remove(&mut self.fields, &key, false)
+    }
+
+    pub fn remove_prune(&mut self, key: &Atom, prune: bool) -> Option<Value> {
+        util::log::remove(&mut self.fields, &key, prune)
     }
 
     pub fn remove_flat(&mut self, key: &Atom) -> Option<Value> {

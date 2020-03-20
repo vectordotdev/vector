@@ -22,8 +22,7 @@ use tokio02::{
 mod bytes_path;
 use bytes_path::BytesPath;
 
-mod streaming_sink;
-use streaming_sink::StreamingSink;
+use super::streaming_sink::{self, StreamingSink};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
