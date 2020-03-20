@@ -206,9 +206,16 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
-            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        // let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
+        //     .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
+        //     .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+
+        let buffer = PartitionBuffer::new(Buffer::new(compression));
+
+        let sink =
+            crate::sinks::util::sink::PartitionedBatchSink::new(svc, buffer, cx.acker(), batch)
+                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }

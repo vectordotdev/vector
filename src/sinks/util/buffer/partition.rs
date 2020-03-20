@@ -260,201 +260,201 @@ impl<B, S, K> fmt::Debug for PartitionedBatchSink<B, S, K> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bytes::Bytes;
-    use futures01::{Future, Sink};
-    use std::time::Duration;
-    use tokio01_test::clock;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use bytes::Bytes;
+//     use futures01::{Future, Sink};
+//     use std::time::Duration;
+//     use tokio01_test::clock;
 
-    #[test]
-    fn batch_sink_buffers_messages_until_limit() {
-        let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
+//     #[test]
+//     fn batch_sink_buffers_messages_until_limit() {
+//         let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
 
-        let (buffered, _) = buffered
-            .send_all(futures01::stream::iter_ok(0..22))
-            .wait()
-            .unwrap();
+//         let (buffered, _) = buffered
+//             .send_all(futures01::stream::iter_ok(0..22))
+//             .wait()
+//             .unwrap();
 
-        let output = buffered.into_inner_sink();
-        assert_eq!(
-            output,
-            vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-                vec![20, 21]
-            ]
-        );
-    }
+//         let output = buffered.into_inner_sink();
+//         assert_eq!(
+//             output,
+//             vec![
+//                 vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+//                 vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+//                 vec![20, 21]
+//             ]
+//         );
+//     }
 
-    #[test]
-    fn batch_sink_doesnt_buffer_if_its_flushed() {
-        let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
+//     #[test]
+//     fn batch_sink_doesnt_buffer_if_its_flushed() {
+//         let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
 
-        let buffered = buffered.send(0).wait().unwrap();
-        let buffered = buffered.send(1).wait().unwrap();
+//         let buffered = buffered.send(0).wait().unwrap();
+//         let buffered = buffered.send(1).wait().unwrap();
 
-        let output = buffered.into_inner_sink();
-        assert_eq!(output, vec![vec![0], vec![1],]);
-    }
+//         let output = buffered.into_inner_sink();
+//         assert_eq!(output, vec![vec![0], vec![1],]);
+//     }
 
-    // FIXME: need to get an updated Buffer that can work here
-    // #[test]
-    // fn batch_sink_allows_the_final_item_to_exceed_the_buffer_size() {
-    //     let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
+//     // FIXME: need to get an updated Buffer that can work here
+//     // #[test]
+//     // fn batch_sink_allows_the_final_item_to_exceed_the_buffer_size() {
+//     //     let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 10);
 
-    //     let input = vec![
-    //         vec![0, 1, 2],
-    //         vec![3, 4, 5],
-    //         vec![6, 7, 8],
-    //         vec![9, 10, 11],
-    //         vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-    //         vec![24],
-    //     ];
-    //     let (buffered, _) = buffered
-    //         .send_all(futures01::stream::iter_ok(input))
-    //         .wait()
-    //         .unwrap();
+//     //     let input = vec![
+//     //         vec![0, 1, 2],
+//     //         vec![3, 4, 5],
+//     //         vec![6, 7, 8],
+//     //         vec![9, 10, 11],
+//     //         vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+//     //         vec![24],
+//     //     ];
+//     //     let (buffered, _) = buffered
+//     //         .send_all(futures01::stream::iter_ok(input))
+//     //         .wait()
+//     //         .unwrap();
 
-    //     let output = buffered
-    //         .into_inner_sink()
-    //         .into_iter()
-    //         .map(|b| )
-    //         .collect::<Vec<Vec<i32>>>();
+//     //     let output = buffered
+//     //         .into_inner_sink()
+//     //         .into_iter()
+//     //         .map(|b| )
+//     //         .collect::<Vec<Vec<i32>>>();
 
-    //     assert_eq!(
-    //         output,
-    //         vec![
-    //             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-    //             vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-    //             vec![24],
-    //         ]
-    //     );
-    // }
+//     //     assert_eq!(
+//     //         output,
+//     //         vec![
+//     //             vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+//     //             vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+//     //             vec![24],
+//     //         ]
+//     //     );
+//     // }
 
-    #[test]
-    fn batch_sink_buffers_by_partition_buffer_size_one() {
-        let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 1);
+//     #[test]
+//     fn batch_sink_buffers_by_partition_buffer_size_one() {
+//         let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 1);
 
-        let input = vec![Partitions::A, Partitions::B];
+//         let input = vec![Partitions::A, Partitions::B];
 
-        let (buffered, _) = buffered
-            .send_all(futures01::stream::iter_ok(input))
-            .wait()
-            .unwrap();
+//         let (buffered, _) = buffered
+//             .send_all(futures01::stream::iter_ok(input))
+//             .wait()
+//             .unwrap();
 
-        let mut output = buffered.into_inner_sink();
-        output[..].sort();
-        assert_eq!(output, vec![vec![Partitions::A], vec![Partitions::B]]);
-    }
+//         let mut output = buffered.into_inner_sink();
+//         output[..].sort();
+//         assert_eq!(output, vec![vec![Partitions::A], vec![Partitions::B]]);
+//     }
 
-    #[test]
-    fn batch_sink_buffers_by_partition_buffer_size_two() {
-        let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 2);
+//     #[test]
+//     fn batch_sink_buffers_by_partition_buffer_size_two() {
+//         let buffered = PartitionedBatchSink::new(Vec::new(), Vec::new(), 2);
 
-        let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
+//         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
 
-        let (buffered, _) = buffered
-            .send_all(futures01::stream::iter_ok(input))
-            .wait()
-            .unwrap();
+//         let (buffered, _) = buffered
+//             .send_all(futures01::stream::iter_ok(input))
+//             .wait()
+//             .unwrap();
 
-        let mut output = buffered.into_inner_sink();
-        output[..].sort();
-        assert_eq!(
-            output,
-            vec![
-                vec![Partitions::A, Partitions::A],
-                vec![Partitions::B, Partitions::B]
-            ]
-        );
-    }
+//         let mut output = buffered.into_inner_sink();
+//         output[..].sort();
+//         assert_eq!(
+//             output,
+//             vec![
+//                 vec![Partitions::A, Partitions::A],
+//                 vec![Partitions::B, Partitions::B]
+//             ]
+//         );
+//     }
 
-    #[test]
-    fn batch_sink_submits_after_linger() {
-        let mut buffered = PartitionedBatchSink::with_linger(
-            Vec::new(),
-            Vec::new(),
-            10,
-            2,
-            Duration::from_secs(1),
-        );
+//     #[test]
+//     fn batch_sink_submits_after_linger() {
+//         let mut buffered = PartitionedBatchSink::with_linger(
+//             Vec::new(),
+//             Vec::new(),
+//             10,
+//             2,
+//             Duration::from_secs(1),
+//         );
 
-        clock::mock(|handle| {
-            buffered.start_send(1 as usize).unwrap();
-            buffered.poll_complete().unwrap();
+//         clock::mock(|handle| {
+//             buffered.start_send(1 as usize).unwrap();
+//             buffered.poll_complete().unwrap();
 
-            handle.advance(Duration::from_secs(2));
+//             handle.advance(Duration::from_secs(2));
 
-            buffered.poll_complete().unwrap();
-        });
+//             buffered.poll_complete().unwrap();
+//         });
 
-        let output = buffered.into_inner_sink();
-        assert_eq!(output, vec![vec![1]]);
-    }
+//         let output = buffered.into_inner_sink();
+//         assert_eq!(output, vec![vec![1]]);
+//     }
 
-    #[test]
-    fn batch_sink_cancels_linger() {
-        let mut buffered = PartitionedBatchSink::with_linger(
-            Vec::new(),
-            Vec::new(),
-            10,
-            2,
-            Duration::from_millis(5),
-        );
+//     #[test]
+//     fn batch_sink_cancels_linger() {
+//         let mut buffered = PartitionedBatchSink::with_linger(
+//             Vec::new(),
+//             Vec::new(),
+//             10,
+//             2,
+//             Duration::from_millis(5),
+//         );
 
-        clock::mock(|handle| {
-            buffered.start_send(1 as usize).unwrap();
-            buffered.start_send(2 as usize).unwrap();
-            buffered.poll_complete().unwrap();
+//         clock::mock(|handle| {
+//             buffered.start_send(1 as usize).unwrap();
+//             buffered.start_send(2 as usize).unwrap();
+//             buffered.poll_complete().unwrap();
 
-            handle.advance(Duration::from_millis(5));
-            buffered.poll_complete().unwrap();
+//             handle.advance(Duration::from_millis(5));
+//             buffered.poll_complete().unwrap();
 
-            std::thread::sleep(Duration::from_millis(8));
+//             std::thread::sleep(Duration::from_millis(8));
 
-            buffered.start_send(3 as usize).unwrap();
-            buffered.poll_complete().unwrap();
-        });
+//             buffered.start_send(3 as usize).unwrap();
+//             buffered.poll_complete().unwrap();
+//         });
 
-        let output = buffered.into_inner_sink();
-        assert_eq!(output, vec![vec![1, 2]]);
-    }
+//         let output = buffered.into_inner_sink();
+//         assert_eq!(output, vec![vec![1, 2]]);
+//     }
 
-    #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
-    enum Partitions {
-        A,
-        B,
-    }
+//     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
+//     enum Partitions {
+//         A,
+//         B,
+//     }
 
-    impl Partition<Bytes> for Partitions {
-        fn partition(&self) -> Bytes {
-            format!("{:?}", self).into()
-        }
-    }
+//     impl Partition<Bytes> for Partitions {
+//         fn partition(&self) -> Bytes {
+//             format!("{:?}", self).into()
+//         }
+//     }
 
-    impl Partition<Bytes> for usize {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
+//     impl Partition<Bytes> for usize {
+//         fn partition(&self) -> Bytes {
+//             "key".into()
+//         }
+//     }
 
-    impl Partition<Bytes> for u8 {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
+//     impl Partition<Bytes> for u8 {
+//         fn partition(&self) -> Bytes {
+//             "key".into()
+//         }
+//     }
 
-    impl Partition<Bytes> for i32 {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
+//     impl Partition<Bytes> for i32 {
+//         fn partition(&self) -> Bytes {
+//             "key".into()
+//         }
+//     }
 
-    impl Partition<Bytes> for Vec<i32> {
-        fn partition(&self) -> Bytes {
-            "key".into()
-        }
-    }
-}
+//     impl Partition<Bytes> for Vec<i32> {
+//         fn partition(&self) -> Bytes {
+//             "key".into()
+//         }
+//     }
+// }

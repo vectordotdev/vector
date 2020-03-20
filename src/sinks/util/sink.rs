@@ -1,4 +1,5 @@
 use super::batch::{Batch, BatchSettings};
+use super::buffer::partition::Partition;
 use crate::buffers::Acker;
 use futures01::{
     future::Either,
@@ -242,13 +243,22 @@ where
 
 // === PartitionBatchSink ===
 
-pub trait Partition<K> {
-    fn partition(&self) -> K;
-}
-
-// TODO: Make this a concrete type
 type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send + 'static>;
 
+/// A parition based batcher, given some `Service` and `Batch` where the
+/// input is partitionable via the `Partition` trait, it will hold many
+/// in flight batches.
+///
+/// This type is similar to `BatchSink` with the added benefit that it has
+/// more fine grained partitioning ability. It will hold many different batches
+/// of events and contain linger timeouts for each.
+///
+/// # Acking
+///
+/// Service based acking will only ack events when all prior request
+/// batches have been acked. This means if sequential requests r1, r2,
+/// and r3 are dispatched and r2 and r3 complete, all events contained
+/// in all requests will not be acked until r1 has completed.
 pub struct PartitionedBatchSink<B, S, K, Request, E = DefaultExecutor> {
     batch: B,
     service: ServiceSink<S, Request>,
@@ -266,6 +276,33 @@ enum LingerState<K> {
     Canceled,
 }
 
+impl<B, S, K, Request> PartitionedBatchSink<B, S, K, Request, DefaultExecutor>
+where
+    B: Batch<Output = Request>,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    S: Service<Request>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: fmt::Debug,
+{
+    pub fn new(service: S, batch: B, acker: Acker, settings: BatchSettings) -> Self {
+        let service = ServiceSink::new(service, acker);
+
+        Self {
+            batch,
+            service,
+            exec: DefaultExecutor::current(),
+            partitions: HashMap::new(),
+            settings,
+            closing: false,
+            sending: VecDeque::new(),
+            lingers: FuturesUnordered::new(),
+            linger_handles: HashMap::new(),
+        }
+    }
+}
+
 impl<B, S, K, Request, E> PartitionedBatchSink<B, S, K, Request, E>
 where
     B: Batch<Output = Request>,
@@ -277,7 +314,13 @@ where
     S::Response: fmt::Debug,
     E: Executor,
 {
-    pub fn new(service: S, batch: B, acker: Acker, settings: BatchSettings, exec: E) -> Self {
+    pub fn with_executor(
+        service: S,
+        batch: B,
+        acker: Acker,
+        settings: BatchSettings,
+        exec: E,
+    ) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
@@ -433,10 +476,9 @@ where
         for partition in ready {
             if let Some(batch) = self.partitions.remove(&partition) {
                 if let Some(linger_cancel) = self.linger_handles.remove(&partition) {
-                    linger_cancel
-                        .send(partition.clone())
-                        .map_err(|_| ())
-                        .expect("Linger deadline should be removed on elapsed.");
+                    // XXX: had to remove the expect here, a cancaellation should
+                    // always be a best effort.
+                    let _ = linger_cancel.send(partition.clone());
                 }
 
                 ready_batches.push(batch);
@@ -581,7 +623,7 @@ where
 mod tests {
     use super::*;
     use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSettings, Buffer};
+    use crate::sinks::util::{buffer::partition::Partition, BatchSettings, Buffer};
     use crate::test_util::runtime;
     use bytes::Bytes;
     use futures01::{future, Sink};
@@ -846,6 +888,7 @@ mod tests {
 
     #[test]
     fn partition_batch_sink_buffers_messages_until_limit() {
+        let rt = runtime();
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
@@ -857,7 +900,7 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
         let buffered =
-            PartitionedBatchSink::new(svc, Vec::new(), acker, SETTINGS, DefaultExecutor::current());
+            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, SETTINGS, rt.executor());
 
         let (_buffered, _) = buffered
             .sink_map_err(drop)
@@ -874,6 +917,113 @@ mod tests {
                 vec![20, 21]
             ]
         );
+    }
+
+    #[test]
+    fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
+        let rt = runtime();
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = tower::service_fn(|req| {
+            let sent_requests = sent_requests.clone();
+
+            sent_requests.lock().unwrap().push(req);
+
+            future::ok::<_, std::io::Error>(())
+        });
+
+        let settings = BatchSettings {
+            size: 1,
+            ..SETTINGS
+        };
+
+        let buffered =
+            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, settings, rt.executor());
+
+        let input = vec![Partitions::A, Partitions::B];
+
+        let (_buffered, _) = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let mut output = sent_requests.lock().unwrap();
+        output[..].sort();
+        assert_eq!(&*output, &vec![vec![Partitions::A], vec![Partitions::B]]);
+    }
+
+    #[test]
+    fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
+        let rt = runtime();
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = tower::service_fn(|req| {
+            let sent_requests = sent_requests.clone();
+
+            sent_requests.lock().unwrap().push(req);
+
+            future::ok::<_, std::io::Error>(())
+        });
+
+        let settings = BatchSettings {
+            size: 2,
+            ..SETTINGS
+        };
+
+        let buffered =
+            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, settings, rt.executor());
+
+        let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
+
+        let (_buffered, _) = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let mut output = sent_requests.lock().unwrap();
+        output[..].sort();
+        assert_eq!(
+            &*output,
+            &vec![
+                vec![Partitions::A, Partitions::A],
+                vec![Partitions::B, Partitions::B]
+            ]
+        );
+    }
+
+    #[test]
+    fn partition_batch_sink_submits_after_linger() {
+        let mut clock = MockClock::new();
+        let rt = runtime();
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = tower::service_fn(|req| {
+            let sent_requests = sent_requests.clone();
+
+            sent_requests.lock().unwrap().push(req);
+
+            future::ok::<_, std::io::Error>(())
+        });
+
+        let mut buffered =
+            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, SETTINGS, rt.executor());
+
+        clock.enter(|handle| {
+            buffered.start_send(1 as usize).unwrap();
+            buffered.poll_complete().unwrap();
+
+            handle.advance(Duration::from_secs(11));
+
+            buffered.poll_complete().unwrap();
+        });
+
+        let output = sent_requests.lock().unwrap();
+        assert_eq!(&*output, &vec![vec![1]]);
     }
 
     #[derive(Default, Clone)]
@@ -902,8 +1052,6 @@ mod tests {
         pub fn poll(&mut self) -> futures01::Poll<(), ()> {
             let mut futs = self.0.lock().unwrap();
 
-            // let mut futs_to_remove = Vec::new();
-
             for (fut, is_done) in &mut *futs {
                 if !*is_done {
                     if let Async::Ready(_) = fut.poll()? {
@@ -911,12 +1059,6 @@ mod tests {
                     }
                 }
             }
-
-            // if futs.is_empty() {
-            //     Ok(Async::Ready(()))
-            // } else {
-            //     Ok(Async::NotReady)
-            // }
 
             // XXX: We don't really use this beyond polling a group
             // of futures, it is expected that the user manually keeps
