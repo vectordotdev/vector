@@ -238,8 +238,10 @@ impl SinkConfig for MockSinkConfig {
             .sender
             .clone()
             .unwrap()
-            .stream_ack(cx.acker())
-            .sink_map_err(|e| error!("Error sending in sink {}", e));
+            .sink_map_err(
+                |error| error!(message = "Ingesting an event failed at mock sink", %error),
+            )
+            .stream_ack(cx.acker());
         let healthcheck = match self.healthy {
             true => future::ok(()),
             false => future::err(HealthcheckError::Unhealthy.into()),
