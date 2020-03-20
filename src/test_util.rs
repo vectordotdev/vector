@@ -10,7 +10,7 @@ use std::fs::File;
 use std::io::Read;
 use std::iter;
 use std::mem;
-use std::net::SocketAddr;
+use std::net::{Shutdown, SocketAddr};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -66,7 +66,12 @@ pub fn send_lines(
                 .forward(out)
                 .and_then(|(_source, sink)| {
                     let socket = sink.into_inner().into_inner();
-                    tokio::io::shutdown(socket).map_err(|e| panic!("{:}", e))
+                    // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
+                    // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
+                    // Use `TcpStream::shutdown` instead - it actually does something.
+                    socket
+                        .shutdown(Shutdown::Both)
+                        .map_err(|e| panic!("{:}", e))
                 })
                 .map(|_| ())
         })
