@@ -51,6 +51,13 @@ pub fn source() -> (Sender<Event>, MockSourceConfig) {
     (tx, source)
 }
 
+pub fn source_with_event_counter() -> (Sender<Event>, MockSourceConfig, Arc<AtomicUsize>) {
+    let event_counter = Arc::new(AtomicUsize::new(0));
+    let (tx, rx) = futures01::sync::mpsc::channel(0);
+    let source = MockSourceConfig::new_with_event_counter(rx, event_counter.clone());
+    (tx, source, event_counter)
+}
+
 pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
     MockTransformConfig::new(suffix.to_owned(), increase)
 }

@@ -241,6 +241,15 @@ pub fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| std::net::TcpStream::connect(addr).is_ok())
 }
 
+pub fn wait_for_atomic_usize<T, F>(val: T, unblock: F)
+where
+    T: AsRef<AtomicUsize>,
+    F: Fn(usize) -> bool,
+{
+    let val = val.as_ref();
+    wait_for(|| unblock(val.load(Ordering::SeqCst)))
+}
+
 pub fn shutdown_on_idle(runtime: Runtime) {
     block_on(
         runtime
