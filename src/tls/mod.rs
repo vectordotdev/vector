@@ -7,17 +7,18 @@ use openssl::{
 use snafu::{ResultExt, Snafu};
 use std::fmt::Debug;
 use std::io::Error as IoError;
+use std::net::SocketAddr;
 use std::path::PathBuf;
-#[cfg(feature = "sources-tls")]
 use tokio::net::TcpStream;
+use tokio_openssl::SslStream;
 
-#[cfg(any(feature = "sources-tls", feature = "sources-http"))]
+#[cfg(any(feature = "sources-tls"))]
 mod incoming;
 mod maybe_tls;
 mod settings;
 
-#[cfg(any(feature = "sources-tls", feature = "sources-http"))]
-pub(crate) use incoming::MaybeTlsStream;
+#[cfg(any(feature = "sources-tls"))]
+pub(crate) use incoming::MaybeTlsListener;
 pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
@@ -92,6 +93,17 @@ pub enum TlsError {
     ParsePkcs12 { source: ErrorStack },
     #[snafu(display("TCP bind failed: {}", source))]
     TcpBind { source: IoError },
+}
+
+pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
+
+impl MaybeTlsStream<TcpStream> {
+    pub fn peer_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {
+        match self {
+            Self::Raw(raw) => raw.peer_addr(),
+            Self::Tls(tls) => tls.get_ref().get_ref().peer_addr(),
+        }
+    }
 }
 
 pub(crate) fn tls_connector_builder(settings: MaybeTlsSettings) -> Result<SslConnectorBuilder> {

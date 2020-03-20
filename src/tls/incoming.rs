@@ -1,5 +1,5 @@
 use super::{
-    CreateAcceptor, Handshake, IncomingListener, MaybeTls, MaybeTlsSettings, Result, TcpBind,
+    CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, Result, TcpBind,
     TlsError, TlsSettings,
 };
 use futures01::Poll;
@@ -9,9 +9,7 @@ use snafu::ResultExt;
 use std::fmt::{self, Debug, Formatter};
 use std::net::SocketAddr;
 use tokio::net::{tcp::Incoming, TcpListener, TcpStream};
-use tokio_openssl::{AcceptAsync, SslAcceptorExt, SslStream};
-
-pub(crate) type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
+use tokio_openssl::{AcceptAsync, SslAcceptorExt};
 
 pub(crate) struct MaybeTlsIncoming<I: Stream> {
     incoming: I,
@@ -118,5 +116,14 @@ impl MaybeTlsListener {
     pub(crate) fn incoming(self) -> MaybeTlsIncoming<Incoming> {
         let incoming = self.listener.incoming();
         MaybeTlsIncoming::new(incoming, self.acceptor)
+    }
+}
+
+impl From<TcpListener> for MaybeTlsListener {
+    fn from(listener: TcpListener) -> Self {
+        Self {
+            listener,
+            acceptor: None,
+        }
     }
 }
