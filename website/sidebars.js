@@ -257,6 +257,8 @@ module.exports = {
             
               "reference/sinks/prometheus",
             
+              "reference/sinks/pulsar",
+            
               "reference/sinks/sematext_logs",
             
               "reference/sinks/socket",

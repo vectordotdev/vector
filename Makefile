@@ -22,8 +22,8 @@ help:
 bench: ## Run internal benchmarks
 	@cargo bench --all
 
-build: ## Build the project
-	@cargo build --no-default-features --features="$${FEATURES:-default}"
+build: ## Build the project in release mode
+	@cargo build --no-default-features --features="$${FEATURES:-default}" --release
 
 check: check-code check-fmt check-generate check-examples
 

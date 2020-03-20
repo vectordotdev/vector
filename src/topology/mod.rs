@@ -11,6 +11,7 @@ use crate::topology::builder::Pieces;
 
 use crate::buffers;
 use crate::runtime;
+use crate::shutdown::ShutdownCoordinator;
 use futures01::{
     future,
     sync::{mpsc, oneshot},
@@ -20,7 +21,6 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
-use stream_cancel::Trigger;
 use tokio::timer;
 use tracing_futures::Instrument;
 
@@ -30,7 +30,7 @@ pub struct RunningTopology {
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
-    shutdown_triggers: HashMap<String, Trigger>,
+    shutdown_coordinator: ShutdownCoordinator,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
@@ -56,7 +56,7 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_triggers: HashMap::new(),
+        shutdown_coordinator: ShutdownCoordinator::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -227,24 +227,35 @@ impl RunningTopology {
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
 
-        for name in sources_to_remove {
+        // First pass to tell the sources to shut down.
+        for name in &sources_to_remove {
             info!("Removing source {:?}", name);
 
-            self.tasks.remove(&name).unwrap().forget();
+            self.tasks.remove(name).unwrap().forget();
 
-            self.remove_outputs(&name);
-            self.shutdown_source(&name);
+            self.remove_outputs(name);
+            self.shutdown_source_begin(name);
         }
-
-        for name in sources_to_change {
+        for name in &sources_to_change {
             info!("Rebuilding source {:?}", name);
 
-            self.remove_outputs(&name);
-            self.shutdown_source(&name);
+            self.remove_outputs(name);
+            self.shutdown_source_begin(name);
+        }
 
-            self.setup_outputs(&name, &mut new_pieces);
+        // Second pass to wait for the shutdowns to complete
+        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
+        // more like 30-60 seconds.
+        info!("Waiting for up to 3 seconds for sources to finish shutting down");
+        let deadline = Instant::now() + Duration::from_secs(3);
+        for name in &sources_to_remove {
+            self.shutdown_source_end(rt, name, deadline.clone());
+        }
+        for name in &sources_to_change {
+            self.shutdown_source_end(rt, name, deadline);
 
-            self.spawn_source(&name, &mut new_pieces, rt);
+            self.setup_outputs(name, &mut new_pieces);
+            self.spawn_source(name, &mut new_pieces, rt);
         }
 
         for name in sources_to_add {
@@ -364,9 +375,8 @@ impl RunningTopology {
             previous.forget();
         }
 
-        let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
-        self.shutdown_triggers
-            .insert(name.to_string(), shutdown_trigger);
+        self.shutdown_coordinator
+            .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task.instrument(span), self.abort_tx.clone());
@@ -376,8 +386,16 @@ impl RunningTopology {
         );
     }
 
-    fn shutdown_source(&mut self, name: &str) {
-        self.shutdown_triggers.remove(name).unwrap().cancel();
+    /// Informs a Source that it should shut down, but does not wait for the shutdown to complete.
+    fn shutdown_source_begin(&mut self, name: &str) {
+        self.shutdown_coordinator.shutdown_source_begin(name);
+    }
+
+    /// Waits for the Source to finish shutting down until a given deadline and then forcibly shuts
+    /// down the source if it hasn't finished by then.
+    fn shutdown_source_end(&mut self, rt: &mut runtime::Runtime, name: &str, deadline: Instant) {
+        self.shutdown_coordinator
+            .shutdown_source_end(rt, name.to_string(), deadline);
         self.source_tasks.remove(name).wait().unwrap();
     }
 

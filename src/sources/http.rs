@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -62,6 +63,7 @@ impl SourceConfig for SimpleHttpConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
@@ -177,6 +179,7 @@ fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessa
 fn json_error(s: String) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
+
 fn json_value_to_type_string(value: &JsonValue) -> &'static str {
     match value {
         JsonValue::Object(_) => "Object",
@@ -193,6 +196,7 @@ mod tests {
     use super::{Encoding, SimpleHttpConfig};
     use warp::http::HeaderMap;
 
+    use crate::shutdown::ShutdownSignal;
     use crate::{
         event::{self, Event},
         runtime::Runtime,
@@ -220,7 +224,12 @@ mod tests {
                 headers,
                 tls: None,
             }
-            .build("default", &GlobalOptions::default(), sender)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
             .unwrap(),
         );
         (recv, address)
