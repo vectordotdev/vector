@@ -1,3 +1,8 @@
+// Using a shared mod like this is probably not the best idea, since we have to
+// disable the `dead_code` lint, as we don't need all of the helpers from here
+// all over the place.
+#![allow(dead_code)]
+
 use futures01::{
     future,
     sink::Sink,
@@ -10,6 +15,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
+use tracing::{error, info};
 use vector::event::{self, metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};

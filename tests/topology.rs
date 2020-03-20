@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate tracing;
-
-pub mod support;
+mod support;
 
 use crate::support::{
     sink, sink_failing_healthcheck, sink_with_buffer_size, source, transform, MockSourceConfig,
