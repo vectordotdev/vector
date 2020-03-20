@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
-    tls::{tls_connector, MaybeTls, MaybeTlsSettings, TlsConfig},
+    tls::{tls_connector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -18,7 +18,7 @@ use tokio::{
     net::tcp::{ConnectFuture, TcpStream},
     timer::Delay,
 };
-use tokio_openssl::{ConnectAsync as SslConnectAsync, ConnectConfigurationExt, SslStream};
+use tokio_openssl::{ConnectAsync as SslConnectAsync, ConnectConfigurationExt};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
 
@@ -81,8 +81,7 @@ enum TcpSinkState {
     Backoff(Delay),
 }
 
-type TcpOrTlsStream =
-    MaybeTls<FramedWrite<TcpStream, BytesCodec>, FramedWrite<SslStream<TcpStream>, BytesCodec>>;
+type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
 
 impl TcpSink {
     pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
@@ -159,10 +158,10 @@ impl TcpSink {
                                     TcpSinkState::Backoff(self.next_delay())
                                 }
                             },
-                            None => TcpSinkState::Connected(MaybeTls::Raw(FramedWrite::new(
-                                socket,
+                            None => TcpSinkState::Connected(FramedWrite::new(
+                                MaybeTlsStream::Raw(socket),
                                 BytesCodec::new(),
-                            ))),
+                            )),
                         }
                     }
                     Ok(Async::NotReady) => {
@@ -178,10 +177,10 @@ impl TcpSink {
                         Ok(Async::Ready(socket)) => {
                             debug!(message = "negotiated TLS.");
                             self.backoff = Self::fresh_backoff();
-                            TcpSinkState::Connected(MaybeTls::Tls(FramedWrite::new(
-                                socket,
+                            TcpSinkState::Connected(FramedWrite::new(
+                                MaybeTlsStream::Tls(socket),
                                 BytesCodec::new(),
-                            )))
+                            ))
                         }
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(error) => {

@@ -16,6 +16,8 @@ mod incoming;
 mod maybe_tls;
 mod settings;
 
+#[cfg(any(feature = "sources-tls", feature = "sources-http"))]
+pub(crate) use incoming::MaybeTlsStream;
 pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
