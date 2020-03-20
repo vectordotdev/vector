@@ -3,13 +3,47 @@ title: Use Vector On Docker
 sidebar_label: Docker
 description: Using Vector on Docker
 source_url: [[[urls.vector_docker_source_files]]]
-
 ---
+
+<%- platform = metadata.installation.platforms.docker -%>
+<%- interfaces = platform.interfaces -%>
+<%- strategies = platform.strategies -%>
 
 Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
 available on [Docker Hub][urls.docker_hub_vector] which come pre-installed
 with Vector and any recommended system dependencies. These images are available
 for <%= metadata.installation.platforms.docker.archs.to_sentence %>
 architectures.
+
+## Install
+
+import CodeExplanation from '@site/src/components/CodeExplanation';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= interfaces.first.name %>"
+  values={<%= interfaces.collect { |interface| {label: interface.title, value: interface.name } }.to_json %>}>
+<%- interfaces.each do |interface| -%>
+<TabItem value="<%= interface.name %>">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= "#{interface.name}-#{strategies.first.name}" %>"
+  values={<%= strategies.collect { |strategy| {label: strategy.title, value: "#{interface.name}-#{strategy.name}" } }.to_json %>}>
+<%- strategies.each do |strategy| %>
+<TabItem value="<%= interface.name %>-<%= strategy.name %>">
+
+<%= setup_tutorial(interface: interface, platform: platform, strategy: strategy) %>
+
+</TabItem>
+<%- end -%>
+</Tabs>
+</TabItem>
+<%- end -%>
+</Tabs>
 
 <%= docker_docs %>

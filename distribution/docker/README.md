@@ -30,15 +30,6 @@ of your observability data with Vector.
      distribution/docker/README.md.erb
 -->
 
-## Running
-
-```bash
-docker run timberio/vector:0.8.2-alpine
-```
-
-* The `vector` binary is located at `/usr/local/bin/vector`, which should be in your `$PATH`.
-* The default [configuration file][docs.configuration] is located at `/etc/vector/vector.toml`.
-
 ## Configuring
 
 The Vector Docker images ship with a [default `/etc/vector/vector.toml` configuration file][urls.default_configuration].

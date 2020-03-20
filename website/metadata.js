@@ -252,9 +252,36 @@ module.exports = {
           "ARM64",
           "ARMv7"
         ],
+        "interfaces": [
+          {
+            "name": "docker-cli",
+            "title": "Docker CLI"
+          },
+          {
+            "name": "docker-compose",
+            "title": "Docker Compose"
+          }
+        ],
         "oss": [
           "Linux",
           "MacOS"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "title": "Daemon",
+            "source": "docker"
+          },
+          {
+            "name": "sidecar",
+            "title": "Sidecar",
+            "source": "file"
+          },
+          {
+            "name": "service",
+            "title": "Service",
+            "source": "http"
+          }
         ],
         "name": "docker"
       }

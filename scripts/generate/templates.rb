@@ -6,6 +6,7 @@ require_relative "templates/config_example_writer"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 require_relative "templates/setup_guide"
+require_relative "templates/setup_tutorial_docker_cli"
 
 # Renders templates in the templates sub-dir
 #
@@ -147,7 +148,7 @@ class Templates
     end
   end
 
-  def create_config_command(source: nil, sink: nil, default_sink: nil)
+  def create_config_command(source: nil, sink: nil, default_sink_name: "console")
     if source.nil? && sink.nil?
       raise ArgumentError.new("You must supply at least one source or sink")
     end
@@ -441,6 +442,32 @@ class Templates
   def setup_guide(id, source: nil, sink: nil)
     guide = SetupGuide.new(source: source, sink: sink)
     render("#{partials_path}/_setup_guide.md", binding).strip
+  end
+
+  def setup_tutorial(interface: nil, platform: nil, source: nil, strategy: nil)
+    #
+    # Defaults
+    #
+
+    if source.nil? && !strategy.nil?
+      source = metadata.sources.send(strategy.source)
+    end
+
+    #
+    # Render
+    #
+
+    case (interface && interface.name)
+    when "docker-cli"
+      tutorial = SetupTutorialDockerCLI.new(source)
+      render("#{partials_path}/_setup_tutorial_docker_cli.md", binding).strip
+    when "docker-compose"
+      tutorial = SetupTutorialDockerCLI.new(source)
+      render("#{partials_path}/_setup_tutorial_docker_cli.md", binding).strip
+    else
+      # this should use the Vector CLI
+      raise (interface && interface.name).inspect
+    end
   end
 
   def sink_description(sink)

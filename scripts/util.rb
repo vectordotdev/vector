@@ -1,6 +1,7 @@
 require "active_support/core_ext/array/conversions"
 require "active_support/core_ext/hash/deep_merge"
 require "active_support/core_ext/string/conversions"
+require "active_support/core_ext/string/filters"
 require "active_support/core_ext/string/indent"
 
 require_relative "util/core_ext"

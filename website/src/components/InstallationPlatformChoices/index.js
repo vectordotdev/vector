@@ -15,15 +15,13 @@ function getInstallation() {
 }
 
 function ArchChoices({arch, docker, os, packageManager}) {
-  const {containers, downloads, package_managers: packageManagers} = getInstallation();
+  const {downloads, package_managers: packageManagers, platforms} = getInstallation();
 
   const archiveDownload = Object.values(downloads).filter(download => (
     download.arch.toLowerCase() == arch.toLowerCase() &&
       download.os.toLowerCase() == os.toLowerCase() &&
       download.type == "archive")
   )[0];
-
-  console.log(Object.values(downloads))
 
   const dockerSupported = platforms.docker.archs.map(arch => arch.toLowerCase()).includes(arch) &&
     platforms.docker.oss.map(os => os.toLowerCase()).includes(os);

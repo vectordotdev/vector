@@ -1,5 +1,5 @@
 ---
-title: Install Vector On Containers
+title: Install Vector On Platforms
 sidebar_label: hidden
 hide_pagination: true
 ---

@@ -32,6 +32,14 @@ class Hash
           else
             val.to_struct(should_have_keys: should_have_keys)
           end
+        elsif val.is_a?(Array)
+          val.collect do |item|
+            if item.is_a?(Hash)
+              item.to_struct
+            else
+              item
+            end
+          end
         else
           val
         end
