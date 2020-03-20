@@ -93,7 +93,9 @@ impl RunningTopology {
     /// Transforms and sinks should shut down automatically once their input tasks finish.
     /// Note that this takes ownership of `self`, so once this function returns everything in the
     /// RunningTopology instance has been dropped except for the `tasks` map, which gets moved
-    /// into the returned future and is used to poll for when the tasks have completed.
+    /// into the returned future and is used to poll for when the tasks have completed. One the
+    /// returned future is dropped then everything from this RunningTopology instance is fully
+    /// dropped.
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         let mut running_tasks = self.tasks;
