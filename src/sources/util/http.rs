@@ -100,7 +100,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         info!(message = "building http server", addr = %address);
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
-        let incoming = tls.bind(&address)?;
+        let incoming = tls.bind(&address)?.incoming();
 
         let server = warp::serve(routes).serve_incoming_with_graceful_shutdown(incoming, tripwire);
 

@@ -25,12 +25,12 @@ enum MaybeTlsIncomingState<S> {
 }
 
 impl<I: Stream> MaybeTlsIncoming<I> {
-    pub(crate) fn new(incoming: I, acceptor: Option<SslAcceptor>) -> Result<Self> {
-        Ok(Self {
+    pub(crate) fn new(incoming: I, acceptor: Option<SslAcceptor>) -> Self {
+        Self {
             incoming,
             acceptor,
             state: MaybeTlsIncomingState::Inner,
-        })
+        }
     }
 }
 
@@ -97,15 +97,26 @@ impl TlsSettings {
 }
 
 impl MaybeTlsSettings {
-    pub(crate) fn bind(&self, addr: &SocketAddr) -> Result<MaybeTlsIncoming<Incoming>> {
+    pub(crate) fn bind(&self, addr: &SocketAddr) -> Result<MaybeTlsListener> {
         let listener = TcpListener::bind(addr).context(TcpBind)?;
-        let incoming = listener.incoming();
 
         let acceptor = match self {
             Self::Tls(tls) => Some(tls.acceptor()?.into()),
             Self::Raw(()) => None,
         };
 
-        MaybeTlsIncoming::new(incoming, acceptor)
+        Ok(MaybeTlsListener { listener, acceptor })
+    }
+}
+
+pub(crate) struct MaybeTlsListener {
+    listener: TcpListener,
+    acceptor: Option<SslAcceptor>,
+}
+
+impl MaybeTlsListener {
+    pub(crate) fn incoming(self) -> MaybeTlsIncoming<Incoming> {
+        let incoming = self.listener.incoming();
+        MaybeTlsIncoming::new(incoming, self.acceptor)
     }
 }

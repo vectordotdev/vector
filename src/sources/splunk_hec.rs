@@ -87,7 +87,7 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let incoming = tls.bind(&self.address)?;
+        let incoming = tls.bind(&self.address)?.incoming();
 
         let server =
             warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);
