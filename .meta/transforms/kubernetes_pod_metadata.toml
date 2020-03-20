@@ -13,7 +13,7 @@ See [Connecting To The Kubernetes API server section](#connecting-to-the-kuberne
 
 Vector must be given authorization to `watch` resource `pods`. \
 In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] \
-[RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
+[RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default. \
 """
 
 <%= render("_partials/_component_options.toml", type: "transform", name: "kubernetes_pod_metadata") %>
@@ -26,17 +26,17 @@ required = true
 description = """\
 Node's name whose pod's logs should be enriched. \
 Either this or `node_name` field must be defined. \
-Defined automatically when using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
+Defined automatically when using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml]. \
 """
 
 [transforms.kubernetes_pod_metadata.options.fields]
 type = "[string]"
 common = true
 default = ["name","namespace","labels","annotations","node_name"]
-description ="""\
+description = """\
 A list of fields to include in each event. \
 They will be added under global [`kubernetes_key` option][docs.reference.global-options#kubernetes_key]. \
-See [Nesting](#nesting-fields) for more info.
+See [Nesting](#nesting-fields) for more info. \
 """
 
 [transforms.kubernetes_pod_metadata.options.cache_ttl]
@@ -52,7 +52,7 @@ examples = ["minikube"]
 description = """\
 Node's name whose pod's logs should be enriched. \
 Either this or `VECTOR_NODE_NAME` must be defined. \
-Has priority over `VECTOR_NODE_NAME`.
+Has priority over `VECTOR_NODE_NAME`. \
 """
 
 [transforms.kubernetes_pod_metadata.options.pod_uid]
@@ -68,7 +68,7 @@ default = 1
 description = """\
 When needing to connect to Kubernetes API server, for how long in seconds \
 will the transform maximally wait before trying to connect. \
-See [Retry Policy section](#retry-policy) for more info.
+See [Retry Policy section](#retry-policy) for more info. \
 """
 
 
@@ -94,13 +94,21 @@ description = "Timestamp of when the Pod was deleted."
 
 [transforms.kubernetes_pod_metadata.output.log.fields.labels]
 type = "table"
-examples = [{release = "stable", tier = "frontend"}]
-description = "Pod's labels as keys and values nested under `labels` key."
+examples = [{"release" = "stable", "tier" = "frontend"}]
+description = """\
+Pod's labels as keys and values nested under `labels` key. \
+The keys are added literally, so to be used in the rest \
+of Vector configuration the '.' will need to be [escaped](docs.reference.field-path-notation#escaping. \
+"""
 
 [transforms.kubernetes_pod_metadata.output.log.fields.annotations]
 type = "table"
-examples = [{kubectl = { kubernetes = { io = "..."}}}]
-description = "Pod's annotations as keys and values nested under `annotations` key."
+examples = [{"kubectl.kubernetes.io/last-applied-configuration" = "..."}]
+description = """\
+Pod's annotations as keys and values nested under `annotations` key. \
+The keys are added literally, so to be used in the rest \
+of Vector configuration the '.' will need to be [escaped](docs.reference.field-path-notation#escaping. \
+"""
 
 [transforms.kubernetes_pod_metadata.output.log.fields.node_name]
 type = "string"

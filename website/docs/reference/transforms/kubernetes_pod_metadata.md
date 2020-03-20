@@ -75,8 +75,7 @@ import Alert from '@site/src/components/Alert';
 
 Vector must be run inside a Kubernetes cluster for this transform to work. See [Connecting To The Kubernetes API server section](#connecting-to-the-kubernetes-api-server) for more info.
 
-Vector must be given authorization to `watch` resource `pods`. In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] [RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
-
+Vector must be given authorization to `watch` resource `pods`. In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] [RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default. 
 
 * Network access is required for this component to function correctly. See the
   [Network Access section](#network-access) for more info.
@@ -253,6 +252,7 @@ config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-
 
 
 
+
 </Field>
 
 
@@ -265,11 +265,7 @@ For example:
 
 ```javascript
 {
-  "kubectl": {
-    "kubernetes": {
-      "io": "..."
-    }
-  },
+  "kubectl.kubernetes.io/last-applied-configuration": "...",
   "creation_timestamp": "2019-11-01T21:15:47+00:00",
   "deletion_timestamp": "2019-11-01T21:15:47+00:00",
   "host_ip": "192.168.99.106",
@@ -296,7 +292,7 @@ More detail on the output schema is below.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[{"kubectl":{"kubernetes":{"io":"..."}}}]}
+  examples={[{"kubectl.kubernetes.io/last-applied-configuration":"..."}]}
   groups={[]}
   name={"annotations"}
   path={null}
@@ -309,7 +305,9 @@ More detail on the output schema is below.
 
 ### annotations
 
-Pod's annotations as keys and values nested under [`annotations`](#annotations) key.
+Pod's annotations as keys and values nested under [`annotations`](#annotations) key. The keys
+are added literally, so to be used in the rest of Vector configuration the '.'
+will need to be [escaped](docs.reference.field-path-notation#escaping.
 
 
 
@@ -459,7 +457,9 @@ IP address allocated to the pod.
 
 ### labels
 
-Pod's labels as keys and values nested under [`labels`](#labels) key.
+Pod's labels as keys and values nested under [`labels`](#labels) key. The keys are added
+literally, so to be used in the rest of Vector configuration the '.' will need
+to be [escaped](docs.reference.field-path-notation#escaping.
 
 
 
