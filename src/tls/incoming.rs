@@ -1,7 +1,10 @@
-use super::*;
+use super::{
+    CreateAcceptor, Handshake, IncomingListener, MaybeTls, MaybeTlsSettings, Result, TcpBind,
+    TlsError, TlsSettings,
+};
 use futures01::Poll;
 use futures01::{try_ready, Async, Future, Stream};
-use openssl::ssl::SslAcceptor;
+use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::fmt::{self, Debug, Formatter};
 use std::net::SocketAddr;

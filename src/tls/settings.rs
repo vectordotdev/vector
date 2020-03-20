@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    AddCertToStore, AddExtraChainCert, DerExportError, FileOpenFailed, FileReadFailed, MaybeTls,
+    NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result, SetCertificate,
+    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
+};
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
@@ -9,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::fmt::{self, Debug, Formatter};
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

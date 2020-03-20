@@ -6,7 +6,7 @@ use openssl::{
 };
 use snafu::{ResultExt, Snafu};
 use std::fmt::Debug;
-use std::io::{Error as IoError, Read};
+use std::io::Error as IoError;
 use std::path::PathBuf;
 #[cfg(feature = "sources-tls")]
 use tokio::net::TcpStream;
