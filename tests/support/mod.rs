@@ -27,20 +27,24 @@ use vector::topology::config::{
 };
 use vector::transforms::Transform;
 
-pub fn sink() -> (Receiver<Event>, MockSinkConfig) {
+pub fn sink() -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
     sink_with_buffer_size(10)
 }
 
-pub fn sink_with_buffer_size(size: usize) -> (Receiver<Event>, MockSinkConfig) {
+pub fn sink_with_buffer_size(size: usize) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
     let (tx, rx) = futures01::sync::mpsc::channel(size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
 
-pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
+pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
     let (tx, rx) = futures01::sync::mpsc::channel(10);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
+}
+
+pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
+    MockSinkConfig::new(DeadSink::new(), false)
 }
 
 pub fn source() -> (Sender<Event>, MockSourceConfig) {
@@ -209,17 +213,25 @@ impl TransformConfig for MockTransformConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSinkConfig {
+pub struct MockSinkConfig<T>
+where
+    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
+    <T as Sink>::SinkError: std::fmt::Debug,
+{
     #[serde(skip)]
-    sender: Option<Sender<Event>>,
+    sink: Option<T>,
     #[serde(skip)]
     healthy: bool,
 }
 
-impl MockSinkConfig {
-    pub fn new(sender: Sender<Event>, healthy: bool) -> Self {
+impl<T> MockSinkConfig<T>
+where
+    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
+    <T as Sink>::SinkError: std::fmt::Debug,
+{
+    pub fn new(sink: T, healthy: bool) -> Self {
         Self {
-            sender: Some(sender),
+            sink: Some(sink),
             healthy,
         }
     }
@@ -231,16 +243,17 @@ enum HealthcheckError {
     Unhealthy,
 }
 
-#[typetag::serde(name = "mock")]
-impl SinkConfig for MockSinkConfig {
+impl<T> SinkConfig for MockSinkConfig<T>
+where
+    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
+    <T as Sink>::SinkError: std::fmt::Debug,
+{
     fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
-        let sink = self
-            .sender
-            .clone()
-            .unwrap()
-            .sink_map_err(
-                |error| error!(message = "Ingesting an event failed at mock sink", %error),
-            )
+        let sink = self.sink.clone().unwrap();
+        let sink = sink
+            .sink_map_err(|error| {
+                error!(message = "Ingesting an event failed at mock sink", ?error)
+            })
             .stream_ack(cx.acker());
         let healthcheck = match self.healthy {
             true => future::ok(()),
@@ -255,5 +268,40 @@ impl SinkConfig for MockSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "mock"
+    }
+
+    fn typetag_name(&self) -> &'static str {
+        unimplemented!("not intended for use in real configs")
+    }
+
+    fn typetag_deserialize(&self) {
+        unimplemented!("not intended for use in real configs")
+    }
+}
+
+/// Represents a sink that's never ready.
+/// Useful to simulate an upstream sink server that is down.
+#[derive(Debug, Clone)]
+pub struct DeadSink<T>(std::marker::PhantomData<T>);
+
+impl<T> DeadSink<T> {
+    pub fn new() -> Self {
+        Self(std::marker::PhantomData)
+    }
+}
+
+impl<T> Sink for DeadSink<T> {
+    type SinkItem = T;
+    type SinkError = &'static str;
+
+    fn start_send(
+        &mut self,
+        item: Self::SinkItem,
+    ) -> futures01::StartSend<Self::SinkItem, Self::SinkError> {
+        Ok(futures01::AsyncSink::NotReady(item))
+    }
+
+    fn poll_complete(&mut self) -> futures01::Poll<(), Self::SinkError> {
+        Ok(futures01::Async::Ready(()))
     }
 }
