@@ -18,11 +18,20 @@ fn test_buffering() {
     let data_dir = data_dir.path().to_path_buf();
 
     let num_lines: usize = 10;
+    let line_length = 100;
+    let max_size = 10_000;
+
+    assert!(
+        line_length * num_lines * 2 <= max_size,
+        "Test parameters are invalid, this test implies  that all lines will fit
+        into the buffer, but the buffer is not big enough"
+    );
 
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    // Run vector while sink server is not running, and then shut it down abruptly
+    // Run vector while sink server is not running, and then shut it down
+    // without server ever coming online.
     let mut config = config::Config::empty();
     config.add_source(
         "in",
@@ -34,7 +43,7 @@ fn test_buffering() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size: 10_000,
+        max_size,
         when_full: Default::default(),
     };
     config.global.data_dir = Some(data_dir.clone());
@@ -44,7 +53,9 @@ fn test_buffering() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
-    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    let input_lines = random_lines(line_length)
+        .take(num_lines)
+        .collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();
 
@@ -56,7 +67,8 @@ fn test_buffering() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    // Start sink server, then run vector again. It should send all of the lines from the first run.
+    // Start sink server, then run vector again. It should send all of the lines
+    // from the first run.
     let mut config = config::Config::empty();
     config.add_source(
         "in",
@@ -68,7 +80,7 @@ fn test_buffering() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size: 10_000,
+        max_size,
         when_full: Default::default(),
     };
     config.global.data_dir = Some(data_dir);
@@ -81,7 +93,9 @@ fn test_buffering() {
 
     wait_for_tcp(in_addr);
 
-    let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    let input_lines2 = random_lines(line_length)
+        .take(num_lines)
+        .collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines2.clone().into_iter());
     rt.block_on(send).unwrap();
 
