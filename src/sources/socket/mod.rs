@@ -131,10 +131,12 @@ mod test {
     };
     use crate::tls::{TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures01::sync::{mpsc, oneshot};
-    use futures01::Stream;
     #[cfg(unix)]
-    use futures01::{Future, Sink};
+    use futures01::Sink;
+    use futures01::{
+        sync::{mpsc, oneshot},
+        Future, Stream,
+    };
     use std::net::UdpSocket;
     #[cfg(unix)]
     use std::path::PathBuf;
