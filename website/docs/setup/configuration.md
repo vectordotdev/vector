@@ -214,5 +214,5 @@ All TOML values types are supported. For convenience this includes:
 [docs.reference.templating]: /docs/reference/templating/
 [docs.reference]: /docs/reference/
 [urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.toml]: https://github.com/toml-lang/toml
