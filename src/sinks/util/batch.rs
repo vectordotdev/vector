@@ -48,6 +48,15 @@ pub trait Batch {
     fn fresh(&self) -> Self;
     fn finish(self) -> Self::Output;
     fn num_items(&self) -> usize;
+
+    /// Replace the current batch with a fresh one, returning the old one.
+    fn fresh_replace(&mut self) -> Self
+    where
+        Self: Sized,
+    {
+        let fresh = self.fresh();
+        std::mem::replace(self, fresh)
+    }
 }
 
 impl<T> Batch for Vec<T> {

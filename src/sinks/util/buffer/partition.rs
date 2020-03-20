@@ -410,6 +410,8 @@ mod tests {
             buffered.poll_complete().unwrap();
 
             handle.advance(Duration::from_millis(5));
+            buffered.poll_complete().unwrap();
+
             std::thread::sleep(Duration::from_millis(8));
 
             buffered.start_send(3 as usize).unwrap();
