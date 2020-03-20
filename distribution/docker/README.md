@@ -32,21 +32,11 @@ of your observability data with Vector.
 
 ## Configuring
 
-The Vector Docker images ship with a [default `/etc/vector/vector.toml` configuration file][urls.default_configuration].
-To use your own configuration file:
-
-1. Create your own [Vector configuration file][docs.configuration] and save it
-   as `vector.toml`.
-
-2. Run the Vector Docker image with the following command:
-
-   ```bash
-   docker run \
-    -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-    timberio/vector:0.8.2-alpine
-   ```
-
-   Modify `$PWD` to the directory where you store your local `vector.toml` file.
+As shown above, you can pass a custom
+[Vector configuration file][docs.configuration] via the `-v` flag. You'll want
+to do this since the
+[default `/etc/vector/vector.toml` configuration file][urls.default_configuration]
+doesn't do anything.
 
 ## Deploying
 

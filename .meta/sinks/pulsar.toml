@@ -10,7 +10,7 @@ input_types = ["log"]
 requirements = {}
 write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]"
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.pulsar.options",
   encodings: ["json", "text"]
 ) %>

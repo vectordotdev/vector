@@ -71,9 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-id"] # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
   group_name = "group-name" # required
-  group_name = "{{ file }}" # required
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "{{ host }}" # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default

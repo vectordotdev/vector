@@ -84,12 +84,6 @@ import TabItem from '@theme/TabItem';
 
 </Tabs>
 
-### Previous Versions
-
-Historical Vector versions can be found in the [releases][urls.vector_releases].
-Once you've found the version you'd like to install you can re-follow the
-[install](#install) steps with the URL to the Vector `.msi` file.
-
 ## Configuring
 
 The Vector configuration file is placed in:

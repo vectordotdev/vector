@@ -10,11 +10,11 @@ class Templates
       @source = source
     end
 
-    def start_command_flags
-      flags.collect(&:flag)
+    def start_command_lines
+      flags.collect(&:flag) + ["timberio/vector:latest-alpine"]
     end
 
-    def start_explanation
+    def start_command_explanations
       flags.collect do |flag|
         "The `#{flag.flag.truncate(5)}` flag #{flag.explanation}."
       end

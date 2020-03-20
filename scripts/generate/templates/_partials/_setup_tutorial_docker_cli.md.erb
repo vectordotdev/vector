@@ -8,15 +8,16 @@
 
    ```bash
    docker run \
-   <%= tutorial.start_command_flags.join(" \\\n").indent(2) %>
-     timberio/vector:latest-alpine
+<%= tutorial.start_command_lines.join(" \\\n").indent(5) %>
    ```
 
+   <%- if tutorial.start_command_explanations.any? -%>
    <CodeExplanation>
 
    * <%= tutorial.start_command_explanations.join("\n   *") %>
 
    </CodeExplanation>
+   <%- end -%>
 
    That's it! Simple and to the point. Hit `ctrl+c` to exit.
 

@@ -1,7 +1,7 @@
 ---
-title: Use Vector On Docker
+title: Install Vector On Docker
 sidebar_label: Docker
-description: Using Vector on Docker
+description: Install Vector on the Docker platform
 source_url: https://github.com/timberio/vector/tree/master/distribution/docker
 ---
 
@@ -45,13 +45,13 @@ import TabItem from '@theme/TabItem';
 
 1. ### Configure Vector
 
-   **Where would you like to send your data?**
+   **Where would you like to send your data? (**
 
    <Tabs
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
@@ -65,7 +65,7 @@ import TabItem from '@theme/TabItem';
      # General
      type = "aws_cloudwatch_logs" # required
      inputs = ["in"] # required
-     group_name = "{{ file }}" # required
+     group_name = "group-name" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
 
@@ -77,11 +77,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -110,11 +110,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -143,11 +143,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -177,11 +177,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -205,11 +205,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -234,11 +234,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -265,11 +265,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -292,11 +292,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -324,11 +324,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -358,11 +358,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -387,11 +387,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -417,11 +417,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -446,11 +446,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -478,11 +478,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -506,11 +506,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -540,11 +540,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -569,11 +569,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -602,11 +602,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -629,11 +629,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -661,11 +661,42 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
+
+   </CodeExplanation>
+
+   </TabItem>
+   <TabItem value="pulsar">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
+   ```bash
+   echo '
+   [sources.in]
+     type = "docker" # required
+
+   [sinks.out]
+     # General
+     address = "127.0.0.1:6650" # required
+     topic = "topic-1234" # required
+
+     # Encoding
+     encoding.codec = "json" # required
+   ' > vector.toml
+   ```
+
+   <CodeExplanation>
+
+   * The `vector.toml` file is the Vector configuration file that we'll pass in
+     the next step.
+   * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+     logs.
+   * The the [`console` sink][docs.sinks.console] simply prints the collected
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -689,11 +720,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -723,11 +754,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -756,11 +787,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -784,11 +815,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -799,13 +830,13 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    docker run \
-     -v /var/run/docker.sock:/var/run/docker.sock
+     -v /var/run/docker.sock:/var/run/docker.sock \
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
-   *  tutorial.start_command_explanations.join("\n   *")
+   * The `-v...` flag ensures that Vector has access to the Docker API.
 
    </CodeExplanation>
 
@@ -821,13 +852,13 @@ import TabItem from '@theme/TabItem';
 
 1. ### Configure Vector
 
-   **Where would you like to send your data?**
+   **Where would you like to send your data? (**
 
    <Tabs
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
@@ -835,13 +866,14 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
      type = "aws_cloudwatch_logs" # required
      inputs = ["in"] # required
-     group_name = "{{ file }}" # required
+     group_name = "group-name" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
 
@@ -853,11 +885,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -869,7 +901,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -886,11 +919,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -902,7 +935,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -919,11 +953,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -935,7 +969,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -953,11 +988,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -969,7 +1004,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "blackhole" # required
@@ -981,11 +1017,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -997,7 +1033,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "clickhouse" # required
@@ -1010,11 +1047,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1026,7 +1063,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1041,11 +1079,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1057,7 +1095,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "elasticsearch" # required
@@ -1068,11 +1107,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1084,7 +1123,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1100,11 +1140,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1116,7 +1156,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1134,11 +1175,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1150,7 +1191,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "gcp_pubsub" # required
@@ -1163,11 +1205,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1179,7 +1221,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "gcp_stackdriver_logging" # required
@@ -1193,11 +1236,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1209,7 +1252,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "honeycomb" # required
@@ -1222,11 +1266,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1238,7 +1282,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1254,11 +1299,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1270,7 +1315,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "humio_logs" # required
@@ -1282,11 +1328,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1298,7 +1344,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1316,11 +1363,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1332,7 +1379,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "logdna" # required
@@ -1345,11 +1393,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1361,7 +1409,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1378,11 +1427,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1394,7 +1443,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "new_relic_logs" # required
@@ -1405,11 +1455,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1421,7 +1471,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1437,11 +1488,43 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
+
+   </CodeExplanation>
+
+   </TabItem>
+   <TabItem value="pulsar">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
+   ```bash
+   echo '
+   [sources.in]
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
+
+   [sinks.out]
+     # General
+     address = "127.0.0.1:6650" # required
+     topic = "topic-1234" # required
+
+     # Encoding
+     encoding.codec = "json" # required
+   ' > vector.toml
+   ```
+
+   <CodeExplanation>
+
+   * The `vector.toml` file is the Vector configuration file that we'll pass in
+     the next step.
+   * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+     logs.
+   * The the [`console` sink][docs.sinks.console] simply prints the collected
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1453,7 +1536,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "sematext_logs" # required
@@ -1465,11 +1549,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1481,7 +1565,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1499,11 +1584,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1515,7 +1600,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -1532,11 +1618,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1548,7 +1634,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "vector" # required
@@ -1560,11 +1647,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1575,13 +1662,12 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    docker run \
-   
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
-   *  tutorial.start_command_explanations.join("\n   *")
+   * 
 
    </CodeExplanation>
 
@@ -1597,13 +1683,13 @@ import TabItem from '@theme/TabItem';
 
 1. ### Configure Vector
 
-   **Where would you like to send your data?**
+   **Where would you like to send your data? (**
 
    <Tabs
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
@@ -1611,13 +1697,14 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
      type = "aws_cloudwatch_logs" # required
      inputs = ["in"] # required
-     group_name = "{{ file }}" # required
+     group_name = "group-name" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
 
@@ -1629,11 +1716,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1645,7 +1732,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -1662,11 +1750,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1678,7 +1766,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -1695,11 +1784,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1711,7 +1800,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -1729,11 +1819,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1745,7 +1835,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "blackhole" # required
@@ -1757,11 +1848,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1773,7 +1864,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "clickhouse" # required
@@ -1786,11 +1878,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1802,7 +1894,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -1817,11 +1910,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1833,7 +1926,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "elasticsearch" # required
@@ -1844,11 +1938,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1860,7 +1954,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -1876,11 +1971,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1892,7 +1987,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -1910,11 +2006,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1926,7 +2022,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "gcp_pubsub" # required
@@ -1939,11 +2036,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1955,7 +2052,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "gcp_stackdriver_logging" # required
@@ -1969,11 +2067,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -1985,7 +2083,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "honeycomb" # required
@@ -1998,11 +2097,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2014,7 +2113,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -2030,11 +2130,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2046,7 +2146,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "humio_logs" # required
@@ -2058,11 +2159,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2074,7 +2175,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -2092,11 +2194,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2108,7 +2210,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "logdna" # required
@@ -2121,11 +2224,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2137,7 +2240,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -2154,11 +2258,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2170,7 +2274,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "new_relic_logs" # required
@@ -2181,11 +2286,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2197,7 +2302,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -2213,11 +2319,43 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
+
+   </CodeExplanation>
+
+   </TabItem>
+   <TabItem value="pulsar">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
+   ```bash
+   echo '
+   [sources.in]
+     type = "http" # required
+     address = "0.0.0.0:80" # required
+
+   [sinks.out]
+     # General
+     address = "127.0.0.1:6650" # required
+     topic = "topic-1234" # required
+
+     # Encoding
+     encoding.codec = "json" # required
+   ' > vector.toml
+   ```
+
+   <CodeExplanation>
+
+   * The `vector.toml` file is the Vector configuration file that we'll pass in
+     the next step.
+   * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+     logs.
+   * The the [`console` sink][docs.sinks.console] simply prints the collected
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2229,7 +2367,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "sematext_logs" # required
@@ -2241,11 +2380,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2257,7 +2396,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -2275,11 +2415,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2291,7 +2431,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -2308,11 +2449,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2324,7 +2465,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "vector" # required
@@ -2336,11 +2478,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2351,13 +2493,12 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    docker run \
-   
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
-   *  tutorial.start_command_explanations.join("\n   *")
+   * 
 
    </CodeExplanation>
 
@@ -2381,13 +2522,13 @@ import TabItem from '@theme/TabItem';
 
 1. ### Configure Vector
 
-   **Where would you like to send your data?**
+   **Where would you like to send your data? (**
 
    <Tabs
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
@@ -2401,7 +2542,7 @@ import TabItem from '@theme/TabItem';
      # General
      type = "aws_cloudwatch_logs" # required
      inputs = ["in"] # required
-     group_name = "{{ file }}" # required
+     group_name = "group-name" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
 
@@ -2413,11 +2554,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2446,11 +2587,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2479,11 +2620,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2513,11 +2654,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2541,11 +2682,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2570,11 +2711,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2601,11 +2742,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2628,11 +2769,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2660,11 +2801,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2694,11 +2835,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2723,11 +2864,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2753,11 +2894,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2782,11 +2923,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2814,11 +2955,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2842,11 +2983,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2876,11 +3017,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2905,11 +3046,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2938,11 +3079,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2965,11 +3106,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -2997,11 +3138,42 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
+
+   </CodeExplanation>
+
+   </TabItem>
+   <TabItem value="pulsar">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
+   ```bash
+   echo '
+   [sources.in]
+     type = "docker" # required
+
+   [sinks.out]
+     # General
+     address = "127.0.0.1:6650" # required
+     topic = "topic-1234" # required
+
+     # Encoding
+     encoding.codec = "json" # required
+   ' > vector.toml
+   ```
+
+   <CodeExplanation>
+
+   * The `vector.toml` file is the Vector configuration file that we'll pass in
+     the next step.
+   * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+     logs.
+   * The the [`console` sink][docs.sinks.console] simply prints the collected
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3025,11 +3197,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3059,11 +3231,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3092,11 +3264,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3120,11 +3292,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3135,13 +3307,13 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    docker run \
-     -v /var/run/docker.sock:/var/run/docker.sock
+     -v /var/run/docker.sock:/var/run/docker.sock \
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
-   *  tutorial.start_command_explanations.join("\n   *")
+   * The `-v...` flag ensures that Vector has access to the Docker API.
 
    </CodeExplanation>
 
@@ -3157,13 +3329,13 @@ import TabItem from '@theme/TabItem';
 
 1. ### Configure Vector
 
-   **Where would you like to send your data?**
+   **Where would you like to send your data? (**
 
    <Tabs
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
@@ -3171,13 +3343,14 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
      type = "aws_cloudwatch_logs" # required
      inputs = ["in"] # required
-     group_name = "{{ file }}" # required
+     group_name = "group-name" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
 
@@ -3189,11 +3362,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3205,7 +3378,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3222,11 +3396,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3238,7 +3412,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3255,11 +3430,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3271,7 +3446,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3289,11 +3465,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3305,7 +3481,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "blackhole" # required
@@ -3317,11 +3494,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3333,7 +3510,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "clickhouse" # required
@@ -3346,11 +3524,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3362,7 +3540,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3377,11 +3556,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3393,7 +3572,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "elasticsearch" # required
@@ -3404,11 +3584,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3420,7 +3600,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3436,11 +3617,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3452,7 +3633,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3470,11 +3652,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3486,7 +3668,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "gcp_pubsub" # required
@@ -3499,11 +3682,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3515,7 +3698,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "gcp_stackdriver_logging" # required
@@ -3529,11 +3713,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3545,7 +3729,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "honeycomb" # required
@@ -3558,11 +3743,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3574,7 +3759,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3590,11 +3776,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3606,7 +3792,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "humio_logs" # required
@@ -3618,11 +3805,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3634,7 +3821,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3652,11 +3840,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3668,7 +3856,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "logdna" # required
@@ -3681,11 +3870,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3697,7 +3886,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3714,11 +3904,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3730,7 +3920,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "new_relic_logs" # required
@@ -3741,11 +3932,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3757,7 +3948,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3773,11 +3965,43 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
+
+   </CodeExplanation>
+
+   </TabItem>
+   <TabItem value="pulsar">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
+   ```bash
+   echo '
+   [sources.in]
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
+
+   [sinks.out]
+     # General
+     address = "127.0.0.1:6650" # required
+     topic = "topic-1234" # required
+
+     # Encoding
+     encoding.codec = "json" # required
+   ' > vector.toml
+   ```
+
+   <CodeExplanation>
+
+   * The `vector.toml` file is the Vector configuration file that we'll pass in
+     the next step.
+   * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+     logs.
+   * The the [`console` sink][docs.sinks.console] simply prints the collected
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3789,7 +4013,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "sematext_logs" # required
@@ -3801,11 +4026,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3817,7 +4042,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3835,11 +4061,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3851,7 +4077,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      # General
@@ -3868,11 +4095,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3884,7 +4111,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "file" # required
+     include = ["/var/log/nginx/*.log"] # required
 
    [sinks.out]
      type = "vector" # required
@@ -3896,11 +4124,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3911,13 +4139,12 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    docker run \
-   
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
-   *  tutorial.start_command_explanations.join("\n   *")
+   * 
 
    </CodeExplanation>
 
@@ -3933,13 +4160,13 @@ import TabItem from '@theme/TabItem';
 
 1. ### Configure Vector
 
-   **Where would you like to send your data?**
+   **Where would you like to send your data? (**
 
    <Tabs
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
@@ -3947,13 +4174,14 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
      type = "aws_cloudwatch_logs" # required
      inputs = ["in"] # required
-     group_name = "{{ file }}" # required
+     group_name = "group-name" # required
      region = "us-east-1" # required, required when endpoint = ""
      stream_name = "{{ host }}" # required
 
@@ -3965,11 +4193,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -3981,7 +4209,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -3998,11 +4227,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4014,7 +4243,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4031,11 +4261,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4047,7 +4277,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4065,11 +4296,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4081,7 +4312,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "blackhole" # required
@@ -4093,11 +4325,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4109,7 +4341,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "clickhouse" # required
@@ -4122,11 +4355,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4138,7 +4371,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4153,11 +4387,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4169,7 +4403,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "elasticsearch" # required
@@ -4180,11 +4415,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4196,7 +4431,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4212,11 +4448,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4228,7 +4464,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4246,11 +4483,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4262,7 +4499,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "gcp_pubsub" # required
@@ -4275,11 +4513,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4291,7 +4529,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "gcp_stackdriver_logging" # required
@@ -4305,11 +4544,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4321,7 +4560,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "honeycomb" # required
@@ -4334,11 +4574,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4350,7 +4590,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4366,11 +4607,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4382,7 +4623,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "humio_logs" # required
@@ -4394,11 +4636,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4410,7 +4652,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4428,11 +4671,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4444,7 +4687,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "logdna" # required
@@ -4457,11 +4701,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4473,7 +4717,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4490,11 +4735,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4506,7 +4751,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "new_relic_logs" # required
@@ -4517,11 +4763,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4533,7 +4779,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4549,11 +4796,43 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
+
+   </CodeExplanation>
+
+   </TabItem>
+   <TabItem value="pulsar">
+
+   <CodeHeader icon="info" text="Run this in your terminal, adjust the values as necessary" />
+
+   ```bash
+   echo '
+   [sources.in]
+     type = "http" # required
+     address = "0.0.0.0:80" # required
+
+   [sinks.out]
+     # General
+     address = "127.0.0.1:6650" # required
+     topic = "topic-1234" # required
+
+     # Encoding
+     encoding.codec = "json" # required
+   ' > vector.toml
+   ```
+
+   <CodeExplanation>
+
+   * The `vector.toml` file is the Vector configuration file that we'll pass in
+     the next step.
+   * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
+     logs.
+   * The the [`console` sink][docs.sinks.console] simply prints the collected
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4565,7 +4844,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "sematext_logs" # required
@@ -4577,11 +4857,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4593,7 +4873,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4611,11 +4892,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4627,7 +4908,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      # General
@@ -4644,11 +4926,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4660,7 +4942,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    echo '
    [sources.in]
-     type = "docker" # required
+     type = "http" # required
+     address = "0.0.0.0:80" # required
 
    [sinks.out]
      type = "vector" # required
@@ -4672,11 +4955,11 @@ import TabItem from '@theme/TabItem';
    <CodeExplanation>
 
    * The `vector.toml` file is the Vector configuration file that we'll pass in
-    the next step.
+     the next step.
    * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
-    logs.
+     logs.
    * The the [`console` sink][docs.sinks.console] simply prints the collected
-    logs so that we can manually verify everything is working.
+     logs so that we can manually verify everything is working.
 
    </CodeExplanation>
 
@@ -4687,13 +4970,12 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    docker run \
-   
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
-   *  tutorial.start_command_explanations.join("\n   *")
+   * 
 
    </CodeExplanation>
 
@@ -4708,21 +4990,11 @@ import TabItem from '@theme/TabItem';
 
 ## Configuring
 
-The Vector Docker images ship with a [default `/etc/vector/vector.toml` configuration file][urls.default_configuration].
-To use your own configuration file:
-
-1. Create your own [Vector configuration file][docs.configuration] and save it
-   as `vector.toml`.
-
-2. Run the Vector Docker image with the following command:
-
-   ```bash
-   docker run \
-    -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-    timberio/vector:0.8.2-alpine
-   ```
-
-   Modify `$PWD` to the directory where you store your local `vector.toml` file.
+As shown above, you can pass a custom
+[Vector configuration file][docs.configuration] via the `-v` flag. You'll want
+to do this since the
+[default `/etc/vector/vector.toml` configuration file][urls.default_configuration]
+doesn't do anything.
 
 ## Deploying
 

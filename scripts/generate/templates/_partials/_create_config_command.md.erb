@@ -1,5 +1,5 @@
 <%- if sink.nil? -%>
-**Where would you like to send your data?**
+**Where would you like to send your data? (**
 
 <Tabs
   block={true}
@@ -13,18 +13,18 @@
 
 ```bash
 echo '
-<%= config_pipeline_example(metadata.sources.docker, sink) %>
+<%= config_pipeline_example(source, sink) %>
 ' > vector.toml
 ```
 
 <CodeExplanation>
 
 * The `vector.toml` file is the Vector configuration file that we'll pass in
- the next step.
+  the next step.
 * The [`docker` source][docs.sources.docker] tells Vector to collect Docker
- logs.
+  logs.
 * The the [`console` sink][docs.sinks.console] simply prints the collected
- logs so that we can manually verify everything is working.
+  logs so that we can manually verify everything is working.
 
 </CodeExplanation>
 
