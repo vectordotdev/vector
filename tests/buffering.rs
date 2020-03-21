@@ -312,13 +312,7 @@ fn test_reclaim_disk_space() {
     rt.block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
-    let before_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
-        .into_iter()
-        .filter_map(|entry| entry.ok())
-        .filter_map(|entry| entry.metadata().ok())
-        .filter(|metadata| metadata.is_file())
-        .map(|m| m.len())
-        .sum();
+    let before_disk_size: u64 = compute_disk_size(&data_dir);
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run.
@@ -365,15 +359,19 @@ fn test_reclaim_disk_space() {
     assert_eq!(input_events, &output_events[..num_events]);
     assert_eq!(input_events2, &output_events[num_events..]);
 
-    let after_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
+    let after_disk_size: u64 = compute_disk_size(&data_dir);
+
+    // Ensure that the disk space after is less than half of the size that it
+    // was before we reclaimed the space.
+    assert!(after_disk_size < before_disk_size / 2);
+}
+
+fn compute_disk_size(dir: impl AsRef<std::path::Path>) -> u64 {
+    walkdir::WalkDir::new(dir)
         .into_iter()
         .filter_map(|entry| entry.ok())
         .filter_map(|entry| entry.metadata().ok())
         .filter(|metadata| metadata.is_file())
         .map(|m| m.len())
-        .sum();
-
-    // Ensure that the disk space after is less than half of the size that it
-    // was before we reclaimed the space.
-    assert!(after_disk_size < before_disk_size / 2);
+        .sum()
 }
