@@ -359,25 +359,25 @@ where
     }
 }
 
-pub struct Receiver {
-    handle: futures01::sync::oneshot::SpawnHandle<Vec<String>, ()>,
+pub struct Receiver<T> {
+    handle: futures01::sync::oneshot::SpawnHandle<Vec<T>, ()>,
     count: Arc<AtomicUsize>,
     trigger: Trigger,
     _runtime: Runtime,
 }
 
-impl Receiver {
+impl<T> Receiver<T> {
     pub fn count(&self) -> usize {
         self.count.load(Ordering::Relaxed)
     }
 
-    pub fn wait(self) -> Vec<String> {
+    pub fn wait(self) -> Vec<T> {
         self.trigger.cancel();
         self.handle.wait().unwrap()
     }
 }
 
-pub fn receive(addr: &SocketAddr) -> Receiver {
+pub fn receive(addr: &SocketAddr) -> Receiver<String> {
     let runtime = runtime();
 
     let listener = TcpListener::bind(addr).unwrap();
@@ -399,6 +399,35 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
         .collect();
 
     let handle = futures01::sync::oneshot::spawn(lines, &runtime.executor());
+    Receiver {
+        handle,
+        count,
+        trigger,
+        _runtime: runtime,
+    }
+}
+
+pub fn receive_events<S>(stream: S) -> Receiver<Event>
+where
+    S: Stream<Item = Event> + Send + 'static,
+    <S as Stream>::Error: std::fmt::Debug,
+{
+    let runtime = runtime();
+
+    let count = Arc::new(AtomicUsize::new(0));
+    let count_clone = Arc::clone(&count);
+
+    let (trigger, tripwire) = Tripwire::new();
+
+    let events = stream
+        .take_until(tripwire)
+        .inspect(move |_| {
+            count_clone.fetch_add(1, Ordering::Relaxed);
+        })
+        .map_err(|e| panic!("{:?}", e))
+        .collect();
+
+    let handle = futures01::sync::oneshot::spawn(events, &runtime.executor());
     Receiver {
         handle,
         count,

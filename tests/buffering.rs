@@ -1,6 +1,6 @@
 #![cfg(feature = "leveldb")]
 
-use futures01::{Future, Sink, Stream};
+use futures01::{Future, Sink};
 use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
@@ -73,7 +73,7 @@ fn test_buffering() {
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run.
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
-    let (mut out_rx, sink_config) = support::sink(expected_events_count + 100);
+    let (out_rx, sink_config) = support::sink(10);
     let config = {
         let mut config = config::Config::empty();
         config.add_source("in", source_config);
@@ -98,6 +98,8 @@ fn test_buffering() {
         .send_all(input_events_stream);
     let _ = rt.block_on(send).unwrap();
 
+    let output_events = test_util::receive_events(out_rx);
+
     // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
     // reason, at times less events than were sent actually arrive to the
     // `source`.
@@ -108,9 +110,7 @@ fn test_buffering() {
     rt.block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
-    out_rx.close();
-    let output_events = out_rx.collect().wait().unwrap();
-
+    let output_events = output_events.wait();
     assert_eq!(expected_events_count, output_events.len());
     assert_eq!(input_events, &output_events[..num_events]);
     assert_eq!(input_events2, &output_events[num_events..]);
@@ -176,7 +176,7 @@ fn test_max_size() {
     // send all of the events from the first run that fit in the limited buffer
     // space.
     let (_in_tx, source_config) = support::source();
-    let (mut out_rx, sink_config) = support::sink(num_events + 100);
+    let (out_rx, sink_config) = support::sink(10);
     let config = {
         let mut config = config::Config::empty();
         config.add_source("in", source_config);
@@ -193,12 +193,12 @@ fn test_max_size() {
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
+    let output_events = test_util::receive_events(out_rx);
+
     rt.block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
-    out_rx.close();
-    let output_events = out_rx.collect().wait().unwrap();
-
+    let output_events = output_events.wait();
     assert_eq!(num_events / 2, output_events.len());
     assert_eq!(&input_events[..num_events / 2], &output_events[..]);
 }
