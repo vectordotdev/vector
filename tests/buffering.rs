@@ -205,28 +205,24 @@ fn test_max_size() {
 
 #[test]
 fn test_max_size_resume() {
-    vector::test_util::trace_init();
+    test_util::trace_init();
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
 
-    let num_lines: usize = 1000;
-    let line_size = 1000;
-    let max_size = num_lines * line_size / 2;
+    let num_events: usize = 1000;
+    let line_length = 1000;
+    let max_size = num_events * line_length / 2;
 
-    let in_addr1 = next_addr();
-    let in_addr2 = next_addr();
     let out_addr = next_addr();
 
     let mut config = config::Config::empty();
-    config.add_source(
-        "in1",
-        sources::socket::SocketConfig::make_tcp_config(in_addr1),
-    );
-    config.add_source(
-        "in2",
-        sources::socket::SocketConfig::make_tcp_config(in_addr2),
-    );
+    let (in1_tx, mut source_config) = support::source();
+    source_config.set_data_type(config::DataType::Log);
+    config.add_source("in1", source_config);
+    let (in2_tx, mut source_config) = support::source();
+    source_config.set_data_type(config::DataType::Log);
+    config.add_source("in2", source_config);
     config.add_sink(
         "out",
         &["in1", "in2"],
@@ -241,28 +237,31 @@ fn test_max_size_resume() {
     let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-    wait_for_tcp(in_addr1);
-    wait_for_tcp(in_addr2);
 
-    // Send all of the input lines _before_ the output sink is ready. This causes the writers to stop
-    // writing to the on-disk buffer, and once the output sink is available and the size of the buffer
-    // begins to decrease, they should starting writing again.
-    let input_lines1 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
-    let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
-    let input_lines2 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
-    let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
-    rt.block_on(send1.join(send2)).unwrap();
+    // Send all of the input events _before_ the output sink is ready.
+    // This causes the writers to stop writing to the on-disk buffer, and once
+    // the output sink is available and the size of the buffer begins to
+    // decrease, they should start writing again.
+    let (_, input_events_stream) = test_util::random_events_with_stream(line_length, num_events);
+    let send1 = in1_tx
+        .sink_map_err(|err| panic!(err))
+        .send_all(input_events_stream);
+    let (_, input_events_stream) = test_util::random_events_with_stream(line_length, num_events);
+    let send2 = in2_tx
+        .sink_map_err(|err| panic!(err))
+        .send_all(input_events_stream);
+    let _ = rt.block_on(send1.join(send2)).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    // Simulate a delay before enabling the sink as if sink server is going up.
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
-    let output_lines = receive(&out_addr);
+    let output_lines = test_util::receive(&out_addr);
 
     rt.block_on(topology.stop()).unwrap();
-
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
-    assert_eq!(num_lines * 2, output_lines.len());
+    assert_eq!(num_events * 2, output_lines.len());
 }
 
 #[test]
