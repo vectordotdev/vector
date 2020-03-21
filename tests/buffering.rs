@@ -231,6 +231,7 @@ fn test_max_size_resume() {
     };
     config.global.data_dir = Some(data_dir.clone());
 
+    // Use a multi-thread runtime here.
     let mut rt = runtime::Runtime::new().unwrap();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
