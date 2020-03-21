@@ -265,50 +265,52 @@ fn test_max_size_resume() {
 }
 
 #[test]
-#[ignore]
 fn test_reclaim_disk_space() {
-    vector::test_util::trace_init();
+    test_util::trace_init();
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
 
-    let num_lines: usize = 10_000;
-    let line_size = 1000;
+    let num_events: usize = 10_000;
+    let line_length = 1000;
+    let max_size = 1_000_000_000;
 
-    let in_addr = next_addr();
-    let out_addr = next_addr();
-
-    // Run vector while sink server is not running, and then shut it down abruptly
-    let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
-    );
-    config.add_sink(
-        "out",
-        &["in"],
-        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-    );
-    config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size: 1_000_000_000,
-        when_full: Default::default(),
-    }
-    .into();
-    config.global.data_dir = Some(data_dir.clone());
+    // Run vector with a dead sink, and then shut it down without sink ever
+    // accepting any data.
+    let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
+    let sink_config = support::sink_dead();
+    let config = {
+        let mut config = config::Config::empty();
+        config.add_source("in", source_config);
+        config.add_sink("out", &["in"], sink_config);
+        config.sinks["out"].buffer = BufferConfig::Disk {
+            max_size,
+            when_full: Default::default(),
+        };
+        config.global.data_dir = Some(data_dir.clone());
+        config
+    };
 
     let mut rt = runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-    wait_for_tcp(in_addr);
 
-    let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+    let (input_events, input_events_stream) =
+        test_util::random_events_with_stream(line_length, num_events);
+    let send = in_tx
+        .sink_map_err(|err| panic!(err))
+        .send_all(input_events_stream);
+    let _ = rt.block_on(send).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(10000));
+    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
+    // reason, at times less events than were sent actually arrive to the
+    // `source`.
+    // We mitigate that by waiting on the event counter provided by our source
+    // mock.
+    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    rt.shutdown_now().wait().unwrap();
-    drop(topology);
+    rt.block_on(topology.stop()).unwrap();
+    shutdown_on_idle(rt);
 
     let before_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
         .into_iter()
@@ -318,48 +320,50 @@ fn test_reclaim_disk_space() {
         .map(|m| m.len())
         .sum();
 
-    let in_addr = next_addr();
-    let out_addr = next_addr();
-
-    // Start sink server, then run vector again. It should send all of the lines from the first run.
-    let mut config = config::Config::empty();
-    config.add_source(
-        "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
-    );
-    config.add_sink(
-        "out",
-        &["in"],
-        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-    );
-    config.sinks["out"].buffer = BufferConfig::Disk {
-        max_size: 1_000_000_000,
-        when_full: Default::default(),
+    // Then run vector again with a sink that accepts events now. It should
+    // send all of the events from the first run.
+    let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
+    let (out_rx, sink_config) = support::sink(10);
+    let config = {
+        let mut config = config::Config::empty();
+        config.add_source("in", source_config);
+        config.add_sink("out", &["in"], sink_config);
+        config.sinks["out"].buffer = BufferConfig::Disk {
+            max_size,
+            when_full: Default::default(),
+        };
+        config.global.data_dir = Some(data_dir.clone());
+        config
     };
-    config.global.data_dir = Some(data_dir.clone());
 
-    let mut rt = runtime();
-
-    let output_lines = receive(&out_addr);
+    let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
-    wait_for_tcp(in_addr);
+    let (input_events2, input_events_stream) =
+        test_util::random_events_with_stream(line_length, num_events);
 
-    let input_lines2 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines2.clone().into_iter());
-    rt.block_on(send).unwrap();
+    let send = in_tx
+        .sink_map_err(|err| panic!(err))
+        .send_all(input_events_stream);
+    let _ = rt.block_on(send).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_millis(1000));
+    let output_events = test_util::receive_events(out_rx);
 
-    block_on(topology.stop()).unwrap();
+    // A race caused by `rt.block_on(send).unwrap()` is handled here. For some
+    // reason, at times less events than were sent actually arrive to the
+    // `source`.
+    // We mitigate that by waiting on the event counter provided by our source
+    // mock.
+    test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
+    rt.block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait();
-    assert_eq!(num_lines * 2, output_lines.len());
-    assert_eq!(&input_lines[..], &output_lines[..num_lines]);
-    assert_eq!(&input_lines2[..], &output_lines[num_lines..]);
+    let output_events = output_events.wait();
+    assert_eq!(num_events * 2, output_events.len());
+    assert_eq!(input_events, &output_events[..num_events]);
+    assert_eq!(input_events2, &output_events[num_events..]);
 
     let after_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
         .into_iter()
