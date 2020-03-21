@@ -3,9 +3,7 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            encoding::{
-                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
-            },
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -40,7 +38,10 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]

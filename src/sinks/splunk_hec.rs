@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
     },
@@ -35,7 +35,10 @@ pub struct HecSinkConfig {
     pub host_key: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
