@@ -5,12 +5,9 @@ use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{
-    self, block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
-    wait_for_tcp,
-};
+use vector::test_util::{self, next_addr, runtime, shutdown_on_idle};
 use vector::topology::{self, config};
-use vector::{buffers::BufferConfig, runtime, sinks, sources};
+use vector::{buffers::BufferConfig, runtime, sinks};
 
 mod support;
 
