@@ -16,6 +16,11 @@ fn terminate_gracefully(mut rt: runtime::Runtime, topology: topology::RunningTop
     test_util::shutdown_on_idle(rt);
 }
 
+fn terminate_abruptly(rt: runtime::Runtime, topology: topology::RunningTopology) {
+    rt.shutdown_now().wait().unwrap();
+    drop(topology);
+}
+
 #[test]
 fn test_buffering() {
     test_util::trace_init();
@@ -69,7 +74,10 @@ fn test_buffering() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    terminate_gracefully(rt, topology);
+    // Give the topology some time to process the received data and simulate
+    // a crash.
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run.
@@ -169,7 +177,10 @@ fn test_max_size() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    terminate_gracefully(rt, topology);
+    // Give the topology some time to process the received data and simulate
+    // a crash.
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    terminate_abruptly(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run that fit in the limited buffer
@@ -307,7 +318,10 @@ fn test_reclaim_disk_space() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    terminate_gracefully(rt, topology);
+    // Give the topology some time to process the received data and simulate
+    // a crash.
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    terminate_abruptly(rt, topology);
 
     let before_disk_size: u64 = compute_disk_size(&data_dir);
 
