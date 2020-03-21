@@ -5,11 +5,16 @@ use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{self, next_addr, shutdown_on_idle};
+use vector::test_util::{self, next_addr};
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks};
 
 mod support;
+
+fn terminate_gracefully(mut rt: runtime::Runtime, topology: topology::RunningTopology) {
+    rt.block_on(topology.stop()).unwrap();
+    test_util::shutdown_on_idle(rt);
+}
 
 #[test]
 fn test_buffering() {
@@ -64,8 +69,7 @@ fn test_buffering() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run.
@@ -104,8 +108,7 @@ fn test_buffering() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     let output_events = output_events.wait();
     assert_eq!(expected_events_count, output_events.len());
@@ -166,8 +169,7 @@ fn test_max_size() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     // Then run vector again with a sink that accepts events now. It should
     // send all of the events from the first run that fit in the limited buffer
@@ -192,8 +194,7 @@ fn test_max_size() {
 
     let output_events = test_util::receive_events(out_rx);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     let output_events = output_events.wait();
     assert_eq!(num_events / 2, output_events.len());
@@ -255,8 +256,7 @@ fn test_max_size_resume() {
 
     let output_lines = test_util::receive(&out_addr);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     let output_lines = output_lines.wait();
     assert_eq!(num_events * 2, output_lines.len());
@@ -307,8 +307,7 @@ fn test_reclaim_disk_space() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     let before_disk_size: u64 = compute_disk_size(&data_dir);
 
@@ -349,8 +348,7 @@ fn test_reclaim_disk_space() {
     // mock.
     test_util::wait_for_atomic_usize(source_event_counter, |x| x == num_events);
 
-    rt.block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    terminate_gracefully(rt, topology);
 
     let output_events = output_events.wait();
     assert_eq!(num_events * 2, output_events.len());
