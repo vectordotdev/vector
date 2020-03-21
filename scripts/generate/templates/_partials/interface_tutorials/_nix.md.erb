@@ -1,0 +1,33 @@
+1.  ### Install Vector
+
+    ```bash
+    nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
+    ```
+
+    <CodeExplanation>
+
+    * The `--file` flag ensures that you're installing the latest stable version
+      of Vector (<%= metadata.latest_version %>).
+    * The `--attr` improves installation speed.
+
+    </CodeExplanation>
+
+    [Looking for a specific version?][docs.package_managers.nix#versions]
+
+2. ### Configure Vector
+
+<%= command_create_config("/etc/vector/vector.toml", source: source).indent(3) %>
+
+3.  ### Start Vector
+
+    ```bash
+    vector --config /etc/vector/vector.toml
+    ```
+
+    <CodeExplanation>
+
+    * `vector` is placed in your `$PATH`.
+    * You must create a [Vector configuration file][docs.configuration] to
+      successfully start Vector.
+
+    </CodeExplanation>

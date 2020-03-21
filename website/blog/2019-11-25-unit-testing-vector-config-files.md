@@ -6,6 +6,14 @@ author_github: https://github.com/Jeffail
 tags: ["type: announcement", "domain: config"]
 ---
 
+---
+id: unit-testing-vector-config-files
+title: "Unit Testing Your Vector Config Files"
+description: "Treating your Vector configuration files as code"
+author_github: https://github.com/Jeffail
+tags: ["type: announcement", "domain: config"]
+---
+
 Today we're excited to announce beta support for unit testing Vector
 configurations, allowing you to define tests directly within your Vector
 configuration file. These tests are used to assert the output from topologies of

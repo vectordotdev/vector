@@ -1,13 +1,18 @@
+# Platforms
+#
+# Platforms represent higher level abstractions. They are opinionated platforms
+# where Vector can be installed.
+
 [installation.platforms.docker]
 title = "Docker"
 archs = ["x86_64", "ARM64", "ARMv7"]
 interfaces = [
-  {name = "docker-cli", title = "Docker CLI"},
-  {name = "docker-compose", title = "Docker Compose"},
+  "docker-cli",
+  "docker-compose",
 ]
 oss = ["Linux", "MacOS"]
 strategies = [
-  {name = "daemon", title = "Daemon", source = "docker"},
-  {name = "sidecar", title = "Sidecar", source = "file"},
-  {name = "service", title = "Service", source = "http"},
+  {name = "daemon", source = "docker"},
+  {name = "sidecar", source = "file"},
+  {name = "service", source = "http"},
 ]

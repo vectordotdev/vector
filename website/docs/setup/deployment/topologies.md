@@ -3,6 +3,8 @@ title: Topologies
 description: The various topologies that Vector can accomplish and when to use each.
 ---
 
+import SVG from 'react-inlinesvg';
+
 Vector can be deployed to form a variety of topologies. This section showcases
 common examples; use these as _guidelines_ to build your own. Once you have a
 general understanding of your own topology you should progress to the
@@ -18,8 +20,6 @@ serves to form your topology.
 -->
 
 ## Distributed
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/topologies-distributed.svg" />
 

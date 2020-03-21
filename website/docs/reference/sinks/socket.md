@@ -14,6 +14,13 @@ title: "Socket Sink"
 unsupported_operating_systems: []
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `socket` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to a socket, such as
 a TCP or Unix domain socket.
@@ -28,18 +35,12 @@ a TCP or Unix domain socket.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="unix"
   values={[{"label":"unix","value":"unix"},{"label":"tcp","value":"tcp"},{"label":"unix (adv)","value":"unix-adv"},{"label":"tcp (adv)","value":"tcp-adv"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="unix">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -107,10 +108,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -691,8 +688,6 @@ you understand the risks of not verifying the remote hostname.
 ## How It Works
 
 ### Buffers
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers.svg" />
 

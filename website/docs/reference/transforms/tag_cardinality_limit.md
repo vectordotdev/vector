@@ -11,6 +11,12 @@ status: "beta"
 title: "Tag Cardinality Limit Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `tag_cardinality_limit` transform
 accepts and [outputs `metric` events](#output) allowing you to limit the
 cardinality of metric tags to prevent downstream disruption of metrics services.
@@ -25,18 +31,12 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -66,10 +66,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

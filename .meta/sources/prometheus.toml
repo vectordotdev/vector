@@ -6,6 +6,7 @@ delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["metric"]
 requirements = {}
+strategies = ["daemon", "sidecar"]
 through_description = "the Prometheus text exposition format"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "prometheus") %>

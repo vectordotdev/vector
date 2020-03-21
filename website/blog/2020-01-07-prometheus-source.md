@@ -6,6 +6,14 @@ author_github: https://github.com/Jeffail
 tags: ["type: announcement", "domain: sources", "source: prometheus"]
 ---
 
+---
+id: prometheus-source
+title: "Prometheus Source"
+description: "Scrape prometheus metrics with Vector"
+author_github: https://github.com/Jeffail
+tags: ["type: announcement", "domain: sources", "source: prometheus"]
+---
+
 We love [Prometheus][urls.prometheus], but we also love [options](https://www.mms.com/en-us/shop/single-color)
 and so we've added a [`prometheus` source][docs.sources.prometheus] to let you
 send Prometheus format metrics anywhere you like.

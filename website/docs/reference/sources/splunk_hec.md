@@ -14,6 +14,13 @@ title: "Splunk HEC Source"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `splunk_hec` source
 ingests data through the [Splunk HTTP Event Collector
 protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
@@ -26,27 +33,28 @@ protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
      website/docs/reference/sources/splunk_hec.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
   type = "splunk_hec" # required
-  address = "0.0.0.0:8088" # optional, default
+  address = "0.0.0.0:80" # optional, default
   token = "A94A8FE5CCB19BA61C4C08" # optional, no default
 ```
 
@@ -59,7 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # General
   type = "splunk_hec" # required
-  address = "0.0.0.0:8088" # optional, default
+  address = "0.0.0.0:80" # optional, default
   token = "A94A8FE5CCB19BA61C4C08" # optional, no default
 
   # TLS
@@ -74,18 +82,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
 
 
 <Field
   common={true}
-  defaultValue={"0.0.0.0:8088"}
+  defaultValue={"0.0.0.0:80"}
   enumValues={null}
-  examples={["0.0.0.0:8088"]}
+  examples={["0.0.0.0:80"]}
   groups={[]}
   name={"address"}
   path={null}

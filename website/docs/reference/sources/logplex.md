@@ -14,6 +14,13 @@ title: "Heroku Logplex Source"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `logplex` source
 ingests data through the [Heroku Logplex HTTP Drain
 protocol][urls.logplex_protocol] and outputs [`log`][docs.data-model.log]
@@ -27,27 +34,28 @@ events.
      website/docs/reference/sources/logplex.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sources.my_source_id]
   type = "logplex" # required
-  address = "0.0.0.0:8088" # required
+  address = "0.0.0.0:80" # required
 ```
 
 </TabItem>
@@ -59,7 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 [sources.my_source_id]
   # General
   type = "logplex" # required
-  address = "0.0.0.0:8088" # required
+  address = "0.0.0.0:80" # required
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -73,10 +81,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
 
 
@@ -84,7 +88,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["0.0.0.0:8088"]}
+  examples={["0.0.0.0:80"]}
   groups={[]}
   name={"address"}
   path={null}

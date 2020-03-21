@@ -5,6 +5,7 @@ delivery_guarantee = "best_effort"
 function_category = "collect"
 output_types = ["log"]
 requirements = {}
+strategies = ["daemon"]
 through_description = "kubernetes node's"
 
 [sources.kubernetes.options.include_container_names]

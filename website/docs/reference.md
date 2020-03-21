@@ -5,11 +5,11 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
+import Jump from '@site/src/components/Jump';
+
 The Vector reference will outline and define all available options within
 Vector. Serving as a complete guide to option types, values, requirements,
 and more.
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/reference/env-vars/">Env Vars</Jump>
 <Jump to="/docs/reference/field-path-notation/">Field path notation</Jump>

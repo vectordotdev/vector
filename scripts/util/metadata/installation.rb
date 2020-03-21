@@ -1,15 +1,26 @@
 class Installation
-  attr_reader :downloads, :operating_systems, :package_managers, :platforms
+  attr_reader :downloads,
+    :interfaces,
+    :operating_systems,
+    :package_managers,
+    :platforms,
+    :strategies
 
   def initialize(hash)
     @downloads = hash.fetch("downloads").to_struct_with_name(ensure_keys: ["package_manager"])
+    @interfaces = hash.fetch("interfaces").to_struct_with_name
     @operating_systems = hash.fetch("operating_systems").to_struct_with_name
     @package_managers = hash.fetch("package_managers").to_struct_with_name
     @platforms = hash.fetch("platforms").to_struct_with_name
+    @strategies = hash.fetch("strategies").to_struct_with_name
   end
 
   def downloads_list
     @downloads_list ||= downloads.to_h.values.sort_by(&:name)
+  end
+
+  def interfaces_list
+    @interfaces_list ||= interfaces.to_h.values.sort_by(&:title)
   end
 
   def operating_systems_list

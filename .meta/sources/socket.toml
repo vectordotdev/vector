@@ -5,7 +5,8 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
+requirements.network_port = "9000"
+strategies = ["service"]
 through_description = "a socket, such as a TCP, UDP, or Unix socket"
 
 <%= render(

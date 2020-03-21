@@ -1,8 +1,6 @@
-<div className="steps steps--h3">
-
 1. ### Configure Vector
 
-<%= create_config_command(source: source).indent(3) %>
+<%= command_create_config(tutorial.config_path, source: source).indent(3) %>
 
 2. ### Start the Vector container
 
@@ -14,11 +12,9 @@
    <%- if tutorial.start_command_explanations.any? -%>
    <CodeExplanation>
 
-   * <%= tutorial.start_command_explanations.join("\n   *") %>
+   * <%= tutorial.start_command_explanations.join("\n   * ") %>
 
    </CodeExplanation>
    <%- end -%>
 
    That's it! Simple and to the point. Hit `ctrl+c` to exit.
-
-</div>

@@ -1,6 +1,11 @@
 <%- requirements = component.requirements -%>
 <Alert icon={false} type="danger" classNames="list--warnings">
 
+<%- if component.requirements.aws_imds_v2 %>
+* AWS IMDS v2 is required.
+* Running this transform within Docker on EC2 requires 2 network hops. Users
+  must raise this limit. See [AWS IMDS v2](#aws-imds-v2) for more info.
+<%- end -%>
 <%- if requirements.clickhouse -%>
 * Clickhouse version `<%= requirements.clickhouse %>` is required.
 <%- end -%>
@@ -23,10 +28,6 @@
 <%- end -%>
 <%- if requirements.prometheus -%>
 * Prometheus version `<%= requirements.prometheus %>` is required.
-<%- end -%>
-<%- if component.requirements.network %>
-* Network access is required for this component to function correctly. See
-  ["How it works"](#how-it-works) for more info.
 <%- end -%>
 
 </Alert>

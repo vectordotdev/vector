@@ -1,0 +1,38 @@
+<%- downloads = metadata.installation.select_downloads(package_manager: :dpkg) -%>
+
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= downloads.first.arch.parameterize %>"
+  values={<%= downloads.collect { |download| {label: download.arch, value: download.arch.parameterize} }.to_json %>}>
+
+<%- downloads.each do |download| -%>
+<TabItem value="<%= download.arch.parameterize %>">
+
+1.  ### Download the Vector `.deb` package
+
+    ```bash
+    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version.minor_x}/#{download.file_name}") %>
+    ```
+
+    [Looking for a different version?][docs.package_managers.dpkg#versions]
+
+2.  ### Install the downloaded package
+
+    ```bash
+    sudo dpkg -i <%= download.file_name %>
+    ```
+
+3. ### Configure Vector
+
+<%= command_create_config("/etc/vector/vector.toml", source: source).indent(3) %>
+
+4.  ### Start Vector
+
+    ```bash
+    sudo systemctl start vector
+    ```
+
+</TabItem>
+<%- end -%>
+</Tabs>

@@ -3,6 +3,10 @@ title: Configuration
 description: Configuring Vector
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Jump from '@site/src/components/Jump';
+
 This section covers configuring Vector and creating pipelines like the
 [example below](#example). Vector's configuration uses the [TOML][urls.toml]
 syntax, and the configuration file must be passed via the
@@ -22,8 +26,6 @@ vector --config /etc/vector/vector.toml
 -->
 
 ## Example
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" />
 
@@ -74,8 +76,6 @@ The key thing to notice above is the use of the `inputs` option. This connects
 Vector's component to create a pipeline. For a simple introduction, please
 refer to the:
 
-import Jump from '@site/src/components/Jump';
-
 <Jump to="/docs/setup/guides/getting-started/">Getting Started Guide</Jump>
 
 ## Reference
@@ -117,8 +117,6 @@ with the following syntax:
     host = "${HOSTNAME}"
     environment = "${ENV:-development}" # default value when not present
 ```
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="info">
 

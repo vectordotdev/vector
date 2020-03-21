@@ -4,6 +4,12 @@ description: Vector's unit test configuration options, allowing you to unit test
 status: beta
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The intention of these tests is to
 improve the maintainability of configs containing larger and more complex
@@ -25,8 +31,6 @@ vector test /etc/vector/*.toml
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
@@ -36,11 +40,7 @@ import Tabs from '@theme/Tabs';
   ]
 }>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" />
 
@@ -131,10 +131,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
 
 ## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

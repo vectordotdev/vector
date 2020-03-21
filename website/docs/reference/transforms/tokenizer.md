@@ -11,6 +11,10 @@ status: "prod-ready"
 title: "Tokenizer Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `tokenizer` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to
 tokenize a field's value by splitting on white space, ignoring special wrapping
@@ -25,8 +29,6 @@ characters, and zip the tokens into ordered field names.
 -->
 
 ## Configuration
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -47,10 +49,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

@@ -6,6 +6,7 @@ delivery_guarantee = "at_least_once"
 function_category = "collect"
 output_types = ["log"]
 requirements.kafka = ">= 0.8"
+strategies = ["service"]
 through_description = "Kafka"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "kafka") %>

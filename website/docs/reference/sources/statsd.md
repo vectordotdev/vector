@@ -14,6 +14,13 @@ title: "Statsd Source"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `statsd` source
 ingests data through the StatsD UDP protocol and [outputs `metric`
 events](#output).
@@ -26,9 +33,14 @@ events](#output).
      website/docs/reference/sources/statsd.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import CodeHeader from '@site/src/components/CodeHeader';
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+
+</Alert>
+
+## Configuration
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -37,10 +49,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "statsd" # required
   address = "127.0.0.1:8126" # required
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -78,14 +86,10 @@ The `statsd` source ingests data through the StatsD UDP protocol and [outputs `m
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="counter"
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer","value":"timer"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="counter">
 

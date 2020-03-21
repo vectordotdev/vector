@@ -14,6 +14,13 @@ title: "Socket Source"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `socket` source
 ingests data through a socket, such as a TCP, UDP, or Unix socket and [outputs
 `log` events](#output).
@@ -26,20 +33,21 @@ ingests data through a socket, such as a TCP, UDP, or Unix socket and [outputs
      website/docs/reference/sources/socket.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="unix"
   values={[{"label":"unix","value":"unix"},{"label":"udp","value":"udp"},{"label":"tcp","value":"tcp"},{"label":"unix (adv)","value":"unix-adv"},{"label":"udp (adv)","value":"udp-adv"},{"label":"tcp (adv)","value":"tcp-adv"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="unix">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -139,10 +147,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

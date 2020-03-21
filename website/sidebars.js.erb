@@ -89,8 +89,9 @@ module.exports = {
               label: 'Strategies',
               items: [
                 <%= metadata.links.fetch_id("docs.deployment.strategies").to_json %>,
-                <%= metadata.links.fetch_id("docs.deployment.strategies.dedicated-container").to_json %>,
+                <%= metadata.links.fetch_id("docs.deployment.strategies.daemon").to_json %>,
                 <%= metadata.links.fetch_id("docs.deployment.strategies.sidecar").to_json %>,
+                <%= metadata.links.fetch_id("docs.deployment.strategies.service").to_json %>,
               ]
             },
             <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,

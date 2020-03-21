@@ -4,75 +4,17 @@ sidebar_label: DPKG
 description: Install Vector through the DKG package manager
 ---
 
+<%- package_manager = metadata.installation.package_managers.dpkg -%>
+<%- downloads = metadata.installation.select_downloads(package_manager: package_manager.name) -%>
+<%- interfaces = fetch_interfaces(package_manager.interfaces) -%>
+<%- strategies = fetch_strategies(package_manager.strategies) -%>
+
 Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
 
-<%- downloads = metadata.installation.select_downloads(package_manager: :dpkg) -%>
-<%- download_tabs = downloads.collect { |d| {label: d.arch, value: d.arch} } -%>
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Install
 
-<Tabs
-  block={true}
-  defaultValue="<%= download_tabs.first.fetch(:value) %>"
-  urlKey="arch"
-  values={<%= download_tabs.to_json %>}>
-
-<%- downloads.each do |download| %>
-<TabItem value="<%= download.arch %>">
-<div className="steps steps--h3">
-
-1.  ### Download the Vector `.deb` package
-
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
-
-    <TabItem value="latest">
-
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version.minor_x}/#{download.file_name}") %>
-    ```
-
-    </TabItem>
-    <TabItem value="nightly">
-
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.nightly/latest/#{download.file_name}") %>
-    ```
-
-    </TabItem>
-    </Tabs>
-
-    [Looking for a specific version?](#versions)
-
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i <%= download.file_name %>
-    ```
-
-3.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</div>
-</TabItem>
-
-<%- end -%>
-
-</Tabs>
-
-That's it! Proceed to [configure](#configuring) Vector for your use case.
+<%= installation_tutorial(interfaces, strategies) %>
 
 ## Configuring
 
@@ -129,4 +71,3 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 
 Vector's DPKG source files are located in
 [Vector's repo][urls.vector_debian_source_files].
-

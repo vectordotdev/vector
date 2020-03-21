@@ -6,6 +6,14 @@ author_github: https://github.com/binarylogic
 tags: ["type: announcement", "domain: platforms", "platform: windows"]
 ---
 
+---
+id: windows-support
+title: "Windows Support Is Here!"
+description: "Bringing the performance and reliability of Vector to Windows"
+author_github: https://github.com/binarylogic
+tags: ["type: announcement", "domain: platforms", "platform: windows"]
+---
+
 We're excited to announce that Vector can now be installed on Windows!
 To get started, check out the [Windows installation instructions][docs.operating-systems.windows]
 or head over to the [releases section][pages.releases] and download the

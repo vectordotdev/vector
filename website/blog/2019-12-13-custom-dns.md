@@ -6,6 +6,14 @@ author_github: https://github.com/Jeffail
 tags: ["type: announcement", "domain: networking"]
 ---
 
+---
+id: custom-dns
+title: "Use Custom DNS Servers"
+description: "Point Vector to custom DNS servers"
+author_github: https://github.com/Jeffail
+tags: ["type: announcement", "domain: networking"]
+---
+
 We're modern progressive parents and aren't about to tell Vector who it can and
 can't hang out with. As such, we're now allowing you to specify custom DNS
 servers in your configs.

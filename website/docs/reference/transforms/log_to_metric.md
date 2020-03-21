@@ -11,6 +11,11 @@ status: "prod-ready"
 title: "Log to Metric Transform"
 ---
 
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `log_to_metric` transform
 accepts [`log`][docs.data-model.log] events but outputs
 [`metric`][docs.data-model.metric] events allowing you to convert logs into one
@@ -42,10 +47,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     tags.host = "{{host}}" # optional
     tags.env = "${ENV}" # optional
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -240,8 +241,6 @@ The metric type.
 
 ## Output
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="timings"
@@ -253,8 +252,6 @@ import Tabs from '@theme/Tabs';
     { label: 'Sets', value: 'sets', },
   ]
 }>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="timings">
 

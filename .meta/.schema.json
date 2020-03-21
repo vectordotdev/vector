@@ -156,6 +156,15 @@
         }
       }
     },
+    "interfaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "docker": {
+          "type": "bool"
+        }
+      }
+    },
     "operating_systems": {
       "type": "array",
       "description": "A list of Vector support operating systems.",
@@ -196,6 +205,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "aws_imds_v2": {
+          "type": "boolean",
+          "description": "If access to the AWS IMDSv2 service is required."
+        },
         "clickhouse": {
           "type": "string",
           "description": "The minimum Docker API version required."
@@ -203,6 +216,10 @@
         "docker_api": {
           "type": "string",
           "description": "The minimum Docker API version required."
+        },
+        "file_system": {
+          "type": "boolean",
+          "description": "Requires access to the file system"
         },
         "journalctl": {
           "type": "boolean",
@@ -212,13 +229,13 @@
           "type": "string",
           "description": "The minimum Kafka version required."
         },
+        "network_port": {
+          "type": "string",
+          "description": "The network port that this component exposes."
+        },
         "prometheus": {
           "type": "string",
           "description": "The minimum Kafka version required."
-        },
-        "network": {
-          "type": "boolean",
-          "description": "Is the network required for this component?"
         }
       }
     },
@@ -434,6 +451,14 @@
           "type": "string",
           "description": "The name of the underlying service that this component integrates with."
         },
+        "strategies": {
+          "type": "array",
+          "description": "Any applicable stratgies that this source applies to. Must be strategy names only.",
+          "minLength": 1,
+          "items": {
+            "type": "string"
+          }
+        },
         "through_description": {
           "type": "string",
           "decription": "A short one sentence description describing how this source emits events.",
@@ -444,6 +469,25 @@
           "description": "A simple title for this source, typically one word.",
           "minLength": 1,
           "max_lenfth": 50
+        }
+      }
+    },
+    "strategies": {
+      "type": "array",
+      "description": "A list of deployment strategies.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
         }
       }
     },

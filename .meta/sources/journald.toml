@@ -13,6 +13,7 @@ function_category = "collect"
 only_operating_systems = ["Linux"]
 output_types = ["log"]
 requirements.journalctl = true
+strategies = ["daemon"]
 through_description = "log records from journald"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "journald") %>

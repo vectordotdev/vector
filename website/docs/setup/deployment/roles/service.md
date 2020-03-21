@@ -4,6 +4,8 @@ sidebar_label: Service
 description: Deploying and running Vector as a service
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/roles-service.svg" />
@@ -43,8 +45,6 @@ by adding a simple `[buffer]` table to each of your configured sinks. In
 addition, we recommend specifying an explicit `data_dir` for Vector's buffer.
 For example:
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" />
 
 ```toml
@@ -59,8 +59,6 @@ data_dir = "/var/lib/vector"
         max_size = 5000000000 # 5gb
 ```
 
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 

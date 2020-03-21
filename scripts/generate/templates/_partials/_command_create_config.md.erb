@@ -1,0 +1,32 @@
+<%- if sink.nil? -%>
+**Where would you like to send your data?**
+
+<Tabs
+  block={true}
+  select={true}
+  defaultValue="<%= default_sink_name %>"
+  values={<%= sinks.collect { |sink| {label: sink.title, value: sink.name } }.to_json %>}>
+<%- sinks.each do |sink| -%>
+<TabItem value=<%= sink.name.to_json %>>
+
+<CodeHeader icon="info" text="adjust the values as necessary" />
+
+```bash
+echo '
+<%= config_pipeline_example(source, sink) %>
+' > <%= path %>
+```
+
+<CodeExplanation>
+
+* The the [`<%= source.name %>` source][docs.sources.<%= source.name %>] <%= component_description(source).continuize %>
+* The the [`<%= sink.name %>` sink][docs.sinks.<%= sink.name %>] <%= component_description(sink).continuize %>
+* The `<%= path %>` file is the [Vector configuration file][docs.configuration]
+  that we'll pass in the next step.
+
+</CodeExplanation>
+
+</TabItem>
+<%- end -%>
+</Tabs>
+<%- end -%>

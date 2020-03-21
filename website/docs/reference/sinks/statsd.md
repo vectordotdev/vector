@@ -14,6 +14,10 @@ title: "Statsd Sink"
 unsupported_operating_systems: []
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `statsd` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to
 [StatsD][urls.statsd] metrics service.
@@ -28,8 +32,6 @@ The Vector `statsd` sink
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -40,10 +42,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

@@ -107,6 +107,18 @@
   force = true
 
 [[redirects]]
+  from = "/docs/setup/installation/deployment/roles/agent/"
+  to = "/docs/setup/installation/deployment/strategies/daemon"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/installation/deployment/roles/service/"
+  to = "/docs/setup/installation/deployment/strategies/service"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/download/"
   to = "/releases/latest/download/"
   status = 302

@@ -9,13 +9,14 @@
   padding: var(--ifm-pre-padding);
 }
 
-.code-explanation--expanded a,
-.code-explanation--expanded code {
+.code-explanation--expanded a {
   color: var(--ifm-color-primary);
+  text-decoration: underline;
 }
 
 .code-explanation--expanded code {
   background-color: rgba( var(--ifm-color-primary-rgb), 0.15 );
+  color: var(--ifm-color-primary);
 }
 
 .code-explanation--expanded > ul {

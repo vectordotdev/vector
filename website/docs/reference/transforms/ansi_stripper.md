@@ -11,6 +11,10 @@ status: "prod-ready"
 title: "ANSI Stripper Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `ansi_stripper` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to strips
 ANSI escape sequences from the specified field.
@@ -25,8 +29,6 @@ ANSI escape sequences from the specified field.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -35,10 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   field = "message" # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

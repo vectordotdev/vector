@@ -11,6 +11,12 @@ status: "beta"
 title: "LUA Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `lua` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to
 transform events with a full embedded [Lua][urls.lua] engine.
@@ -24,8 +30,6 @@ transform events with a full embedded [Lua][urls.lua] engine.
 -->
 
 ## Configuration
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -47,10 +51,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   search_dirs = ["/etc/vector/lua"] # optional, no default
   version = "1" # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -134,8 +134,6 @@ transform API version
 
 ## Output
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="timings"
@@ -145,8 +143,6 @@ import Tabs from '@theme/Tabs';
     { label: 'Drop Event', value: 'drop_event', },
   ]
 }>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="add_fields">
 

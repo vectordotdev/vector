@@ -351,7 +351,7 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   address = "0.0.0.0:80"
-  address = "localhost:8080"
+  address = "localhost:80"
 
   # The expected encoding of received data. Note that for `json` and `ndjson`
   # encodings, the fields of the JSON objects are output as separate fields.
@@ -648,7 +648,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  address = "0.0.0.0:8088"
+  address = "0.0.0.0:80"
 
   #
   # TLS
@@ -881,9 +881,9 @@ dns_servers = ["0.0.0.0:53"]
   # The address to accept connections on.
   #
   # * optional
-  # * default: "0.0.0.0:8088"
+  # * default: "0.0.0.0:80"
   # * type: string
-  address = "0.0.0.0:8088"
+  address = "0.0.0.0:80"
 
   # If supplied, incoming requests must supply this token in the `Authorization`
   # header, just as a client would if it was communicating with the Splunk HEC
@@ -1023,7 +1023,7 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   # * required when mode = "tcp" or mode = "udp"
-  address = "0.0.0.0:9000"
+  address = "0.0.0.0:514"
   address = "systemd"
   address = "systemd#2"
 

@@ -11,6 +11,12 @@ status: "beta"
 title: "Swimlanes Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `swimlanes` transform
 accepts and [outputs `log` events](#output) allowing you to route events across
 parallel streams using logical filters.
@@ -24,8 +30,6 @@ parallel streams using logical filters.
 -->
 
 ## Configuration
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -42,10 +46,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
     "message.contains" = "foo" # example
     "environment.prefix" = "staging-" # example
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -269,14 +269,10 @@ The `swimlanes` transform accepts and [outputs `log` events](#output) allowing y
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="ifelse"
   values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="ifelse">
 

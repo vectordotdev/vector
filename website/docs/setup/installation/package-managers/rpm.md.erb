@@ -4,72 +4,17 @@ sidebar_label: RPM
 description: Install Vector through the RPM package manager
 ---
 
+<%- package_manager = metadata.installation.package_managers.rpm -%>
+<%- downloads = metadata.installation.select_downloads(package_manager: package_manager.name) -%>
+<%- interfaces = fetch_interfaces(package_manager.interfaces) -%>
+<%- strategies = fetch_strategies(package_manager.strategies) -%>
+
 Vector can be installed through the [RPM package manager][urls.rpm] which is
 generally used on CentOS.
 
-<%- downloads = metadata.installation.select_downloads(package_manager: :rpm) -%>
-<%- download_tabs = downloads.collect { |d| {label: d.arch, value: d.arch} } -%>
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Install
 
-<Tabs
-  block={true}
-  defaultValue="<%= download_tabs.first.fetch(:value) %>"
-  urlKey="arch"
-  values={<%= download_tabs.to_json %>}>
-<%- downloads.each do |download| -%>
-<TabItem value="<%= download.arch %>">
-<div className="steps steps--h3">
-
-1.  ### Download the Vector `.rpm` file
-
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
-
-    <TabItem value="latest">
-
-    ```bash
-    curl -O [[[urls.vector_downloads.<%= metadata.latest_version.minor_x %>/<%= download.file_name %>]]]
-    ```
-
-    </TabItem>
-    <TabItem value="nightly">
-
-    ```bash
-    curl -O [[[urls.vector_downloads.nightly/latest/<%= download.file_name %>]]]
-    ```
-
-    </TabItem>
-    </Tabs>
-
-    [Looking for a specific version?](#versions)
-
-2.  ### Install the Vector `.rpm` package directly
-
-    ```bash
-    sudo rpm -i <%= download.file_name %>
-    ```
-
-3.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-    That's it! Proceed to [configure](#configuring) Vector for your use case.
-
-</div>
-</TabItem>
-<%- end -%>
-</Tabs>
+<%= installation_tutorial(interfaces, strategies) %>
 
 ## Configuring
 

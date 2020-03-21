@@ -7,12 +7,13 @@ features = [
   "Collect Docker container logs.",
   "Filter which containers you collect them from.",
   "Automatically merge logs that Docker splits.",
-  "Enrich your logs with useful Docker context."
+  "Enrich your logs with useful Docker context.",
 ]
 function_category = "collect"
 output_types = ["log"]
 requirements.docker_api = ">= 1.24"
 service_name = "Docker API"
+strategies = ["daemon"]
 through_description = "the [Docker engine daemon][urls.docker_daemon]"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "docker") %>

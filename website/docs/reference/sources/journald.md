@@ -14,6 +14,13 @@ title: "Journald Source"
 unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `journald` source
 ingests data through log records from journald and [outputs `log`
 events](#output).
@@ -28,8 +35,6 @@ events](#output).
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 * The [`journalctl`](#journalctl) binary is required.
@@ -41,18 +46,12 @@ import Alert from '@site/src/components/Alert';
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -80,10 +79,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

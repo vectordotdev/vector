@@ -25,15 +25,50 @@ module PostProcessors
       'VectorComponents' => "import VectorComponents from '@site/src/components/VectorComponents';"
     }
 
+    FRONTMATTER_FENCE = "---".freeze
+
     class << self
       def import!(content)
+        statements = []
+
         IMPORTS.each do |tag, import|
           if content.include?("<#{tag}") && !content.include?(import)
-            content.sub!(/( *)<#{tag}/, "\\1#{import}\n\n\\1<#{tag}")
+            statements << import
           end
         end
 
-        content
+        if statements.any?
+          imports = statements.join("\n")
+
+          content = content.lstrip
+
+          if content.start_with?(FRONTMATTER_FENCE)
+            parts = content.split(FRONTMATTER_FENCE, 3)
+
+            if parts.size < 3
+              raise <<~EOF
+              Unable to parse
+
+              #{content.inspect}
+              EOF
+            end
+
+            front_matter = parts[1]
+            body = parts[2].lstrip
+
+            FRONTMATTER_FENCE +
+              front_matter +
+              FRONTMATTER_FENCE +
+              "\n\n" +
+              imports +
+              "\n\n" +
+              body
+          else
+            imports + content
+          end
+        else
+          content
+        end
       end
     end
   end

@@ -14,6 +14,14 @@ title: "Clickhouse Sink"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `clickhouse` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
 [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
@@ -28,8 +36,6 @@ The Vector `clickhouse` sink
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 * Clickhouse version `>= 1.1.54378` is required.
@@ -38,18 +44,12 @@ import Alert from '@site/src/components/Alert';
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -124,10 +124,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -1050,8 +1046,6 @@ verifying the remote certificate.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

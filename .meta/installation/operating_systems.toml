@@ -1,43 +1,123 @@
 [installation.operating_systems.amazon-linux]
 title = "Amazon Linux"
-package_manager = "RPM"
+interfaces = [
+  "rpm",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.centos]
 title = "CentOS"
-package_manager = "RPM"
+interfaces = [
+  "rpm",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.debian]
 title = "Debian"
-package_manager = "DPKG"
+interfaces = [
+  "dpkg",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.macos]
 title = "MacOS"
-package_manager = "Homebrew"
+interfaces = [
+  "homebrew",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "file"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.nixos]
 title = "NixOS"
-package_manager = "nix"
+interfaces = [
+  "nix",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.raspbian]
 title = "Raspbian"
-package_manager = "DPKG"
+interfaces = [
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"}
+]
 
 [installation.operating_systems.rhel]
 title = "RHEL"
-package_manager = "RPM"
+interfaces = [
+  "rpm",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.ubuntu]
 title = "Ubuntu"
-package_manager = "DPKG"
+interfaces = [
+  "dpkg",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Linux"
+strategies = [
+  {name = "daemon", source = "journald"},
+  {name = "service", source = "http"},
+]
 
 [installation.operating_systems.windows]
 title = "Windows"
+interfaces = [
+  "msi",
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
 os = "Windows"
+strategies = [
+  {name = "daemon", source = "file"},
+  {name = "service", source = "http"},
+]

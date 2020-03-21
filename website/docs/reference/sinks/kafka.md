@@ -14,6 +14,14 @@ title: "Kafka Sink"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `kafka` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to [Apache
 Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
@@ -28,8 +36,6 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 * Kafka version `>= 0.8` is required.
@@ -38,18 +44,12 @@ import Alert from '@site/src/components/Alert';
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -113,10 +113,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -796,8 +792,6 @@ within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] o
 how to do this.
 
 ### Buffers
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers.svg" />
 

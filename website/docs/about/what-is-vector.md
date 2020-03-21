@@ -3,6 +3,8 @@ title: "What is Vector?"
 description: "High-level description of the Vector observability data collector and router."
 ---
 
+import Jump from '@site/src/components/Jump';
+
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
@@ -33,8 +35,6 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * Vector's largest user **processes over 10TB daily**.
 * Vector is **used by multiple fortune 500 companies** with stringent production requirements.
 * Vector has **over 15 active contributors** and growing.
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/setup/guides/getting-started/">Get started</Jump>
 

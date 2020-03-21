@@ -4,80 +4,16 @@ sidebar_label: MSI
 description: Install Vector through the Windows Installer
 ---
 
+<%- package_manager = metadata.installation.package_managers.msi -%>
+<%- downloads = metadata.installation.select_downloads(package_manager: package_manager.name) -%>
+<%- interfaces = fetch_interfaces(package_manager.interfaces) -%>
+<%- strategies = fetch_strategies(package_manager.strategies) -%>
+
 Vector can be installed from an MSI package through the Windows Installer.
-
-<%- downloads = metadata.installation.select_downloads(package_manager: :msi) -%>
-<%- download_tabs = downloads.collect { |d| {label: d.arch, value: d.arch} } -%>
-
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 ## Install
 
-<Tabs
-  block={true}
-  defaultValue="<%= download_tabs.first.fetch(:value) %>"
-  urlKey="arch"
-  values={<%= download_tabs.to_json %>}>
-
-<%- downloads.each do |download| %>
-<TabItem value="<%= download.arch %>">
-<div className="steps steps--h3">
-
-1.  ### Download the Vector `.msi` file
-
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (<%= metadata.latest_version %>)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
-
-    <TabItem value="latest">
-
-    ```bat
-    powershell Invoke-WebRequest [[[urls.vector_downloads.<%= metadata.latest_version.minor_x %>/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
-    ```
-
-    </TabItem>
-    <TabItem value="nightly">
-
-    ```bat
-    powershell Invoke-WebRequest [[[urls.vector_downloads.nightly/latest/<%= download.file_name %>]]] -OutFile <%= download.file_name %>
-    ```
-
-    </TabItem>
-    </Tabs>
-
-    [Looking for a specific version?](#versions)
-
-2.  ### Install the Vector `.msi` package using `msiexec` command
-
-    ```bat
-    msiexec /i <%= download.file_name %> /quiet
-    ```
-
-3.  ### Navigate to the Vector directory
-
-    ```bat
-    cd "C:\Program Files\Vector"
-    ```
-
-4.  ### Start Vector
-
-    ```bat
-    .\bin\vector --config config\vector.toml
-    ```
-
-    That's it! Proceed to [configure](#configuring) Vector for your use case.
-
-</div>
-</TabItem>
-
-<%- end -%>
-
-</Tabs>
+<%= installation_tutorial(interfaces, strategies) %>
 
 ## Configuring
 

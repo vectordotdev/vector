@@ -11,6 +11,10 @@ status: "beta"
 title: "Field Filter Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `field_filter` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to filter
 events by a log field's value.
@@ -25,8 +29,6 @@ events by a log field's value.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -36,10 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   field = "application_id" # required
   value = "/var/log/nginx.log" # required
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

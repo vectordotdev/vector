@@ -3,6 +3,10 @@ title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 In addition to [sources][docs.sources], [transforms][docs.transforms], and
 [sinks][docs.sinks], Vector accepts global options that serve to configure
 Vector as a whole and set defaults for component options.
@@ -16,8 +20,6 @@ Vector as a whole and set defaults for component options.
 -->
 
 ## Configuration
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" />
 
@@ -33,10 +35,6 @@ log_schema.timestamp_key = "timestamp" # optional, default
 ```
 
 ## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

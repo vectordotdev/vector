@@ -1,2 +1,2 @@
-<%- source = metadata.sources.journald -%>
+<%- source = metadata.sources.send("journald") -%>
 <%= setup_guide("setup/sources/#{source.name}", source: source) %>

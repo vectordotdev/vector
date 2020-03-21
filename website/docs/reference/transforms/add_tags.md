@@ -11,6 +11,10 @@ status: "prod-ready"
 title: "Add Tags Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `add_tags` transform
 accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
 add one or more metric tags.
@@ -25,8 +29,6 @@ add one or more metric tags.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -39,10 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tags.static_tag = "my value" # example
   tags.env_tag = "${ENV_VAR}" # example
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

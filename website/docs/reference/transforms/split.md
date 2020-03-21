@@ -11,6 +11,10 @@ status: "prod-ready"
 title: "Split Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `split` transform
 accepts and [outputs `log` events](#output) allowing you to split a field's
 value on a _literal_ separator and zip the tokens into ordered field names.
@@ -24,8 +28,6 @@ value on a _literal_ separator and zip the tokens into ordered field names.
 -->
 
 ## Configuration
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -47,10 +49,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

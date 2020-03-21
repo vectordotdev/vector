@@ -11,6 +11,11 @@ status: "beta"
 title: "AWS EC2 Metadata Transform"
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `aws_ec2_metadata` transform
 accepts and [outputs `log` events](#output) allowing you to enrich logs with
 AWS EC2 instance metadata.
@@ -25,19 +30,16 @@ AWS EC2 instance metadata.
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 
-* Network access is required for this component to function correctly. See
-  ["How it works"](#how-it-works) for more info.
+* AWS IMDS v2 is required.
+* Running this transform within Docker on EC2 requires 2 network hops. Users
+  must raise this limit. See [AWS IMDS v2](#aws-imds-v2) for more info.
 
 </Alert>
 
 ## Configuration
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -50,10 +52,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   namespace = "" # optional, default
   refresh_interval_secs = 10 # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -465,6 +463,20 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 ## How It Works
 
+### AWS IMDS v2
+
+v2 of the AWS IMDS service addresses a number of very serious security issues
+with v1. As part of tighening security, Amazon limited the number of network
+hops allowed to communicate with this service to 1. Unfortunately, when running
+Vector within Docker this introduces an additional hop. Therefore, you _must_
+configure your AWS instances to allow for 2 hops:
+
+```
+aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
+```
+
+If you do not raise this limit the `aws_ec2_metadata` transform will not work.
+
 ### Complex Processing
 
 If you encounter limitations with the `aws_ec2_metadata`
@@ -481,24 +493,6 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
-### Network Access
-
-The `aws_ec2_metadata` transform requires network access to
-operate correctly.
-
-#### Docker Network Access
-
-If you are running Vector within a Docker container then you should pass the
-`--net=host` flag when starting Docker:
-
-```bash
-docker run --net=host ...
-```
-
-Otherwise Vector will not be able to communicate with EC2 metadata service.
-Learn more in the [Docker networking docs][urls.docker_networking].
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -14,6 +14,12 @@ title: "InfluxDB Metrics Sink"
 unsupported_operating_systems: []
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `influxdb_metrics` sink
 [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to
 [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or
@@ -29,18 +35,12 @@ The Vector `influxdb_metrics` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="v2"
   values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="v2">
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
@@ -155,10 +155,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

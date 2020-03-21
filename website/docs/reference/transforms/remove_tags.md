@@ -11,6 +11,10 @@ status: "prod-ready"
 title: "Remove Tags Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `remove_tags` transform
 accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
 remove one or more metric tags.
@@ -25,8 +29,6 @@ remove one or more metric tags.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -35,10 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   tags = ["tag1", "tag2"] # required
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

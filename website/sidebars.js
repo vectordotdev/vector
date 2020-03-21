@@ -95,8 +95,9 @@ module.exports = {
               label: 'Strategies',
               items: [
                 "setup/deployment/strategies",
-                "setup/deployment/strategies/dedicated-container",
+                "setup/deployment/strategies/daemon",
                 "setup/deployment/strategies/sidecar",
+                "setup/deployment/strategies/service",
               ]
             },
             "setup/deployment/topologies",

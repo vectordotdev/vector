@@ -5,7 +5,8 @@ common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
+requirements.network_port = "514"
+strategies = ["service"]
 through_description = "the Syslog protocol"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "syslog") %>
@@ -13,7 +14,7 @@ through_description = "the Syslog protocol"
 [sources.syslog.options.address]
 type = "string"
 common = true
-examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
+examples = ["0.0.0.0:514", "systemd", "systemd#2"]
 relevant_when = {mode = ["tcp", "udp"]}
 required = true
 description = """\

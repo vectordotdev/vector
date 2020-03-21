@@ -10,6 +10,7 @@ class Source < Component
   attr_reader :delivery_guarantee,
     :output,
     :output_types,
+    :strategies,
     :through_description
 
   def initialize(hash)
@@ -21,6 +22,7 @@ class Source < Component
     @output = OpenStruct.new
     @log_fields = (hash["log_fields"] || {}).to_struct_with_name(constructor: Field)
     @output_types = hash.fetch("output_types")
+    @strategies = hash["strategies"] || []
     @through_description = hash.fetch("through_description")
 
     # output

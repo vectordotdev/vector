@@ -1,7 +1,7 @@
 ---
-title: Dedicated Container Deployment Strategy
-description: Deploy Vector as a dedicated container
-sidebar_label: Dedicated Container
+title: Service Deployment Strategy
+description: Deploy Vector as a service
+sidebar_label: Service
 ---
 
 import SVG from 'react-inlinesvg';

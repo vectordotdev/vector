@@ -1,0 +1,30 @@
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= interfaces.first.name %>"
+  values={<%= interfaces.collect { |interface| {label: interface.title, value: interface.name } }.to_json %>}>
+<%- interfaces.each do |interface| -%>
+<TabItem value="<%= interface.name %>">
+<Tabs
+  block={true}
+  defaultValue="<%= "#{interface.name}-#{strategies.first.name}" %>"
+  values={<%= strategies.collect { |strategy| {label: "#{strategy.title} Strategy", value: "#{interface.name}-#{strategy.name}" } }.to_json %>}>
+<%- strategies.each do |strategy| %>
+<%- source = metadata.sources.send(strategy.source) -%>
+<TabItem value="<%= interface.name %>-<%= strategy.name %>">
+
+<%= deployment_strategy(strategy, platform: platform) %>
+
+---
+
+<div className="steps steps--h3">
+
+<%= interface_tutorial(interface, source: source) %>
+
+</div>
+</TabItem>
+<%- end -%>
+</Tabs>
+</TabItem>
+<%- end -%>
+</Tabs>

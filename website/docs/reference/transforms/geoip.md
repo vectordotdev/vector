@@ -11,6 +11,10 @@ status: "beta"
 title: "GeoIP Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector [`geoip`](#geoip) transform
 accepts and [outputs `log` events](#output) allowing you to enrich events with
 geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
@@ -25,8 +29,6 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -37,10 +39,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   source = "ip_address" # required
   target = "geoip" # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

@@ -4,11 +4,11 @@ sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
 
 This page covers installing Vector from a pre-built archive. These archives
 contain the `vector` binary as well as supporting configuration files.
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 
@@ -34,12 +34,12 @@ import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="vector-aarch64-unknown-linux-musl.tar.gz"
+  defaultValue="aarch64-unknown-linux-musl-tar-gz"
   urlKey="file_name"
-  values={[{"label":"aarch64-unknown-linux-musl-tar-gz","value":"vector-aarch64-unknown-linux-musl.tar.gz"},{"label":"armv7-unknown-linux-musleabihf-tar-gz","value":"vector-armv7-unknown-linux-musleabihf.tar.gz"},{"label":"x86_64-apple-darwin-tar-gz","value":"vector-x86_64-apple-darwin.tar.gz"},{"label":"x86_64-pc-windows-msvc-zip","value":"vector-x86_64-pc-windows-msvc.zip"},{"label":"x86_64-unknown-linux-musl-tar-gz","value":"vector-x86_64-unknown-linux-musl.tar.gz"}]}>
+  values={[{"label":"Linux (ARM64)","value":"aarch64-unknown-linux-musl-tar-gz"},{"label":"Linux (ARMv7)","value":"armv7-unknown-linux-musleabihf-tar-gz"},{"label":"MacOS (x86_64)","value":"x86_64-apple-darwin-tar-gz"},{"label":"Windows (x86_64, 7+)","value":"x86_64-pc-windows-msvc-zip"},{"label":"Linux (x86_64)","value":"x86_64-unknown-linux-musl-tar-gz"}]}>
 
 
-<TabItem value="vector-aarch64-unknown-linux-musl.tar.gz">
+<TabItem value="vector-aarch64-unknown-linux-musl-tar-gz">
 <div className="steps steps--h3">
 
 
@@ -97,7 +97,7 @@ import TabItem from '@theme/TabItem';
 </div>
 </TabItem>
 
-<TabItem value="vector-armv7-unknown-linux-musleabihf.tar.gz">
+<TabItem value="vector-armv7-unknown-linux-musleabihf-tar-gz">
 <div className="steps steps--h3">
 
 
@@ -155,7 +155,7 @@ import TabItem from '@theme/TabItem';
 </div>
 </TabItem>
 
-<TabItem value="vector-x86_64-apple-darwin.tar.gz">
+<TabItem value="vector-x86_64-apple-darwin-tar-gz">
 <div className="steps steps--h3">
 
 
@@ -213,7 +213,7 @@ import TabItem from '@theme/TabItem';
 </div>
 </TabItem>
 
-<TabItem value="vector-x86_64-pc-windows-msvc.zip">
+<TabItem value="vector-x86_64-pc-windows-msvc-zip">
 <div className="steps steps--h3">
 
 
@@ -264,7 +264,7 @@ import TabItem from '@theme/TabItem';
 </div>
 </TabItem>
 
-<TabItem value="vector-x86_64-unknown-linux-musl.tar.gz">
+<TabItem value="vector-x86_64-unknown-linux-musl-tar-gz">
 <div className="steps steps--h3">
 
 
@@ -354,8 +354,6 @@ Make sure that this directory is writable by the `vector` process.
 
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" />
 

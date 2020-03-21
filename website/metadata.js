@@ -66,7 +66,7 @@ module.exports = {
         "name": "x86_64-pc-windows-msvc-zip"
       },
       "x64-msi": {
-        "package_manager": "MSI",
+        "package_manager": "msi",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "x86_64",
@@ -78,7 +78,7 @@ module.exports = {
         "name": "x64-msi"
       },
       "amd64-deb": {
-        "package_manager": "DPKG",
+        "package_manager": "dpkg",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "x86_64",
@@ -90,7 +90,7 @@ module.exports = {
         "name": "amd64-deb"
       },
       "arm64-deb": {
-        "package_manager": "DPKG",
+        "package_manager": "dpkg",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "ARM64",
@@ -102,7 +102,7 @@ module.exports = {
         "name": "arm64-deb"
       },
       "armhf-deb": {
-        "package_manager": "DPKG",
+        "package_manager": "dpkg",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "ARMv7",
@@ -114,7 +114,7 @@ module.exports = {
         "name": "armhf-deb"
       },
       "x86_64-rpm": {
-        "package_manager": "RPM",
+        "package_manager": "rpm",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "x86_64",
@@ -126,7 +126,7 @@ module.exports = {
         "name": "x86_64-rpm"
       },
       "aarch64-rpm": {
-        "package_manager": "RPM",
+        "package_manager": "rpm",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "ARM64",
@@ -138,7 +138,7 @@ module.exports = {
         "name": "aarch64-rpm"
       },
       "armv7hl-rpm": {
-        "package_manager": "RPM",
+        "package_manager": "rpm",
         "available_on_latest": true,
         "available_on_nightly": true,
         "arch": "ARMv7",
@@ -153,55 +153,186 @@ module.exports = {
     "operating_systems": {
       "amazon-linux": {
         "title": "Amazon Linux",
-        "package_manager": "RPM",
+        "interfaces": [
+          "rpm",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "amazon-linux"
       },
       "centos": {
         "title": "CentOS",
-        "package_manager": "RPM",
+        "interfaces": [
+          "rpm",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "centos"
       },
       "debian": {
         "title": "Debian",
-        "package_manager": "DPKG",
+        "interfaces": [
+          "dpkg",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "debian"
       },
       "macos": {
         "title": "MacOS",
-        "package_manager": "Homebrew",
+        "interfaces": [
+          "homebrew",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "file"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "macos"
       },
       "nixos": {
         "title": "NixOS",
-        "package_manager": "nix",
+        "interfaces": [
+          "nix",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "nixos"
       },
       "raspbian": {
         "title": "Raspbian",
-        "package_manager": "DPKG",
+        "interfaces": [
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          }
+        ],
         "name": "raspbian"
       },
       "rhel": {
         "title": "RHEL",
-        "package_manager": "RPM",
+        "interfaces": [
+          "rpm",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "rhel"
       },
       "ubuntu": {
         "title": "Ubuntu",
-        "package_manager": "DPKG",
+        "interfaces": [
+          "dpkg",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Linux",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "journald"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "ubuntu"
       },
       "windows": {
         "title": "Windows",
+        "interfaces": [
+          "msi",
+          "vector-cli",
+          "docker-cli",
+          "docker-compose"
+        ],
         "os": "Windows",
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "file"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "windows"
       }
     },
@@ -213,6 +344,19 @@ module.exports = {
           "ARM64",
           "ARMv7"
         ],
+        "interfaces": [
+          "dpkg"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "dpkg"
       },
       "homebrew": {
@@ -220,28 +364,80 @@ module.exports = {
         "archs": [
           "x86_64"
         ],
+        "interfaces": [
+          "homebrew"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
         "name": "homebrew"
+      },
+      "msi": {
+        "title": "MSI",
+        "interfaces": [
+          "msi"
+        ],
+        "archs": [
+          "x86_64"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
+        "name": "msi"
       },
       "nix": {
         "title": "Nix",
+        "interfaces": [
+          "nix"
+        ],
         "archs": [
           "x86_64"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
         ],
         "name": "nix"
       },
       "rpm": {
         "title": "RPM",
+        "interfaces": [
+          "rpm"
+        ],
         "archs": [
           "x86_64"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
         ],
         "name": "rpm"
-      },
-      "msi": {
-        "title": "MSI",
-        "archs": [
-          "x86_64"
-        ],
-        "name": "msi"
       }
     },
     "platforms": {
@@ -253,14 +449,8 @@ module.exports = {
           "ARMv7"
         ],
         "interfaces": [
-          {
-            "name": "docker-cli",
-            "title": "Docker CLI"
-          },
-          {
-            "name": "docker-compose",
-            "title": "Docker Compose"
-          }
+          "docker-cli",
+          "docker-compose"
         ],
         "oss": [
           "Linux",
@@ -269,17 +459,14 @@ module.exports = {
         "strategies": [
           {
             "name": "daemon",
-            "title": "Daemon",
             "source": "docker"
           },
           {
             "name": "sidecar",
-            "title": "Sidecar",
             "source": "file"
           },
           {
             "name": "service",
-            "title": "Service",
             "source": "http"
           }
         ],
@@ -290,7 +477,7 @@ module.exports = {
   "latest_post": {
     "author_github": "https://github.com/Jeffail",
     "date": "2020-01-07",
-    "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+    "description": "---\nid: prometheus-source\ntitle: \"Prometheus Source\"\ndescription: \"Scrape prometheus metrics with Vector\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: sources\", \"source: prometheus\"]\n---",
     "id": "prometheus-source",
     "path": "website/blog/2020-01-07-prometheus-source.md",
     "permalink": "https://vector.dev/blog/prometheus-source",
@@ -421,7 +608,7 @@ module.exports = {
     {
       "author_github": "https://github.com/lukesteensen",
       "date": "2019-06-28",
-      "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
+      "description": "---\nid: introducing-vector\ntitle: Introducing Vector\ndescription: \"Hello World. Bringing Vector to life.\"\nauthor_github: https://github.com/lukesteensen\ntags: [\"type: announcement\"]\n---",
       "id": "introducing-vector",
       "path": "website/blog/2019-06-28-introducing-vector.md",
       "permalink": "https://vector.dev/blog/introducing-vector",
@@ -433,7 +620,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-19",
-      "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+      "description": "---\nid: arm-support-on-linux\ntitle: \"ARMv7 & ARM64 Support on Linux\"\ndescription: \"These architectures are widely used in embeded devices & servers\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: arm\"]\n---",
       "id": "arm-support-on-linux",
       "path": "website/blog/2019-11-19-arm-support-on-linux.md",
       "permalink": "https://vector.dev/blog/arm-support-on-linux",
@@ -447,7 +634,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-21",
-      "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
+      "description": "---\nid: windows-support\ntitle: \"Windows Support Is Here!\"\ndescription: \"Bringing the performance and reliability of Vector to Windows\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: windows\"]\n---",
       "id": "windows-support",
       "path": "website/blog/2019-11-21-windows-support.md",
       "permalink": "https://vector.dev/blog/windows-support",
@@ -461,7 +648,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-11-25",
-      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+      "description": "---\nid: unit-testing-vector-config-files\ntitle: \"Unit Testing Your Vector Config Files\"\ndescription: \"Treating your Vector configuration files as code\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: config\"]\n---",
       "id": "unit-testing-vector-config-files",
       "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
       "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -474,7 +661,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-13",
-      "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+      "description": "---\nid: custom-dns\ntitle: \"Use Custom DNS Servers\"\ndescription: \"Point Vector to custom DNS servers\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: networking\"]\n---",
       "id": "custom-dns",
       "path": "website/blog/2019-12-13-custom-dns.md",
       "permalink": "https://vector.dev/blog/custom-dns",
@@ -487,7 +674,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-14",
-      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+      "description": "---\nid: kubernetes-source-alpha\ntitle: \"Alpha Kubernetes Source\"\ndescription: \"Early adopters have something to chew on\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: kubernetes\"]\n---",
       "id": "kubernetes-source-alpha",
       "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
       "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
@@ -501,7 +688,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-16",
-      "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+      "description": "---\nid: ec2-metadata\ntitle: \"EC2 Metadata Enrichments\"\ndescription: \"Enrich your events with EC2 metadata\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: transforms\", \"transform: ec2_metadata\"]\n---",
       "id": "ec2-metadata",
       "path": "website/blog/2019-12-16-ec2-metadata.md",
       "permalink": "https://vector.dev/blog/ec2-metadata",
@@ -515,7 +702,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-01-07",
-      "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+      "description": "---\nid: prometheus-source\ntitle: \"Prometheus Source\"\ndescription: \"Scrape prometheus metrics with Vector\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: sources\", \"source: prometheus\"]\n---",
       "id": "prometheus-source",
       "path": "website/blog/2020-01-07-prometheus-source.md",
       "permalink": "https://vector.dev/blog/prometheus-source",
@@ -12930,7 +13117,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
-          "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
+          "description": "---\nid: arm-support-on-linux\ntitle: \"ARMv7 & ARM64 Support on Linux\"\ndescription: \"These architectures are widely used in embeded devices & servers\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: arm\"]\n---",
           "id": "arm-support-on-linux",
           "path": "website/blog/2019-11-19-arm-support-on-linux.md",
           "permalink": "https://vector.dev/blog/arm-support-on-linux",
@@ -12944,7 +13131,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
-          "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
+          "description": "---\nid: windows-support\ntitle: \"Windows Support Is Here!\"\ndescription: \"Bringing the performance and reliability of Vector to Windows\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: windows\"]\n---",
           "id": "windows-support",
           "path": "website/blog/2019-11-21-windows-support.md",
           "permalink": "https://vector.dev/blog/windows-support",
@@ -12958,7 +13145,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-11-25",
-          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+          "description": "---\nid: unit-testing-vector-config-files\ntitle: \"Unit Testing Your Vector Config Files\"\ndescription: \"Treating your Vector configuration files as code\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: config\"]\n---",
           "id": "unit-testing-vector-config-files",
           "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
           "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -16288,7 +16475,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-13",
-          "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
+          "description": "---\nid: custom-dns\ntitle: \"Use Custom DNS Servers\"\ndescription: \"Point Vector to custom DNS servers\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: networking\"]\n---",
           "id": "custom-dns",
           "path": "website/blog/2019-12-13-custom-dns.md",
           "permalink": "https://vector.dev/blog/custom-dns",
@@ -16301,7 +16488,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-14",
-          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
+          "description": "---\nid: kubernetes-source-alpha\ntitle: \"Alpha Kubernetes Source\"\ndescription: \"Early adopters have something to chew on\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: kubernetes\"]\n---",
           "id": "kubernetes-source-alpha",
           "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
           "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
@@ -16315,7 +16502,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-16",
-          "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
+          "description": "---\nid: ec2-metadata\ntitle: \"EC2 Metadata Enrichments\"\ndescription: \"Enrich your events with EC2 metadata\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: transforms\", \"transform: ec2_metadata\"]\n---",
           "id": "ec2-metadata",
           "path": "website/blog/2019-12-16-ec2-metadata.md",
           "permalink": "https://vector.dev/blog/ec2-metadata",
@@ -16329,7 +16516,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-01-07",
-          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
+          "description": "---\nid: prometheus-source\ntitle: \"Prometheus Source\"\ndescription: \"Scrape prometheus metrics with Vector\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: sources\", \"source: prometheus\"]\n---",
           "id": "prometheus-source",
           "path": "website/blog/2020-01-07-prometheus-source.md",
           "permalink": "https://vector.dev/blog/prometheus-source",

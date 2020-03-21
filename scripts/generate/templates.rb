@@ -5,8 +5,8 @@ require "active_support/core_ext/string/output_safety"
 require_relative "templates/config_example_writer"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
+require_relative "templates/interface_tutorials"
 require_relative "templates/setup_guide"
-require_relative "templates/setup_tutorial_docker_cli"
 
 # Renders templates in the templates sub-dir
 #
@@ -38,6 +38,31 @@ class Templates
     @root_dir = root_dir
     @partials_path = "scripts/generate/templates/_partials"
     @metadata = metadata
+  end
+
+  def command_create_config(path, source: nil, sink: nil, default_sink_name: "console")
+    if source.nil? && sink.nil?
+      raise ArgumentError.new("You must supply at least one source or sink")
+    end
+
+    sources = []
+    sinks = []
+
+    if source.nil?
+      sources =
+        metadata.sources_list.select do |source|
+          source.can_send_to?(sink)
+        end
+    end
+
+    if sink.nil?
+      sinks =
+        metadata.sinks_list.select do |sink|
+          sink.can_receive_from?(source)
+        end
+    end
+
+    render("#{partials_path}/_command_create_config.md", binding).strip
   end
 
   def common_component_links(type, limit = 5)
@@ -148,29 +173,15 @@ class Templates
     end
   end
 
-  def create_config_command(source: nil, sink: nil, default_sink_name: "console")
-    if source.nil? && sink.nil?
-      raise ArgumentError.new("You must supply at least one source or sink")
-    end
+  def deployment_strategy(strategy, platform: nil)
+    template_name =
+      if platform
+        "deployment_strategies/_#{platform.name}_#{strategy.name}"
+      else
+        "deployment_strategies/_#{strategy.name}"
+      end
 
-    sources = []
-    sinks = []
-
-    if source.nil?
-      sources =
-        metadata.sources_list.select do |source|
-          source.can_send_to?(sink)
-        end
-    end
-
-    if sink.nil?
-      sinks =
-        metadata.sinks_list.select do |sink|
-          sink.can_receive_from?(source)
-        end
-    end
-
-    render("#{partials_path}/_create_config_command.md", binding).strip
+    render("#{partials_path}/#{template_name}.md", binding).strip
   end
 
   def docker_docs
@@ -206,6 +217,27 @@ class Templates
     types.collect do |type|
       "[`#{type}`][docs.data-model.#{type}]"
     end
+  end
+
+  def fetch_interfaces(interface_names)
+    interface_names.collect do |name|
+      metadata.installation.interfaces.send(name)
+    end
+  end
+
+  def fetch_strategies(strategy_references)
+    strategy_references.collect do |reference|
+      name = reference.is_a?(Hash) ? reference.name : reference
+      strategy = metadata.installation.strategies.send(name)
+      if reference.respond_to?(:source)
+        strategy[:source] = reference.source
+      end
+      strategy
+    end
+  end
+
+  def fetch_strategy(strategy_reference)
+    fetch_strategies([strategy_reference]).first
   end
 
   def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
@@ -246,6 +278,22 @@ class Templates
 
   def full_config_spec
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
+  end
+
+  def installation_tutorial(interfaces, strategies, platform: nil)
+    render("#{partials_path}/_installation_tutorial.md", binding).strip
+  end
+
+  def interface_tutorial(interface, sink: nil, source: nil)
+    tutorial =
+      case (interface && interface.name)
+      when "docker-cli"
+        InterfaceTutorials::DockerCLI.new(source)
+      when "docker-compose"
+        InterfaceTutorials::DockerCLI.new(source)
+      end
+
+    render("#{partials_path}/interface_tutorials/_#{interface.name}.md", binding).strip
   end
 
   def manual_installation_next_steps(type)
@@ -439,35 +487,33 @@ class Templates
     content
   end
 
-  def setup_guide(id, source: nil, sink: nil)
-    guide = SetupGuide.new(source: source, sink: sink)
-    render("#{partials_path}/_setup_guide.md", binding).strip
-  end
+  def setup_guide(id, platform: nil, source: nil, sink: nil)
+    if platform && source
+      raise ArgumentError.new("You cannot pass both a platform and a source")
+    end
 
-  def setup_tutorial(interface: nil, platform: nil, source: nil, strategy: nil)
-    #
-    # Defaults
-    #
+    interfaces = []
+    strategy = nil
+    title = nil
 
-    if source.nil? && !strategy.nil?
+    if platform
+      interfaces = fetch_interfaces(platform.interfaces)
+      strategy = fetch_strategy(platform.strategies.first)
       source = metadata.sources.send(strategy.source)
+      title = platform.title
+    elsif source
+      interfaces = [metadata.installation.interfaces.send("vector-cli")]
+      strategy = fetch_strategy(source.strategies.first)
+      title = source.title
+    elsif sink
+      interfaces = metadata.installation.interfaces_list
+      strategy = metadata.installation.strategies.first
+      title = sink.title
     end
 
-    #
-    # Render
-    #
+    guide = SetupGuide.new(title, interfaces, strategy, source: source, sink: sink)
 
-    case (interface && interface.name)
-    when "docker-cli"
-      tutorial = SetupTutorialDockerCLI.new(source)
-      render("#{partials_path}/_setup_tutorial_docker_cli.md", binding).strip
-    when "docker-compose"
-      tutorial = SetupTutorialDockerCLI.new(source)
-      render("#{partials_path}/_setup_tutorial_docker_cli.md", binding).strip
-    else
-      # this should use the Vector CLI
-      raise (interface && interface.name).inspect
-    end
+    render("#{partials_path}/_setup_guide.md", binding).strip
   end
 
   def sink_description(sink)

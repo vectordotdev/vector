@@ -14,6 +14,10 @@ title: "Console Sink"
 unsupported_operating_systems: []
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `console` sink
 [streams](#streaming) [`log`][docs.data-model.log] and
 [`metric`][docs.data-model.metric] events to [standard output
@@ -29,8 +33,6 @@ streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -43,10 +45,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # Encoding
   encoding.codec = "json" # required
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

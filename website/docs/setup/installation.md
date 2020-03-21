@@ -5,6 +5,9 @@ description: Install Vector on your platform
 hide_pagination: true
 ---
 
+import InstallationCommand from '@site/src/components/InstallationCommand';
+import Jump from '@site/src/components/Jump';
+
 Vector compiles to a single `musl` static binary with no dependencies, making it
 simple to install.
 
@@ -21,13 +24,9 @@ simple to install.
 This light-weight script will perform platform detection and determine the best
 method to install Vector:
 
-import InstallationCommand from '@site/src/components/InstallationCommand';
-
 <InstallationCommand />
 
 ## Other methods
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/setup/installation/manual/">Manual</Jump>
 <Jump to="/docs/setup/installation/operating-systems/">Operating systems</Jump>

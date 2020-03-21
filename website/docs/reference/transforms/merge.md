@@ -11,6 +11,12 @@ status: "beta"
 title: "Merge Transform"
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector [`merge`](#merge) transform
 accepts and [outputs `log` events](#output) allowing you to merge partial log
 events into a single event.
@@ -25,8 +31,6 @@ events into a single event.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -37,10 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   partial_event_marker_field = "_partial" # optional, default
   stream_discriminant_fields = [] # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -135,14 +135,10 @@ The [`merge`](#merge) transform accepts and [outputs `log` events](#output) allo
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="default"
   values={[{"label":"Default","value":"default"},{"label":"With Merge Fields","value":"with-merge-fields"}]}>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="default">
 

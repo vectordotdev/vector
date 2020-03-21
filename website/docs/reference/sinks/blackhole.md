@@ -14,6 +14,10 @@ title: "Blackhole Sink"
 unsupported_operating_systems: []
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 The Vector `blackhole` sink
 [streams](#streaming) [`log`][docs.data-model.log] and
 [`metric`][docs.data-model.metric] events to a blackhole that simply discards
@@ -29,8 +33,6 @@ data, designed for testing and benchmarking purposes.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -39,10 +41,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   print_amount = 1000 # required
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 

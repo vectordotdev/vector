@@ -1,0 +1,9 @@
+<SVG src="/img/deployment-strategies-docker-service.svg" />
+
+As shown in the diagram above, the [service deployment strategy][docs.strategies.service]
+treats Vector like any other service. Vector must be configured with [a source
+that receives data over the network][urls.vector_receiving_sources], and the
+upstream service must use that protocol to send data to Vector. This could be
+another Vector instance using the [`vector` sink][docs.sinks.vector] or any
+service that can send log data over the configured protocol.
+[Learn more...][docs.strategies.daemon]

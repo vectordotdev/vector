@@ -142,6 +142,42 @@ metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 
 #
+# Create missing platform setup guides
+#
+
+metadata.installation.platforms_list.each do |platform|
+  template_path = "#{GUIDES_ROOT}/setup/platforms/#{platform.name}.md.erb"
+
+  if !File.exists?(template_path)
+    contents =
+      <<~EOF
+      <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
+      <%= setup_guide("setup/platforms/\#{platform.name}", platform: platform) %>
+      EOF
+
+    File.open(template_path, 'w+') { |file| file.write(contents) }
+  end
+end
+
+#
+# Create missing source setup guides
+#
+
+metadata.sources_list.each do |source|
+  template_path = "#{GUIDES_ROOT}/setup/sources/#{source.name}.md.erb"
+
+  if !File.exists?(template_path)
+    contents =
+      <<~EOF
+      <%- source = metadata.sources.send("#{source.name}") -%>
+      <%= setup_guide("setup/sources/\#{source.name}", source: source) %>
+      EOF
+
+    File.open(template_path, 'w+') { |file| file.write(contents) }
+  end
+end
+
+#
 # Create missing release pages
 #
 

@@ -4,6 +4,9 @@ sidebar_label: From Source
 description: Install Vector from the Vector source code
 ---
 
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+
 This page covers installing Vector from source using the native toolchain for
 the host.
 
@@ -13,8 +16,6 @@ for details.
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 
@@ -323,8 +324,6 @@ Make sure that this directory is writable by the `vector` process.
 
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 <CodeHeader text="vector.toml" />
 

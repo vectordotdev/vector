@@ -6,6 +6,7 @@ delivery_guarantee = "at_least_once"
 function_category = "receive"
 output_types = ["log"]
 requirements = {}
+strategies = ["sidecar"]
 through_description = "standard input (STDIN)"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "stdin") %>
