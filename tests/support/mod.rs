@@ -68,6 +68,8 @@ pub struct MockSourceConfig {
     receiver: Arc<Mutex<Option<Receiver<Event>>>>,
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
+    #[serde(skip)]
+    data_type: Option<DataType>,
 }
 
 impl MockSourceConfig {
@@ -75,6 +77,7 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
+            data_type: Some(DataType::Any),
         }
     }
 
@@ -85,7 +88,12 @@ impl MockSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
+            data_type: Some(DataType::Any),
         }
+    }
+
+    pub fn set_data_type(&mut self, data_type: DataType) {
+        self.data_type = Some(data_type)
     }
 }
 
@@ -120,7 +128,7 @@ impl SourceConfig for MockSourceConfig {
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        self.data_type.clone().unwrap()
     }
 
     fn source_type(&self) -> &'static str {
