@@ -256,6 +256,7 @@ enum HealthcheckError {
     Unhealthy,
 }
 
+#[typetag::serialize(name = "mock")]
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
@@ -281,10 +282,6 @@ where
 
     fn sink_type(&self) -> &'static str {
         "mock"
-    }
-
-    fn typetag_name(&self) -> &'static str {
-        unimplemented!("not intended for use in real configs")
     }
 
     fn typetag_deserialize(&self) {
