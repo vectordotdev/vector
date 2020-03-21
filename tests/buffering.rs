@@ -5,7 +5,7 @@ use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
-use vector::test_util::{self, next_addr, runtime, shutdown_on_idle};
+use vector::test_util::{self, next_addr, shutdown_on_idle};
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime, sinks};
 
@@ -46,7 +46,7 @@ fn test_buffering() {
         config
     };
 
-    let mut rt = runtime();
+    let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
@@ -83,7 +83,7 @@ fn test_buffering() {
         config
     };
 
-    let mut rt = runtime();
+    let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
@@ -150,7 +150,7 @@ fn test_max_size() {
         config
     };
 
-    let mut rt = runtime();
+    let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
@@ -186,7 +186,7 @@ fn test_max_size() {
         config
     };
 
-    let mut rt = runtime();
+    let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
@@ -288,7 +288,7 @@ fn test_reclaim_disk_space() {
         config
     };
 
-    let mut rt = runtime();
+    let mut rt = test_util::runtime();
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
