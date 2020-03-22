@@ -51,7 +51,7 @@ class Installation
       downloads: downloads,
       operating_systems: operating_systems,
       package_managers: package_managers,
-      platforms: platforms
+      platforms: platforms.deep_to_h
     }
   end
 end

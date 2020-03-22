@@ -47,7 +47,9 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
-  const {containers, package_managers: packageManagers, operating_systems: operatingSystems} = installation;
+  const {package_managers: packageManagers, platforms, operating_systems: operatingSystems} = installation;
+
+  console.log(platforms);
 
   return (
     <div className={styles.downloadTable}>
@@ -70,12 +72,12 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
         </div>
       </div>
       <div>
-        <div>Containers</div>
+        <div>Platforms</div>
         <div>
-          {Object.values(containers).map((container, idx) => (
+          {Object.values(platforms).map((platform, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/containers/${container.id}/`}> {container.name}</Link>
+              <Link to={`/docs/setup/installation/platforms/${platform.id}/`}> {platform.title}</Link>
             </span>
           ))}
         </div>
@@ -86,7 +88,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
           {Object.values(packageManagers).map((packageManager, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/package-managers/${packageManager.id}/`}>{packageManager.name}</Link>
+              <Link to={`/docs/setup/installation/package-managers/${packageManager.id}/`}>{packageManager.title}</Link>
             </span>
           ))}
         </div>
@@ -97,7 +99,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
           {Object.values(operatingSystems).map((operatingSystem, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}/`}>{operatingSystem.name}</Link>
+              <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}/`}>{operatingSystem.title}</Link>
             </span>
           ))}
         </div>

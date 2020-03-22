@@ -441,7 +441,37 @@ module.exports = {
       }
     },
     "platforms": {
-      "docker": "#<Platform:0x00007fedd62eb320>"
+      "docker": {
+        "archs": [
+          "x86_64",
+          "ARM64",
+          "ARMv7"
+        ],
+        "interfaces": [
+          "docker-cli",
+          "docker-compose"
+        ],
+        "name": "docker",
+        "oss": [
+          "Linux",
+          "MacOS"
+        ],
+        "strategies": [
+          {
+            "name": "daemon",
+            "source": "docker"
+          },
+          {
+            "name": "sidecar",
+            "source": "file"
+          },
+          {
+            "name": "service",
+            "source": "http"
+          }
+        ],
+        "title": "Docker"
+      }
     }
   },
   "latest_post": {
