@@ -1,3 +1,5 @@
+require_relative "platform"
+
 class Installation
   attr_reader :downloads,
     :interfaces,
@@ -11,7 +13,7 @@ class Installation
     @interfaces = hash.fetch("interfaces").to_struct_with_name
     @operating_systems = hash.fetch("operating_systems").to_struct_with_name
     @package_managers = hash.fetch("package_managers").to_struct_with_name
-    @platforms = hash.fetch("platforms").to_struct_with_name
+    @platforms = hash.fetch("platforms").to_struct_with_name(constructor: Platform)
     @strategies = hash.fetch("strategies").to_struct_with_name
   end
 

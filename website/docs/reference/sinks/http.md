@@ -88,8 +88,8 @@ HTTP endpoint.
 
   # Auth
   auth.strategy = "basic" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${HTTP_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${HTTP_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
@@ -108,7 +108,7 @@ HTTP endpoint.
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Headers
-  headers.Authorization = "${TOKEN_ENV_VAR}" # example
+  headers.Authorization = "${HTTP_TOKEN}" # example
   headers.X-Powered-By = "Vector" # example
 
   # Request
@@ -187,7 +187,7 @@ The authentication strategy to use.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${HTTP_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -212,7 +212,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${HTTP_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}
@@ -629,7 +629,7 @@ Options for custom headers.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
+  examples={[{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]}
   groups={[]}
   name={"`[header-key]`"}
   path={"headers"}

@@ -12,17 +12,22 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Component({delivery_guarantee, description, event_types, function_category, name, status, type}) {
-  let path = null;
-  if(type == "source") path = `/docs/reference/sources/${name}/`;
-  if(type == "transform") path = `/docs/reference/transforms/${name}/`;
-  if(type == "sink") path = `/docs/reference/sinks/${name}/`;
+function Component({delivery_guarantee, description, event_types, function_category, name, pathPrefix, status, title, type}) {
+  let prefix = pathPrefix;
+
+  if (!prefix) {
+    if(type == "source") prefix = '/docs/reference/sources';
+    if(type == "transform") prefix = '/docs/reference/transforms';
+    if(type == "sink") prefix = '/docs/reference/sinks';
+  }
+
+  let path = `${prefix}/${name}/`;
 
   return (
     <Link to={path} className="vector-component">
       <div className="vector-component--header">
         {description && <i className="feather icon-info" title={description}></i>}
-        <div className="vector-component--name">{name} {type}</div>
+        <div className="vector-component--name">{title}</div>
       </div>
       <div className="vector-component--badges">
         {event_types.includes("log") ?
@@ -43,7 +48,7 @@ function Component({delivery_guarantee, description, event_types, function_categ
   );
 }
 
-function Components({components, headingLevel, titles}) {
+function Components({components, headingLevel, pathPrefix, titles}) {
   const sourceComponents = components.filter(component => component.type == "source");
   const transformComponents = components.filter(component => component.type == "transform");
   const sinkComponents = components.filter(component => component.type == "sink");
@@ -57,7 +62,7 @@ function Components({components, headingLevel, titles}) {
             {titles && <HeadingTag>{sourceComponents.length} Sources</HeadingTag>}
             <div className="vector-components--grid">
               {sourceComponents.map((props, idx) => (
-                <Component key={idx} {...props} />
+                <Component key={idx} pathPrefix={pathPrefix} {...props} />
               ))}
             </div>
           </>:
@@ -67,7 +72,7 @@ function Components({components, headingLevel, titles}) {
             {titles && <HeadingTag>{transformComponents.length} Transforms</HeadingTag>}
             <div className="vector-components--grid">
               {transformComponents.map((props, idx) => (
-                <Component key={idx} {...props} />
+                <Component key={idx} pathPrefix={pathPrefix} {...props} />
               ))}
             </div>
           </>:
@@ -77,7 +82,7 @@ function Components({components, headingLevel, titles}) {
             {titles && <HeadingTag>{sinkComponents.length} Sinks</HeadingTag>}
             <div className="vector-components--grid">
               {sinkComponents.map((props, idx) => (
-                <Component key={idx} {...props} />
+                <Component key={idx} pathPrefix={pathPrefix} {...props} />
               ))}
             </div>
           </>:
@@ -104,9 +109,10 @@ function VectorComponents(props) {
   //
 
   const {siteConfig} = useDocusaurusContext();
-  const {metadata: {event_types, sources, transforms, sinks}} = siteConfig.customFields;
+  const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
+  const pathPrefix = props.pathPrefix;
   const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
 
   let components = [];
@@ -120,7 +126,7 @@ function VectorComponents(props) {
   //
 
   const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
-  const [onlyEventTypes, setOnlyEventTypes] = useState(new Set(queryObj['event-types']));
+  const [onlyEventTypes, setOnlyEventTypes] = useState(new Set(queryObj['event-types'] || props.eventTypes));
   const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['functions']));
   const [onlyOperatingSystems, setOnlyOperatingSystems] = useState(new Set(queryObj['operating-systems']));
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
@@ -166,7 +172,17 @@ function VectorComponents(props) {
   // Filter options
   //
 
-  const eventTypes = new Set(event_types);
+  const eventTypes = onlyEventTypes.size > 0 ?
+    onlyEventTypes :
+    new Set(
+      _(components).
+        map(component => component.event_types).
+        flatten().
+        uniq().
+        compact().
+        sort().
+        value()
+    );
 
   const operatingSystems = new Set(
     _(components).
@@ -223,6 +239,7 @@ function VectorComponents(props) {
       <div className="filters">
         <div className="search">
           <input
+            className="input--lg"
             type="text"
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
             placeholder="🔍 Search..." />
@@ -337,7 +354,11 @@ function VectorComponents(props) {
         )}
       </div>
       <div className="vector-components--results">
-        <Components components={components} headingLevel={props.headingLevel} titles={titles} />
+        <Components
+          components={components}
+          headingLevel={props.headingLevel}
+          pathPrefix={pathPrefix}
+          titles={titles} />
       </div>
     </div>
   );

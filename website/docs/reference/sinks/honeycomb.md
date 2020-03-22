@@ -48,7 +48,7 @@ The Vector `honeycomb` sink
 [sinks.my_sink_id]
   type = "honeycomb" # required
   inputs = ["my-source-id"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
   healthcheck = true # optional, default
 ```
@@ -63,7 +63,7 @@ The Vector `honeycomb` sink
   # General
   type = "honeycomb" # required
   inputs = ["my-source-id"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
   healthcheck = true # optional, default
 
@@ -97,7 +97,7 @@ The Vector `honeycomb` sink
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${MY_API_KEY}","some-api-key"]}
+  examples={["${HONEYCOMB_API_KEY}","some-api-key"]}
   groups={[]}
   name={"api_key"}
   path={null}

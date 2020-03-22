@@ -3,6 +3,10 @@ title = "Statsd"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
+features = [
+  "Accept metrics data over the Statsd UDP protocol.",
+  "Automatically parse metrics into a lossless interoperable data model.",
+]
 function_category = "receive"
 output_types = ["metric"]
 requirements.network_port = "8126"

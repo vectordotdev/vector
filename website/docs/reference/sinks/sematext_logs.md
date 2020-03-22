@@ -48,7 +48,7 @@ The Vector `sematext_logs` sink
 [sinks.my_sink_id]
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
   healthcheck = true # optional, default
 ```
 
@@ -62,7 +62,7 @@ The Vector `sematext_logs` sink
   # General
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
   healthcheck = true # optional, default
   host = "http://127.0.0.1" # optional, no default
   region = "na" # optional, no default
@@ -701,7 +701,7 @@ duplicate data downstream.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${SEMATEXT_TOKEN_ENV_VAR}","some-sematext-token"]}
+  examples={["${SEMATEXT_TOKEN}","some-sematext-token"]}
   groups={[]}
   name={"token"}
   path={null}

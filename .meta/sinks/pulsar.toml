@@ -4,6 +4,11 @@ beta = true
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
+features = [
+  "Send logs to Apache Pulsar.",
+  "Stream data in a real-time fashion.",
+  "Automatically retry failed requests, with backoff.",
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -36,12 +41,12 @@ description = "Options for the authentication strategy."
 
 [sinks.pulsar.options.auth.children.name]
 type = "string"
-examples = ["${NAME_ENV_VAR}", "name123"]
+examples = ["${PULSAR_NAME}", "name123"]
 required = false
 description = "The basic authentication name."
 
 [sinks.pulsar.options.auth.children.token]
 type = "string"
-examples = ["${TOKEN_ENV_VAR}", "123456789"]
+examples = ["${PULSAR_TOKEN}", "123456789"]
 required = false
 description = "The basic authentication password."

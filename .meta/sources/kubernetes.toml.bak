@@ -2,6 +2,13 @@
 title = "Kubernetes"
 beta = true
 delivery_guarantee = "best_effort"
+features = [
+  "Collect Kubernetes logs.",
+  "Automatically discover new containers and pods.",
+  "Filter by containers, pods, or namespaces."
+  "Merge multi-line logs into one event.",
+  "Enrich your logs with useful Kubernetes context."
+]
 function_category = "collect"
 output_types = ["log"]
 requirements = {}

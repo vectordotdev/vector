@@ -4,6 +4,10 @@ beta = false
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Print logs to STDOUT or STDERR.",
+  "Encode logs to JSON or text.",
+]
 function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]

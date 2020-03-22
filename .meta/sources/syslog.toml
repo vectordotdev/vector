@@ -3,6 +3,10 @@ title = "Syslog"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.",
+  "Automatically parse Syslog 3164 and 5424 formats.",
+]
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "514"

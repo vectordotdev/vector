@@ -3,6 +3,11 @@ title = "Prometheus"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
+features = [
+  "Scrape one or more Prometheus endpoints.",
+  "Ingest all Prometheus metric types.",
+  "Automatically parse metrics into a lossless interoperable data model.",
+]
 function_category = "receive"
 output_types = ["metric"]
 requirements = {}
@@ -21,9 +26,9 @@ description = "Host addresses to scrape metrics from."
 [sources.prometheus.options.scrape_interval_secs]
 type = "int"
 common = true
-required = true
-examples = [1]
-description = "The interval between scrapes in seconds."
+default = 15
+unit = "seconds"
+description = "The interval between scrapes, in seconds."
 
 [[sources.prometheus.output.metric.examples]]
 label = "Counter"

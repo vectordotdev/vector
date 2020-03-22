@@ -48,3 +48,7 @@
 .markdown .code-explanation {
   margin-top: calc( ( var(--ifm-spacing-vertical) * -1 ) - 7px );
 }
+
+.markdown pre.prism-code + .code-explanation {
+  margin-top: -3px;
+}

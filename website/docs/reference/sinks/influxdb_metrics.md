@@ -56,7 +56,7 @@ The Vector `influxdb_metrics` sink
 
   # auth
   org = "Organization" # required
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
+  token = "${INFLUXDB_TOKEN}" # required
 ```
 
 </TabItem>
@@ -75,7 +75,7 @@ The Vector `influxdb_metrics` sink
   healthcheck = true # optional, default
 
   # auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  password = "${INFLUXDB_PASSWORD}" # optional, no default
   username = "todd" # optional, no default
 
   # persistence
@@ -100,7 +100,7 @@ The Vector `influxdb_metrics` sink
 
   # auth
   org = "Organization" # required
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
+  token = "${INFLUXDB_TOKEN}" # required
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -132,7 +132,7 @@ The Vector `influxdb_metrics` sink
   healthcheck = true # optional, default
 
   # auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  password = "${INFLUXDB_PASSWORD}" # optional, no default
   username = "todd" # optional, no default
 
   # persistence
@@ -417,7 +417,7 @@ Specifies the destination organization for writes into InfluxDB 2.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${INFLUXDB_PASSWORD_ENV_VAR}","influxdb4ever"]}
+  examples={["${INFLUXDB_PASSWORD}","influxdb4ever"]}
   groups={["v1"]}
   name={"password"}
   path={null}
@@ -678,7 +678,7 @@ Sets the target retention policy for the write into InfluxDB 1.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${INFLUXDB_TOKEN_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={["v2"]}
   name={"token"}
   path={null}

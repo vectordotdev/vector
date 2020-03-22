@@ -65,8 +65,8 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
   topic = "topic-1234" # required
 
   # Auth
-  auth.name = "${NAME_ENV_VAR}" # optional, no default
-  auth.token = "${TOKEN_ENV_VAR}" # optional, no default
+  auth.name = "${PULSAR_NAME}" # optional, no default
+  auth.token = "${PULSAR_TOKEN}" # optional, no default
 
   # Encoding
   encoding.codec = "json" # required
@@ -134,7 +134,7 @@ Options for the authentication strategy.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["${NAME_ENV_VAR}","name123"]}
+  examples={["${PULSAR_NAME}","name123"]}
   groups={[]}
   name={"name"}
   path={"auth"}
@@ -159,7 +159,7 @@ The basic authentication name.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["${TOKEN_ENV_VAR}","123456789"]}
+  examples={["${PULSAR_TOKEN}","123456789"]}
   groups={[]}
   name={"token"}
   path={"auth"}

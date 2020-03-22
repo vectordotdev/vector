@@ -53,6 +53,10 @@ class Source < Component
       component.input_types.intersection(output_types).any?
   end
 
+  def collects?
+    strategies.include?("daemon") || strategies.include?("sidecar")
+  end
+
   def description
     @description ||= "Ingests data through #{through_description} and outputs #{output_types.to_sentence} events."
   end

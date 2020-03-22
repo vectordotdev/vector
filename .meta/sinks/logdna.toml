@@ -4,6 +4,12 @@ beta = true
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+features = [
+  "Send logs to the LogDNA logging service.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -36,7 +42,7 @@ write_to_description = "[LogDna][urls.logdna]'s HTTP Ingestion API"
 [sinks.logdna.options.api_key]
 type = "string"
 required = true
-examples = ["${LOGDNA_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+examples = ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 description = "The Ingestion API key."
 
 [sinks.logdna.options.host]

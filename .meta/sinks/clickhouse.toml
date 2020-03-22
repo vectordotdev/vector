@@ -3,6 +3,13 @@ title = "Clickhouse"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Send logs to ClickHouse.",
+  "Compress and batch data to maximize throughput.",
+  "Encode timestamps to ClickHouse supported formats.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
@@ -49,14 +56,14 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 
 [sinks.clickhouse.options.auth.children.password]
 type = "string"
-examples = ["${PASSWORD_ENV_VAR}", "password"]
+examples = ["${CLICKHOUSE_PASSWORD}", "password"]
 relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication password."
 
 [sinks.clickhouse.options.auth.children.user]
 type = "string"
-examples = ["${USERNAME_ENV_VAR}", "username"]
+examples = ["${CLICKHOUSE_USERNAME}", "username"]
 relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication user name."

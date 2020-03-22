@@ -3,6 +3,13 @@ title = "GCP PubSub"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Send logs to GCP PubSub.",
+  "Leverage any of GCP's IAM strategies.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
@@ -38,7 +45,7 @@ write_to_description = "[Google Cloud Platform's Pubsub service][urls.gcp_pubsub
 
 [sinks.gcp_pubsub.options.api_key]
 type = "string"
-examples = ["${GCP_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+examples = ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 description = """\
 A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate access the pubsub project and topic. \
 Either this or `credentials_path` must be set.\

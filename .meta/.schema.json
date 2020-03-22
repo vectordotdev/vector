@@ -297,6 +297,14 @@
           "$ref": "#/definitions/fields",
           "description": "The environment variables supported by this source, keyed by the variables's name."
         },
+        "features": {
+          "type": "array",
+          "description": "A list of human readable features.",
+          "minLength": 1,
+          "items": {
+            "type": "string"
+          }
+        },
         "function_category": {
           "type": "string",
           "description": "The function category the sink serves. Used for filtering.",
@@ -406,6 +414,7 @@
         "features": {
           "type": "array",
           "description": "A list of human readable features.",
+          "minLength": 1,
           "items": {
             "type": "string"
           }

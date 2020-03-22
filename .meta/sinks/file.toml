@@ -4,6 +4,10 @@ beta = false
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Write logs to files.",
+  "Dynamically partition logs across multiple files.",
+]
 function_category = "transmit"
 healthcheck = false
 input_types = ["log"]

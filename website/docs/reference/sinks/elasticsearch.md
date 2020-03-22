@@ -71,8 +71,8 @@ endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-b
 
   # Auth
   auth.strategy = "aws" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${ELASTICSEARCH_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
@@ -90,7 +90,7 @@ endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-b
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Headers
-  headers.Authorization = "${TOKEN_ENV_VAR}" # example
+  headers.Authorization = "${ELASTICSEARCH_TOKEN}" # example
   headers.X-Powered-By = "Vector" # example
 
   # Query
@@ -172,7 +172,7 @@ The authentication strategy to use.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${ELASTICSEARCH_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -197,7 +197,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${ELASTICSEARCH_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}
@@ -590,7 +590,7 @@ Options for custom headers.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
+  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
   groups={[]}
   name={"`[header-name]`"}
   path={"headers"}

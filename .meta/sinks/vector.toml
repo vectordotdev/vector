@@ -4,6 +4,9 @@ beta = true
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Send data to another downstream Vector instance.",
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]

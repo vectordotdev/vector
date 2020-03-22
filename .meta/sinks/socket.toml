@@ -4,6 +4,10 @@ beta = false
 common = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Stream logs over a TCP, UDP, or Unix socket.",
+  "Buffer your data in-memory or on-disk for performance and durability.",
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]

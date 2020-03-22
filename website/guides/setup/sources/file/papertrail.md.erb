@@ -1,0 +1,3 @@
+<%- source = metadata.sources.send("file") -%>
+<%- sink = metadata.sinks.send("papertrail") -%>
+<%= setup_guide("setup/sources/#{source.name}/#{sink.name}", source: source, sink: sink) %>

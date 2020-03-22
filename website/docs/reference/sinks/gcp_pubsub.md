@@ -65,7 +65,7 @@ Interface][urls.gcp_pubsub_rest].
   inputs = ["my-source-id"] # required
   project = "vector-123456" # required
   topic = "this-is-a-topic" # required
-  api_key = "${GCP_API_KEY_ENV_VAR}" # optional, no default
+  api_key = "${GCP_API_KEY}" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
 
@@ -112,7 +112,7 @@ Interface][urls.gcp_pubsub_rest].
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["${GCP_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={[]}
   name={"api_key"}
   path={null}

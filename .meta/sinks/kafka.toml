@@ -4,6 +4,13 @@ beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
+features = [
+  "Send logs to Kafka.",
+  "Leverage any of AWS' IAM strategies.",
+  "Optionally compress data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]

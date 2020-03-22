@@ -3,6 +3,10 @@ title = "STDIN"
 beta = false
 common = false
 delivery_guarantee = "at_least_once"
+features = [
+  "Accept new line delimited log data through STDIN.",
+  "Automatically enrich logs with host-level context.",
+]
 function_category = "receive"
 output_types = ["log"]
 requirements = {}

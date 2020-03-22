@@ -3,6 +3,10 @@ title = "Socket"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Accept log data over a TCP, UDP, or UDS socket.",
+  "Automatically enrich logs with host-level context.",
+]
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "9000"

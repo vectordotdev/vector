@@ -49,7 +49,7 @@ The Vector `humio_logs` sink
   # General
   type = "humio_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${HUMIO_TOKEN}" # required
   healthcheck = true # optional, default
 
   # Encoding
@@ -66,7 +66,7 @@ The Vector `humio_logs` sink
   # General
   type = "humio_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${HUMIO_TOKEN}" # required
   healthcheck = true # optional, default
   host = "http://myhumiohost.com" # optional, no default
 
@@ -703,7 +703,7 @@ duplicate data downstream.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
+  examples={["${HUMIO_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
   groups={[]}
   name={"token"}
   path={null}

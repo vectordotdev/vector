@@ -48,7 +48,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
@@ -64,7 +64,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
   # General
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
@@ -93,7 +93,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={[]}
   name={"api_key"}
   path={null}

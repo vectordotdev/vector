@@ -4,6 +4,12 @@ beta = true
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+features = [
+  "Send logs to AWS Kinesis Firehose.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]

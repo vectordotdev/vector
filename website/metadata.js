@@ -441,37 +441,7 @@ module.exports = {
       }
     },
     "platforms": {
-      "docker": {
-        "title": "Docker",
-        "archs": [
-          "x86_64",
-          "ARM64",
-          "ARMv7"
-        ],
-        "interfaces": [
-          "docker-cli",
-          "docker-compose"
-        ],
-        "oss": [
-          "Linux",
-          "MacOS"
-        ],
-        "strategies": [
-          {
-            "name": "daemon",
-            "source": "docker"
-          },
-          {
-            "name": "sidecar",
-            "source": "file"
-          },
-          {
-            "name": "service",
-            "source": "http"
-          }
-        ],
-        "name": "docker"
-      }
+      "docker": "#<Platform:0x00007fedd62eb320>"
     }
   },
   "latest_post": {
@@ -21578,6 +21548,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "aws_cloudwatch_logs_sink",
+      "logo_path": null,
       "name": "aws_cloudwatch_logs",
       "operating_systems": [
         "Linux",
@@ -21588,6 +21559,7 @@ module.exports = {
         "AWS"
       ],
       "status": "prod-ready",
+      "title": "AWS Cloudwatch Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21602,6 +21574,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "aws_cloudwatch_metrics_sink",
+      "logo_path": null,
       "name": "aws_cloudwatch_metrics",
       "operating_systems": [
         "Linux",
@@ -21612,6 +21585,7 @@ module.exports = {
         "AWS"
       ],
       "status": "beta",
+      "title": "AWS Cloudwatch Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21626,6 +21600,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "aws_kinesis_firehose_sink",
+      "logo_path": null,
       "name": "aws_kinesis_firehose",
       "operating_systems": [
         "Linux",
@@ -21636,6 +21611,7 @@ module.exports = {
         "AWS"
       ],
       "status": "beta",
+      "title": "AWS Kinesis Firehose",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21650,6 +21626,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "aws_kinesis_streams_sink",
+      "logo_path": null,
       "name": "aws_kinesis_streams",
       "operating_systems": [
         "Linux",
@@ -21660,6 +21637,7 @@ module.exports = {
         "AWS"
       ],
       "status": "beta",
+      "title": "AWS Kinesis Data Streams",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21674,6 +21652,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "aws_s3_sink",
+      "logo_path": "/img/logos/aws_s3.svg",
       "name": "aws_s3",
       "operating_systems": [
         "Linux",
@@ -21684,6 +21663,7 @@ module.exports = {
         "AWS"
       ],
       "status": "beta",
+      "title": "AWS S3",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21699,6 +21679,7 @@ module.exports = {
       ],
       "function_category": "test",
       "id": "blackhole_sink",
+      "logo_path": null,
       "name": "blackhole",
       "operating_systems": [
         "Linux",
@@ -21709,6 +21690,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Blackhole",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21723,6 +21705,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "clickhouse_sink",
+      "logo_path": null,
       "name": "clickhouse",
       "operating_systems": [
         "Linux",
@@ -21733,6 +21716,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Clickhouse",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21748,6 +21732,7 @@ module.exports = {
       ],
       "function_category": "test",
       "id": "console_sink",
+      "logo_path": null,
       "name": "console",
       "operating_systems": [
         "Linux",
@@ -21758,6 +21743,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Console",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21782,6 +21768,7 @@ module.exports = {
         "Datadog"
       ],
       "status": "beta",
+      "title": "Datadog Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21796,6 +21783,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "datadog_metrics_sink",
+      "logo_path": null,
       "name": "datadog_metrics",
       "operating_systems": [
         "Linux",
@@ -21820,6 +21808,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "elasticsearch_sink",
+      "logo_path": null,
       "name": "elasticsearch",
       "operating_systems": [
         "Linux",
@@ -21831,6 +21820,7 @@ module.exports = {
         "Elastic"
       ],
       "status": "beta",
+      "title": "Elasticsearch",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21845,6 +21835,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "file_sink",
+      "logo_path": null,
       "name": "file",
       "operating_systems": [
         "Linux",
@@ -21855,6 +21846,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "File",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21869,6 +21861,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "gcp_cloud_storage_sink",
+      "logo_path": null,
       "name": "gcp_cloud_storage",
       "operating_systems": [
         "Linux",
@@ -21879,6 +21872,7 @@ module.exports = {
         "Google"
       ],
       "status": "beta",
+      "title": "GCP Cloud Storage (GCS)",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21893,6 +21887,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "gcp_pubsub_sink",
+      "logo_path": null,
       "name": "gcp_pubsub",
       "operating_systems": [
         "Linux",
@@ -21903,6 +21898,7 @@ module.exports = {
         "Google"
       ],
       "status": "beta",
+      "title": "GCP PubSub",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21917,6 +21913,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "gcp_stackdriver_logging_sink",
+      "logo_path": null,
       "name": "gcp_stackdriver_logging",
       "operating_systems": [
         "Linux",
@@ -21927,6 +21924,7 @@ module.exports = {
         "Google"
       ],
       "status": "beta",
+      "title": "GCP Stackdriver Logging",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21941,6 +21939,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "honeycomb_sink",
+      "logo_path": null,
       "name": "honeycomb",
       "operating_systems": [
         "Linux",
@@ -21951,6 +21950,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Honeycomb",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21965,6 +21965,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "http_sink",
+      "logo_path": null,
       "name": "http",
       "operating_systems": [
         "Linux",
@@ -21975,6 +21976,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "HTTP",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21989,6 +21991,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "humio_logs_sink",
+      "logo_path": null,
       "name": "humio_logs",
       "operating_systems": [
         "Linux",
@@ -21999,6 +22002,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Humio Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22013,6 +22017,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "influxdb_metrics_sink",
+      "logo_path": null,
       "name": "influxdb_metrics",
       "operating_systems": [
         "Linux",
@@ -22023,6 +22028,7 @@ module.exports = {
         "InfluxData"
       ],
       "status": "beta",
+      "title": "InfluxDB Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22037,6 +22043,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "kafka_sink",
+      "logo_path": null,
       "name": "kafka",
       "operating_systems": [
         "Linux",
@@ -22048,6 +22055,7 @@ module.exports = {
         "Confluent"
       ],
       "status": "prod-ready",
+      "title": "Kafka",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22062,6 +22070,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "logdna_sink",
+      "logo_path": null,
       "name": "logdna",
       "operating_systems": [
         "Linux",
@@ -22072,6 +22081,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "LogDNA",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22086,6 +22096,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "loki_sink",
+      "logo_path": null,
       "name": "loki",
       "operating_systems": [
         "Linux",
@@ -22096,6 +22107,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Loki",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22110,6 +22122,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "new_relic_logs_sink",
+      "logo_path": null,
       "name": "new_relic_logs",
       "operating_systems": [
         "Linux",
@@ -22120,6 +22133,7 @@ module.exports = {
         "New Relic"
       ],
       "status": "beta",
+      "title": "New Relic Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22134,6 +22148,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "papertrail_sink",
+      "logo_path": null,
       "name": "papertrail",
       "operating_systems": [
         "Linux",
@@ -22144,6 +22159,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Papertrail",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22158,6 +22174,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "prometheus_sink",
+      "logo_path": null,
       "name": "prometheus",
       "operating_systems": [
         "Linux",
@@ -22168,6 +22185,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Prometheus",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22182,6 +22200,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "pulsar_sink",
+      "logo_path": null,
       "name": "pulsar",
       "operating_systems": [
         "Linux",
@@ -22192,6 +22211,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Apache Pulsar",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22206,6 +22226,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "sematext_logs_sink",
+      "logo_path": null,
       "name": "sematext_logs",
       "operating_systems": [
         "Linux",
@@ -22216,6 +22237,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Sematext Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22230,6 +22252,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "socket_sink",
+      "logo_path": null,
       "name": "socket",
       "operating_systems": [
         "Linux",
@@ -22240,6 +22263,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Socket",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22254,6 +22278,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "splunk_hec_sink",
+      "logo_path": null,
       "name": "splunk_hec",
       "operating_systems": [
         "Linux",
@@ -22264,6 +22289,7 @@ module.exports = {
         "Splunk"
       ],
       "status": "prod-ready",
+      "title": "Splunk HEC",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22278,6 +22304,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "statsd_sink",
+      "logo_path": null,
       "name": "statsd",
       "operating_systems": [
         "Linux",
@@ -22288,6 +22315,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Statsd",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22302,6 +22330,7 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "vector_sink",
+      "logo_path": null,
       "name": "vector",
       "operating_systems": [
         "Linux",
@@ -22312,6 +22341,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Vector",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22328,6 +22358,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "docker_source",
+      "logo_path": "/img/logos/docker.svg",
       "name": "docker",
       "operating_systems": [
         "Linux",
@@ -22338,6 +22369,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Docker",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22352,6 +22384,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "file_source",
+      "logo_path": null,
       "name": "file",
       "operating_systems": [
         "Linux",
@@ -22362,6 +22395,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "File",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22376,6 +22410,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "http_source",
+      "logo_path": null,
       "name": "http",
       "operating_systems": [
         "Linux",
@@ -22386,6 +22421,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "HTTP",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22400,6 +22436,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "journald_source",
+      "logo_path": null,
       "name": "journald",
       "operating_systems": [
         "Linux"
@@ -22408,6 +22445,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Journald",
       "type": "source",
       "unsupported_operating_systems": [
         "MacOS",
@@ -22423,6 +22461,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "kafka_source",
+      "logo_path": null,
       "name": "kafka",
       "operating_systems": [
         "Linux",
@@ -22433,6 +22472,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Kafka",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22447,6 +22487,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "logplex_source",
+      "logo_path": null,
       "name": "logplex",
       "operating_systems": [
         "Linux",
@@ -22457,6 +22498,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Heroku Logplex",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22471,6 +22513,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "prometheus_source",
+      "logo_path": null,
       "name": "prometheus",
       "operating_systems": [
         "Linux",
@@ -22481,6 +22524,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Prometheus",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22495,6 +22539,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "socket_source",
+      "logo_path": null,
       "name": "socket",
       "operating_systems": [
         "Linux",
@@ -22505,6 +22550,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Socket",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22519,6 +22565,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "splunk_hec_source",
+      "logo_path": null,
       "name": "splunk_hec",
       "operating_systems": [
         "Linux",
@@ -22529,6 +22576,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Splunk HEC",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22543,6 +22591,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "statsd_source",
+      "logo_path": null,
       "name": "statsd",
       "operating_systems": [
         "Linux",
@@ -22553,6 +22602,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Statsd",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22567,6 +22617,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "stdin_source",
+      "logo_path": null,
       "name": "stdin",
       "operating_systems": [
         "Linux",
@@ -22577,6 +22628,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "STDIN",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22591,6 +22643,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "syslog_source",
+      "logo_path": null,
       "name": "syslog",
       "operating_systems": [
         "Linux",
@@ -22601,6 +22654,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Syslog",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22616,6 +22670,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "vector_source",
+      "logo_path": null,
       "name": "vector",
       "operating_systems": [
         "Linux",
@@ -22626,6 +22681,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Vector",
       "type": "source",
       "unsupported_operating_systems": [
 
@@ -22709,6 +22765,7 @@ module.exports = {
       ],
       "function_category": "shape",
       "id": "add_fields_transform",
+      "logo_path": null,
       "name": "add_fields",
       "operating_systems": [
 
@@ -22717,6 +22774,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Add Fields",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22731,6 +22789,7 @@ module.exports = {
       ],
       "function_category": "shape",
       "id": "add_tags_transform",
+      "logo_path": null,
       "name": "add_tags",
       "operating_systems": [
 
@@ -22739,6 +22798,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Add Tags",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22753,6 +22813,7 @@ module.exports = {
       ],
       "function_category": "sanitize",
       "id": "ansi_stripper_transform",
+      "logo_path": null,
       "name": "ansi_stripper",
       "operating_systems": [
 
@@ -22761,6 +22822,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "ANSI Stripper",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22775,6 +22837,7 @@ module.exports = {
       ],
       "function_category": "enrich",
       "id": "aws_ec2_metadata_transform",
+      "logo_path": null,
       "name": "aws_ec2_metadata",
       "operating_systems": [
 
@@ -22783,6 +22846,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "AWS EC2 Metadata",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22797,6 +22861,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "coercer_transform",
+      "logo_path": null,
       "name": "coercer",
       "operating_systems": [
 
@@ -22805,6 +22870,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Coercer",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22819,6 +22885,7 @@ module.exports = {
       ],
       "function_category": "shape",
       "id": "concat_transform",
+      "logo_path": null,
       "name": "concat",
       "operating_systems": [
 
@@ -22827,6 +22894,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Concat",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22841,6 +22909,7 @@ module.exports = {
       ],
       "function_category": "filter",
       "id": "dedupe_transform",
+      "logo_path": null,
       "name": "dedupe",
       "operating_systems": [
 
@@ -22849,6 +22918,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Dedupe events",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22863,6 +22933,7 @@ module.exports = {
       ],
       "function_category": "filter",
       "id": "field_filter_transform",
+      "logo_path": null,
       "name": "field_filter",
       "operating_systems": [
 
@@ -22871,6 +22942,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Field Filter",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22885,6 +22957,7 @@ module.exports = {
       ],
       "function_category": "enrich",
       "id": "geoip_transform",
+      "logo_path": null,
       "name": "geoip",
       "operating_systems": [
 
@@ -22893,6 +22966,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "GeoIP",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22907,6 +22981,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "grok_parser_transform",
+      "logo_path": null,
       "name": "grok_parser",
       "operating_systems": [
 
@@ -22915,6 +22990,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Grok Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22929,6 +23005,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "json_parser_transform",
+      "logo_path": null,
       "name": "json_parser",
       "operating_systems": [
 
@@ -22937,6 +23014,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "JSON Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22952,6 +23030,7 @@ module.exports = {
       ],
       "function_category": "convert",
       "id": "log_to_metric_transform",
+      "logo_path": null,
       "name": "log_to_metric",
       "operating_systems": [
 
@@ -22960,6 +23039,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Log to Metric",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22974,6 +23054,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "logfmt_parser_transform",
+      "logo_path": null,
       "name": "logfmt_parser",
       "operating_systems": [
 
@@ -22982,6 +23063,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Logfmt Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -22996,6 +23078,7 @@ module.exports = {
       ],
       "function_category": "program",
       "id": "lua_transform",
+      "logo_path": null,
       "name": "lua",
       "operating_systems": [
 
@@ -23004,6 +23087,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "LUA",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23018,6 +23102,7 @@ module.exports = {
       ],
       "function_category": "aggregate",
       "id": "merge_transform",
+      "logo_path": null,
       "name": "merge",
       "operating_systems": [
 
@@ -23026,6 +23111,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Merge",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23040,6 +23126,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "regex_parser_transform",
+      "logo_path": null,
       "name": "regex_parser",
       "operating_systems": [
 
@@ -23048,6 +23135,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Regex Parser",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23062,6 +23150,7 @@ module.exports = {
       ],
       "function_category": "shape",
       "id": "remove_fields_transform",
+      "logo_path": null,
       "name": "remove_fields",
       "operating_systems": [
 
@@ -23070,6 +23159,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Remove Fields",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23084,6 +23174,7 @@ module.exports = {
       ],
       "function_category": "shape",
       "id": "remove_tags_transform",
+      "logo_path": null,
       "name": "remove_tags",
       "operating_systems": [
 
@@ -23092,6 +23183,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Remove Tags",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23106,6 +23198,7 @@ module.exports = {
       ],
       "function_category": "shape",
       "id": "rename_fields_transform",
+      "logo_path": null,
       "name": "rename_fields",
       "operating_systems": [
 
@@ -23114,6 +23207,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Rename Fields",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23128,6 +23222,7 @@ module.exports = {
       ],
       "function_category": "filter",
       "id": "sampler_transform",
+      "logo_path": null,
       "name": "sampler",
       "operating_systems": [
 
@@ -23136,6 +23231,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Sampler",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23150,6 +23246,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "split_transform",
+      "logo_path": null,
       "name": "split",
       "operating_systems": [
 
@@ -23158,6 +23255,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Split",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23172,6 +23270,7 @@ module.exports = {
       ],
       "function_category": "route",
       "id": "swimlanes_transform",
+      "logo_path": null,
       "name": "swimlanes",
       "operating_systems": [
 
@@ -23180,6 +23279,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Swimlanes",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23194,6 +23294,7 @@ module.exports = {
       ],
       "function_category": "filter",
       "id": "tag_cardinality_limit_transform",
+      "logo_path": null,
       "name": "tag_cardinality_limit",
       "operating_systems": [
 
@@ -23202,6 +23303,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "title": "Tag Cardinality Limit",
       "type": "transform",
       "unsupported_operating_systems": [
 
@@ -23216,6 +23318,7 @@ module.exports = {
       ],
       "function_category": "parse",
       "id": "tokenizer_transform",
+      "logo_path": null,
       "name": "tokenizer",
       "operating_systems": [
 
@@ -23224,6 +23327,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "title": "Tokenizer",
       "type": "transform",
       "unsupported_operating_systems": [
 

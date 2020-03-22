@@ -549,7 +549,7 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: string
-  key_field = "user_id"
+  key_field = "topic"
 
   # The Kafka session timeout in milliseconds.
   #
@@ -724,11 +724,13 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   hosts = ["http://localhost:9090"]
 
-  # The interval between scrapes in seconds.
+  # The interval between scrapes, in seconds.
   #
-  # * required
+  # * optional
+  # * default: 15
   # * type: int
-  scrape_interval_secs = 1
+  # * unit: seconds
+  scrape_interval_secs = 15
 
 # Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events.
 [sources.socket]
@@ -3636,7 +3638,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${CLICKHOUSE_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.
@@ -3644,7 +3646,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${CLICKHOUSE_USERNAME}"
     user = "username"
 
   #
@@ -4115,7 +4117,7 @@ end
   #
   # * required
   # * type: string
-  api_key = "${DATADOG_API_KEY_ENV_VAR}"
+  api_key = "${DATADOG_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # A prefix that will be added to all metric names.
@@ -4297,7 +4299,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${ELASTICSEARCH_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.
@@ -4305,7 +4307,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${ELASTICSEARCH_USERNAME}"
     user = "username"
 
   #
@@ -4406,7 +4408,7 @@ end
     #
     # * required
     # * type: string
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${ELASTICSEARCH_TOKEN}"
     X-Powered-By = "Vector"
 
   #
@@ -4999,7 +5001,7 @@ end
   # * optional
   # * no default
   # * type: string
-  api_key = "${GCP_API_KEY_ENV_VAR}"
+  api_key = "${GCP_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # The filename for a Google Cloud service account credentials JSON file used to
@@ -5574,7 +5576,7 @@ end
   #
   # * required
   # * type: string
-  api_key = "${MY_API_KEY}"
+  api_key = "${HONEYCOMB_API_KEY}"
   api_key = "some-api-key"
 
   # The dataset that Vector will send logs to.
@@ -5786,7 +5788,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${HTTP_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.
@@ -5794,7 +5796,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${HTTP_USERNAME}"
     user = "username"
 
   #
@@ -5904,7 +5906,7 @@ end
     #
     # * required
     # * type: string
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${HTTP_TOKEN}"
     X-Powered-By = "Vector"
 
   #
@@ -6045,7 +6047,7 @@ end
   #
   # * required
   # * type: string
-  token = "${TOKEN_ENV_VAR}"
+  token = "${HUMIO_TOKEN}"
   token = "A94A8FE5CCB19BA61C4C08"
 
   # Enables/disables the sink healthcheck upon start.
@@ -6295,7 +6297,7 @@ end
   #
   # * required
   # * type: string
-  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  token = "${INFLUXDB_TOKEN}"
   token = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # Sets the password for authentication if you’ve enabled authentication for the
@@ -6304,7 +6306,7 @@ end
   # * optional
   # * no default
   # * type: string
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "${INFLUXDB_PASSWORD}"
   password = "influxdb4ever"
 
   # Sets the username for authentication if you’ve enabled authentication for the
@@ -6663,7 +6665,7 @@ end
   #
   # * required
   # * type: string
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
+  api_key = "${LOGDNA_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # The hostname that will be attached to each batch of events.
@@ -6954,7 +6956,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${LOKI_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.If using GrafanaLab's hosted Loki then
@@ -6963,7 +6965,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${LOKI_USERNAME}"
     user = "username"
 
   #
@@ -7234,7 +7236,7 @@ end
   # * no default
   # * type: string
   insert_key = "xxxx"
-  insert_key = "${INSERT_KEY_ENV_VAR}"
+  insert_key = "${NEW_RELIC_INSERT_KEY}"
 
   # Your New Relic license key (if applicable).
   #
@@ -7242,7 +7244,7 @@ end
   # * no default
   # * type: string
   license_key = "xxxx"
-  license_key = "${LICENSE_KEY_ENV_VAR}"
+  license_key = "${NEW_RELIC_LICENSE_KEY}"
 
   # The API region to send logs to.
   #
@@ -7598,7 +7600,7 @@ end
     # * optional
     # * no default
     # * type: string
-    name = "${NAME_ENV_VAR}"
+    name = "${PULSAR_NAME}"
     name = "name123"
 
     # The basic authentication password.
@@ -7606,7 +7608,7 @@ end
     # * optional
     # * no default
     # * type: string
-    token = "${TOKEN_ENV_VAR}"
+    token = "${PULSAR_TOKEN}"
     token = "123456789"
 
   #
@@ -7669,7 +7671,7 @@ end
   #
   # * required
   # * type: string
-  token = "${SEMATEXT_TOKEN_ENV_VAR}"
+  token = "${SEMATEXT_TOKEN}"
   token = "some-sematext-token"
 
   # Enables/disables the sink healthcheck upon start.
@@ -8075,7 +8077,7 @@ end
   #
   # * required
   # * type: string
-  token = "${TOKEN_ENV_VAR}"
+  token = "${SPLUNK_HEC_TOKEN}"
   token = "A94A8FE5CCB19BA61C4C08"
 
   # Enables/disables the sink healthcheck upon start.

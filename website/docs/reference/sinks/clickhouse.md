@@ -87,8 +87,8 @@ The Vector `clickhouse` sink
 
   # Auth
   auth.strategy = "basic" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${CLICKHOUSE_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${CLICKHOUSE_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
@@ -181,7 +181,7 @@ The authentication strategy to use.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${CLICKHOUSE_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -206,7 +206,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${CLICKHOUSE_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}

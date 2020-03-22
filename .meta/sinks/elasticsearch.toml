@@ -4,6 +4,13 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+features = [
+  "Send logs to Elasticsearch, self-hosted and AWS.",
+  "Batch data to maximize throughput.",
+  "Dynamically partition logs across indexes.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability.",
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -58,14 +65,14 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 
 [sinks.elasticsearch.options.auth.children.password]
 type = "string"
-examples = ["${PASSWORD_ENV_VAR}", "password"]
+examples = ["${ELASTICSEARCH_PASSWORD}", "password"]
 relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication password."
 
 [sinks.elasticsearch.options.auth.children.user]
 type = "string"
-examples = ["${USERNAME_ENV_VAR}", "username"]
+examples = ["${ELASTICSEARCH_USERNAME}", "username"]
 relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication user name."
@@ -82,7 +89,7 @@ description = "Options for custom headers."
 [sinks.elasticsearch.options.headers.children."`[header-name]`"]
 type = "string"
 examples = [
-  {Authorization = "${TOKEN_ENV_VAR}"},
+  {Authorization = "${ELASTICSEARCH_TOKEN}"},
   {"X-Powered-By" = "Vector"}
 ]
 required = true

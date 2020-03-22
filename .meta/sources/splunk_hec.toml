@@ -3,6 +3,11 @@ title = "Splunk HEC"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+features = [
+  "Accept log data just like the Splunk HTTP event collector.",
+  "Automatically parse incoming data into structured events.",
+  "Optionally require authentication on all requests.",
+]
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "80"

@@ -3,6 +3,12 @@ title = "Kafka"
 beta = true
 common = true
 delivery_guarantee = "at_least_once"
+features = [
+  "Consume one or more Kafka topics.",
+  "Automatically discover new files with glob patterns.",
+  "Checkpoint your position to ensure data is not lost between restarts.",
+  "Enrich your logs with useful Kafka context."
+]
 function_category = "collect"
 output_types = ["log"]
 requirements.kafka = ">= 0.8"
@@ -39,7 +45,7 @@ The consumer group name to be used to consume events from Kafka.
 [sources.kafka.options.key_field]
 type = "string"
 common = true
-examples = ["user_id"]
+examples = ["topic"]
 description = """\
 The log field name to use for the topic key. If unspecified, the key would not \
 be added to the log event. If the message has null key, then this field would \

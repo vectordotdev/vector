@@ -4,6 +4,12 @@ common = false
 beta = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+features = [
+  "Send logs to the Humio logging service.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -36,7 +42,7 @@ write_to_description = "[Humio][urls.humio] via the [HEC API][urls.humio_hec]"
 [sinks.humio_logs.options.token]
 type = "string"
 common = true
-examples = ["${TOKEN_ENV_VAR}", "A94A8FE5CCB19BA61C4C08"]
+examples = ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 required = true
 description = "Your Humio ingestion token."
 

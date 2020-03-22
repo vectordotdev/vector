@@ -2,7 +2,7 @@ require_relative "setup_guide"
 
 class Templates
   class SetupGuide
-    def initialize(title, interfaces, strategy, platform: nil, source: nil, sink: nil)
+    def initialize(interfaces, strategy, platform: nil, source: nil, sink: nil)
       if platform && source
         raise ArgumentError.new("You cannot provide both a platform and a source")
       end
@@ -16,32 +16,63 @@ class Templates
       @source = source
       @sink = sink
       @strategy = source.strategies.first
-      @title = title
     end
 
-    def action_phrase(narrative = :second_person)
-      pronoun = narrative == :first_person ? "my" : "your"
+    def action_phrase(narrative = nil)
+      pronoun =
+        case narrative
+        when :first_person
+          "my "
+        when :second_person
+          "your "
+        else
+          nil
+        end
+
+      target =
+        case narrative
+        when :first_person
+          "somewhere"
+        else
+          "anywhere"
+        end
 
       if @source && @sink
-        "collect #{pronoun} #{@title} #{@source.event_types.collect(&:pluralize).to_sentence} and send them to #{@sink.title}"
+        "send #{pronoun}#{normalize_title(@source.title)} #{@source.event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.title)}"
       elsif @source
-        "collect #{pronoun} #{@title} #{@source.event_types.collect(&:pluralize).to_sentence} and send them anywhere"
+        "collect #{pronoun}#{normalize_title(@source.title)} #{@source.event_types.collect(&:pluralize).to_sentence} and send them #{target}"
       elsif @sink
-        "send #{pronoun} #{@sink.event_types.collect(&:pluralize).to_sentence} to #{@title}"
+        "send #{pronoun}#{@sink.event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.title)}"
       end
     end
 
     def features
       @features ||=
         begin
-          features = (@source ? @source.features : []) + (@sink ? @sink.features : [])
+          features = []
 
-          if @source.nil?
-            features << "Collect your #{@sinks.event_types.collect(&:pluralize)} from one or more sources"
+          if @source
+            features << {
+              text: @source.features[0],
+              features: @source.features[1..-1].collect { |f| {text: f }.to_struct }
+            }.to_struct
+          else
+            features << {
+              text: "Collect your #{@sinks.event_types.collect(&:pluralize)} from one or more sources",
+              features: []
+            }.to_struct
           end
 
-          if @sink.nil?
-            features << "Send your #{@source.event_types.collect(&:pluralize).to_sentence} to one or more destinations"
+          if @sink
+            features << {
+              text: @sink.features[0],
+              features: @sink.features[1..-1].collect { |f| {text: f }.to_struct }
+            }.to_struct
+          else
+            features << {
+              text: "Send your #{@source.event_types.collect(&:pluralize).to_sentence} to one or more destinations",
+              features: []
+            }.to_struct
           end
 
           features
@@ -68,5 +99,10 @@ class Templates
           strings
         end
     end
+
+    private
+      def normalize_title(title)
+        title.gsub(/ (logs|metrics)$/i, '')
+      end
   end
 end

@@ -1,3 +1,13 @@
 .credit {
   margin-bottom: 0.5em
 }
+
+.sinkSwitcher {
+  background: var(--ifm-background-color);
+  height: 100%;
+  left: 0;
+  position: sticky;
+  top: 0;
+  width: 500px;
+  z-index: 201;
+}

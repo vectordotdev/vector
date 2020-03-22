@@ -4,6 +4,13 @@ beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+features = [
+  "Send logs over the HTTP protocol.",
+  "Batch and compress data to maximize throughput.",
+  "Optionally set custom headers.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -49,14 +56,14 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 
 [sinks.http.options.auth.children.password]
 type = "string"
-examples = ["${PASSWORD_ENV_VAR}", "password"]
+examples = ["${HTTP_PASSWORD}", "password"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication password."
 
 [sinks.http.options.auth.children.user]
 type = "string"
-examples = ["${USERNAME_ENV_VAR}", "username"]
+examples = ["${HTTP_USERNAME}", "username"]
 required = true
 relevant_when = {strategy = "basic"}
 description = "The basic authentication user name."
@@ -86,7 +93,7 @@ description = "Options for custom headers."
 [sinks.http.options.headers.children."`[header-key]`"]
 type = "string"
 examples = [
-  {"Authorization" = "${TOKEN_ENV_VAR}"},
+  {"Authorization" = "${HTTP_TOKEN}"},
   {"X-Powered-By" = "Vector"},
 ]
 required = true

@@ -6,8 +6,8 @@ delivery_guarantee = "at_least_once"
 features = [
   "Collect Journald/Systemd logs.",
   "Filter which Systemd units you collect them from.",
-  "Checkpoint your position to ensure data is not lost.",
-  "Enrich your logs with useful Systemd context."
+  "Checkpoint your position to ensure data is not lost between restarts.",
+  "Enrich your logs with useful Systemd context.",
 ]
 function_category = "collect"
 only_operating_systems = ["Linux"]

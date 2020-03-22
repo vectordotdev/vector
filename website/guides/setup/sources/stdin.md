@@ -1,21 +1,25 @@
 ---
 id: "setup/sources/stdin"
-title: "Collect your STDIN logs and send them anywhere"
-description: "A guide to quickly, and correctly, collect your STDIN logs and send them anywhere."
+title: "Collect STDIN logs and send them anywhere"
+description: "A guide to quickly, and correctly, collect STDIN logs and send them anywhere."
+platform_name: 
+sink_name: 
+source_name: "stdin"
 tags: ["category: setup","source: stdin"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import CodeHeader from '@site/src/components/CodeHeader';
 import InstallationCommand from '@site/src/components/InstallationCommand';
+import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-> "I just wanna, like, collect my STDIN logs and send them anywhere -- why is all of this so complicated?"
+> "I just wanna, like, collect my STDIN logs and send them somewhere -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to collect your STDIN logs and send them anywhere? Sounds simple! Sadly, it is not.
+So you want to collect STDIN logs and send them anywhere? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
@@ -28,14 +32,37 @@ you up and running in minutes.
      website/guides/setup/sources/stdin.md.erb
 -->
 
-## What We'll Accomplish In This Guide
+## What We'll Accomplish
 
 <ol className="list--checks list--lg list--semi-bold list--primary list--flush">
-  <li>Send your logs to one or more destinations</li>
+  <li>
+    Accept new line delimited log data through STDIN.
+    <ol>
+      <li>Automatically enrich logs with host-level context.</li>
+    </ol>
+  </li>
+  <li>
+    Send your logs to one or more destinations
+  </li>
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
 
-## Deployment Strategy
+## How We'll Do It
+
+To collect STDIN logs and send them anywhere _properly_, and accomplish all of the items above,
+we'll use [Vector][urls.vector_website] and deploy it as a
+sidecar.
+
+### 1. We'll Use Vector
+
+<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
+
+[Vector][urls.vector_website] is a lightweight and ultra-fast tool for building
+observability pipelines. Compared to Logstash and friends, Vector [improves
+throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance] and it's the perfect tool for this task.
+
+### 2. We'll Deploy Vector As A Sidecar
 
 _sidecar.md.erb
 
@@ -61,7 +88,7 @@ _sidecar.md.erb
   block={true}
   select={true}
   defaultValue="console"
-  values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+  values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
 <TabItem value="aws_cloudwatch_logs">
 
 <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -424,7 +451,7 @@ echo '
 [sinks.out]
   type = "honeycomb" # required
   inputs = ["in"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
 ' > vector.toml
 ```
@@ -481,7 +508,7 @@ echo '
 [sinks.out]
   type = "humio_logs" # required
   inputs = ["in"] # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${HUMIO_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -539,7 +566,7 @@ echo '
 [sinks.out]
   type = "logdna" # required
   inputs = ["in"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
 ' > vector.toml
 ```
@@ -681,7 +708,7 @@ echo '
 [sinks.out]
   type = "sematext_logs" # required
   inputs = ["in"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -741,7 +768,7 @@ echo '
   type = "splunk_hec" # required
   inputs = ["in"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Encoding
   encoding.codec = "json" # required
@@ -860,3 +887,5 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [urls.sematext_es]: https://sematext.com/docs/logs/index-events-via-elasticsearch-api/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
+[urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_website]: https://vector.dev

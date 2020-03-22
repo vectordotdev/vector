@@ -3,6 +3,9 @@ title = "Vector"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
+features = [
+  "Accept data from another upstream Vector instance.",
+]
 function_category = "receive"
 output_types = ["log", "metric"]
 requirements.network_port = "9000"

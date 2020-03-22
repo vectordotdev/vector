@@ -3,6 +3,10 @@ title = "Heroku Logplex"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+features = [
+  "Accept Heroku Logplex data over HTTP.",
+  "Automatically parse incoming data into structured events.",
+]
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "80"
@@ -21,3 +25,18 @@ The address to accept connections on. The address _must_ include a port.\
 """
 
 <%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.logplex.options", relevant: "") %>
+
+[sources.logplex.output.log.fields.message]
+type = "string"
+examples = ["This is one line from the plain text HTTP body"]
+relevant_when = {encoding = ["text"]}
+required = true
+description = "The message field, containing the plain text message."
+
+[sources.logplex.output.log.fields.timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47.443232Z"]
+required = true
+description = """\
+The time the event was ingested. Note this may be overridden by JSON payloads.\
+"""

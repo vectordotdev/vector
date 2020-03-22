@@ -472,7 +472,7 @@ Enables/disables the sink healthcheck upon start.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["xxxx","${INSERT_KEY_ENV_VAR}"]}
+  examples={["xxxx","${NEW_RELIC_INSERT_KEY}"]}
   groups={[]}
   name={"insert_key"}
   path={null}
@@ -497,7 +497,7 @@ Your New Relic insert key (if applicable).
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["xxxx","${LICENSE_KEY_ENV_VAR}"]}
+  examples={["xxxx","${NEW_RELIC_LICENSE_KEY}"]}
   groups={[]}
   name={"license_key"}
   path={null}

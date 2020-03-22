@@ -3,6 +3,13 @@ title = "GCP Stackdriver Logging"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Send logs to GCP Stackdriver.",
+  "Leverage any of GCP's IAM strategies.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"

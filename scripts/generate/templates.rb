@@ -494,24 +494,20 @@ class Templates
 
     interfaces = []
     strategy = nil
-    title = nil
 
     if platform
       interfaces = fetch_interfaces(platform.interfaces)
       strategy = fetch_strategy(platform.strategies.first)
       source = metadata.sources.send(strategy.source)
-      title = platform.title
     elsif source
       interfaces = [metadata.installation.interfaces.send("vector-cli")]
       strategy = fetch_strategy(source.strategies.first)
-      title = source.title
     elsif sink
       interfaces = metadata.installation.interfaces_list
       strategy = metadata.installation.strategies.first
-      title = sink.title
     end
 
-    guide = SetupGuide.new(title, interfaces, strategy, source: source, sink: sink)
+    guide = SetupGuide.new(interfaces, strategy, source: source, sink: sink)
 
     render("#{partials_path}/_setup_guide.md", binding).strip
   end

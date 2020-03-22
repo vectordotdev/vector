@@ -4,6 +4,10 @@ beta = false
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Test log throughput.",
+  "Print log totals on an interval.",
+]
 function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]

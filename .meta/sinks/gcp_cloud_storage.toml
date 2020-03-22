@@ -3,6 +3,17 @@ title = "GCP Cloud Storage (GCS)"
 beta = true
 common = true
 delivery_guarantee = "at_least_once"
+features = [
+  "Send logs to GCP Cloud Storage.",
+  "Leverage any of GCP's IAM strategies.",
+  "Confifgure object sizes to reduce request cost.",
+  "Dynamically partition logs across different key prefixes.",
+  "Optionally compress data to reduce storage cost.",
+  "Control object-level ACL.",
+  "Choose different storage classes for cost control.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"

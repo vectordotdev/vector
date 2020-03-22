@@ -88,8 +88,37 @@ class Component
       end
   end
 
+  def for_platform?
+    !requirements.docker_api.nil?
+  end
+
   def field_path_notation_options
     options_list.select(&:field_path_notation?)
+  end
+
+  def function_category?(name)
+    function_category == name
+  end
+
+  def logo_path
+    return @logo_path if defined?(@logo_path)
+
+    variations = Set.new([name])
+
+    event_types.each do |event_name|
+      variations << name.sub(/ #{event_name}$/, "")
+    end
+
+    variations.each do |name|
+      path = "/img/logos/#{name}.svg"
+
+      if File.exists?("#{STATIC_ROOT}#{path}")
+        @logo_path = path
+        break
+      end
+    end
+
+    @logo_path
   end
 
   def only_service_provider?(provider_name)
@@ -191,10 +220,12 @@ class Component
       event_types: event_types,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
+      logo_path: logo_path,
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
       service_providers: service_providers,
       status: status,
+      title: title,
       type: type,
       unsupported_operating_systems: unsupported_operating_systems
     }

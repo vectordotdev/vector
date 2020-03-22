@@ -422,21 +422,25 @@ table.comparison tr td.bar.vector .bar {
   max-height: 135px;
   max-width: 300px;
 }
-.component-icons > * {
+.component-icons > .icon {
   background-color: rgba(var(--ifm-panel-background-rgb), 0.75) !important;
   border-radius: 2rem !important;
+  color: var(--ifm-heading-color);
   flex: 1 1;
+  height: 125px;
   margin-right: var(--ifm-spacing-vertical);
   padding: 1.5em;
+  white-space: pre-line;
 }
-.component-icons > *:last-child {
+.component-icons > .icon:last-child {
   margin-right: 0;
 }
-.component-icons > a {
-  font-size: 2.5em;
-}
-.component-icons .icon img {
+.component-icons > .icon svg {
   height: 100%;
+  width: 100%;
+}
+.component-icons > .icon i.feather {
+  font-size: 4.5em !important;
 }
 
 /**
@@ -527,7 +531,7 @@ table.comparison tr td.bar.vector .bar {
   margin-bottom: var(--ifm-spacing-vertical);
 }
 .filters .search {
-  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) );
 }
 .filters .search--result-count {
   float: right;
@@ -868,8 +872,13 @@ ol.list--semi-bold {
  * A simple list that uses check marks as bullets.
  */
 
-ol.list--checks {
+ol.list--checks,
+ol.list--checks ol {
   list-style: none;
+}
+ol.list--checks ol {
+  font-size: 0.85em;
+  margin: var(--ifm-spacing-vertical) 0;
 }
 ol.list--checks li:before {
   content: '✓';
@@ -992,6 +1001,43 @@ ol li.list--li--pink {
   border-color: var(--ifm-color-content-secondary);
   bottom: 1rem;
   right: 1rem;
+}
+
+/**
+ * modal
+ *
+ * Modal used as an overlap
+ */
+
+.modal {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  right: 40px;
+  bottom: 40px;
+
+  padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 2 );
+  background-color: var(--ifm-background-color);
+  border-radius: calc( var(--ifm-global-radius) * 2 );
+  overflow: scroll;
+}
+
+.modal header {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+.modal header h1 {
+  font-size: 2em;
+}
+
+.modal-overlay {
+  background-color: var(--ifm-color-gray-800);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 201;
 }
 
 /**
@@ -1138,9 +1184,10 @@ ol li.list--li--pink {
   opacity: 0.5;
 }
 a.panel:hover {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-active) !important;
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-color-primary);
   text-decoration: none;
 }
 

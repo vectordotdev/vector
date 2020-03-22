@@ -4,6 +4,12 @@ beta = true
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+features = [
+  "Send logs to the New Relic logging service.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 input_types = ["log"]
 healthcheck = true
@@ -37,13 +43,13 @@ write_to_description = "[New Relic's log service][urls.new_relic] via their [log
 [sinks.new_relic_logs.options.license_key]
 type = "string"
 common = true
-examples = ["xxxx", "${LICENSE_KEY_ENV_VAR}"]
+examples = ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
 description = "Your New Relic license key (if applicable)."
 
 [sinks.new_relic_logs.options.insert_key]
 type = "string"
 common = true
-examples = ["xxxx", "${INSERT_KEY_ENV_VAR}"]
+examples = ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
 description = "Your New Relic insert key (if applicable)."
 
 [sinks.new_relic_logs.options.region]

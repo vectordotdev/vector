@@ -57,7 +57,7 @@ ingests data through Kafka and [outputs `log` events](#output).
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   group_id = "consumer-group-name" # required
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
-  key_field = "user_id" # optional, no default
+  key_field = "topic" # optional, no default
 ```
 
 </TabItem>
@@ -74,7 +74,7 @@ ingests data through Kafka and [outputs `log` events](#output).
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
   auto_offset_reset = "largest" # optional, default
   fetch_wait_max_ms = 100 # optional, default, milliseconds
-  key_field = "user_id" # optional, no default
+  key_field = "topic" # optional, no default
   session_timeout_ms = 10000 # optional, default, milliseconds
   socket_timeout_ms = 60000 # optional, default, milliseconds
 
@@ -205,7 +205,7 @@ The consumer group name to be used to consume events from Kafka.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["user_id"]}
+  examples={["topic"]}
   groups={[]}
   name={"key_field"}
   path={null}

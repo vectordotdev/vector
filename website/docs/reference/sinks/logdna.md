@@ -48,7 +48,7 @@ The Vector `logdna` sink
 [sinks.my_sink_id]
   type = "logdna" # required
   inputs = ["my-source-id"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
   healthcheck = true # optional, default
 ```
@@ -63,7 +63,7 @@ The Vector `logdna` sink
   # General
   type = "logdna" # required
   inputs = ["my-source-id"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
   default_app = "vector" # optional, default
   healthcheck = true # optional, default
@@ -107,7 +107,7 @@ The Vector `logdna` sink
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${LOGDNA_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${LOGDNA_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={[]}
   name={"api_key"}
   path={null}

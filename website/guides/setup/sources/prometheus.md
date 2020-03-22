@@ -1,7 +1,10 @@
 ---
 id: "setup/sources/prometheus"
-title: "Collect your Prometheus metrics and send them anywhere"
-description: "A guide to quickly, and correctly, collect your Prometheus metrics and send them anywhere."
+title: "Collect Prometheus metrics and send them anywhere"
+description: "A guide to quickly, and correctly, collect Prometheus metrics and send them anywhere."
+platform_name: 
+sink_name: 
+source_name: "prometheus"
 tags: ["category: setup","source: prometheus"]
 ---
 
@@ -12,11 +15,11 @@ import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-> "I just wanna, like, collect my Prometheus metrics and send them anywhere -- why is all of this so complicated?"
+> "I just wanna, like, collect my Prometheus metrics and send them somewhere -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to collect your Prometheus metrics and send them anywhere? Sounds simple! Sadly, it is not.
+So you want to collect Prometheus metrics and send them anywhere? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
@@ -29,14 +32,38 @@ you up and running in minutes.
      website/guides/setup/sources/prometheus.md.erb
 -->
 
-## What We'll Accomplish In This Guide
+## What We'll Accomplish
 
 <ol className="list--checks list--lg list--semi-bold list--primary list--flush">
-  <li>Send your metrics to one or more destinations</li>
+  <li>
+    Scrape one or more Prometheus endpoints.
+    <ol>
+      <li>Ingest all Prometheus metric types.</li>
+      <li>Automatically parse metrics into a lossless interoperable data model.</li>
+    </ol>
+  </li>
+  <li>
+    Send your metrics to one or more destinations
+  </li>
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
 
-## Deployment Strategy
+## How We'll Do It
+
+To collect Prometheus metrics and send them anywhere _properly_, and accomplish all of the items above,
+we'll use [Vector][urls.vector_website] and deploy it as a
+daemon.
+
+### 1. We'll Use Vector
+
+<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
+
+[Vector][urls.vector_website] is a lightweight and ultra-fast tool for building
+observability pipelines. Compared to Logstash and friends, Vector [improves
+throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance] and it's the perfect tool for this task.
+
+### 2. We'll Deploy Vector As A Daemon
 
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
@@ -76,7 +103,6 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   type = "aws_cloudwatch_metrics" # required
@@ -105,7 +131,6 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   type = "blackhole" # required
@@ -133,7 +158,6 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   # General
@@ -164,12 +188,11 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   type = "datadog_metrics" # required
   inputs = ["in"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
 ' > vector.toml
 ```
@@ -193,7 +216,6 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   # General
@@ -206,7 +228,7 @@ echo '
 
   # auth
   org = "Organization" # required
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
+  token = "${INFLUXDB_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -229,7 +251,6 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   type = "prometheus" # required
@@ -258,7 +279,6 @@ echo '
 [sources.in]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
 
 [sinks.out]
   type = "statsd" # required
@@ -315,3 +335,5 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [urls.prometheus]: https://prometheus.io/
 [urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.statsd]: https://github.com/statsd/statsd
+[urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_website]: https://vector.dev

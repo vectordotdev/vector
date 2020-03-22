@@ -50,7 +50,7 @@ HTTP Event Collector][urls.splunk_hec].
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
   healthcheck = true # optional, default
   host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
@@ -70,7 +70,7 @@ HTTP Event Collector][urls.splunk_hec].
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
   healthcheck = true # optional, default
   host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
@@ -928,7 +928,7 @@ verifying the remote certificate.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
+  examples={["${SPLUNK_HEC_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
   groups={[]}
   name={"token"}
   path={null}

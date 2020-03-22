@@ -29,6 +29,7 @@
     "react-dom": "^16.8.4",
     "react-github-btn": "^1.1.1",
     "react-inlinesvg": "^1.1.7",
+    "react-modal": "^3.11.2",
     "react-select": "^3.0.8",
     "reading-time": "^1.2.0",
     "strftime": "^0.10.0",

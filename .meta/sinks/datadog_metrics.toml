@@ -4,6 +4,12 @@ beta = true
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+features = [
+  "Send metrics to Datadog.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Automatically aggregate metrics at the edge for improved performance.",
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
@@ -31,7 +37,7 @@ write_to_description = "[Datadog's][urls.datadog] metrics service using [HTTP AP
 [sinks.datadog_metrics.options.api_key]
 type = "string"
 common = true
-examples = ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+examples = ["${DATADOG_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 required = true
 description = "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
 

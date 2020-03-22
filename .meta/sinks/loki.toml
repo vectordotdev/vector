@@ -1,9 +1,16 @@
 [sinks.loki]
-title = "loki"
+title = "Loki"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+features = [
+  "Send structured logs to the Loki logging service.",
+  "Batch data to maximize throughput.",
+  "Set custom labels to be added to all log data.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -114,7 +121,7 @@ basic = "The [basic authentication strategy][urls.basic_auth]."
 
 [sinks.loki.options.auth.children.password]
 type = "string"
-examples = ["${PASSWORD_ENV_VAR}", "password"]
+examples = ["${LOKI_PASSWORD}", "password"]
 relevant_when = {strategy = "basic"}
 required = true
 description = """\
@@ -126,7 +133,7 @@ to your `instanceId`.\
 
 [sinks.loki.options.auth.children.user]
 type = "string"
-examples = ["${USERNAME_ENV_VAR}", "username"]
+examples = ["${LOKI_USERNAME}", "username"]
 relevant_when = {strategy = "basic"}
 required = true
 description = """\

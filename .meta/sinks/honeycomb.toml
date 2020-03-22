@@ -4,6 +4,12 @@ beta = true
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+features = [
+  "Send structured logs to the Honeycomb observability service.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -31,7 +37,7 @@ requirements = {}
 
 [sinks.honeycomb.options.api_key]
 type = "string"
-examples = ["${MY_API_KEY}", "some-api-key"]
+examples = ["${HONEYCOMB_API_KEY}", "some-api-key"]
 required = true
 description = "The team key that will be used to authenticate against Honeycomb."
 

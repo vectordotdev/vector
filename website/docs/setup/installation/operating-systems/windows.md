@@ -82,7 +82,7 @@ collecting and forwarding all data on the host.
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -458,7 +458,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "honeycomb" # required
      inputs = ["in"] # required
-     api_key = "${MY_API_KEY}" # required
+     api_key = "${HONEYCOMB_API_KEY}" # required
      dataset = "my-honeycomb-dataset" # required
    ' > configector.toml
    ```
@@ -517,7 +517,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "humio_logs" # required
      inputs = ["in"] # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${HUMIO_TOKEN}" # required
    ' > configector.toml
    ```
 
@@ -577,7 +577,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "logdna" # required
      inputs = ["in"] # required
-     api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+     api_key = "${LOGDNA_API_KEY}" # required
      hostname = "my-local-machine" # required
    ' > configector.toml
    ```
@@ -724,7 +724,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "sematext_logs" # required
      inputs = ["in"] # required
-     token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+     token = "${SEMATEXT_TOKEN}" # required
    ' > configector.toml
    ```
 
@@ -786,7 +786,7 @@ collecting and forwarding all data on the host.
      type = "splunk_hec" # required
      inputs = ["in"] # required
      host = "http://my-splunk-host.com" # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${SPLUNK_HEC_TOKEN}" # required
 
      # Encoding
      encoding.codec = "json" # required
@@ -888,7 +888,7 @@ _service.md.erb
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -1264,7 +1264,7 @@ _service.md.erb
    [sinks.out]
      type = "honeycomb" # required
      inputs = ["in"] # required
-     api_key = "${MY_API_KEY}" # required
+     api_key = "${HONEYCOMB_API_KEY}" # required
      dataset = "my-honeycomb-dataset" # required
    ' > configector.toml
    ```
@@ -1323,7 +1323,7 @@ _service.md.erb
    [sinks.out]
      type = "humio_logs" # required
      inputs = ["in"] # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${HUMIO_TOKEN}" # required
    ' > configector.toml
    ```
 
@@ -1383,7 +1383,7 @@ _service.md.erb
    [sinks.out]
      type = "logdna" # required
      inputs = ["in"] # required
-     api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+     api_key = "${LOGDNA_API_KEY}" # required
      hostname = "my-local-machine" # required
    ' > configector.toml
    ```
@@ -1530,7 +1530,7 @@ _service.md.erb
    [sinks.out]
      type = "sematext_logs" # required
      inputs = ["in"] # required
-     token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+     token = "${SEMATEXT_TOKEN}" # required
    ' > configector.toml
    ```
 
@@ -1592,7 +1592,7 @@ _service.md.erb
      type = "splunk_hec" # required
      inputs = ["in"] # required
      host = "http://my-splunk-host.com" # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${SPLUNK_HEC_TOKEN}" # required
 
      # Encoding
      encoding.codec = "json" # required
@@ -1687,7 +1687,7 @@ collecting and forwarding all data on the host.
   block={true}
   select={true}
   defaultValue="console"
-  values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+  values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
 <TabItem value="aws_cloudwatch_logs">
 
 <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -2063,7 +2063,7 @@ echo '
 [sinks.out]
   type = "honeycomb" # required
   inputs = ["in"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
 ' > vector.toml
 ```
@@ -2122,7 +2122,7 @@ echo '
 [sinks.out]
   type = "humio_logs" # required
   inputs = ["in"] # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${HUMIO_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -2182,7 +2182,7 @@ echo '
 [sinks.out]
   type = "logdna" # required
   inputs = ["in"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
 ' > vector.toml
 ```
@@ -2329,7 +2329,7 @@ echo '
 [sinks.out]
   type = "sematext_logs" # required
   inputs = ["in"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -2391,7 +2391,7 @@ echo '
   type = "splunk_hec" # required
   inputs = ["in"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Encoding
   encoding.codec = "json" # required
@@ -2480,7 +2480,7 @@ _service.md.erb
   block={true}
   select={true}
   defaultValue="console"
-  values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+  values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
 <TabItem value="aws_cloudwatch_logs">
 
 <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -2856,7 +2856,7 @@ echo '
 [sinks.out]
   type = "honeycomb" # required
   inputs = ["in"] # required
-  api_key = "${MY_API_KEY}" # required
+  api_key = "${HONEYCOMB_API_KEY}" # required
   dataset = "my-honeycomb-dataset" # required
 ' > vector.toml
 ```
@@ -2915,7 +2915,7 @@ echo '
 [sinks.out]
   type = "humio_logs" # required
   inputs = ["in"] # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${HUMIO_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -2975,7 +2975,7 @@ echo '
 [sinks.out]
   type = "logdna" # required
   inputs = ["in"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
 ' > vector.toml
 ```
@@ -3122,7 +3122,7 @@ echo '
 [sinks.out]
   type = "sematext_logs" # required
   inputs = ["in"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
 ' > vector.toml
 ```
 
@@ -3184,7 +3184,7 @@ echo '
   type = "splunk_hec" # required
   inputs = ["in"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Encoding
   encoding.codec = "json" # required
@@ -3274,7 +3274,7 @@ collecting and forwarding all data on the host.
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -3650,7 +3650,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "honeycomb" # required
      inputs = ["in"] # required
-     api_key = "${MY_API_KEY}" # required
+     api_key = "${HONEYCOMB_API_KEY}" # required
      dataset = "my-honeycomb-dataset" # required
    ' > vector.toml
    ```
@@ -3709,7 +3709,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "humio_logs" # required
      inputs = ["in"] # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${HUMIO_TOKEN}" # required
    ' > vector.toml
    ```
 
@@ -3769,7 +3769,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "logdna" # required
      inputs = ["in"] # required
-     api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+     api_key = "${LOGDNA_API_KEY}" # required
      hostname = "my-local-machine" # required
    ' > vector.toml
    ```
@@ -3916,7 +3916,7 @@ collecting and forwarding all data on the host.
    [sinks.out]
      type = "sematext_logs" # required
      inputs = ["in"] # required
-     token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+     token = "${SEMATEXT_TOKEN}" # required
    ' > vector.toml
    ```
 
@@ -3978,7 +3978,7 @@ collecting and forwarding all data on the host.
      type = "splunk_hec" # required
      inputs = ["in"] # required
      host = "http://my-splunk-host.com" # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${SPLUNK_HEC_TOKEN}" # required
 
      # Encoding
      encoding.codec = "json" # required
@@ -4062,7 +4062,7 @@ _service.md.erb
      block={true}
      select={true}
      defaultValue="console"
-     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
+     values={[{"label":"AWS Cloudwatch Logs","value":"aws_cloudwatch_logs"},{"label":"AWS Kinesis Firehose","value":"aws_kinesis_firehose"},{"label":"AWS Kinesis Data Streams","value":"aws_kinesis_streams"},{"label":"AWS S3","value":"aws_s3"},{"label":"Blackhole","value":"blackhole"},{"label":"Clickhouse","value":"clickhouse"},{"label":"Console","value":"console"},{"label":"Elasticsearch","value":"elasticsearch"},{"label":"File","value":"file"},{"label":"GCP Cloud Storage (GCS)","value":"gcp_cloud_storage"},{"label":"GCP PubSub","value":"gcp_pubsub"},{"label":"GCP Stackdriver Logging","value":"gcp_stackdriver_logging"},{"label":"Honeycomb","value":"honeycomb"},{"label":"HTTP","value":"http"},{"label":"Humio Logs","value":"humio_logs"},{"label":"Kafka","value":"kafka"},{"label":"LogDNA","value":"logdna"},{"label":"Loki","value":"loki"},{"label":"New Relic Logs","value":"new_relic_logs"},{"label":"Papertrail","value":"papertrail"},{"label":"Apache Pulsar","value":"pulsar"},{"label":"Sematext Logs","value":"sematext_logs"},{"label":"Socket","value":"socket"},{"label":"Splunk HEC","value":"splunk_hec"},{"label":"Vector","value":"vector"}]}>
    <TabItem value="aws_cloudwatch_logs">
 
    <CodeHeader icon="info" text="adjust the values as necessary" />
@@ -4438,7 +4438,7 @@ _service.md.erb
    [sinks.out]
      type = "honeycomb" # required
      inputs = ["in"] # required
-     api_key = "${MY_API_KEY}" # required
+     api_key = "${HONEYCOMB_API_KEY}" # required
      dataset = "my-honeycomb-dataset" # required
    ' > vector.toml
    ```
@@ -4497,7 +4497,7 @@ _service.md.erb
    [sinks.out]
      type = "humio_logs" # required
      inputs = ["in"] # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${HUMIO_TOKEN}" # required
    ' > vector.toml
    ```
 
@@ -4557,7 +4557,7 @@ _service.md.erb
    [sinks.out]
      type = "logdna" # required
      inputs = ["in"] # required
-     api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+     api_key = "${LOGDNA_API_KEY}" # required
      hostname = "my-local-machine" # required
    ' > vector.toml
    ```
@@ -4704,7 +4704,7 @@ _service.md.erb
    [sinks.out]
      type = "sematext_logs" # required
      inputs = ["in"] # required
-     token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+     token = "${SEMATEXT_TOKEN}" # required
    ' > vector.toml
    ```
 
@@ -4766,7 +4766,7 @@ _service.md.erb
      type = "splunk_hec" # required
      inputs = ["in"] # required
      host = "http://my-splunk-host.com" # required
-     token = "${TOKEN_ENV_VAR}" # required
+     token = "${SPLUNK_HEC_TOKEN}" # required
 
      # Encoding
      encoding.codec = "json" # required

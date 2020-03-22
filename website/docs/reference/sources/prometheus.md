@@ -41,7 +41,7 @@ ingests data through the Prometheus text exposition format and [outputs
 [sources.my_source_id]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
-  scrape_interval_secs = 1 # required
+  scrape_interval_secs = 15 # optional, default, seconds
 ```
 
 <Fields filters={true}>
@@ -74,22 +74,22 @@ Host addresses to scrape metrics from.
 
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={15}
   enumValues={null}
-  examples={[1]}
+  examples={[15]}
   groups={[]}
   name={"scrape_interval_secs"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"int"}
-  unit={null}
+  unit={"seconds"}
   >
 
 ### scrape_interval_secs
 
-The interval between scrapes in seconds.
+The interval between scrapes, in seconds.
 
 
 

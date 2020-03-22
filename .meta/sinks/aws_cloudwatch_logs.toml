@@ -4,6 +4,13 @@ beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+features = [
+  "Send logs to AWS Cloudwatch.",
+  "Dynamically partition logs across CloudWatch groups and streams.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]

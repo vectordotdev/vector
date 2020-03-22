@@ -3,6 +3,11 @@ title = "HTTP"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Accept log data over HTTP.",
+  "Decode JSON, NDJSON, and text.",
+  "Enrich your logs with select HTTP headers.",
+]
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "80"
@@ -44,6 +49,8 @@ will be inserted into the log event if the corresponding HTTP header was \
 missing.\
 """
 
+<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.http.options", relevant: "") %>
+
 [sources.http.output.log.fields.message]
 type = "string"
 examples = ["This is one line from the plain text HTTP body"]
@@ -58,5 +65,3 @@ required = true
 description = """\
 The time the event was ingested. Note this may be overridden by JSON payloads.\
 """
-
-<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.http.options", relevant: "") %>

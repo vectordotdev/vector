@@ -4,6 +4,10 @@ beta = true
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Stream metrics over a StatsD UDP protocol.",
+  "Automatically aggregate metrics at the edge for improved performance.",
+]
 function_category = "transmit"
 healthcheck = false
 requirements = {}
