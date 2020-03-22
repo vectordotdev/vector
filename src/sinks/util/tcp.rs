@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
-    tls::{tls_connector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
+    tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -15,10 +15,9 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
-    net::tcp::{ConnectFuture, TcpStream},
+    net::tcp::TcpStream,
     timer::Delay,
 };
-use tokio_openssl::{ConnectAsync as SslConnectAsync, ConnectConfigurationExt};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
 
@@ -75,8 +74,7 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     ResolvingDns(crate::dns::ResolverFuture),
-    Connecting(ConnectFuture),
-    TlsConnecting(SslConnectAsync<TcpStream>),
+    Connecting(MaybeTlsConnector),
     Connected(TcpOrTlsStream),
     Backoff(Delay),
 }
@@ -123,7 +121,13 @@ impl TcpSink {
                             let addr = SocketAddr::new(ip, self.port);
 
                             debug!(message = "connecting", %addr);
-                            TcpSinkState::Connecting(TcpStream::connect(&addr))
+                            match self.tls.connect(self.host.clone(), addr) {
+                                Ok(connector) => TcpSinkState::Connecting(connector),
+                                Err(error) => {
+                                    error!(message = "unable to connect", %error);
+                                    TcpSinkState::Backoff(self.next_delay())
+                                }
+                            }
                         } else {
                             error!("DNS resolved but there were no IP addresses.");
                             TcpSinkState::Backoff(self.next_delay())
@@ -145,24 +149,10 @@ impl TcpSink {
                     }
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
-                    Ok(Async::Ready(socket)) => {
+                    Ok(Async::Ready(stream)) => {
                         debug!(message = "connected");
                         self.backoff = Self::fresh_backoff();
-                        match self.tls.tls() {
-                            Some(_) => match tls_connector(&self.tls) {
-                                Ok(connector) => TcpSinkState::TlsConnecting(
-                                    connector.connect_async(&self.host, socket),
-                                ),
-                                Err(err) => {
-                                    error!(message = "unable to establish TLS connection.", error = %err);
-                                    TcpSinkState::Backoff(self.next_delay())
-                                }
-                            },
-                            None => TcpSinkState::Connected(FramedWrite::new(
-                                MaybeTlsStream::Raw(socket),
-                                BytesCodec::new(),
-                            )),
-                        }
+                        TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
                     }
                     Ok(Async::NotReady) => {
                         return Ok(Async::NotReady);
@@ -172,23 +162,6 @@ impl TcpSink {
                         TcpSinkState::Backoff(self.next_delay())
                     }
                 },
-                TcpSinkState::TlsConnecting(ref mut connect_future) => {
-                    match connect_future.poll() {
-                        Ok(Async::Ready(socket)) => {
-                            debug!(message = "negotiated TLS.");
-                            self.backoff = Self::fresh_backoff();
-                            TcpSinkState::Connected(FramedWrite::new(
-                                MaybeTlsStream::Tls(socket),
-                                BytesCodec::new(),
-                            ))
-                        }
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Err(error) => {
-                            error!(message = "unable to negotiate TLS.", %error);
-                            TcpSinkState::Backoff(self.next_delay())
-                        }
-                    }
-                }
                 TcpSinkState::Connected(ref mut connection) => {
                     return Ok(Async::Ready(connection));
                 }

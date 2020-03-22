@@ -1,8 +1,6 @@
-#[cfg(feature = "sources-tls")]
-use openssl::ssl::HandshakeError;
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, HandshakeError, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
 use std::fmt::Debug;
@@ -15,11 +13,13 @@ use tokio_openssl::SslStream;
 #[cfg(feature = "sources-tls")]
 mod incoming;
 mod maybe_tls;
+mod outgoing;
 mod settings;
 
 #[cfg(feature = "sources-tls")]
 pub(crate) use incoming::MaybeTlsListener;
 pub(crate) use maybe_tls::MaybeTls;
+pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
@@ -70,7 +70,6 @@ pub enum TlsError {
     },
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
-    #[cfg(feature = "sources-tls")]
     #[snafu(display("TLS handshake failed: {}", source))]
     Handshake { source: HandshakeError<TcpStream> },
     #[snafu(display("Incoming listener failed: {}", source))]
@@ -93,6 +92,8 @@ pub enum TlsError {
     ParsePkcs12 { source: ErrorStack },
     #[snafu(display("TCP bind failed: {}", source))]
     TcpBind { source: IoError },
+    #[snafu(display("{}", source))]
+    Connect { source: std::io::Error },
 }
 
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
@@ -114,7 +115,7 @@ pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslCo
     Ok(builder)
 }
 
-pub(crate) fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
+fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let verify_hostname = settings
         .tls()
         .map(|settings| settings.verify_hostname)
