@@ -149,7 +149,7 @@ impl TcpSink {
                         debug!(message = "connected");
                         self.backoff = Self::fresh_backoff();
                         match self.tls.tls() {
-                            Some(_) => match tls_connector(self.tls.clone()) {
+                            Some(_) => match tls_connector(&self.tls) {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
                                     connector.connect_async(&self.host, socket),
                                 ),

@@ -149,7 +149,7 @@ where
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector_builder(tls_settings.into())?;
+        let tls = tls_connector_builder(&tls_settings.into())?;
         let https = HttpsConnector::with_connector(http, tls)?;
 
         let client = hyper::Client::builder()
