@@ -223,6 +223,8 @@ module.exports = {
             
               "reference/sinks/console",
             
+              "reference/sinks/datadog_logs",
+            
               "reference/sinks/datadog_metrics",
             
               "reference/sinks/elasticsearch",
@@ -254,6 +256,8 @@ module.exports = {
               "reference/sinks/papertrail",
             
               "reference/sinks/prometheus",
+            
+              "reference/sinks/pulsar",
             
               "reference/sinks/sematext_logs",
             

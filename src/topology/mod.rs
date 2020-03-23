@@ -11,7 +11,7 @@ use crate::topology::builder::Pieces;
 
 use crate::buffers;
 use crate::runtime;
-use crate::shutdown::ShutdownCoordinator;
+use crate::shutdown::SourceShutdownCoordinator;
 use futures01::{
     future,
     sync::{mpsc, oneshot},
@@ -30,7 +30,7 @@ pub struct RunningTopology {
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
-    shutdown_coordinator: ShutdownCoordinator,
+    shutdown_coordinator: SourceShutdownCoordinator,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
@@ -56,7 +56,7 @@ pub fn start_validated(
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
-        shutdown_coordinator: ShutdownCoordinator::new(),
+        shutdown_coordinator: SourceShutdownCoordinator::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -88,6 +88,14 @@ pub fn validate(config: &Config, exec: runtime::TaskExecutor) -> Option<Pieces> 
 }
 
 impl RunningTopology {
+    /// Sends the shutdown signal to all sources and returns a future that resolves
+    /// once all components (sources, transforms, and sinks) have finished shutting down.
+    /// Transforms and sinks should shut down automatically once their input tasks finish.
+    /// Note that this takes ownership of `self`, so once this function returns everything in the
+    /// RunningTopology instance has been dropped except for the `tasks` map, which gets moved
+    /// into the returned future and is used to poll for when the tasks have completed. One the
+    /// returned future is dropped then everything from this RunningTopology instance is fully
+    /// dropped.
     #[must_use]
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         let mut running_tasks = self.tasks;
@@ -150,13 +158,27 @@ impl RunningTopology {
             .map(|_| ())
             .map_err(|_: future::SharedError<()>| ());
 
-        future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
-            Box::new(timeout),
-            Box::new(reporter),
-            Box::new(success),
-        ])
-        .map(|_| ())
-        .map_err(|_| ())
+        let shutdown_complete_future =
+            future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
+                Box::new(timeout),
+                Box::new(reporter),
+                Box::new(success),
+            ])
+            .map(|_| ())
+            .map_err(|_| ());
+
+        // TODO: Once all Sources properly look for the ShutdownSignal, remove this in favor of
+        // using 'deadline' instead.
+        let source_shutdown_deadline = Instant::now() + Duration::from_secs(3);
+
+        // Now kick off the shutdown process by shutting down the sources.
+        let source_shutdown_complete = self
+            .shutdown_coordinator
+            .shutdown_all(source_shutdown_deadline);
+
+        source_shutdown_complete
+            .join(shutdown_complete_future)
+            .map(|_| ())
     }
 
     pub fn reload_config_and_respawn(
@@ -228,32 +250,40 @@ impl RunningTopology {
             to_remove_change_add(&self.config.sources, &new_config.sources);
 
         // First pass to tell the sources to shut down.
+        let mut source_shutdown_complete_futures = Vec::new();
+        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
+        // more like 30-60 seconds.
+        info!("Waiting for up to 3 seconds for sources to finish shutting down");
+        let deadline = Instant::now() + Duration::from_secs(3);
         for name in &sources_to_remove {
             info!("Removing source {:?}", name);
 
             self.tasks.remove(name).unwrap().forget();
 
             self.remove_outputs(name);
-            self.shutdown_source_begin(name);
+            source_shutdown_complete_futures
+                .push(self.shutdown_coordinator.shutdown_source(name, deadline));
         }
         for name in &sources_to_change {
             info!("Rebuilding source {:?}", name);
 
             self.remove_outputs(name);
-            self.shutdown_source_begin(name);
+            source_shutdown_complete_futures
+                .push(self.shutdown_coordinator.shutdown_source(name, deadline));
         }
 
-        // Second pass to wait for the shutdowns to complete
-        // TODO: Once all Sources properly look for the ShutdownSignal, up this time limit to something
-        // more like 30-60 seconds.
+        // Wait for the shutdowns to complete
         info!("Waiting for up to 3 seconds for sources to finish shutting down");
-        let deadline = Instant::now() + Duration::from_secs(3);
+        rt.block_on(future::join_all(source_shutdown_complete_futures))
+            .unwrap();
+
+        // Second pass now that all sources have shut down for final cleanup and spawning
+        // new versions of sources as needed.
         for name in &sources_to_remove {
-            self.shutdown_source_end(rt, name, deadline.clone());
+            self.source_tasks.remove(name).wait().unwrap();
         }
         for name in &sources_to_change {
-            self.shutdown_source_end(rt, name, deadline);
-
+            self.source_tasks.remove(name).wait().unwrap();
             self.setup_outputs(name, &mut new_pieces);
             self.spawn_source(name, &mut new_pieces, rt);
         }
@@ -384,19 +414,6 @@ impl RunningTopology {
             name.to_string(),
             oneshot::spawn(source_task, &rt.executor()),
         );
-    }
-
-    /// Informs a Source that it should shut down, but does not wait for the shutdown to complete.
-    fn shutdown_source_begin(&mut self, name: &str) {
-        self.shutdown_coordinator.shutdown_source_begin(name);
-    }
-
-    /// Waits for the Source to finish shutting down until a given deadline and then forcibly shuts
-    /// down the source if it hasn't finished by then.
-    fn shutdown_source_end(&mut self, rt: &mut runtime::Runtime, name: &str, deadline: Instant) {
-        self.shutdown_coordinator
-            .shutdown_source_end(rt, name.to_string(), deadline);
-        self.source_tasks.remove(name).wait().unwrap();
     }
 
     fn remove_outputs(&mut self, name: &str) {

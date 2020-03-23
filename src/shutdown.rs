@@ -1,8 +1,7 @@
-use crate::runtime;
-use futures01::{future, stream::Stream, Async, Future};
+use futures01::{future, Async, Future};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::timer;
 
@@ -66,13 +65,13 @@ impl ShutdownSignal {
     }
 }
 
-pub struct ShutdownCoordinator {
+pub struct SourceShutdownCoordinator {
     shutdown_begun_triggers: HashMap<String, Trigger>,
     shutdown_force_triggers: HashMap<String, Trigger>,
     shutdown_complete_tripwires: HashMap<String, Tripwire>,
 }
 
-impl ShutdownCoordinator {
+impl SourceShutdownCoordinator {
     pub fn new() -> Self {
         Self {
             shutdown_begun_triggers: HashMap::new(),
@@ -158,154 +157,152 @@ impl ShutdownCoordinator {
         }
     }
 
-    pub fn shutdown_source_begin(&mut self, name: &str) {
-        self.shutdown_begun_triggers
-            .remove(name)
-            .expect(&format!(
-                "shutdown_begun_trigger for source '{}' not found in the ShutdownCoordinator",
+    /// Sends a signal to begin shutting down to all sources, and returns a future that
+    /// resolves once all sources have either shut down completely, or have been sent the
+    /// force shutdown signal.  The force shutdown signal will be sent to any sources that
+    /// don't cleanly shut down before the given `deadline`.
+    pub fn shutdown_all(self, deadline: Instant) -> impl Future<Item = (), Error = ()> {
+        let mut complete_futures = Vec::new();
+
+        let shutdown_begun_triggers = self.shutdown_begun_triggers;
+        let mut shutdown_complete_tripwires = self.shutdown_complete_tripwires;
+        let mut shutdown_force_triggers = self.shutdown_force_triggers;
+
+        for (name, trigger) in shutdown_begun_triggers {
+            trigger.cancel();
+
+            let shutdown_complete_tripwire =
+                shutdown_complete_tripwires.remove(&name).expect(&format!(
+                "shutdown_complete_tripwire for source '{}' not found in the ShutdownCoordinator",
                 name
-            ))
-            .cancel();
+            ));
+            let shutdown_force_trigger = shutdown_force_triggers.remove(&name).expect(&format!(
+                "shutdown_force_trigger for source '{}' not found in the ShutdownCoordinator",
+                name
+            ));
+
+            let source_complete = SourceShutdownCoordinator::shutdown_source_complete(
+                shutdown_complete_tripwire,
+                shutdown_force_trigger,
+                name,
+                deadline,
+            );
+
+            complete_futures.push(source_complete);
+        }
+
+        future::join_all(complete_futures)
+            .map(|_| ())
+            .map_err(|_| ())
     }
 
-    /// Waits for the source to shut down until the deadline.  If the source does not
-    /// notify the shutdown_complete_tripwire for this source before the dealine, then signals
-    /// the shutdown_force_trigger for this source to force it to shut down.  Returns whether
-    /// or not the source shutdown gracefully.
-    // TODO: The timing and reporting logic is very similar to the logic in
-    // `RunningTopology::stop()`. Once `RunningTopology::stop()` has been updated to utilize the
-    // ShutdownCoordinator, see if some of this logic can be de-duped.
-    pub fn shutdown_source_end(
+    /// Sends the signal to the given source to begin shutting down. Returns a future that resolves
+    /// when the source has finished shutting down cleanly or been sent the force shutdown signal.
+    /// The returned future resolves to a bool that indicates if the source shut down cleanly before
+    /// the given `deadline`. If the result is false then that means the source failed to shut down
+    /// before `deadline` and had to be force-shutdown.
+    pub fn shutdown_source(
         &mut self,
-        rt: &mut runtime::Runtime,
-        name: String,
+        name: &str,
         deadline: Instant,
-    ) -> bool {
-        let name2 = name.clone();
-        let name3 = name.clone();
+    ) -> impl Future<Item = bool, Error = ()> {
+        let begin_shutdown_trigger = self.shutdown_begun_triggers.remove(name).expect(&format!(
+            "shutdown_begun_trigger for source '{}' not found in the ShutdownCoordinator",
+            name
+        ));
+        // This is what actually triggers the source to begin shutting down.
+        begin_shutdown_trigger.cancel();
+
         let shutdown_complete_tripwire =
             self.shutdown_complete_tripwires
-                .remove(&name)
+                .remove(name)
                 .expect(&format!(
                 "shutdown_complete_tripwire for source '{}' not found in the ShutdownCoordinator",
                 name
             ));
-        let shutdown_force_trigger = self.shutdown_force_triggers.remove(&name).expect(&format!(
+        let shutdown_force_trigger = self.shutdown_force_triggers.remove(name).expect(&format!(
             "shutdown_force_trigger for source '{}' not found in the ShutdownCoordinator",
             name
         ));
+        SourceShutdownCoordinator::shutdown_source_complete(
+            shutdown_complete_tripwire,
+            shutdown_force_trigger,
+            name.to_owned(),
+            deadline,
+        )
+    }
 
-        let success = shutdown_complete_tripwire.map(move |_| {
-            info!("Source \"{}\" shut down successfully", name);
-        });
+    fn shutdown_source_complete(
+        shutdown_complete_tripwire: Tripwire,
+        shutdown_force_trigger: Trigger,
+        name: String,
+        deadline: Instant,
+    ) -> impl Future<Item = bool, Error = ()> {
+        let success = shutdown_complete_tripwire.map(move |_| true);
+
         let timeout = timer::Delay::new(deadline)
             .map(move |_| {
                 error!(
                     "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
-                    name2,
+                    name,
                 );
+                false
             })
             .map_err(|err| panic!("Timer error: {:?}", err));
-        let reporter = timer::Interval::new_interval(Duration::from_secs(5))
-            .inspect(move |_| {
-                let time_remaining = if deadline > Instant::now() {
-                    format!(
-                        "{} seconds remaining",
-                        (deadline - Instant::now()).as_secs()
-                    )
+
+        let union = success.select(timeout);
+        union
+            .map(|(success, _)| {
+                if success {
+                    shutdown_force_trigger.disable();
                 } else {
-                    "overdue".to_string()
-                };
-
-                info!(
-                    "Still waiting on source \"{}\" to shut down. {}",
-                    name3, time_remaining,
-                );
+                    shutdown_force_trigger.cancel();
+                }
+                success
             })
-            .filter(|_| false) // Run indefinitely without emitting items
-            .into_future()
-            .map(|_| ())
-            .map_err(|(err, _)| panic!("Timer error: {:?}", err));
-
-        let union = future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
-            Box::new(success),
-            Box::new(timeout),
-            Box::new(reporter),
-        ]);
-
-        // Now block until one of the futures resolves and use the index of the resolved future
-        // to decide whether it was the success or timeout future that resolved first.
-        let index = match rt.block_on(union) {
-            Ok((_, index, _)) => index,
-            Err((err, _, _)) => panic!(
-                "Error from select_all future while waiting for source to shut down: {:?}",
-                err
-            ),
-        };
-
-        let success = if index == 0 {
-            true
-        } else if index == 1 {
-            false
-        } else {
-            panic!(
-                "Neither success nor timeout future finished.  Index finished: {}",
-                index
-            );
-        };
-        if success {
-            shutdown_force_trigger.disable();
-        } else {
-            shutdown_force_trigger.cancel();
-        }
-        success
+            .map_err(|_| ())
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::runtime;
-    use crate::shutdown::ShutdownCoordinator;
+    use crate::shutdown::SourceShutdownCoordinator;
     use futures01::future::Future;
     use std::time::{Duration, Instant};
 
     #[test]
     fn shutdown_coordinator_shutdown_source_clean() {
         let mut rt = runtime::Runtime::new().unwrap();
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let name = "test";
 
         let (shutdown_signal, _) = shutdown.register_source(name);
 
-        shutdown.shutdown_source_begin(name);
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let shutdown_complete = shutdown.shutdown_source(name, deadline);
 
         drop(shutdown_signal);
 
-        let deadline = Instant::now() + Duration::from_secs(1);
-        assert_eq!(
-            true,
-            shutdown.shutdown_source_end(&mut rt, name.to_string(), deadline)
-        );
+        let success = rt.block_on(shutdown_complete).unwrap();
+        assert_eq!(true, success);
     }
 
     #[test]
     fn shutdown_coordinator_shutdown_source_force() {
         let mut rt = runtime::Runtime::new().unwrap();
-        let mut shutdown = ShutdownCoordinator::new();
+        let mut shutdown = SourceShutdownCoordinator::new();
         let name = "test";
 
         let (_shutdown_signal, force_shutdown_tripwire) = shutdown.register_source(name);
 
-        shutdown.shutdown_source_begin(name);
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let shutdown_complete = shutdown.shutdown_source(name, deadline);
 
         // Since we never drop the ShutdownSignal the ShutdownCoordinator assumes the Source is
         // still running and must force shutdown.
-        let deadline = Instant::now() + Duration::from_secs(1);
-        assert_eq!(
-            false,
-            shutdown.shutdown_source_end(&mut rt, name.to_string(), deadline)
-        );
-
+        let success = rt.block_on(shutdown_complete).unwrap();
+        assert_eq!(false, success);
         assert!(force_shutdown_tripwire.wait().is_ok());
     }
 }

@@ -21536,6 +21536,30 @@ module.exports = {
 
       ]
     },
+    "datadog_logs": {
+      "beta": true,
+      "delivery_guarantee": "best_effort",
+      "description": "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "datadog_logs_sink",
+      "name": "datadog_logs",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+        "Datadog"
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "datadog_metrics": {
       "beta": true,
       "delivery_guarantee": "best_effort",
@@ -21908,6 +21932,30 @@ module.exports = {
       "function_category": "transmit",
       "id": "prometheus_sink",
       "name": "prometheus",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "service_providers": [
+
+      ],
+      "status": "beta",
+      "type": "sink",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "pulsar": {
+      "beta": true,
+      "delivery_guarantee": "at_least_once",
+      "description": "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].",
+      "event_types": [
+        "log"
+      ],
+      "function_category": "transmit",
+      "id": "pulsar_sink",
+      "name": "pulsar",
       "operating_systems": [
         "Linux",
         "MacOS",

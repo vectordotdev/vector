@@ -182,6 +182,10 @@ impl SinkContext {
         self.acker.clone()
     }
 
+    pub fn exec(&self) -> TaskExecutor {
+        self.exec.clone()
+    }
+
     pub fn resolver(&self) -> Resolver {
         self.resolver.clone()
     }
