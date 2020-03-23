@@ -116,6 +116,7 @@ scopes:
   - blackhole sink
   - clickhouse sink
   - console sink
+  - datadog_logs sink
   - datadog_metrics sink
   - elasticsearch sink
   - file sink

@@ -223,6 +223,8 @@ module.exports = {
             
               "reference/sinks/console",
             
+              "reference/sinks/datadog_logs",
+            
               "reference/sinks/datadog_metrics",
             
               "reference/sinks/elasticsearch",

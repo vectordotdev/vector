@@ -322,6 +322,9 @@
 - name: "sink: console"
   description: Anything `console` sink related
   color: 4ddbfb
+- name: "sink: datadog_logs"
+  description: Anything `datadog_logs` sink related
+  color: 4ddbfb
 - name: "sink: datadog_metrics"
   description: Anything `datadog_metrics` sink related
   color: 4ddbfb

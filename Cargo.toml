@@ -303,7 +303,7 @@ sinks = [
   "sinks-blackhole",
   "sinks-clickhouse",
   "sinks-console",
-  "sinks-datadog_metrics",
+  "sinks-datadog",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -332,7 +332,7 @@ sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts", "r
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
-sinks-datadog_metrics = []
+sinks-datadog = []
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
