@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
     shutdown::ShutdownSignal,
-    tls::{TlsConfig, TlsSettings},
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
@@ -51,7 +51,7 @@ impl SourceConfig for VectorConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
-        let tls = TlsSettings::from_config(&self.tls, true)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
     }
 

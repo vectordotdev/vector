@@ -223,7 +223,7 @@ sources = [
   "sources-tls",
   "sources-vector",
 ]
-sources-tls = ["sources-http", "sources-logplex", "sources-splunk_hec"]
+sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
 sources-journald = []

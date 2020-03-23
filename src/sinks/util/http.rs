@@ -6,7 +6,7 @@ use super::{
 use crate::{
     dns::Resolver,
     event::Event,
-    tls::{tls_connector_builder, TlsSettings},
+    tls::{tls_connector_builder, MaybeTlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -74,7 +74,7 @@ where
         batch: B,
         request_settings: TowerRequestSettings,
         batch_settings: BatchSettings,
-        tls_settings: impl Into<Option<TlsSettings>>,
+        tls_settings: impl Into<MaybeTlsSettings>,
         cx: &SinkContext,
     ) -> Self {
         let sink = Arc::new(sink);
@@ -144,12 +144,12 @@ where
 {
     pub fn new(
         resolver: Resolver,
-        tls_settings: impl Into<Option<TlsSettings>>,
+        tls_settings: impl Into<MaybeTlsSettings>,
     ) -> crate::Result<HttpClient<B>> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector_builder(tls_settings.into())?;
+        let tls = tls_connector_builder(&tls_settings.into())?;
         let https = HttpsConnector::with_connector(http, tls)?;
 
         let client = hyper::Client::builder()
@@ -238,7 +238,7 @@ pub struct HttpBatchService<B = Vec<u8>> {
 impl<B> HttpBatchService<B> {
     pub fn new(
         resolver: Resolver,
-        tls_settings: impl Into<Option<TlsSettings>>,
+        tls_settings: impl Into<MaybeTlsSettings>,
         request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     ) -> HttpBatchService<B> {
         let inner =

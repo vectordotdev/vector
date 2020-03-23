@@ -1,11 +1,10 @@
 use crate::shutdown::ShutdownSignal;
 use crate::stream::StreamExt;
-use crate::tls::TlsSettings;
+use crate::tls::{MaybeTlsListener, MaybeTlsSettings};
 use crate::Event;
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
-use openssl::ssl::SslAcceptor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
     fmt, io,
@@ -15,14 +14,46 @@ use std::{
 use stream_cancel::Tripwire;
 use tokio::{
     codec::{Decoder, FramedRead},
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
     prelude::AsyncRead,
     reactor::Handle,
     timer,
 };
-use tokio_openssl::SslAcceptorExt;
 use tracing::{field, Span};
 use tracing_futures::Instrument;
+
+fn make_listener(
+    addr: SocketListenAddr,
+    mut listenfd: ListenFd,
+    tls: &MaybeTlsSettings,
+) -> Option<MaybeTlsListener> {
+    match addr {
+        SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr) {
+            Ok(listener) => Some(listener),
+            Err(err) => {
+                error!("Failed to bind to listener socket: {}", err);
+                None
+            }
+        },
+        SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
+            Ok(Some(listener)) => match TcpListener::from_std(listener, &Handle::default()) {
+                Ok(listener) => Some(listener.into()),
+                Err(err) => {
+                    error!("Failed to bind to listener socket: {}", err);
+                    None
+                }
+            },
+            Ok(None) => {
+                error!("Failed to take listen FD, not open or already taken");
+                None
+            }
+            Err(err) => {
+                error!("Failed to take listen FD: {}", err);
+                None
+            }
+        },
+    }
+}
 
 pub trait TcpSource: Clone + Send + 'static {
     type Decoder: Decoder<Error = io::Error> + Send + 'static;
@@ -39,35 +70,18 @@ pub trait TcpSource: Clone + Send + 'static {
         self,
         addr: SocketListenAddr,
         shutdown_timeout_secs: u64,
-        tls: Option<TlsSettings>,
+        tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
-        let mut listenfd = ListenFd::from_env();
+        let listenfd = ListenFd::from_env();
 
         let source = future::lazy(move || {
-            let listener = match addr {
-                SocketListenAddr::SocketAddr(addr) => TcpListener::bind(&addr),
-                SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
-                    Ok(Some(listener)) => TcpListener::from_std(listener, &Handle::default()),
-                    Ok(None) => {
-                        error!("Failed to take listen FD, not open or already taken");
-                        return future::Either::B(future::err(()));
-                    }
-                    Err(err) => {
-                        error!("Failed to take listen FD: {}", err);
-                        return future::Either::B(future::err(()));
-                    }
-                },
-            };
-            let listener = match listener {
-                Ok(listener) => listener,
-                Err(err) => {
-                    error!("Failed to bind to listener socket: {}", err);
-                    return future::Either::B(future::err(()));
-                }
+            let listener = match make_listener(addr, listenfd, &tls) {
+                None => return future::Either::B(future::err(())),
+                Some(listener) => listener,
             };
 
             info!(
@@ -121,15 +135,8 @@ pub trait TcpSource: Clone + Send + 'static {
 
                     let source = self.clone();
                     span.in_scope(|| {
-                        accept_socket(
-                            span.clone(),
-                            socket,
-                            source,
-                            tripwire,
-                            host,
-                            out.clone(),
-                            tls.clone(),
-                        )
+                        debug!("accepted a new connection");
+                        handle_stream(span.clone(), socket, source, tripwire, host, out.clone())
                     });
                     Ok(())
                 })
@@ -138,34 +145,6 @@ pub trait TcpSource: Clone + Send + 'static {
         });
 
         Ok(Box::new(source))
-    }
-}
-
-fn accept_socket(
-    span: Span,
-    socket: TcpStream,
-    source: impl TcpSource,
-    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
-    host: Option<Bytes>,
-    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
-    tls: Option<TlsSettings>,
-) {
-    debug!("accepted a new socket.");
-
-    match tls {
-        Some(tls) => match tls.acceptor() {
-            Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
-            Ok(acceptor) => {
-                let inner_span = span.clone();
-                let handler = SslAcceptor::from(acceptor)
-                    .accept_async(socket)
-                    .map_err(|error| warn!(message = "TLS connection accept error.", %error))
-                    .map(|socket| handle_stream(inner_span, socket, source, tripwire, host, out));
-
-                tokio::spawn(handler.instrument(span.clone()));
-            }
-        },
-        None => handle_stream(span, socket, source, tripwire, host, out),
     }
 }
 
