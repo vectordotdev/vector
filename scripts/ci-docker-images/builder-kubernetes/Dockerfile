@@ -7,7 +7,7 @@ ADD https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-linux-
 RUN chmod +x /usr/local/bin/kind
 
 # Install docker cli
-RUN apt-get install docker.io -y 
+RUN apt-get install docker.io -y
 
 # Install other utility
 RUN apt-get install apt-utils
