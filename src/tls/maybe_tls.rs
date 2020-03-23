@@ -1,4 +1,4 @@
-use futures01::{Poll, Sink, StartSend};
+use futures01::Poll;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Read, Write};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -95,29 +95,6 @@ impl<R: AsyncWrite, T: AsyncWrite> AsyncWrite for MaybeTls<R, T> {
         match self {
             Self::Tls(s) => s.shutdown(),
             Self::Raw(s) => s.shutdown(),
-        }
-    }
-}
-
-impl<R, T, I, E> Sink for MaybeTls<R, T>
-where
-    R: Sink<SinkItem = I, SinkError = E>,
-    T: Sink<SinkItem = I, SinkError = E>,
-{
-    type SinkItem = I;
-    type SinkError = E;
-
-    fn start_send(&mut self, item: I) -> StartSend<I, E> {
-        match self {
-            Self::Raw(r) => r.start_send(item),
-            Self::Tls(t) => t.start_send(item),
-        }
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), E> {
-        match self {
-            Self::Raw(r) => r.poll_complete(),
-            Self::Tls(t) => t.poll_complete(),
         }
     }
 }
