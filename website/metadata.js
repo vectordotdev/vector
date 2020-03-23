@@ -21681,7 +21681,7 @@ module.exports = {
 
       ]
     },
-    "gcp_stackdriver_logging": {
+    "gcp_stackdriver_logs": {
       "beta": true,
       "delivery_guarantee": "best_effort",
       "description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
@@ -21689,8 +21689,8 @@ module.exports = {
         "log"
       ],
       "function_category": "transmit",
-      "id": "gcp_stackdriver_logging_sink",
-      "name": "gcp_stackdriver_logging",
+      "id": "gcp_stackdriver_logs_sink",
+      "name": "gcp_stackdriver_logs",
       "operating_systems": [
         "Linux",
         "MacOS",

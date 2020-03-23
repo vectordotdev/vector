@@ -1,5 +1,5 @@
-[sinks.gcp_stackdriver_logging]
-title = "GCP Stackdriver Logging"
+[sinks.gcp_stackdriver_logs]
+title = "GCP Stackdriver Logs"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
@@ -11,19 +11,19 @@ requirements = {}
 service_providers = ["Google"]
 write_to_description = "[Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_stackdriver_logging") %>
+<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_stackdriver_logs") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
+<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logs.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
 
 <%= render(
   "_partials/_buffer_options.toml",
-  namespace: "sinks.gcp_stackdriver_logging.options",
+  namespace: "sinks.gcp_stackdriver_logs.options",
   common: false
 ) %>
 
 <%= render(
   "_partials/_request_options.toml",
-  namespace: "sinks.gcp_stackdriver_logging.options",
+  namespace: "sinks.gcp_stackdriver_logs.options",
   common: false,
   in_flight_limit: 5,
   rate_limit_duration_secs: 1,
@@ -34,9 +34,9 @@ write_to_description = "[Google Cloud Platform's Stackdriver Logging service][ur
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_stackdriver_logging", access: "Stackdriver Logging API", required: true) %>
+<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_stackdriver_logs", access: "Stackdriver Logging API", required: true) %>
 
-[sinks.gcp_stackdriver_logging.options.project_id]
+[sinks.gcp_stackdriver_logs.options.project_id]
 type = "string"
 common = false
 required = true
@@ -50,7 +50,7 @@ Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or \
 `project_id` must be set.\
 """
 
-[sinks.gcp_stackdriver_logging.options.billing_account_id]
+[sinks.gcp_stackdriver_logs.options.billing_account_id]
 type = "string"
 common = false
 examples = ["012345-6789AB-CDEF01"]
@@ -61,7 +61,7 @@ Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or \
 `project_id` must be set.\
 """
 
-[sinks.gcp_stackdriver_logging.options.folder_id]
+[sinks.gcp_stackdriver_logs.options.folder_id]
 type = "string"
 common = false
 examples = ["My Folder"]
@@ -74,7 +74,7 @@ Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or \
 `project_id` must be set.\
 """
 
-[sinks.gcp_stackdriver_logging.options.log_id]
+[sinks.gcp_stackdriver_logs.options.log_id]
 type = "string"
 common = false
 required = true
@@ -84,7 +84,7 @@ The log ID to which to publish logs. This is a name you create to identify \
 this log stream.\
 """
 
-[sinks.gcp_stackdriver_logging.options.organization_id]
+[sinks.gcp_stackdriver_logs.options.organization_id]
 type = "string"
 common = false
 examples = ["622418129737"]
@@ -96,11 +96,11 @@ Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or \
 `project_id` must be set.\
 """
 
-[sinks.gcp_stackdriver_logging.options.resource]
+[sinks.gcp_stackdriver_logs.options.resource]
 type = "table"
 description = "Options for describing the logging resource."
 
-[sinks.gcp_stackdriver_logging.options.resource.children.type]
+[sinks.gcp_stackdriver_logs.options.resource.children.type]
 type = "string"
 required = true
 examples = ["global", "gce_instance"]
@@ -112,7 +112,7 @@ See the [Google Cloud Platform monitored resource documentation][urls.gcp_resour
 for more details.\
 """
 
-[sinks.gcp_stackdriver_logging.options.resource.children."`[label]`"]
+[sinks.gcp_stackdriver_logs.options.resource.children."`[label]`"]
 type = "string"
 examples = [
   {projectId = "vector-123456"},
@@ -125,9 +125,9 @@ For example, Compute Engine VM instances use the labels `projectId`, \
 `instanceId`, and `zone`.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logging.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logs.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
 
 <%= render("_partials/_encoding.toml",
-  namespace: "sinks.gcp_stackdriver_logging.options",
+  namespace: "sinks.gcp_stackdriver_logs.options",
   encodings: []
 ) %>

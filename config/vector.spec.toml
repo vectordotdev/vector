@@ -5229,7 +5229,7 @@ end
     verify_hostname = false
 
 # Batches `log` events to Google Cloud Platform's Stackdriver Logging service via the REST Interface.
-[sinks.gcp_stackdriver_logging]
+[sinks.gcp_stackdriver_logs]
   #
   # General
   #
@@ -5239,8 +5239,8 @@ end
   #
   # * required
   # * type: string
-  # * must be: "gcp_stackdriver_logging"
-  type = "gcp_stackdriver_logging"
+  # * must be: "gcp_stackdriver_logs"
+  type = "gcp_stackdriver_logs"
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -5318,7 +5318,7 @@ end
   # Batch
   #
 
-  [sinks.gcp_stackdriver_logging.batch]
+  [sinks.gcp_stackdriver_logs.batch]
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
@@ -5339,7 +5339,7 @@ end
   # Buffer
   #
 
-  [sinks.gcp_stackdriver_logging.buffer]
+  [sinks.gcp_stackdriver_logs.buffer]
     # The maximum size of the buffer on the disk.
     #
     # * required
@@ -5379,7 +5379,7 @@ end
   # Encoding
   #
 
-  [sinks.gcp_stackdriver_logging.encoding]
+  [sinks.gcp_stackdriver_logs.encoding]
     # Prevent the sink from encoding the specified labels.
     #
     # * optional
@@ -5407,7 +5407,7 @@ end
   # Request
   #
 
-  [sinks.gcp_stackdriver_logging.request]
+  [sinks.gcp_stackdriver_logs.request]
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
@@ -5472,7 +5472,7 @@ end
   # Resource
   #
 
-  [sinks.gcp_stackdriver_logging.resource]
+  [sinks.gcp_stackdriver_logs.resource]
     # The monitored resource type. For example, the type of a Compute Engine VM
     # instance is gce_instance.
     #
@@ -5500,7 +5500,7 @@ end
   # TLS
   #
 
-  [sinks.gcp_stackdriver_logging.tls]
+  [sinks.gcp_stackdriver_logs.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     #
