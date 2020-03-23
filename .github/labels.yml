@@ -340,8 +340,8 @@
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
-- name: "sink: gcp_stackdriver_logging"
-  description: Anything `gcp_stackdriver_logging` sink related
+- name: "sink: gcp_stackdriver_logs"
+  description: Anything `gcp_stackdriver_logs` sink related
   color: 4ddbfb
 - name: "sink: honeycomb"
   description: Anything `honeycomb` sink related

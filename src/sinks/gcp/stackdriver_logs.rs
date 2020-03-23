@@ -88,7 +88,7 @@ pub struct StackdriverResource {
 }
 
 inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logging")
+    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
 lazy_static! {
@@ -102,7 +102,7 @@ lazy_static! {
         .unwrap();
 }
 
-#[typetag::serde(name = "gcp_stackdriver_logging")]
+#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
@@ -135,7 +135,7 @@ impl SinkConfig for StackdriverConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_logging"
+        "gcp_stackdriver_logs"
     }
 }
 
