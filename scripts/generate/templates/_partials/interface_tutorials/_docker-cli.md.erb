@@ -1,6 +1,10 @@
 1. ### Configure Vector
 
-<%= command_create_config(tutorial.config_path, source: source).indent(3) %>
+   <ConfigExample
+    format="toml"
+    path="<%= tutorial.config_path %>"
+    sourceName={<%= (source && source.name).to_json %>}
+    sinkName={<%= (sink && sink.name).to_json %>} />
 
 2. ### Start the Vector container
 

@@ -29,9 +29,13 @@
     cd "C:\Program Files\Vector"
     ```
 
-4. ### Configure Vector
+4.  ### Configure Vector
 
-<%= command_create_config("config\vector.toml", source: source).indent(3) %>
+    <ConfigExample
+      format="toml"
+      path="config\vector.toml"
+      sourceName={<%= (source && source.name).to_json %>}
+      sinkName={<%= (sink && sink.name).to_json %>} />
 
 5.  ### Start Vector
 

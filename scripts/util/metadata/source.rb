@@ -64,4 +64,11 @@ class Source < Component
   def log_fields_list
     @log_fields_list ||= log_fields.to_h.values.sort
   end
+
+
+  def to_h
+    super.merge(
+      output_types: output_types
+    )
+  end
 end

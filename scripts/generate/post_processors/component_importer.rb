@@ -12,6 +12,7 @@ module PostProcessors
       'Alert' => "import Alert from '@site/src/components/Alert';",
       'CodeExplanation' => "import CodeExplanation from '@site/src/components/CodeExplanation';",
       'CodeHeader' => "import CodeHeader from '@site/src/components/CodeHeader';",
+      'ConfigExample' => "import ConfigExample from '@site/src/components/ConfigExample';",
       'Diagram' => "import Diagram from '@site/src/components/Diagram';",
       'Fields' => "import Fields from '@site/src/components/Fields';",
       'Field' => "import Field from '@site/src/components/Field';",

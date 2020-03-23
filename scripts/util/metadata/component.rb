@@ -1,5 +1,6 @@
 #encoding: utf-8
 
+require_relative "config_writers"
 require_relative "field"
 
 class Component
@@ -57,6 +58,26 @@ class Component
 
   def beta?
     beta == true
+  end
+
+  def config_example(format)
+    id = type == "source" ? "in" : "out"
+
+    writer =
+      ConfigWriters::ExampleWriter.new(
+        options_list,
+        table_path: [type.pluralize, id],
+        values: {inputs: ["in"]}
+      ) do |option|
+        option.required?
+      end
+
+    case format
+    when :toml
+      writer.to_toml
+    else
+      raise ArgumentError.new("Unknown format: #{format}")
+    end
   end
 
   def common?
@@ -215,6 +236,9 @@ class Component
   def to_h
     {
       beta: beta?,
+      config_examples: {
+        toml: config_example(:toml)
+      },
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
       description: description,
       event_types: event_types,

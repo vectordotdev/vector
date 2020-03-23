@@ -2,7 +2,6 @@ require "erb"
 
 require "active_support/core_ext/string/output_safety"
 
-require_relative "templates/config_example_writer"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 require_relative "templates/interface_tutorials"
@@ -38,31 +37,6 @@ class Templates
     @root_dir = root_dir
     @partials_path = "scripts/generate/templates/_partials"
     @metadata = metadata
-  end
-
-  def command_create_config(path, source: nil, sink: nil, default_sink_name: "console")
-    if source.nil? && sink.nil?
-      raise ArgumentError.new("You must supply at least one source or sink")
-    end
-
-    sources = []
-    sinks = []
-
-    if source.nil?
-      sources =
-        metadata.sources_list.select do |source|
-          source.can_send_to?(sink)
-        end
-    end
-
-    if sink.nil?
-      sinks =
-        metadata.sinks_list.select do |sink|
-          sink.can_receive_from?(source)
-        end
-    end
-
-    render("#{partials_path}/_command_create_config.md", binding).strip
   end
 
   def common_component_links(type, limit = 5)
@@ -125,22 +99,8 @@ class Templates
       raise ArgumentError.new("Options must be an Array")
     end
 
-    example = ConfigExampleWriter.new(options, array: array, key_path: key_path, table_path: table_path, &block)
+    example = ConfigWriters::ExampleWriter.new(options, array: array, key_path: key_path, table_path: table_path, &block)
     example.to_toml
-  end
-
-  def config_pipeline_example(source, sink)
-    source_example =
-      ConfigExampleWriter.new(source.options_list, table_path: ["sources", "in"]) do |option|
-        option.required?
-      end
-
-    sink_example =
-      ConfigExampleWriter.new(sink.options_list, table_path: ["sinks", "out"], values: {inputs: ["in"]}) do |option|
-        option.required?
-      end
-
-    source_example.to_toml + "\n\n" + sink_example.to_toml
   end
 
   def config_schema(options, opts = {})
@@ -293,7 +253,8 @@ class Templates
         InterfaceTutorials::DockerCLI.new(source)
       end
 
-    render("#{partials_path}/interface_tutorials/_#{interface.name}.md", binding).strip
+
+    render("#{partials_path}/_interface_tutorial.md", binding).strip
   end
 
   def manual_installation_next_steps(type)

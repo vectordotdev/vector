@@ -10,7 +10,11 @@
 
 ### Configure Vector
 
-<%= command_create_config("vector.toml", source: source) %>
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
 
 </li>
 <li>

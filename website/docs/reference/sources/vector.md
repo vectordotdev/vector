@@ -38,6 +38,7 @@ events.
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
+* This component exposes a configured network port. Upstream producers must be able to access this port.
 
 </Alert>
 

@@ -1,5 +1,5 @@
-class Templates
-  class ConfigWriter
+module ConfigWriters
+  class Base
     class Writer
       def category(name)
         raise NotImplementedError.new()

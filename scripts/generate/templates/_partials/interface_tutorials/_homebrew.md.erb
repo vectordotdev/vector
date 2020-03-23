@@ -1,17 +1,21 @@
-1. ### Add the Timber tap and install `vector`
+1.  ### Add the Timber tap and install `vector`
 
-   ```bash
-   brew tap timberio/brew && brew install vector
-   ```
+    ```bash
+    brew tap timberio/brew && brew install vector
+    ```
 
-   [Looking for a specific version?][docs.package_managers.homebrew]
+    [Looking for a specific version?][docs.package_managers.homebrew]
 
-2. ### Configure Vector
+2.  ### Configure Vector
 
-<%= command_create_config("/etc/vector/vector.toml", source: source).indent(3) %>
+    <ConfigExample
+      format="toml"
+      path="/etc/vector/vector.toml"
+      sourceName={<%= (source && source.name).to_json %>}
+      sinkName={<%= (sink && sink.name).to_json %>} />
 
-3. ### Start Vector
+3.  ### Start Vector
 
-   ```bash
-   brew services start vector
-   ```
+    ```bash
+    brew services start vector
+    ```

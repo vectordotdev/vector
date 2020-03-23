@@ -1,7 +1,7 @@
-require_relative "config_writer"
+require_relative "base"
 
-class Templates
-  class ConfigExampleWriter < ConfigWriter
+module ConfigWriters
+  class ExampleWriter < Base
     def to_toml(table_style: :normal)
       writer = TOMLWriter.new()
 

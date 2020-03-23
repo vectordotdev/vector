@@ -37,6 +37,7 @@ ingests data through a socket, such as a TCP, UDP, or Unix socket and [outputs
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
+* This component exposes a configured network port. Upstream producers must be able to access this port.
 
 </Alert>
 

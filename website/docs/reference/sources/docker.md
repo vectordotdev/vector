@@ -38,11 +38,7 @@ ingests data through the [Docker engine daemon][urls.docker_daemon] and
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 * Docker API `>= 1.24` is required.
-* In order for the Docker API to work properly, the
-  [`json-file`][urls.docker_logging_driver_json_file] (default) or
-  [`journald`][urls.docker_logging_driver_journald] Docker logging driver
-  must be enabled for this component to work. See
-  ["How it works"](#how-it-works) for more info.
+* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See ["How it works"](#how-it-works) for more info.
 
 </Alert>
 

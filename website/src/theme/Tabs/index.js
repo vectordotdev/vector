@@ -49,7 +49,7 @@ function SelectSwitcher({placeholder, selectedValue, setSelectedValue, values}) 
 }
 
 function Tabs(props) {
-  const {block, centered, children, defaultValue, placeholder, select, style, values, urlKey} = props;
+  const {block, centered, children, defaultValue, label, placeholder, select, style, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -64,6 +64,7 @@ function Tabs(props) {
   return (
     <>
       <div className="margin-vert--md">
+        {label && <div className="margin-vert--sm">{label}</div>}
         {values.length > 1 && (select ?
           <SelectSwitcher placeholder={placeholder} selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
           <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}

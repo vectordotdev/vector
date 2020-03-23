@@ -1202,6 +1202,14 @@ a.panel:hover {
 }
 
 /**
+ * prism-code
+ */
+
+.prism-code {
+  position: relative;
+}
+
+/**
  * react-select-container
  */
 
@@ -1415,7 +1423,7 @@ div.section-list.section-list--hover > .section:hover {
   margin-bottom: 0;
 }
 .steps > ol > li > *:last-child {
-  margin-bottom: calc(var(--ifm-spacing-vertical) * 3 );
+  margin-bottom: calc(var(--ifm-spacing-vertical) * 3 ) !important;
 }
 .steps > ol > li:before {
   background: var(--ifm-heading-color);

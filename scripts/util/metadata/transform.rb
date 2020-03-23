@@ -67,4 +67,11 @@ class Transform < Component
   def description
     @desription ||= "Accepts #{input_types.to_sentence} events and allows you to #{allow_you_to_description}."
   end
+
+  def to_h
+    super.merge(
+      inpuut_types: input_types,
+      output_types: output_types
+    )
+  end
 end

@@ -37,10 +37,8 @@ events](#output).
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* The [`journalctl`](#journalctl) binary is required.
-* The Vector user must be part of the `systemd-journal` group in order to
-  execute the [`journalctl`](#journalctl) binary. See ["How it works"](#how-it-works) for more
-  info.
+* The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See ["How it works"](#how-it-works) for more info.
+* The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See ["How it works"](#how-it-works) for more info.
 
 </Alert>
 

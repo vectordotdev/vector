@@ -8,12 +8,9 @@ source_name: "prometheus"
 tags: ["category: setup","source: prometheus","sink: datadog_metrics"]
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import CodeHeader from '@site/src/components/CodeHeader';
+import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import SVG from 'react-inlinesvg';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 > "I just wanna, like, send my Prometheus metrics to Datadog -- why is all of this so complicated?"
 >
@@ -32,7 +29,7 @@ you up and running in minutes.
      website/guides/setup/sources/prometheus/datadog_metrics.md.erb
 -->
 
-## What We'll Accomplish
+## What We'll Accomplish In This Guide
 
 <ol className="list--checks list--lg list--semi-bold list--primary list--flush">
   <li>
@@ -59,16 +56,17 @@ To send Prometheus metrics to Datadog _properly_, and accomplish all of the item
 we'll use [Vector][urls.vector_website] and deploy it as a
 daemon.
 
-### 1. We'll Use Vector
+### First, We'll Use Vector
 
 <SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
 
-[Vector][urls.vector_website] is a lightweight and ultra-fast tool for building
-observability pipelines. Compared to Logstash and friends, Vector [improves
-throughput by ~10X while significanly reducing CPU and memory
-usage][urls.vector_performance] and it's the perfect tool for this task.
+Written in [Rust][urls.rust], [Vector][urls.vector_website] is a lightweight
+and ultra-fast tool for building observability pipelines. Compared to Logstash
+and friends, Vector [improves throughput by ~10X while significanly reducing
+CPU and memory usage][urls.vector_performance] and it's the perfect tool for
+this task.
 
-### 2. We'll Deploy Vector As A Daemon
+### Second, We'll Deploy Vector As A Daemon
 
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
@@ -92,217 +90,11 @@ collecting and forwarding all data on the host.
 
 ### Configure Vector
 
-**Where would you like to send your data?**
-
-<Tabs
-  block={true}
-  select={true}
-  defaultValue="console"
-  values={[{"label":"AWS Cloudwatch Metrics","value":"aws_cloudwatch_metrics"},{"label":"Blackhole","value":"blackhole"},{"label":"Console","value":"console"},{"label":"Datadog Metrics","value":"datadog_metrics"},{"label":"InfluxDB Metrics","value":"influxdb_metrics"},{"label":"Prometheus","value":"prometheus"},{"label":"Statsd","value":"statsd"}]}>
-<TabItem value="aws_cloudwatch_metrics">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  type = "aws_cloudwatch_metrics" # required
-  inputs = ["in"] # required
-  namespace = "service" # required
-  region = "us-east-1" # required, required when endpoint = ""
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics] [streams](#streaming) [`metric`][docs.data-model.metric] events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-<TabItem value="blackhole">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  type = "blackhole" # required
-  inputs = ["in"] # required
-  print_amount = 1000 # required
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`blackhole` sink][docs.sinks.blackhole] [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-<TabItem value="console">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  # General
-  type = "console" # required
-  inputs = ["in"] # required
-
-  # Encoding
-  encoding.codec = "json" # required
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`console` sink][docs.sinks.console] [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to [standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`.
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-<TabItem value="datadog_metrics">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  type = "datadog_metrics" # required
-  inputs = ["in"] # required
-  api_key = "${DATADOG_API_KEY}" # required
-  namespace = "service" # required
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`datadog_metrics` sink][docs.sinks.datadog_metrics] [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-<TabItem value="influxdb_metrics">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  # General
-  type = "influxdb_metrics" # required
-  inputs = ["in"] # required
-  bucket = "vector-bucket" # required
-  database = "vector-database" # required
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
-  namespace = "service" # required
-
-  # auth
-  org = "Organization" # required
-  token = "${INFLUXDB_TOKEN}" # required
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`influxdb_metrics` sink][docs.sinks.influxdb_metrics] [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-<TabItem value="prometheus">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  type = "prometheus" # required
-  inputs = ["in"] # required
-  address = "0.0.0.0:9598" # required
-  namespace = "service" # required
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`prometheus` sink][docs.sinks.prometheus] [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-<TabItem value="statsd">
-
-<CodeHeader icon="info" text="adjust the values as necessary" />
-
-```bash
-echo '
-[sources.in]
-  type = "prometheus" # required
-  hosts = ["http://localhost:9090"] # required
-
-[sinks.out]
-  type = "statsd" # required
-  inputs = ["in"] # required
-  namespace = "service" # required
-' > vector.toml
-```
-
-<CodeExplanation>
-
-* The the [`prometheus` source][docs.sources.prometheus] ingests data through the Prometheus text exposition format and [outputs `metric` events](#output).
-* The the [`statsd` sink][docs.sinks.statsd] [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
-* The `vector.toml` file is the [Vector configuration file][docs.configuration]
-  that we'll pass in the next step.
-
-</CodeExplanation>
-
-</TabItem>
-</Tabs>
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"prometheus"}
+  sinkName={"datadog_metrics"} />
 
 </li>
 <li>
@@ -321,24 +113,6 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 </div>
 
 
-[docs.configuration]: /docs/setup/configuration/
-[docs.data-model.log]: /docs/about/data-model/log/
-[docs.data-model.metric]: /docs/about/data-model/metric/
-[docs.sinks.aws_cloudwatch_metrics]: /docs/reference/sinks/aws_cloudwatch_metrics/
-[docs.sinks.blackhole]: /docs/reference/sinks/blackhole/
-[docs.sinks.console]: /docs/reference/sinks/console/
-[docs.sinks.datadog_metrics]: /docs/reference/sinks/datadog_metrics/
-[docs.sinks.influxdb_metrics]: /docs/reference/sinks/influxdb_metrics/
-[docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
-[docs.sinks.statsd]: /docs/reference/sinks/statsd/
-[docs.sources.prometheus]: /docs/reference/sources/prometheus/
-[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
-[urls.datadog]: https://www.datadoghq.com
-[urls.influxdb]: https://www.influxdata.com/products/influxdb-overview/
-[urls.influxdb_http_api_v1]: https://docs.influxdata.com/influxdb/latest/tools/api/#write-http-endpoint
-[urls.influxdb_http_api_v2]: https://v2.docs.influxdata.com/v2.0/api/#tag/Write
-[urls.prometheus]: https://prometheus.io/
-[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
-[urls.statsd]: https://github.com/statsd/statsd
+[urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_website]: https://vector.dev

@@ -23,9 +23,13 @@
     sudo rpm -i <%= download.file_name %>
     ```
 
-3. ### Configure Vector
+3.  ### Configure Vector
 
-<%= command_create_config("/etc/vector/vector.toml", source: source).indent(3) %>
+    <ConfigExample
+      format="toml"
+      path="/etc/vector/vector.toml"
+      sourceName={<%= (source && source.name).to_json %>}
+      sinkName={<%= (sink && sink.name).to_json %>} />
 
 4.  ### Start Vector
 

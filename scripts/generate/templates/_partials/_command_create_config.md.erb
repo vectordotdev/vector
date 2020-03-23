@@ -1,14 +1,12 @@
 <%- if sink.nil? -%>
-**Where would you like to send your data?**
-
 <Tabs
   block={true}
   select={true}
   defaultValue="<%= default_sink_name %>"
+  label="Where would you like to send your data?"
   values={<%= sinks.collect { |sink| {label: sink.title, value: sink.name } }.to_json %>}>
 <%- sinks.each do |sink| -%>
 <TabItem value=<%= sink.name.to_json %>>
-
 <CodeHeader icon="info" text="adjust the values as necessary" />
 
 ```bash
@@ -25,7 +23,9 @@ echo '
   that we'll pass in the next step.
 
 </CodeExplanation>
-
+<%- if source && source.requirements.any? -%>
+<%= component_requirements(source) %>
+<%- end -%>
 </TabItem>
 <%- end -%>
 </Tabs>

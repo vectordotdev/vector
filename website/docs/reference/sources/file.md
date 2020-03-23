@@ -37,6 +37,7 @@ events](#output).
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
+* This component must be provided access to the configured file system.
 
 </Alert>
 

@@ -34,8 +34,7 @@ AWS EC2 instance metadata.
 
 
 * AWS IMDS v2 is required.
-* Running this transform within Docker on EC2 requires 2 network hops. Users
-  must raise this limit. See [AWS IMDS v2](#aws-imds-v2) for more info.
+* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See [AWS IMDS v2](#aws-imds-v2) for more info.
 
 </Alert>
 

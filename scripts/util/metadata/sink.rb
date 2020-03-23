@@ -77,6 +77,12 @@ class Sink < Component
     egress_method == "streaming"
   end
 
+  def to_h
+    super.merge(
+      input_types: input_types
+    )
+  end
+
   def write_verb
     case egress_method
     when "batching"
