@@ -37,8 +37,6 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
   const sources = Object.values(sourcesMap);
   const sinks = _.sortBy(Object.values(sinksMap), ['title']);
 
-  console.log(sinkName)
-
   if (sourceName && sinkName) {
     const source = sourcesMap[sourceName];
     const sink = sinksMap[sinkName];

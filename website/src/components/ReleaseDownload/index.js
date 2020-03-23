@@ -49,8 +49,6 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
   const {metadata: {installation: installation, latest_release: latestRelease}} = siteConfig.customFields;
   const {package_managers: packageManagers, platforms, operating_systems: operatingSystems} = installation;
 
-  console.log(platforms);
-
   return (
     <div className={styles.downloadTable}>
       <div>
