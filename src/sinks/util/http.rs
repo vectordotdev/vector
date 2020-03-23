@@ -11,7 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
-use futures01::{AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use futures01::{Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
 use http::header::HeaderValue;
 use http::{Request, StatusCode};
 use hyper::body::{Body, Payload};
@@ -37,6 +37,19 @@ pub trait HttpSink: Send + Sync + 'static {
     fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>>;
 }
 
+/// Provides a simple wrapper around internal tower and
+/// batching sinks for http.
+///
+/// This type wraps some `HttpSink` and some `Batch` type
+/// and will apply request, batch and tls settings. Internally,
+/// it holds an Arc reference to the `HttpSink`. It then exposes
+/// a `Sink` interface that can be returned from `SinkConfig`.
+///
+/// Implementation details we require to buffer a single item due
+/// to how `Sink` works. This is because we must "encode" the type
+/// to be able to send it to the inner batch type and sink. Because of
+/// this we must provide a single buffer slot. To ensure the buffer is
+/// fully flushed make sure `poll_complete` returns ready.
 pub struct BatchedHttpSink<T, B: Batch>
 where
     B::Output: Clone,
@@ -61,7 +74,7 @@ where
         batch: B,
         request_settings: TowerRequestSettings,
         batch_settings: BatchSettings,
-        tls_settings: Option<TlsSettings>,
+        tls_settings: impl Into<Option<TlsSettings>>,
         cx: &SinkContext,
     ) -> Self {
         let sink = Arc::new(sink);
@@ -90,8 +103,14 @@ where
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        if self.slot.is_some() {
+            self.poll_complete()?;
+            return Ok(AsyncSink::NotReady(item));
+        }
+
         if let Some(item) = self.sink.encode_event(item) {
             if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.poll_complete()?;
                 self.slot = Some(item);
             }
         }
@@ -100,6 +119,14 @@ where
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        if let Some(item) = self.slot.take() {
+            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.slot = Some(item);
+                self.inner.poll_complete()?;
+                return Ok(Async::NotReady);
+            }
+        }
+
         self.inner.poll_complete()
     }
 }

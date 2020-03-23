@@ -33,6 +33,7 @@ impl BatchEventsConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct BatchSettings {
     pub size: usize,
     pub timeout: Duration,

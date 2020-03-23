@@ -1,4 +1,4 @@
-use crate::{topology::config::GlobalOptions, Event};
+use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
 use futures01::{sync::mpsc, Future, Sink, Stream};
 use http::Uri;
 use hyper;
@@ -27,6 +27,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();

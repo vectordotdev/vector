@@ -56,8 +56,11 @@ fn value_eq(this: &Value, other: &Value) -> bool {
         (Value::Boolean(this), Value::Boolean(other)) => this.eq(other),
         (Value::Integer(this), Value::Integer(other)) => this.eq(other),
         (Value::Timestamp(this), Value::Timestamp(other)) => this.eq(other),
+        (Value::Null, Value::Null) => true,
         // Non-trivial.
         (Value::Float(this), Value::Float(other)) => f64_eq(this, other),
+        (Value::Array(this), Value::Array(other)) => array_eq(this, other),
+        (Value::Map(this), Value::Map(other)) => map_eq(this, other),
         // Type mismatch.
         _ => false,
     }
@@ -77,6 +80,26 @@ fn f64_eq(this: &f64, other: &f64) -> bool {
         return false;
     }
     true
+}
+
+fn array_eq(this: &Vec<Value>, other: &Vec<Value>) -> bool {
+    if this.len() != other.len() {
+        return false;
+    }
+
+    this.iter()
+        .zip(other.iter())
+        .all(|(first, second)| value_eq(first, second))
+}
+
+fn map_eq(this: &BTreeMap<Atom, Value>, other: &BTreeMap<Atom, Value>) -> bool {
+    if this.len() != other.len() {
+        return false;
+    }
+
+    this.iter()
+        .zip(other.iter())
+        .all(|((key1, value1), (key2, value2))| key1 == key2 && value_eq(value1, value2))
 }
 
 impl Hash for Discriminant {
@@ -197,6 +220,73 @@ mod tests {
 
         assert_eq!(discriminant_1, discriminant_2);
         assert_eq!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn map_values_key_order() {
+        let mut event_1 = new_log_event();
+        event_1.insert("nested.a", "a");
+        event_1.insert("nested.b", "b");
+        let mut event_2 = new_log_event();
+        event_2.insert("nested.b", "b");
+        event_2.insert("nested.a", "a");
+
+        let discriminant_fields = vec![Atom::from("nested")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_eq!(discriminant_1, discriminant_2);
+        assert_eq!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn map_values_array() {
+        let mut event_1 = new_log_event();
+        event_1.insert("array[0]", "a");
+        event_1.insert("array[1]", "b");
+        let mut event_2 = new_log_event();
+        event_2.insert("array[1]", "b");
+        event_2.insert("array[0]", "a");
+
+        let discriminant_fields = vec![Atom::from("array")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_eq!(discriminant_1, discriminant_2);
+        assert_eq!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn map_values_matter_1() {
+        let mut event_1 = new_log_event();
+        event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
+        let event_2 = new_log_event(); // empty event
+
+        let discriminant_fields = vec![Atom::from("nested")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_ne!(discriminant_1, discriminant_2);
+        assert_ne!(hash(discriminant_1), hash(discriminant_2));
+    }
+
+    #[test]
+    fn map_values_matter_2() {
+        let mut event_1 = new_log_event();
+        event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
+        let mut event_2 = new_log_event();
+        event_2.insert("nested", "x"); // `nested` is a `Value::String`
+
+        let discriminant_fields = vec![Atom::from("nested")];
+
+        let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
+        let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
+
+        assert_ne!(discriminant_1, discriminant_2);
+        assert_ne!(hash(discriminant_1), hash(discriminant_2));
     }
 
     #[test]

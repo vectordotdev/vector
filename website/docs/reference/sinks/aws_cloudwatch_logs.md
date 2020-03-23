@@ -51,9 +51,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   # General
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-id"] # required
-  group_name = "{{ file }}" # required
+  group_name = "group-name" # required
   region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "{{ instance_id }}" # required
+  stream_name = "{{ host }}" # required
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   healthcheck = true # optional, default
@@ -73,9 +73,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "aws_cloudwatch_logs" # required
   inputs = ["my-source-id"] # required
   endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
-  group_name = "{{ file }}" # required
+  group_name = "group-name" # required
   region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "{{ instance_id }}" # required
+  stream_name = "{{ host }}" # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
@@ -109,8 +109,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-## Options
 
 import Fields from '@site/src/components/Fields';
 
@@ -564,7 +562,7 @@ this option will make [`region`](#region) moot.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["{{ file }}","ec2/{{ instance_id }}","group-name"]}
+  examples={["group-name","{{ file }}"]}
   groups={[]}
   name={"group_name"}
   path={null}
@@ -851,7 +849,7 @@ duplicate data downstream.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["{{ instance_id }}","%Y-%m-%d","stream-name"]}
+  examples={["{{ host }}","%Y-%m-%d","stream-name"]}
   groups={[]}
   name={"stream_name"}
   path={null}
@@ -1090,9 +1088,8 @@ values derived from the event's data. This syntax accepts
 ```toml
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
-  group_name = "{{ file }}"
-  group_name = "ec2/{{ instance_id }}"
   group_name = "group-name"
+  group_name = "{{ file }}"
   # ...
 ```
 
@@ -1117,4 +1114,4 @@ You can learn more about the complete syntax in the
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
