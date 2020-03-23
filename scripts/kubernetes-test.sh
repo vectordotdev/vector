@@ -26,7 +26,7 @@ FROM buildpack-deps:18.04-curl
 COPY ./target/x86_64-unknown-linux-musl/debug/vector /usr/local/bin
 ENTRYPOINT ["/usr/local/bin/vector"]
 EOF
-docker push localhost:5000/vector-test:ts  
+docker push localhost:5000/vector-test:ts
 
 # Create a cluster with the local registry enabled in containerd
 trap delete_cluster EXIT
@@ -35,7 +35,7 @@ run_test(){
   KUBE_IMAGE=$1
 
   echo Testing ${KUBE_IMAGE}
-  
+
   cat <<EOF | kind create cluster --name "${KIND_CLUSTER_NAME}" --image ${KUBE_IMAGE} --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -56,7 +56,7 @@ EOF
 run_test kindest/node:v1.17.0@sha256:9512edae126da271b66b990b6fff768fbb7cd786c7d39e86bdf55906352fdf62
 
 # Test Kubernetes v1.14.10
-run_test kindest/node:v1.14.10 @ sha256:81ae5a3237c779efc4dda43cc81c696f88a194abcc4f8fa34f86cf674aa14977
+run_test kindest/node:v1.14.10@sha256:81ae5a3237c779efc4dda43cc81c696f88a194abcc4f8fa34f86cf674aa14977
 
 # Test Kubernetes v1.13.12
-run_test kindest/node:v1.13.12 @sha256:5e8ae1a4e39f3d151d420ef912e18368745a2ede6d20ea87506920cd947a7e3a
+run_test kindest/node:v1.13.12@sha256:5e8ae1a4e39f3d151d420ef912e18368745a2ede6d20ea87506920cd947a7e3a
