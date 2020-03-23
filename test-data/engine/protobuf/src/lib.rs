@@ -1,5 +1,6 @@
 use std::str::Bytes;
-use serde_json::Value;
+use serde_json::{Value, json};
+use prost::Message;
 
 pub mod items {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));
@@ -15,14 +16,18 @@ mod vector_api {
 
     pub(crate) fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
         let field_str = field.as_ref();
-        let field_cstr = CString::new(field_str)?;
-        let field_ptr: *const c_char = field_cstr.as_ptr();
+        let field_cstring = CString::new(field_str)?;
+        let field_ptr: *const c_char = field_cstring.as_ptr();
 
         let hinted_value_len = unsafe {
             ffi::hint_field_length(
                 field_ptr,
             )
         };
+
+        if hinted_value_len == 0 {
+            return Ok(None)
+        }
 
         let mut value_buffer: Vec<c_char> = Vec::with_capacity(hinted_value_len);
         let mut value_buffer_ptr = value_buffer.as_mut_ptr();
@@ -44,14 +49,15 @@ mod vector_api {
 
     pub(crate) fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
         let field_str = field.as_ref();
-        let field_cstr = CStr::from_bytes_with_nul(field_str.as_bytes())?;
-        let field_ptr = field_cstr.as_ptr();
+        let field_cstring = CString::new(field_str)?;
+        println!("insert::field_cstring: {:?}", field_cstring);
+        let field_ptr = field_cstring.as_ptr();
 
         let value = value.into();
         let value_serialized = serde_json::to_string(&value).unwrap();
         let value_cstring = CString::new(value_serialized)?;
+        println!("insert::value_cstring: {:?}", value_cstring);
         let value_ptr = value_cstring.as_ptr();
-
         unsafe {
             Ok(ffi::insert(
                 field_ptr,
@@ -85,13 +91,16 @@ pub extern "C" fn process() -> bool {
     println!("From inside the wasm machine: {:?}", result);
     match result.unwrap() {
         Some(value) => {
-            vector_api::insert("processed", value);
+            println!("Pre-insert");
+            let decoded = crate::items::AddressBook::decode(value.as_str().expect("Protobuf field not a str").as_bytes()).unwrap();
+            let reencoded = serde_json::to_string(&decoded).unwrap();
+            vector_api::insert("processed", reencoded).unwrap();
             println!("Inserted");
             true
         },
-        None => false
+        None => { println!("No result!"); false },
     };
-    // let result = vector_api::get("processed");
-    // println!("From inside the wasm machine (result): {:?}", result);
+    let result = vector_api::get("processed");
+    println!("From inside the wasm machine (result): {:?}", result);
     true
 }

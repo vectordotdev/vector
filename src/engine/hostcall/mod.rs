@@ -104,6 +104,7 @@ pub unsafe fn insert(
     let value_val = serde_json::Value::from_str(value_str).unwrap_or("Broke on value into".into());
 
     let mut event = hostcall_context.event.as_mut().unwrap();
+    event!(Level::TRACE, "inserting key {:?} with value {:?}", key_str, value_val);
     event.as_mut_log().insert(key_str, value_val);
 
     event!(Level::TRACE, "returning from hostcall");
