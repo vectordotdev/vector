@@ -1,40 +1,62 @@
 set -eu
 
-# Install kubectl
-curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.17.0/bin/linux/amd64/kubectl 
-chmod +x ./kubectl
-mv ./kubectl /usr/local/bin/kubectl
 
-# Install minikube
-curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 
-chmod +x minikube
+delete_cluster() {
+  kind delete cluster --name ${KIND_CLUSTER_NAME}
+}
 
-# Install docker cli
-apt-get install docker.io -y 
+# desired cluster name
+KIND_CLUSTER_NAME="vector_test_cluster"
 
-# Start image registry
-(docker run -d -p 5324:5000 --restart=always registry:2 || true)
+# Create registry container unless it already exists
+reg_name='vector-kind-registry'
+running="$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)"
+if [ "${running}" != 'true' ]; then
+  docker run \
+    -d --restart=always -p "5000:5000" --name "${reg_name}" \
+    registry:2
+fi
+reg_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "${reg_name}")"
 
-# Build & push test image
-docker build -t "localhost:5324/vector_test:latest" -f - . << EOF
+# Build and push image
+echo "Build & push test image"
+strip ./target/x86_64-unknown-linux-musl/debug/vector
+docker build -t "localhost:5000/vector-test:ts" -f - . << EOF
 FROM buildpack-deps:18.04-curl
 COPY ./target/x86_64-unknown-linux-musl/debug/vector /usr/local/bin
-RUN chmod +x /usr/local/bin/vector
 ENTRYPOINT ["/usr/local/bin/vector"]
 EOF
-docker push localhost:5324/vector_test:latest       
+docker push localhost:5000/vector-test:ts  
 
-# Test Kubernetes v1.17.2
-(./minikube start --kubernetes-version=v1.17.2 || CHANGE_MINIKUBE_NONE_USER=true ./minikube start --vm-driver=none --kubernetes-version=v1.17.2)
-KUBE_TEST_IMAGE=localhost:5324/vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
-./minikube stop
+# Create a cluster with the local registry enabled in containerd
+trap delete_cluster EXIT
 
-# # Test Kubernetes v1.14.10
-# CHANGE_MINIKUBE_NONE_USER=true ./minikube start --vm-driver=none --kubernetes-version=v1.14.10
-# KUBE_TEST_IMAGE=localhost:5324/vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
-# ./minikube stop
+run_test(){
+  KUBE_IMAGE=$1
 
-# # Test Kubernetes v1.13.2
-# CHANGE_MINIKUBE_NONE_USER=true ./minikube start --vm-driver=none --kubernetes-version=v1.13.2
-# KUBE_TEST_IMAGE=localhost:5324/vector_test:latest cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
-# ./minikube stop 
+  echo Testing ${KUBE_IMAGE}
+  
+  cat <<EOF | kind create cluster --name "${KIND_CLUSTER_NAME}" --image ${KUBE_IMAGE} --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches: 
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+    endpoint = ["http://${reg_ip}:5000"]
+EOF
+
+  # Test Kubernetes
+  KUBE_TEST_IMAGE=localhost:5000/vector-test:ts cargo test --lib --no-default-features --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+
+  delete_cluster
+
+}
+
+# Test Kubernetes v1.17.0
+run_test kindest/node:v1.17.0@sha256:9512edae126da271b66b990b6fff768fbb7cd786c7d39e86bdf55906352fdf62
+
+# Test Kubernetes v1.14.10
+run_test kindest/node:v1.14.10 @ sha256:81ae5a3237c779efc4dda43cc81c696f88a194abcc4f8fa34f86cf674aa14977
+
+# Test Kubernetes v1.13.12
+run_test kindest/node:v1.13.12 @sha256:5e8ae1a4e39f3d151d420ef912e18368745a2ede6d20ea87506920cd947a7e3a

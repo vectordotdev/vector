@@ -418,6 +418,7 @@ mod kube_tests {
     }
 
     #[test]
+    #[ignore]
     fn watch_pod() {
         let namespace = format!("watch-pod-{}", Uuid::new_v4());
         let kube = Kube::new(namespace.as_str());

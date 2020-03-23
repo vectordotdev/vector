@@ -34,6 +34,7 @@ test-behavior: build
 test-docker: build
 	$(RUN) test-docker
 
+# run tests for Kubernetes
 test-kubernetes: build
 	$(RUN) test-kubernetes
 
