@@ -20,7 +20,7 @@ impl<'a> FromLua<'a> for LogEvent {
                 Ok(log)
             }
             _ => Err(rlua::Error::FromLuaConversionError {
-                from: "",
+                from: value.type_name(),
                 to: "LogEvent",
                 message: Some("LogEvent should ba a Lua table".to_string()),
             }),

@@ -19,7 +19,7 @@ impl<'a> FromLua<'a> for MetricKind {
             LuaValue::String(s) if s == "absolute" => Ok(MetricKind::Absolute),
             LuaValue::String(s) if s == "incremental" => Ok(MetricKind::Incremental),
             _ => Err(LuaError::FromLuaConversionError {
-                from: "",
+                from: value.type_name(),
                 to: "MetricKind",
                 message: Some(
                     "Metric kind should be either \"incremental\" or \"absolute\"".to_string(),
@@ -101,11 +101,11 @@ impl<'a> ToLua<'a> for Metric {
 
 impl<'a> FromLua<'a> for Metric {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
-        let table = match value {
+        let table = match &value {
             LuaValue::Table(table) => table,
-            _ => {
+            other => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: "",
+                    from: other.type_name(),
                     to: "Metric",
                     message: Some("Metric should be a Lua table".to_string()),
                 })
@@ -161,7 +161,7 @@ impl<'a> FromLua<'a> for Metric {
             }
         } else {
             return Err(LuaError::FromLuaConversionError {
-                from: "",
+                from: value.type_name(),
                 to: "Metric",
                 message: Some("Cannot find metric value, expected presence one of \"counter\", \"gauge\", \"set\", \"distribution\", \"aggregated_histogram\", \"aggregated_summary\"".to_string()),
             });

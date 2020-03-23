@@ -38,8 +38,8 @@ impl<'a> FromLua<'a> for Value {
                     table_to_map(t).map(Value::Map)
                 }
             }
-            _ => Err(rlua::Error::FromLuaConversionError {
-                from: "",
+            other => Err(rlua::Error::FromLuaConversionError {
+                from: other.type_name(),
                 to: "Value",
                 message: Some("Unsupported Lua type".to_string()),
             }),

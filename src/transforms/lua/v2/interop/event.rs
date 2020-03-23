@@ -14,11 +14,11 @@ impl<'a> ToLua<'a> for Event {
 
 impl<'a> FromLua<'a> for Event {
     fn from_lua(value: LuaValue<'a>, ctx: LuaContext<'a>) -> LuaResult<Self> {
-        let table = match value {
+        let table = match &value {
             LuaValue::Table(t) => t,
             _ => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: "",
+                    from: value.type_name(),
                     to: "Event",
                     message: Some("Event should be a Lua table".to_string()),
                 })
@@ -33,7 +33,7 @@ impl<'a> FromLua<'a> for Event {
                 ctx,
             )?)),
             _ => Err(LuaError::FromLuaConversionError {
-                from: "",
+                from: value.type_name(),
                 to: "Event",
                 message: Some(
                     "Event should contain either \"log\" or \"metric\" key at the top level"
