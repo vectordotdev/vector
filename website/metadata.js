@@ -21831,6 +21831,9 @@ module.exports = {
     },
     "datadog_logs": {
       "beta": true,
+      "config_examples": {
+        "toml": "[sinks.out]\n  # General\n  type = \"datadog_logs\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY_ENV_VAR}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+      },
       "delivery_guarantee": "best_effort",
       "description": "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints].",
       "event_types": [
@@ -21838,6 +21841,10 @@ module.exports = {
       ],
       "function_category": "transmit",
       "id": "datadog_logs_sink",
+      "input_types": [
+        "log"
+      ],
+      "logo_path": "/img/logos/datadog.svg",
       "name": "datadog_logs",
       "operating_systems": [
         "Linux",
@@ -21848,7 +21855,7 @@ module.exports = {
         "Datadog"
       ],
       "status": "beta",
-      "title": "Datadog Metrics",
+      "title": "Datadog Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -21880,6 +21887,7 @@ module.exports = {
         "Datadog"
       ],
       "status": "beta",
+      "title": "Datadog Metrics",
       "type": "sink",
       "unsupported_operating_systems": [
 
@@ -22549,9 +22557,6 @@ module.exports = {
         "MacOS",
         "Windows"
       ],
-      "output_types": [
-        "log"
-      ],
       "service_providers": [
 
       ],
@@ -22646,6 +22651,9 @@ module.exports = {
         "Linux",
         "MacOS",
         "Windows"
+      ],
+      "output_types": [
+        "log"
       ],
       "service_providers": [
 

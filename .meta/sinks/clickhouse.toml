@@ -8,7 +8,7 @@ features = [
   "Compress and batch data to maximize throughput.",
   "Encode timestamps to ClickHouse supported formats.",
   "Automatically retry failed requests, with backoff.",
-  "Buffer your data in-memory or on-disk for performance and durability."
+  "Buffer your data in-memory or on-disk for performance and durability.",
 ]
 function_category = "transmit"
 healthcheck = true

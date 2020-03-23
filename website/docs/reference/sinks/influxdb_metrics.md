@@ -242,6 +242,31 @@ The maximum age of a batch before it is flushed.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={["https://us-west-2-1.aws.cloud2.influxdata.com","http://localhost:8086/"]}
+  groups={["v1","v2"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### endpoint
+
+InfluxDB endpoint to send metrics to.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={["vector-bucket","4d2225e4d3d49f75"]}
   groups={["v2"]}
   name={"bucket"}
@@ -356,31 +381,6 @@ Enables/disables the sink healthcheck upon start.
 ### namespace
 
 A prefix that will be added to all metric names.
-
-
-
-
-</Field>
-
-
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["https://us-west-2-1.aws.cloud2.influxdata.com","http://localhost:8086/"]}
-  groups={["v1","v2"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### endpoint
-
-InfluxDB endpoint to send metrics to.
 
 
 
