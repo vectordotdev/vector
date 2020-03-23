@@ -123,7 +123,7 @@ import Field from '@site/src/components/Field';
 
 Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 
- See [Obtaining a Sematext token](#obtaining-a-sematext-token) for more info.
+ See [Obtaining an API token](#obtaining-an-api-token) for more info.
 
 
 </Field>
@@ -668,7 +668,7 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 
-### Obtaining a Sematext token
+### Obtaining an API token
 
 1. Register for a free account at [datadoghq.com](https://www.datadoghq.com/)
 
