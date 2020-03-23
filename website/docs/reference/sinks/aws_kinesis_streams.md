@@ -9,7 +9,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 service_name: "AWS Kinesis Data Streams"
 sidebar_label: "aws_kinesis_streams|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS Kinesis Data Streams Sink"
 unsupported_operating_systems: []
 ---

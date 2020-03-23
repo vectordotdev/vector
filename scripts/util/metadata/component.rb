@@ -127,7 +127,7 @@ class Component
     variations = Set.new([name])
 
     event_types.each do |event_name|
-      variations << name.sub(/ #{event_name}$/, "")
+      variations << name.sub(/_#{event_name.pluralize}$/, "")
     end
 
     variations.each do |name|

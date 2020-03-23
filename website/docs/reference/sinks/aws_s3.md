@@ -9,7 +9,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 service_name: "AWS S3"
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS S3 Sink"
 unsupported_operating_systems: []
 ---

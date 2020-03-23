@@ -9,7 +9,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 service_name: "AWS Kinesis Firehose"
 sidebar_label: "aws_kinesis_firehose|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_firehose.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS Kinesis Firehose Sink"
 unsupported_operating_systems: []
 ---

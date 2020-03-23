@@ -18,6 +18,7 @@
   --ifm-code-background: var(--ifm-color-emphasis-50);
   --ifm-code-font-size: 85%;
   --ifm-color-black: rgb(0, 27, 61);
+  --ifm-color-black-rgb: 0, 27, 61;
   --ifm-color-blue: #438FFF;
   --ifm-color-blue-rgb: 67, 143 ,255;
   --ifm-color-content: var(--ifm-color-emphasis-800);
@@ -246,6 +247,13 @@ a.badge:hover {
 .align-text-edges > div[class^='mdxCodeBlock_'] code {
   padding-left: var(--bleed-padding);
   padding-right: var(--bleed-padding);
+}
+
+@media (max-width: 480px) {
+  .align-text-edges {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 /**
@@ -1010,11 +1018,12 @@ ol li.list--li--pink {
  */
 
 .modal {
+  box-shadow: 0 0px 10px 0px black;
   position: absolute;
-  top: 40px;
-  left: 40px;
-  right: 40px;
-  bottom: 40px;
+  top: 4vh;
+  left: 3vw;
+  right: 3vw;
+  bottom: 4vh;
 
   padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 2 );
   background-color: var(--ifm-background-color);
@@ -1031,7 +1040,7 @@ ol li.list--li--pink {
 }
 
 .modal-overlay {
-  background-color: var(--ifm-color-gray-800);
+  background-color: rgba(0, 0, 0, 0.75);
   position: fixed;
   top: 0;
   left: 0;

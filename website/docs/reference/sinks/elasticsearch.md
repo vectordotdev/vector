@@ -9,7 +9,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Elasticsearch"
 sidebar_label: "elasticsearch|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-status: "beta"
+status: "prod-ready"
 title: "Elasticsearch Sink"
 unsupported_operating_systems: []
 ---

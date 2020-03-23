@@ -73,7 +73,7 @@ collecting and forwarding all data on the host.
     <ConfigExample
       format="toml"
       path="/etc/vector/vector.toml"
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -104,7 +104,7 @@ collecting and forwarding all data on the host.
     <ConfigExample
       format="toml"
       path="/etc/vector/vector.toml"
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -135,7 +135,7 @@ collecting and forwarding all data on the host.
     <ConfigExample
       format="toml"
       path="/etc/vector/vector.toml"
-      sourceName={"docker"}
+      sourceName={"journald"}
       sinkName={null} />
 
 4.  ### Start Vector

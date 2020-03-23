@@ -1,6 +1,6 @@
 [sinks.elasticsearch]
 title = "Elasticsearch"
-beta = true
+beta = false
 common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"

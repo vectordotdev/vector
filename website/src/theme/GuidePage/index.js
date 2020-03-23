@@ -97,7 +97,7 @@ function GuidePage(props) {
   //
 
   return (
-    <Layout title="Collect Docker Logs & Send Them Anywhere" description="Collect Docker logs in minutes, for free. Quickly collect Docker logs and metrics and send them to one or more destinations.">
+    <Layout title={title} description={`${title}, in minutes, for free`}>
       {showSinkSwitcher && <Modal
         className="modal"
         onRequestClose={() => setShowSinkSwitcher(false)}
@@ -120,12 +120,12 @@ function GuidePage(props) {
             <div className="component-icons">
               {platform && <div className="icon panel">
                 {source.logo_path ?
-                  <SVG src={source.logo_path} alt="Docker" /> :
+                  <SVG src={source.logo_path} alt={`${platform.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
               {source && !platform && <div className="icon panel">
                 {source.logo_path ?
-                  <SVG src={source.logo_path} alt="Docker" /> :
+                  <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
               {!source && !platform && <a href="#" className="icon panel" title="Select a source">
@@ -133,7 +133,7 @@ function GuidePage(props) {
               </a>}
               {sink && <a href="#" className="icon panel" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
                 {sink.logo_path ?
-                  <SVG src={sink.logo_path} alt="Docker" /> :
+                  <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
                   <i className="feather icon-database"></i>}
                </a>}
                {!sink && <a href="#" className="icon panel" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>

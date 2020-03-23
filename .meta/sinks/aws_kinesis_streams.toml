@@ -1,6 +1,6 @@
 [sinks.aws_kinesis_streams]
 title = "AWS Kinesis Data Streams"
-beta = true
+beta = false
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "batching"

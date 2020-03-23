@@ -59,7 +59,7 @@ collecting and forwarding all data on the host.
     <ConfigExample
       format="toml"
       path="/etc/vector/vector.toml"
-      sourceName={"docker"}
+      sourceName={"file"}
       sinkName={null} />
 
 3.  ### Start Vector

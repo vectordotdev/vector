@@ -350,7 +350,7 @@ module.exports = {
         "strategies": [
           {
             "name": "daemon",
-            "source": "docker"
+            "source": "journald"
           },
           {
             "name": "service",
@@ -370,7 +370,7 @@ module.exports = {
         "strategies": [
           {
             "name": "daemon",
-            "source": "docker"
+            "source": "file"
           },
           {
             "name": "service",
@@ -390,7 +390,7 @@ module.exports = {
         "strategies": [
           {
             "name": "daemon",
-            "source": "docker"
+            "source": "file"
           },
           {
             "name": "service",
@@ -410,7 +410,7 @@ module.exports = {
         "strategies": [
           {
             "name": "daemon",
-            "source": "docker"
+            "source": "journald"
           },
           {
             "name": "service",
@@ -430,7 +430,7 @@ module.exports = {
         "strategies": [
           {
             "name": "daemon",
-            "source": "docker"
+            "source": "journald"
           },
           {
             "name": "service",
@@ -21584,7 +21584,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/aws_cloudwatch.svg",
       "name": "aws_cloudwatch_logs",
       "operating_systems": [
         "Linux",
@@ -21616,7 +21616,7 @@ module.exports = {
       "input_types": [
         "metric"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/aws_cloudwatch.svg",
       "name": "aws_cloudwatch_metrics",
       "operating_systems": [
         "Linux",
@@ -21634,7 +21634,7 @@ module.exports = {
       ]
     },
     "aws_kinesis_firehose": {
-      "beta": true,
+      "beta": false,
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_firehose\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
@@ -21648,7 +21648,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/aws_kinesis_firehose.svg",
       "name": "aws_kinesis_firehose",
       "operating_systems": [
         "Linux",
@@ -21658,7 +21658,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "title": "AWS Kinesis Firehose",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -21666,7 +21666,7 @@ module.exports = {
       ]
     },
     "aws_kinesis_streams": {
-      "beta": true,
+      "beta": false,
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_streams\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
@@ -21680,7 +21680,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/aws_kinesis_streams.svg",
       "name": "aws_kinesis_streams",
       "operating_systems": [
         "Linux",
@@ -21690,7 +21690,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "title": "AWS Kinesis Data Streams",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -21698,7 +21698,7 @@ module.exports = {
       ]
     },
     "aws_s3": {
-      "beta": true,
+      "beta": false,
       "config_examples": {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_s3\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
@@ -21722,7 +21722,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "title": "AWS S3",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -21778,7 +21778,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/clickhouse.svg",
       "name": "clickhouse",
       "operating_systems": [
         "Linux",
@@ -21869,7 +21869,7 @@ module.exports = {
       "input_types": [
         "metric"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/datadog.svg",
       "name": "datadog_metrics",
       "operating_systems": [
         "Linux",
@@ -21886,7 +21886,7 @@ module.exports = {
       ]
     },
     "elasticsearch": {
-      "beta": true,
+      "beta": false,
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required"
       },
@@ -21900,7 +21900,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/elasticsearch.svg",
       "name": "elasticsearch",
       "operating_systems": [
         "Linux",
@@ -21911,7 +21911,7 @@ module.exports = {
         "AWS",
         "Elastic"
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "title": "Elasticsearch",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -21933,7 +21933,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/file.svg",
       "name": "file",
       "operating_systems": [
         "Linux",
@@ -21965,7 +21965,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/gcp_cloud_storage.svg",
       "name": "gcp_cloud_storage",
       "operating_systems": [
         "Linux",
@@ -21997,7 +21997,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/gcp_pubsub.svg",
       "name": "gcp_pubsub",
       "operating_systems": [
         "Linux",
@@ -22061,7 +22061,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/honeycomb.svg",
       "name": "honeycomb",
       "operating_systems": [
         "Linux",
@@ -22093,7 +22093,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/http.svg",
       "name": "http",
       "operating_systems": [
         "Linux",
@@ -22125,7 +22125,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/humio.svg",
       "name": "humio_logs",
       "operating_systems": [
         "Linux",
@@ -22157,7 +22157,7 @@ module.exports = {
       "input_types": [
         "metric"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/influxdb.svg",
       "name": "influxdb_metrics",
       "operating_systems": [
         "Linux",
@@ -22189,7 +22189,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/kafka.svg",
       "name": "kafka",
       "operating_systems": [
         "Linux",
@@ -22222,7 +22222,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/logdna.svg",
       "name": "logdna",
       "operating_systems": [
         "Linux",
@@ -22254,7 +22254,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/loki.svg",
       "name": "loki",
       "operating_systems": [
         "Linux",
@@ -22286,7 +22286,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/new_relic.svg",
       "name": "new_relic_logs",
       "operating_systems": [
         "Linux",
@@ -22318,7 +22318,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/papertrail.svg",
       "name": "papertrail",
       "operating_systems": [
         "Linux",
@@ -22350,7 +22350,7 @@ module.exports = {
       "input_types": [
         "metric"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/prometheus.svg",
       "name": "prometheus",
       "operating_systems": [
         "Linux",
@@ -22382,7 +22382,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/pulsar.svg",
       "name": "pulsar",
       "operating_systems": [
         "Linux",
@@ -22414,7 +22414,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/sematext.svg",
       "name": "sematext_logs",
       "operating_systems": [
         "Linux",
@@ -22446,7 +22446,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/socket.svg",
       "name": "socket",
       "operating_systems": [
         "Linux",
@@ -22478,7 +22478,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/splunk_hec.svg",
       "name": "splunk_hec",
       "operating_systems": [
         "Linux",
@@ -22496,7 +22496,7 @@ module.exports = {
       ]
     },
     "statsd": {
-      "beta": true,
+      "beta": false,
       "config_examples": {
         "toml": "[sinks.out]\n  type = \"statsd\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required"
       },
@@ -22520,7 +22520,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "title": "Statsd",
       "type": "sink",
       "unsupported_operating_systems": [
@@ -22542,7 +22542,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/vector.svg",
       "name": "vector",
       "operating_systems": [
         "Linux",
@@ -22608,7 +22608,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "file_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/file.svg",
       "name": "file",
       "operating_systems": [
         "Linux",
@@ -22640,7 +22640,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "http_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/http.svg",
       "name": "http",
       "operating_systems": [
         "Linux",
@@ -22669,7 +22669,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "journald_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/journald.svg",
       "name": "journald",
       "operating_systems": [
         "Linux"
@@ -22700,7 +22700,7 @@ module.exports = {
       ],
       "function_category": "collect",
       "id": "kafka_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/kafka.svg",
       "name": "kafka",
       "operating_systems": [
         "Linux",
@@ -22732,7 +22732,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "logplex_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/logplex.svg",
       "name": "logplex",
       "operating_systems": [
         "Linux",
@@ -22764,7 +22764,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "prometheus_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/prometheus.svg",
       "name": "prometheus",
       "operating_systems": [
         "Linux",
@@ -22796,7 +22796,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "socket_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/socket.svg",
       "name": "socket",
       "operating_systems": [
         "Linux",
@@ -22828,7 +22828,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "splunk_hec_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/splunk_hec.svg",
       "name": "splunk_hec",
       "operating_systems": [
         "Linux",
@@ -22849,7 +22849,7 @@ module.exports = {
       ]
     },
     "statsd": {
-      "beta": true,
+      "beta": false,
       "config_examples": {
         "toml": "[sources.in]\n  type = \"statsd\" # required\n  address = \"127.0.0.1:8126\" # required"
       },
@@ -22873,7 +22873,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "status": "beta",
+      "status": "prod-ready",
       "title": "Statsd",
       "type": "source",
       "unsupported_operating_systems": [
@@ -22957,7 +22957,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "vector_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/vector.svg",
       "name": "vector",
       "operating_systems": [
         "Linux",

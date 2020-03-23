@@ -3,7 +3,7 @@ title = "DPKG"
 archs = ["x86_64", "ARM64", "ARMv7"]
 interfaces = ["dpkg"]
 strategies = [
-  {name = "daemon", source = "docker"},
+  {name = "daemon", source = "journald"},
   {name = "service", source = "http"},
 ]
 
@@ -12,7 +12,7 @@ title = "Homebrew"
 archs = ["x86_64"]
 interfaces = ["homebrew"]
 strategies = [
-  {name = "daemon", source = "docker"},
+  {name = "daemon", source = "file"},
   {name = "service", source = "http"},
 ]
 
@@ -21,7 +21,7 @@ title = "MSI"
 interfaces = ["msi"]
 archs = ["x86_64"]
 strategies = [
-  {name = "daemon", source = "docker"},
+  {name = "daemon", source = "file"},
   {name = "service", source = "http"},
 ]
 
@@ -30,7 +30,7 @@ title = "Nix"
 interfaces = ["nix"]
 archs = ["x86_64"]
 strategies = [
-  {name = "daemon", source = "docker"},
+  {name = "daemon", source = "journald"},
   {name = "service", source = "http"},
 ]
 
@@ -39,6 +39,6 @@ title = "RPM"
 interfaces = ["rpm"]
 archs = ["x86_64"]
 strategies = [
-  {name = "daemon", source = "docker"},
+  {name = "daemon", source = "journald"},
   {name = "service", source = "http"},
 ]

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64px" height="64px" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 63.1 (92452) - https://sketch.com -->
+    <title>Icon</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="systemd-light" transform="translate(0.000000, 22.000000)" fill-rule="nonzero">
+            <path d="M0.808421053,1.1677193 L0.808421053,19.8512281 L7.99438596,19.8512281 L7.99438596,16.9768421 L3.68280702,16.9768421 L3.68280702,4.04210526 L7.99438596,4.04210526 L7.99438596,1.1677193 L0.808421053,1.1677193 Z M55.4217544,1.1677193 L55.4217544,4.04210526 L59.7333333,4.04210526 L59.7333333,16.9768421 L55.4217544,16.9768421 L55.4217544,19.8512281 L62.6077193,19.8512281 L62.6077193,1.1677193 L55.4217544,1.1677193 Z" id="Shape" fill="#201A26"></path>
+            <polygon id="Path" fill="#30D475" points="33.1452632 10.5094737 46.08 3.32350877 46.08 17.6954386"></polygon>
+            <circle id="Oval" fill="#30D475" cx="22.3670344" cy="10.5101923" r="6.46736842"></circle>
+        </g>
+    </g>
+</svg>

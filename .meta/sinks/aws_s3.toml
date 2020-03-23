@@ -1,6 +1,6 @@
 [sinks.aws_s3]
 title = "AWS S3"
-beta = true
+beta = false
 common = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"

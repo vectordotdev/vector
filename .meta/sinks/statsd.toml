@@ -1,6 +1,6 @@
 [sinks.statsd]
 title = "Statsd"
-beta = true
+beta = false
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"

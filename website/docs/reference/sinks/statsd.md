@@ -9,7 +9,7 @@ operating_systems: ["Linux","MacOS","Windows"]
 service_name: "Statsd"
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/statsd.rs
-status: "beta"
+status: "prod-ready"
 title: "Statsd Sink"
 unsupported_operating_systems: []
 ---
