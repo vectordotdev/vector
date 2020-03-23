@@ -39,7 +39,7 @@ run_test(){
   cat <<EOF | kind create cluster --name "${KIND_CLUSTER_NAME}" --image ${KUBE_IMAGE} --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-containerdConfigPatches: 
+containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
     endpoint = ["http://${reg_ip}:5000"]
