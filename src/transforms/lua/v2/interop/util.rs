@@ -1,6 +1,6 @@
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use rlua::prelude::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
     let table = ctx.create_table()?;
@@ -49,6 +49,17 @@ where
         map.insert(k.into(), v);
     }
     Ok(map)
+}
+
+pub fn table_to_set<'a, T>(t: LuaTable<'a>) -> LuaResult<BTreeSet<T>>
+where
+    T: FromLua<'a> + Ord,
+{
+    let mut set = BTreeSet::new();
+    for item in t.sequence_values() {
+        set.insert(item?);
+    }
+    Ok(set)
 }
 
 pub fn table_is_array<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {

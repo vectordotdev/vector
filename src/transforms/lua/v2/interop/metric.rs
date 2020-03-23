@@ -1,4 +1,4 @@
-use super::util::{table_to_timestamp, timestamp_to_table};
+use super::util::{table_to_set, table_to_timestamp, timestamp_to_table};
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
@@ -132,7 +132,7 @@ impl<'a> FromLua<'a> for Metric {
             }
         } else if let Some(set) = table.get::<_, Option<LuaTable>>("set")? {
             MetricValue::Set {
-                values: set.get::<_, Vec<String>>("values")?.into_iter().collect(), // FIXME
+                values: set.get::<_, LuaTable>("values").and_then(table_to_set)?,
             }
         } else if let Some(distribution) = table.get::<_, Option<LuaTable>>("distribution")? {
             MetricValue::Distribution {
