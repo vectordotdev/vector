@@ -1,5 +1,4 @@
 use crate::Event;
-use getset::{Getters, Setters};
 
 #[derive(Default)]
 pub(super) struct EngineContext {

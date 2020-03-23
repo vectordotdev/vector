@@ -13,12 +13,12 @@ pub mod buffers;
 pub mod conditions;
 pub mod config_paths;
 pub mod dns;
+#[cfg(feature = "engine")]
+pub mod engine;
 pub mod event;
 pub mod generate;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
-#[cfg(feature = "engine")]
-pub mod engine;
 pub mod list;
 pub mod metrics;
 pub mod region;
