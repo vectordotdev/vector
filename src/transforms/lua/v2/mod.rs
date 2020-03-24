@@ -254,6 +254,27 @@ mod tests {
     }
 
     #[test]
+    fn lua_duplicate_event() {
+        let mut transform = from_config(
+            r#"
+            hooks.process = """function (event, emit)
+                emit(event)
+                emit(event)
+            end
+            """
+            "#,
+        )
+        .unwrap();
+
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert("host", "127.0.0.1");
+        let mut out = Vec::new();
+        let event = transform.transform_into(&mut out, event);
+
+        assert_eq!(out.len(), 2);
+    }
+
+    #[test]
     fn lua_read_empty_field() {
         let mut transform = from_config(
             r#"
