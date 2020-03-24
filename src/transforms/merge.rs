@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
-    event::{self, Event},
+    event::{self, Event, LogEvent, Value},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -64,27 +64,59 @@ impl TransformConfig for MergeConfig {
 }
 
 #[derive(Debug)]
-pub struct Merge {
-    partial_event_marker_field: Atom,
+pub struct Merge<N>
+where
+    N: NormalizeLogEvent,
+{
+    normalizer: N,
     merge_fields: Vec<Atom>,
     stream_discriminant_fields: Vec<Atom>,
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
-impl From<MergeConfig> for Merge {
+impl From<MergeConfig> for Merge<PartialEventMarkerFieldNormalizer> {
     fn from(config: MergeConfig) -> Self {
+        let MergeConfig {
+            partial_event_marker_field,
+            merge_fields,
+            stream_discriminant_fields,
+        } = config;
+
+        Self::new(
+            PartialEventMarkerFieldNormalizer {
+                partial_event_marker_field,
+            },
+            merge_fields,
+            stream_discriminant_fields,
+        )
+    }
+}
+
+impl<N> Merge<N>
+where
+    N: NormalizeLogEvent,
+{
+    /// Create a new [`Merge`] transform with the specified parameters.
+    pub fn new(
+        normalizer: N,
+        merge_fields: Vec<Atom>,
+        stream_discriminant_fields: Vec<Atom>,
+    ) -> Self {
         Self {
-            partial_event_marker_field: config.partial_event_marker_field,
-            merge_fields: config.merge_fields,
-            stream_discriminant_fields: config.stream_discriminant_fields,
+            normalizer,
+            merge_fields,
+            stream_discriminant_fields,
             log_event_merge_states: HashMap::new(),
         }
     }
 }
 
-impl Transform for Merge {
+impl<N> Transform for Merge<N>
+where
+    N: NormalizeLogEvent + Send,
+{
     fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut event = event.into_log();
+        let event = event.into_log();
 
         // Prepare an event's discriminant.
         let discriminant = Discriminant::from_log_event(&event, &self.stream_discriminant_fields);
@@ -97,26 +129,32 @@ impl Transform for Merge {
         // easily, as we expect users to rely on `lua` transform to implement
         // custom partial markers.
 
-        // If current event has the partial marker, consider it partial.
-        // Remove the partial marker from the event and stash it.
-        if event.remove(&self.partial_event_marker_field).is_some() {
-            // We got a perial event. Initialize a partial event merging state
-            // if there's none available yet, or extend the existing one by
-            // merging the incoming partial event in.
-            match self.log_event_merge_states.entry(discriminant) {
-                hash_map::Entry::Vacant(entry) => {
-                    entry.insert(LogEventMergeState::new(event));
+        // Normalize the event, and perform partiality detection. Normalization
+        // should clean up the event from the the partiality markers, if
+        // applicable (and if it is a sane behaviuous for a particular use
+        // case).
+        // If the resulting normalized event is partial - stash it.
+        let event = match self.normalizer.normalize(event) {
+            MaybePartialLogEvent::Partial(event) => {
+                // We got a perial event. Initialize a partial event merging state
+                // if there's none available yet, or extend the existing one by
+                // merging the incoming partial event in.
+                match self.log_event_merge_states.entry(discriminant) {
+                    hash_map::Entry::Vacant(entry) => {
+                        entry.insert(LogEventMergeState::new(event));
+                    }
+                    hash_map::Entry::Occupied(mut entry) => {
+                        entry
+                            .get_mut()
+                            .merge_in_next_event(event, &self.merge_fields);
+                    }
                 }
-                hash_map::Entry::Occupied(mut entry) => {
-                    entry
-                        .get_mut()
-                        .merge_in_next_event(event, &self.merge_fields);
-                }
-            }
 
-            // Do not emit the event yet.
-            return None;
-        }
+                // Do not emit the event yet.
+                return None;
+            }
+            MaybePartialLogEvent::NonPartial(event) => event,
+        };
 
         // We got non-partial event. Attempt to get a partial event merge
         // state. If it's empty then we don't have a backlog of partail events
@@ -134,6 +172,63 @@ impl Transform for Merge {
 
         // Return the merged event.
         Some(Event::Log(merged_event))
+    }
+}
+
+/// Represents either a partial or non-partial event.
+/// In both cases, the actual underlying event is ready for further processing,
+/// in a sense that, if the event is partial and the partial event marker has
+/// to be removed according to the [`NormalizeLogEvent`] implementation
+/// semantics, the event contained at the [`MaybePartialLogEvent`] already has
+/// the partial event marker cleaned up.
+#[derive(Debug)]
+pub enum MaybePartialLogEvent {
+    Partial(LogEvent),
+    NonPartial(LogEvent),
+}
+
+/// Performs normalization of the event for merging purposes. It's also
+/// responsible for determining whether the event is partial or non-partial.
+///
+/// If the event has a partial marker of any kind - that event is considered
+/// partial, otherwise - non-partial.
+/// The job of NormalizeLogEvent implementation if to determine whether the
+/// event is partial, and if it is - clear the partial event marker from it and
+/// return the resulting cleared event as [`MaybePartialLogEvent::Partial`].
+/// Events that are detected as non-partial have to be returned as
+/// [`MaybePartialLogEvent::MonPartial`]; negative partial event marker, if any,
+/// can optionally be removed from them.
+///
+/// It's the implementer's job to determine a sane normalization strategy, since
+/// correct semantics varies on a case by case basis.
+///
+/// If you have troubles with determining the correct semantics, consider
+/// checking existing implementations to see some examples.
+pub trait NormalizeLogEvent {
+    fn normalize(&self, event: LogEvent) -> MaybePartialLogEvent;
+}
+
+/// A [`NormalizeLogEvent`] implementation that performs pariality detection
+/// based on the presence of the `partial_event_marker_field`.
+///
+/// If the event has `partial_event_marker_field` among it's field, then,
+/// regardless of the value
+#[derive(Debug, Clone, PartialEq)]
+pub struct PartialEventMarkerFieldNormalizer {
+    pub partial_event_marker_field: Atom,
+}
+
+impl NormalizeLogEvent for PartialEventMarkerFieldNormalizer {
+    fn normalize(&self, mut event: LogEvent) -> MaybePartialLogEvent {
+        // If the event has a field with `partial_event_marker_field` key -
+        // it is a partial event. It is expected that we remove the partial
+        // event marker - so do both the removal and check efficiently in a
+        // single operation.
+        if event.remove(&self.partial_event_marker_field).is_some() {
+            MaybePartialLogEvent::Partial(event)
+        } else {
+            MaybePartialLogEvent::NonPartial(event)
+        }
     }
 }
 
