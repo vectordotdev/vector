@@ -190,9 +190,11 @@ where
     fn call(&mut self, mut request: Request<B>) -> Self::Future {
         let _enter = self.span.enter();
 
-        request
-            .headers_mut()
-            .insert("User-Agent", self.user_agent.clone());
+        if !request.headers().contains_key("User-Agent") {
+            request
+                .headers_mut()
+                .insert("User-Agent", self.user_agent.clone());
+        }
 
         debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
 
