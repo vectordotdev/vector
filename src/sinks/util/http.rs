@@ -134,7 +134,7 @@ where
 pub struct HttpClient<B = Body> {
     client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
     span: Span,
-    version: HeaderValue,
+    user_agent: HeaderValue,
 }
 
 impl<B> HttpClient<B>
@@ -157,13 +157,15 @@ where
             .build(https);
 
         let version = crate::get_version();
+        let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
+            .expect("Invalid header value for version!");
 
         let span = tracing::info_span!("http");
 
         Ok(HttpClient {
             client,
             span,
-            version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
+            user_agent,
         })
     }
 
@@ -188,9 +190,11 @@ where
     fn call(&mut self, mut request: Request<B>) -> Self::Future {
         let _enter = self.span.enter();
 
-        request
-            .headers_mut()
-            .insert("User-Agent", self.version.clone());
+        if !request.headers().contains_key("User-Agent") {
+            request
+                .headers_mut()
+                .insert("User-Agent", self.user_agent.clone());
+        }
 
         debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
 
@@ -215,7 +219,7 @@ impl<B> Clone for HttpClient<B> {
         Self {
             client: self.client.clone(),
             span: self.span.clone(),
-            version: self.version.clone(),
+            user_agent: self.user_agent.clone(),
         }
     }
 }
@@ -224,7 +228,7 @@ impl<B> fmt::Debug for HttpClient<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpClient")
             .field("client", &self.client)
-            .field("version", &self.version)
+            .field("user_agent", &self.user_agent)
             .finish()
     }
 }
