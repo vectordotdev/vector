@@ -1,65 +1,65 @@
 - name: "domain: blog"
-  description: Anything  related
+  description: Anything blog related
   color: 212f3e
 - name: "domain: buffers"
-  description: Anything  related
+  description: Anything buffers related
   color: 212f3e
 - name: "domain: cli"
-  description: Anything  related
+  description: Anything cli related
   color: 212f3e
 - name: "domain: config"
-  description: Anything  related
+  description: Anything config related
   color: 212f3e
 - name: "domain: dependencies"
-  description: Anything  related
+  description: Anything dependencies related
   color: 212f3e
 - name: "domain: docs"
-  description: Anything  related
+  description: Anything docs related
   color: 212f3e
 - name: "domain: guides"
-  description: Anything  related
+  description: Anything guides related
   color: 212f3e
 - name: "domain: marketing"
-  description: Anything  related
+  description: Anything marketing related
   color: 212f3e
 - name: "domain: networking"
-  description: Anything  related
+  description: Anything networking related
   color: 212f3e
 - name: "domain: observability"
-  description: Anything  related
+  description: Anything observability related
   color: 212f3e
 - name: "domain: operations"
-  description: Anything  related
+  description: Anything operations related
   color: 212f3e
 - name: "domain: platforms"
-  description: Anything  related
+  description: Anything platforms related
   color: 212f3e
 - name: "domain: security"
-  description: Anything  related
+  description: Anything security related
   color: 212f3e
 - name: "domain: setup"
-  description: Anything  related
+  description: Anything setup related
   color: 212f3e
 - name: "domain: sinks"
-  description: Anything  related
+  description: Anything sinks related
   color: 212f3e
 - name: "domain: sources"
-  description: Anything  related
+  description: Anything sources related
   color: 212f3e
 - name: "domain: templating"
-  description: Anything  related
+  description: Anything templating related
   color: 212f3e
 - name: "domain: testing"
-  description: Anything  related
+  description: Anything testing related
   color: 212f3e
 - name: "domain: topology"
-  description: Anything  related
+  description: Anything topology related
   color: 212f3e
 - name: "domain: transforms"
-  description: Anything  related
+  description: Anything transforms related
   color: 212f3e
 - name: "domain: website"
-  description: Anything  related
+  description: Anything website related
   color: 212f3e
 
 - name: "event type: log"
