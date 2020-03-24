@@ -16,7 +16,6 @@ import VectorComponents from '@site/src/components/VectorComponents';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
-import readingTime from 'reading-time';
 import styles from './styles.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useTOCHighlight from '@theme/hooks/useTOCHighlight';
@@ -62,9 +61,9 @@ function GuidePage(props) {
 
   const {content: GuideContents} = props;
   const {frontMatter, metadata} = GuideContents;
-  const {author_github: authorGithub, category, id, last_modified_on: lastModifiedOn, platform_name: platformName, sink_name: sinkName, source_name: sourceName, title} = frontMatter;
-  const {tags} = metadata;
-  const readingStats = readingTime(GuideContents.toString());
+  const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, platform_name: platformName, sink_name: sinkName, source_name: sourceName, title} = frontMatter;
+  const {category, readingTime, tags} = metadata;
+  const lastModified = Date.parse(lastModifiedOn);
 
   //
   // Site config
@@ -116,7 +115,7 @@ function GuidePage(props) {
             transforms={false} />
       </Modal>}
       <article>
-        <header className="hero domain-bg domain-bg--platforms">
+        <header className="hero domain-bg domain-bg--networking">
           <div className="container">
             {(platform || source || sink) && (
               <div className="component-icons">
@@ -146,11 +145,11 @@ function GuidePage(props) {
             {authorGithub && <Avatar
               github={authorGithub}
               size="lg"
-              nameSuffix={<> / <time pubdate="pubdate" dateTime={lastModifiedOn}>{lastModifiedOn}</time> / {readingStats.text}</>}
+              nameSuffix={<> / {readingTime} / Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></>}
               rel="author"
               subTitle={false}
               vertical={true} />}
-            <h1>{title}</h1>
+            <h1 className={styles.header}>{title}</h1>
             <Tags colorProfile="guides" tags={tags} />
           </div>
         </header>

@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-03-23"
-title: Hello World. Your First Vector Pipeline.
+last_modified_on: "2020-03-24"
+title: 1. Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
 author_github: https://github.com/Jeffail
 series: getting-started:1

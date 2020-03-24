@@ -169,6 +169,8 @@ end
 
 metadata.installation.platforms_list.each do |platform|
   template_path = "#{GUIDES_ROOT}/setup/platforms/#{platform.name}.md.erb"
+  strategy = platform.strategies.first
+  source = metadata.sources.send(strategy.source)
 
   if !File.exists?(template_path)
     dirname = File.dirname(template_path)
@@ -187,7 +189,7 @@ metadata.installation.platforms_list.each do |platform|
   end
 
   metadata.sinks_list.
-    select { |sink| !sink.function_category?("test") }.
+    select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
     each do |sink|
       template_path = "#{GUIDES_ROOT}/setup/platforms/#{platform.name}/#{sink.name}.md.erb"
 

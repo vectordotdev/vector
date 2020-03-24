@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 delivery_guarantee: "best_effort"
 component_title: "HTTP"
 description: "The Vector `http` source ingests data through the HTTP protocol and outputs `log` events."

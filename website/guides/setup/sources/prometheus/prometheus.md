@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: "Send Prometheus metrics to Prometheus"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Prometheus."
 platform_name: null

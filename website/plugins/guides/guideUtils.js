@@ -1,18 +1,14 @@
 "use strict";
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const lodash_1 = __importDefault(require("lodash"));
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const globby_1 = __importDefault(require("globby"));
 const path_1 = __importDefault(require("path"));
 const utils_1 = require("@docusaurus/utils");
+const reading_time_1 = __importDefault(require("reading-time"));
 function truncate(fileString, truncateMarker) {
     return fileString.split(truncateMarker, 1).shift();
 }
@@ -31,23 +27,27 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
         const source = path_1.default.join(guideDir, relativeSource);
         const aliasedSource = utils_1.aliasedSitePath(source, siteDir);
         const fileString = await fs_extra_1.default.readFile(source, 'utf-8');
+        const readingStats = reading_time_1.default(fileString);
         const { frontMatter, content, excerpt } = utils_1.parse(fileString);
         if (frontMatter.draft && process.env.NODE_ENV === 'production') {
             return;
         }
         let category = relativeSource.split('/')[0];
+        let categorySort = category == 'getting-started' ? 'A' : category;
         let linkName = relativeSource.replace(/\.mdx?$/, '');
         frontMatter.title = frontMatter.title || linkName;
         guides.push({
             id: frontMatter.id || frontMatter.title,
             metadata: {
                 category: category,
+                categorySort: categorySort,
                 description: frontMatter.description || excerpt,
                 permalink: utils_1.normalizeUrl([
                     baseUrl,
                     routeBasePath,
                     frontMatter.id || linkName,
                 ]),
+                readingTime: readingStats.text,
                 sort: frontMatter.sort,
                 source: aliasedSource,
                 tags: (frontMatter.tags || []).concat(category),
@@ -56,8 +56,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             },
         });
     }));
-    guides.sort((a, b) => b.metadata.sort - (a.metadata.sort || 0));
-    return guides;
+    return lodash_1.default.sortBy(guides, ['metadata.categorySort', 'metadata.title']);
 }
 exports.generateGuides = generateGuides;
 function linkify(fileContent, siteDir, guidePath, guides) {

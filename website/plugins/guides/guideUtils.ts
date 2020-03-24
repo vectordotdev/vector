@@ -1,16 +1,12 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+import {PluginOptions, Guide} from './types';
+import {LoadContext} from '@docusaurus/types';
 
+import _ from 'lodash';
 import fs from 'fs-extra';
 import globby from 'globby';
 import path from 'path';
-import {PluginOptions, Guide} from './types';
 import {parse, normalizeUrl, aliasedSitePath} from '@docusaurus/utils';
-import {LoadContext} from '@docusaurus/types';
+import readingTime from 'reading-time';
 
 export function truncate(fileString: string, truncateMarker: RegExp) {
   return fileString.split(truncateMarker, 1).shift()!;
@@ -39,6 +35,7 @@ export async function generateGuides(
       const source = path.join(guideDir, relativeSource);
       const aliasedSource = aliasedSitePath(source, siteDir);
       const fileString = await fs.readFile(source, 'utf-8');
+      const readingStats = readingTime(fileString);
       const {frontMatter, content, excerpt} = parse(fileString);
 
       if (frontMatter.draft && process.env.NODE_ENV === 'production') {
@@ -46,6 +43,7 @@ export async function generateGuides(
       }
 
       let category = relativeSource.split('/')[0];
+      let categorySort = category == 'getting-started' ? 'A' : category;
       let linkName = relativeSource.replace(/\.mdx?$/, '');
       frontMatter.title = frontMatter.title || linkName;
 
@@ -53,12 +51,14 @@ export async function generateGuides(
         id: frontMatter.id || frontMatter.title,
         metadata: {
           category: category,
+          categorySort: categorySort,
           description: frontMatter.description || excerpt,
           permalink: normalizeUrl([
             baseUrl,
             routeBasePath,
             frontMatter.id || linkName,
           ]),
+          readingTime: readingStats.text,
           sort: frontMatter.sort,
           source: aliasedSource,
           tags: (frontMatter.tags || []).concat(category),
@@ -69,7 +69,7 @@ export async function generateGuides(
     }),
   );
 
-  return guides;
+  return _.sortBy(guides, ['metadata.categorySort', 'metadata.title']);
 }
 
 export function linkify(

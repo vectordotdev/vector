@@ -9,7 +9,6 @@ import Tags from '@site/src/components/Tags';
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
 import {enrichTags} from '@site/src/exports/tags';
-import readingTime from 'reading-time';
 
 import './styles.css';
 
@@ -21,19 +20,23 @@ function GuideItem(props) {
     truncated,
     isGuidePage = false,
   } = props;
-  const {category, description, permalink, tags} = metadata;
+  const {category, description, permalink, readingTime, tags} = metadata;
   const {author_github, last_modified_on: lastModifiedOn, title} = frontMatter;
-  const readingStats = readingTime(children.toString());
   const domainTag = enrichTags(tags, 'guides').find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
 
   return (
-    <Link to={permalink + '/'} className={classnames('guide-item', 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
+    <Link to={permalink + '/'} className="guide-item domain-bg domain-bg--networking domain-bg--hover">
       <article>
-        <div className="category">{category}</div>
-        <h2>{title}</h2>
-        <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={lastModifiedOn}>{lastModifiedOn}</time> / {readingStats.text}</>} rel="author" />
-        <Tags colorProfile="guides" tags={tags} />
+        <header>
+          <div className="category">{category}</div>
+          <h2 title={title}>{title}</h2>
+          <Avatar github={author_github} size="sm" subTitle={<>{readingTime}</>} rel="author" />
+          <Tags colorProfile="guides" tags={tags} />
+        </header>
+        <footer>
+          <div className="action">read now</div>
+        </footer>
       </article>
     </Link>
   );

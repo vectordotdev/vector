@@ -232,6 +232,7 @@ a.badge:hover {
   padding: 0 var(--bleed-padding);
 }
 
+.align-text-edges > .alert,
 .align-text-edges > blockquote,
 .align-text-edges > .code-explanation,
 .align-text-edges > .code-header {
@@ -241,7 +242,8 @@ a.badge:hover {
   padding-right: var(--bleed-padding);
 }
 
-.align-text-edges > div[class^='mdxCodeBlock_'] {
+.align-text-edges > div[class^='mdxCodeBlock_'],
+.align-text-edges > div > div > .tabs--block {
   margin-left: var(--bleed-margin);
   margin-right: var(--bleed-margin);
 }
@@ -253,8 +255,8 @@ a.badge:hover {
 
 @media (max-width: 480px) {
   .align-text-edges {
-    padding-left: 0;
-    padding-right: 0;
+    --bleed-padding: var(--ifm-spacing-horizontal);
+    --bleed-margin: calc( var(--bleed-padding) * -1 );
   }
 }
 

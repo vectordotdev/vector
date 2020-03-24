@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 component_title: "Field Filter"
 description: "The Vector `field_filter` transform accepts and outputs `log` events allowing you to filter events by a log field's value."
 event_types: ["log"]

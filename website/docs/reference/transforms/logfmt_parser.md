@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field."
 event_types: ["log"]

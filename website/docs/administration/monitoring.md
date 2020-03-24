@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: Monitoring
 description: How to monitor and observe Vector with logs, metrics, and more.
 ---
@@ -79,7 +79,7 @@ a variety of methods:
 ### Full Backtraces
 
 You can enable full error backtraces by setting the  `RUST_BACKTRACE=full` env
-var. More on this in the [Troubleshooting guide][guides.administration.troubleshooting].
+var. More on this in the [Troubleshooting guide][guides.getting-started.troubleshooting].
 
 ### Rate Limiting
 
@@ -105,5 +105,5 @@ Please refer to our troubleshooting guide:
 [docs.process-management#flags]: /docs/administration/process-management/#flags
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
-[guides.administration.troubleshooting]: /guides/Users/benjohnson/Code/timber/vector/website/guides/administration/troubleshooting/
+[guides.getting-started.troubleshooting]: /guides/Users/benjohnson/Code/timber/vector/website/guides/getting-started/troubleshooting/
 [urls.issue_230]: https://github.com/timberio/vector/issues/230

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 delivery_guarantee: "at_least_once"
 component_title: "Humio Logs"
 description: "The Vector `humio_logs` sink batches `log` events to Humio via the HEC API."

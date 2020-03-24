@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: Concepts
 description: The fundamental Vector concepts. A great place to start learning about Vector.
 ---

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: "Send Docker logs to Clickhouse"
 description: "A guide to quickly, and correctly, send Docker logs to Clickhouse."
 platform_name: "docker"

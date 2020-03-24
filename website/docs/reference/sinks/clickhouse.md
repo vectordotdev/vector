@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 delivery_guarantee: "best_effort"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 delivery_guarantee: "at_least_once"
 component_title: "Heroku Logplex"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."

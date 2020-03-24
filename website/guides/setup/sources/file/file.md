@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: "Send File logs to File"
 description: "A guide to quickly, and correctly, send File logs to File."
 platform_name: null

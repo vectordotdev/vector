@@ -1,9 +1,3 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
 export interface GuideContent {
     guides: Guide[];
     guideListPaginated: GuidePaginated[];
@@ -57,14 +51,16 @@ export interface GuidePaginated {
 }
 export interface MetaData {
     category: string;
+    categorySort: string;
     description: string;
+    nextItem?: Paginator;
     permalink: string;
+    prevItem?: Paginator;
+    readingTime: string;
     sort: number;
     source: string;
     tags: (Tag | string)[];
     title: string;
-    prevItem?: Paginator;
-    nextItem?: Paginator;
     truncated: boolean;
 }
 export interface Paginator {

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: "Send Journald logs to Kafka"
 description: "A guide to quickly, and correctly, send Journald logs to Kafka."
 platform_name: null

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: "Send Journald logs to Sematext"
 description: "A guide to quickly, and correctly, send Journald logs to Sematext."
 platform_name: null

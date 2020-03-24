@@ -1,8 +1,13 @@
 .guide-items {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  font-size: 1.275em;
+  grid-template-columns: repeat(auto-fit, 12.6em);
   grid-gap: 1.5rem;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
+.guide-items--staggered {
+  font-size: 1em;
 }
 
 .guide-items--staggered > a:first-child {
@@ -10,11 +15,7 @@
   grid-column-end: span 2;
   grid-row-start: 1;
   grid-row-end: span 2;
-  font-size: 2em;
-}
-
-.guide-items--staggered > a:first-child h2 {
-  font-weight: 600;
+  font-size: 1.7em;
 }
 
 .guide-items--staggered > a:first-child:hover {

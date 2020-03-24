@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: Process Management
 description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---

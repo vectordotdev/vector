@@ -2,6 +2,15 @@
   margin-bottom: 0.5em
 }
 
+.category {
+  text-transform: uppercase;
+}
+
+.header {
+  margin-top: calc( var(--ifm-spacing-vertical) * 1 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
 .sinkSwitcher {
   background: var(--ifm-background-color);
   height: 100%;

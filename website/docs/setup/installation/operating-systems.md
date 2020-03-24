@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 title: Install Vector On Your Operating System
 sidebar_label: hidden
 hide_pagination: true

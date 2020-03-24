@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-23"
+last_modified_on: "2020-03-24"
 delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."

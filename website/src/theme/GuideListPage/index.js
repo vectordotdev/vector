@@ -1,19 +1,24 @@
 import React from 'react';
 
 import GuideItems from '@theme/GuideItems';
+import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 
+import humanizeString from 'humanize-string';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
+const AnchoredH2 = Heading('h2');
+
 function GuideListPage(props) {
-  const {metadata, items} = props;
+  const {metadata, items: guides} = props;
   const context = useDocusaurusContext();
   const {siteConfig = {title: siteTitle}} = context;
   const isGuideOnlyMode = metadata.permalink === '/';
   const title = isGuideOnlyMode ? siteTitle : 'Guides';
+  const groupedGuides = _.groupBy(guides, ((guide) => guide.content.metadata.category));
 
   return (
     <Layout title={title} description="Vector guides, tutorials, and education.">
@@ -26,7 +31,16 @@ function GuideListPage(props) {
         </div>
       </header>
       <main className="container">
-        <GuideItems items={items.slice(0,25)} staggered={true} />
+        {Object.keys(groupedGuides).map((category, index) => {
+          let groupGuides = groupedGuides[category];
+
+          return (
+            <section>
+              <AnchoredH2 id={category}>{humanizeString(category)}</AnchoredH2>
+              <GuideItems items={groupGuides.slice(0,25)} staggered={index == 0} />
+            </section>
+          );
+        })}
       </main>
     </Layout>
   );
