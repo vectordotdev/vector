@@ -2,7 +2,7 @@ use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
     event::{self, Event},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         SinkExt,
     },
     template::Template,
@@ -29,7 +29,10 @@ use super::streaming_sink::{self, StreamingSink};
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 }
 
