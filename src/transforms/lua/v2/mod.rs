@@ -10,16 +10,26 @@ use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Lua error: {}", source))]
-    InvalidLua { source: rlua::Error },
+    #[snafu(display("Invalid \"search_dirs\": {}", source))]
+    InvalidSearchDirs { source: rlua::Error },
+    #[snafu(display("Cannot evaluate Lua code from \"source\" section: {}", source))]
+    InvalidSource { source: rlua::Error },
+    #[snafu(display("Cannot evaluate Lua code from \"hooks.process\" section: {}", source))]
+    InvalidHooksProcess { source: rlua::Error },
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
-    source: String,
     #[serde(default)]
     search_dirs: Vec<String>,
+    source: Option<String>,
+    hooks: HooksConfig,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct HooksConfig {
+    process: String,
 }
 
 // Implementation of methods from `TransformConfig`
@@ -30,10 +40,7 @@ pub struct LuaConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
-            let b: Box<dyn Transform> = Box::new(l);
-            b
-        })
+        Lua::new(&self).map(|lua| Box::new(lua) as Box<dyn Transform>)
     }
 
     pub fn input_type(&self) -> DataType {
@@ -63,16 +70,17 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> crate::Result<Self> {
+    pub fn new(config: &LuaConfig) -> crate::Result<Self> {
         let lua = rlua::Lua::new();
 
-        let additional_paths = search_dirs
-            .into_iter()
+        let additional_paths = config
+            .search_dirs
+            .iter()
             .map(|d| format!("{}/?.lua", d))
             .collect::<Vec<_>>()
             .join(";");
 
-        lua.context(|ctx| {
+        lua.context(|ctx| -> crate::Result<()> {
             if !additional_paths.is_empty() {
                 let package = ctx.globals().get::<_, rlua::Table<'_>>("package")?;
                 let current_paths = package
@@ -82,11 +90,18 @@ impl Lua {
                 package.set("path", paths)?;
             }
 
-            let func = ctx.load(&source).into_function()?;
-            ctx.set_named_registry_value("vector_func", func)?;
+            if let Some(source) = &config.source {
+                ctx.load(source).eval().context(InvalidSource)?;
+            }
+
+            let hooks_process: rlua::Function<'_> = ctx
+                .load(&config.hooks.process)
+                .eval()
+                .context(InvalidHooksProcess)?;
+            ctx.set_named_registry_value("hooks_process", hooks_process)?;
+
             Ok(())
-        })
-        .context(InvalidLua)?;
+        })?;
 
         Ok(Self {
             lua,
@@ -94,16 +109,19 @@ impl Lua {
         })
     }
 
-    fn process(&mut self, event: Event) -> Result<Option<Event>, rlua::Error> {
-        let result = self.lua.context(|ctx| {
-            let globals = ctx.globals();
+    fn process(&mut self, event: Event, output: &mut Vec<Event>) -> Result<(), rlua::Error> {
+        let result = self.lua.context(|ctx: rlua::Context<'_>| {
+            ctx.scope(|scope| {
+                let emit = scope.create_function_mut(|_, event: Event| {
+                    output.push(event);
+                    Ok(())
+                })?;
+                let process = ctx.named_registry_value::<_, rlua::Function<'_>>("hooks_process")?;
 
-            globals.set("event", event)?;
-
-            let func = ctx.named_registry_value::<_, rlua::Function<'_>>("vector_func")?;
-            func.call(())?;
-            globals.get::<_, Option<Event>>("event")
+                process.call((event, emit))
+            })
         });
+
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
             self.lua.gc_collect()?;
@@ -111,17 +129,25 @@ impl Lua {
         }
         result
     }
+
+    // Used only in tests.
+    fn process_single(&mut self, event: Event) -> Result<Option<Event>, rlua::Error> {
+        let mut out = Vec::new();
+        self.process(event, &mut out)?;
+        assert!(out.len() <= 1);
+        Ok(out.into_iter().next())
+    }
 }
 
 impl Transform for Lua {
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        match self.process(event) {
-            Ok(event) => event,
-            Err(err) => {
-                error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
-                None
-            }
+    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+        if let Err(err) = self.process(event, output) {
+            error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
         }
+    }
+
+    fn transform(&mut self, event: Event) -> Option<Event> {
+        self.process_single(event).unwrap()
     }
 }
 
@@ -143,13 +169,20 @@ mod tests {
         transforms::Transform,
     };
 
+    fn from_config(config: &str) -> crate::Result<Lua> {
+        Lua::new(&toml::from_str(config).unwrap())
+    }
+
     #[test]
     fn lua_add_field() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event["log"]["hello"] = "goodbye"
+            hooks.process = """function (event, emit)
+                event["log"]["hello"] = "goodbye"
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -162,12 +195,15 @@ mod tests {
 
     #[test]
     fn lua_read_field() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              _, _, name = string.find(event.log.message, "Hello, my name is (%a+).")
-              event.log.name = name
+            hooks.process = """function (event, emit)
+                _, _, name = string.find(event.log.message, "Hello, my name is (%a+).")
+                event.log.name = name
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -180,11 +216,14 @@ mod tests {
 
     #[test]
     fn lua_remove_field() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event.log.name = nil
+            hooks.process = """function (event, emit)
+                event.log.name = nil
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -197,11 +236,13 @@ mod tests {
 
     #[test]
     fn lua_drop_event() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event = nil
+            hooks.process = """function (event, emit)
+                -- emit nothing
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -214,15 +255,18 @@ mod tests {
 
     #[test]
     fn lua_read_empty_field() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              if event["log"]["non-existant"] == nil then
-                event["log"]["result"] = "empty"
-              else
-                event["log"]["result"] = "found"
-              end
+            hooks.process = """function (event, emit)
+                if event["log"]["non-existant"] == nil then
+                  event["log"]["result"] = "empty"
+                else
+                  event["log"]["result"] = "found"
+                end
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -234,11 +278,14 @@ mod tests {
 
     #[test]
     fn lua_integer_value() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event["log"]["number"] = 3
+            hooks.process = """function (event, emit)
+                event["log"]["number"] = 3
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -248,11 +295,14 @@ mod tests {
 
     #[test]
     fn lua_numeric_value() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event["log"]["number"] = 3.14159
+            hooks.process = """function (event, emit)
+                event["log"]["number"] = 3.14159
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -262,11 +312,14 @@ mod tests {
 
     #[test]
     fn lua_boolean_value() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event["log"]["bool"] = true
+            hooks.process = """function (event, emit)
+                event["log"]["bool"] = true
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -276,11 +329,14 @@ mod tests {
 
     #[test]
     fn lua_non_coercible_value() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event["log"]["junk"] = nil
+            hooks.process = """function (event, emit)
+                event["log"]["junk"] = nil
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -290,26 +346,34 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_write() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              event["log"][false] = "hello"
+            hooks.process = """function (event, emit)
+                event["log"][false] = "hello"
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
-        let err = transform.process(Event::new_empty_log()).unwrap_err();
+        let err = transform
+            .process_single(Event::new_empty_log())
+            .unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("error converting Lua boolean to String"), err);
     }
 
     #[test]
     fn lua_non_string_key_read() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-            event.log.result = event.log[false]
+            hooks.process = """function (event, emit)
+                event.log.result = event.log[false]
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -319,26 +383,32 @@ mod tests {
 
     #[test]
     fn lua_script_error() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              error("this is an error")
+            hooks.process = """function (event, emit)
+                error("this is an error")
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
-        let err = transform.process(Event::new_empty_log()).unwrap_err();
+        let err = transform
+            .process_single(Event::new_empty_log())
+            .unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), err);
     }
 
     #[test]
     fn lua_syntax_error() {
-        let err = Lua::new(
+        let err = from_config(
             r#"
-              1234 = sadf <>&*!#@
+            hooks.process = """function (event, emit)
+                1234 = sadf <>&*!#@
+            end
+            """
             "#,
-            vec![],
         )
         .map(|_| ())
         .unwrap_err()
@@ -358,25 +428,32 @@ mod tests {
         write!(
             &mut file,
             r#"
-              local M = {{}}
+            local M = {{}}
 
-              local function modify(event2)
-                event2["log"]["new field"] = "new value"
-              end
-              M.modify = modify
+            local function modify(event2)
+              event2["log"]["new field"] = "new value"
+            end
+            M.modify = modify
 
-              return M
+            return M
             "#
         )
         .unwrap();
 
-        let source = r#"
-          local script2 = require("script2")
-          script2.modify(event)
-        "#;
+        let config = format!(
+            r#"
+            hooks.process = """function (event, emit)
+                local script2 = require("script2")
+                script2.modify(event)
+                emit(event)
+            end
+            """
+            search_dirs = ["{}"]
+            "#,
+            dir.path().display()
+        );
 
-        let mut transform =
-            Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
+        let mut transform = from_config(&config).unwrap();
         let event = Event::new_empty_log();
         let event = transform.transform(event).unwrap();
 
@@ -385,13 +462,16 @@ mod tests {
 
     #[test]
     fn lua_pairs() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-              for k,v in pairs(event.log) do
-                event.log[k] = k .. v
-              end
+            hooks.process = """function (event, emit)
+                for k,v in pairs(event.log) do
+                  event.log[k] = k .. v
+                end
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
@@ -407,11 +487,14 @@ mod tests {
 
     #[test]
     fn lua_metric() {
-        let mut transform = Lua::new(
+        let mut transform = from_config(
             r#"
-            event.metric.counter.value = event.metric.counter.value + 1
+            hooks.process = """function (event, emit)
+                event.metric.counter.value = event.metric.counter.value + 1
+                emit(event)
+            end
+            """
             "#,
-            vec![],
         )
         .unwrap();
 
