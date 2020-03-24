@@ -537,6 +537,7 @@ mod tests {
             include_pod_uids: vec!["a027f09d8f18234519fa930f8fa71234".to_owned()],
             include_container_names: vec!["busybox".to_owned()],
             include_namespaces: vec!["telemetry".to_owned(), "app".to_owned()],
+            ..KubernetesConfig::default()
         };
 
         assert_eq!(
