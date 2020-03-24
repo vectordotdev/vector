@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use vector::{
     shutdown::ShutdownSignal,
     test_util::{
-        block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
+        self, block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
     },
     topology::{
@@ -54,6 +54,8 @@ impl Sink for PanicSink {
 
 #[test]
 fn test_sink_panic() {
+    test_util::trace_init();
+
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -136,6 +138,8 @@ impl Sink for ErrorSink {
 
 #[test]
 fn test_sink_error() {
+    test_util::trace_init();
+
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -204,6 +208,8 @@ impl config::SourceConfig for ErrorSourceConfig {
 
 #[test]
 fn test_source_error() {
+    test_util::trace_init();
+
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -274,6 +280,8 @@ impl config::SourceConfig for PanicSourceConfig {
 
 #[test]
 fn test_source_panic() {
+    test_util::trace_init();
+
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
