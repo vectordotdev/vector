@@ -38,25 +38,9 @@ As Vector grows and supports more integrations, our binary size and build comple
 
 Terraform typically runs on CIs and developer machines, making portability valuable. For Terraform, users can follow the [guide](https://www.terraform.io/docs/extend/writing-custom-providers.html) to write a Go-based provider, which they can then distribute as a portable binary. Notably: This means either distributing an unoptimized binary, distributing a lot of optimized binaries, or requiring folks build their own optimized binaries. Terraform doesn't care much about speed, so unoptimized binaries are acceptable.
 
-Vector is in a slightly different position than Terraform though! Vector runs primarily in servers and even end user machines. We can't expect users to have build tooling installed to their servers (it's a security risk!) and we definitely can't expect it on an end-user machines. Most people just aren't that interested in computers.
-
-Vector has different performance needs, too. While folk's aren't generally wanting to execute terraform providers hundreds of thousands (or millions) of times per second they are absolutely doing that with Vector.
+Vector is in a slightly different position than Terraform though! Vector runs primarily in servers and even end user machines. We can't expect users to have build tooling installed to their servers (it's a security risk!) and we definitely can't expect it on an end-user machines. Most people just aren't that interested in computers. Vector has different performance needs, too. While folk's aren't generally wanting to execute terraform providers hundreds of thousands (or millions) of times per second they are absolutely doing that with Vector.
 
 When we're processing the firehose of events originating from a modern infrastructure every millisecond counts. Vector needs a way to ship portable, *optimizable* modules if we ever hope of making this a reality.
-
-### Exploring DSL driven pipelines
-
-We've discussed various refinements to our pipelines such as [Pipelines Proposal V2](https://github.com/timberio/vector/issues/1679) and [Proposal: Compose Transform](https://github.com/timberio/vector/issues/1653). Some of these discussions have been about improving our TOML syntax, others about new syntax entirely, and others about how we could let users write in the language of their choice.
-
-The path forward is unclear, but if we choose to adopt something new we must focus on providing a good user experience as well as performance. Having a fast, simple, portable compile target would make this an easier effort.
-
-### Ecosystem Harmony with Tremor
-
-We exist in an ecosystem, [Tremor](https://www.tremor.rs/) exists and we'd really love to be able to work in harmony somehow. While both tools process events, Vector focuses on acting as a host-level or container-level last/first mile router, Tremor focuses on servicing demanding workloads from it's position as an infrastructure-wide service.
-
-What if we could provide users of Tremor and Vector with some sort of familiar shared experience? What if we could share functionality? What kind of framework could satisfy both our needs? There are so many questions!
-
-We need to talk to them. TODO.
 
 ### Simplifying common basic transforms
 
@@ -67,6 +51,20 @@ We noted that the existing lua runtime was able to accomplish these tasks quite 
 (TODO: Proof)
 
 Users shouldn't pay a high price just for a few lines saved in a configuration file. They shouldn't feel frustration when building these kinds of pipelines either.
+
+### Exploring DSL driven pipelines
+
+We've discussed various refinements to our pipelines such as [Pipelines Proposal V2](https://github.com/timberio/vector/issues/1679) and [Proposal: Compose Transform](https://github.com/timberio/vector/issues/1653). Some of these discussions have been about improving our TOML syntax, others about new syntax entirely, and others about how we could let users write in the language of their choice.
+
+The path forward is unclear, but if we choose to adopt something new we must focus on providing a good user experience as well as performance. Having a fast, simple, portable compile target could make this an easier effort.
+
+### Ecosystem Harmony with Tremor
+
+We exist in an ecosystem, [Tremor](https://www.tremor.rs/) exists and we'd really love to be able to work in harmony somehow. While both tools process events, Vector focuses on acting as a host-level or container-level last/first mile router, Tremor focuses on servicing demanding workloads from it's position as an infrastructure-wide service.
+
+What if we could provide users of Tremor and Vector with some sort of familiar shared experience? What if we could share functionality? What kind of framework could satisfy both our needs? There are so many questions!
+
+We need to talk to them. TODO.
 
 ## Prior Art
 
@@ -80,7 +78,25 @@ Indeed, it is possible we will be able to let Vector build and run Lua code as a
 
 ## Guide-level Proposal
 
+Vector contains a WebAssembly (WASM) engine which allows you to write custom functionality for Vector. You might already be familiar with the [Javascript](TODO) or [Lua]() transforms, WebAssembly is a bit different than that.
+
 ### When to build your own module
+
+Using the WASM engine you can write your own sources, transforms, sinks, codecs in any language that compiles down to a `.wasm` file. Vector can then compile this file down to an optimized, platform specific module which it can use. This allows Vector to work with internal or uncommon protocols or services, support new language transforms, or just write a special transform to do *exactly* what you want. With the WASM engine, Vector puts you in command.
+
+There is a trade-off though! You'll need to embolden yourself, as WASM is a fledgling technology. When it first loads a WASM file, Vector needs to spend some time building an optimized module before it can load it. You'll also be responsible for the safety and correctness of your code, if your module crashes on an event, Vector will re-initialize the module and try again on the next event.
+
+Here's some examples of when a WASM module is a good fit:
+
+* You need to support a specific protobuf type.
+* You have a source or sink which is not currently supported by Vector.
+* You want to write a complex transform in your favorite language.
+
+Here's some examples of where WASM probably isn't right for you:
+
+* You need functionality already offered by Vector.
+* Your desired language doesn't support WASM as a compile target.
+* You are using Vector on a non-Linux X86-64 bit compatible target. (Lucet, our Engine, only supports Linux at this current time. Work on other operating systems is ongoing!)
 
 ### How Vector modules work
 
