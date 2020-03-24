@@ -12,6 +12,7 @@ use crate::{
     sources::Source,
     topology::config::{DataType, GlobalOptions, SourceConfig},
     transforms::{
+        merge::{Merge, TrailingNewlineNormalizer},
         regex_parser::{RegexParser, RegexParserConfig},
         Transform,
     },
@@ -71,13 +72,14 @@ impl SourceConfig for KubernetesConfig {
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;
         let mut parse_message = message_parser::build_message_parser()?;
+        let mut transform_merge_partial_events = transform_merge_partial_events();
 
         // Kubernetes source
         let source = file_recv
             .filter_map(move |event| transform_file.transform(event))
             .filter_map(move |event| parse_message.transform(event))
             .filter_map(move |event| now.filter(event))
-            .map(remove_ending_newline)
+            .filter_map(move |event| transform_merge_partial_events.transform(event))
             .filter_map(move |event| transform_pod_uid.transform(event))
             .forward(out.sink_map_err(drop))
             .map(drop)
@@ -118,18 +120,6 @@ impl TimeFilter {
         }
         Some(event)
     }
-}
-
-fn remove_ending_newline(mut event: Event) -> Event {
-    if let Some(Value::Bytes(msg)) = event
-        .as_mut_log()
-        .get_mut(&event::log_schema().message_key())
-    {
-        if msg.ends_with(&['\n' as u8]) {
-            msg.truncate(msg.len() - 1);
-        }
-    }
-    event
 }
 
 fn transform_file() -> crate::Result<Box<dyn Transform>> {
@@ -210,6 +200,17 @@ fn transform_pod_uid() -> crate::Result<ApplicableTransform> {
     Ok(ApplicableTransform::Candidates(transforms))
 }
 
+fn transform_merge_partial_events() -> Merge<TrailingNewlineNormalizer> {
+    let message_key = event::log_schema().message_key();
+    Merge::new(
+        TrailingNewlineNormalizer {
+            probe_field: message_key.clone(),
+        },
+        vec![message_key.clone()],
+        vec!["pod_uid".into()],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +271,76 @@ mod tests {
         let event = transform.transform(event).expect("Transformed");
 
         has(&event, "object_uid", "306cd636-0c6d-11ea-9079-1c1b0de4d755");
+    }
+
+    #[test]
+    fn partial_events_merge() {
+        let message_key = event::log_schema().message_key();
+        let sample_pod_uid = "qwerty";
+
+        let part1 = {
+            let mut event = Event::new_empty_log();
+            event
+                .as_mut_log()
+                .insert("pod_uid", sample_pod_uid.to_owned());
+            event.as_mut_log().insert(message_key, "hello".to_owned());
+            event
+        };
+        let part2 = {
+            let mut event = Event::new_empty_log();
+            event
+                .as_mut_log()
+                .insert("pod_uid", sample_pod_uid.to_owned());
+            event
+                .as_mut_log()
+                .insert(message_key, " world!\n".to_owned());
+            event
+        };
+
+        let mut transform = transform_merge_partial_events();
+
+        assert!(transform.transform(part1).is_none());
+        let event = transform.transform(part2).unwrap();
+
+        has(&event, "pod_uid", sample_pod_uid);
+        has(&event, message_key, "hello world!");
+    }
+
+    #[test]
+    fn partial_events_merge_separate_streams() {
+        let message_key = event::log_schema().message_key();
+
+        let part1 = {
+            let mut event = Event::new_empty_log();
+            event.as_mut_log().insert("pod_uid", "qwerty1".to_owned());
+            event.as_mut_log().insert(message_key, "par".to_owned());
+            event
+        };
+        let part2 = {
+            let mut event = Event::new_empty_log();
+            event.as_mut_log().insert("pod_uid", "qwerty2".to_owned());
+            event
+                .as_mut_log()
+                .insert(message_key, "non-partial!\n".to_owned());
+            event
+        };
+        let part3 = {
+            let mut event = Event::new_empty_log();
+            event.as_mut_log().insert("pod_uid", "qwerty1".to_owned());
+            event.as_mut_log().insert(message_key, "tial!\n".to_owned());
+            event
+        };
+
+        let mut transform = transform_merge_partial_events();
+
+        assert!(transform.transform(part1).is_none());
+
+        let event = transform.transform(part2).unwrap();
+        has(&event, "pod_uid", "qwerty2");
+        has(&event, message_key, "non-partial!");
+
+        let event = transform.transform(part3).unwrap();
+        has(&event, "pod_uid", "qwerty1");
+        has(&event, message_key, "partial!");
     }
 }
