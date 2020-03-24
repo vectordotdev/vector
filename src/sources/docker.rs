@@ -1,6 +1,7 @@
 use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, Value},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
@@ -104,6 +105,7 @@ impl SourceConfig for DockerConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
         DockerSource::new(
@@ -994,7 +996,12 @@ mod tests {
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
             config
-                .build("default", &GlobalOptions::default(), sender)
+                .build(
+                    "default",
+                    &GlobalOptions::default(),
+                    ShutdownSignal::noop(),
+                    sender,
+                )
                 .unwrap(),
         );
         recv

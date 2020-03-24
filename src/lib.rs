@@ -14,6 +14,7 @@ pub mod conditions;
 pub mod config_paths;
 pub mod dns;
 pub mod event;
+pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
@@ -22,8 +23,10 @@ pub mod metrics;
 pub mod region;
 pub mod runtime;
 pub mod serde;
+pub mod shutdown;
 pub mod sinks;
 pub mod sources;
+pub mod stream;
 pub mod template;
 pub mod test_util;
 pub mod tls;

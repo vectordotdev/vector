@@ -39,8 +39,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   address = "127.0.0.1:8126" # required
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';

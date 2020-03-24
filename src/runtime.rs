@@ -1,16 +1,16 @@
 use futures01::future::{ExecuteError, Executor, Future};
 use std::io;
 use std::pin::Pin;
-use tokio::runtime::Builder;
+use tokio_compat::runtime::{Builder, Runtime as TokioRuntime, TaskExecutor as TokioTaskExecutor};
 
 pub struct Runtime {
-    rt: tokio::runtime::Runtime,
+    rt: TokioRuntime,
 }
 
 impl Runtime {
     pub fn new() -> io::Result<Self> {
         Ok(Runtime {
-            rt: tokio::runtime::Runtime::new()?,
+            rt: TokioRuntime::new()?,
         })
     }
 
@@ -70,7 +70,7 @@ impl Runtime {
 
 #[derive(Clone, Debug)]
 pub struct TaskExecutor {
-    inner: tokio::runtime::TaskExecutor,
+    inner: TokioTaskExecutor,
 }
 
 impl TaskExecutor {

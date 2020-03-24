@@ -128,9 +128,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
@@ -1421,5 +1418,5 @@ You can learn more about the complete syntax in the
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 [urls.new_gcp_cloud_storage_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_cloud_storage
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)

@@ -3,14 +3,14 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        BatchBytesConfig, Buffer, Compression, SinkExt, TowerRequestConfig,
+        http::{BatchedHttpSink, HttpClient, HttpSink},
+        BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures01::{stream::iter_ok, Future, Sink};
+use futures01::Future;
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -75,9 +75,21 @@ impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
         let healthcheck = healthcheck(&self, cx.resolver())?;
-        let sink = hec(self.clone(), cx)?;
 
-        Ok((sink, healthcheck))
+        let batch = self.batch.unwrap_or(bytesize::mib(1u64), 1);
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+
+        let sink = BatchedHttpSink::new(
+            self.clone(),
+            Buffer::new(self.is_gzip()),
+            request,
+            batch,
+            tls_settings,
+            &cx,
+        );
+
+        Ok((Box::new(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -89,52 +101,69 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, cx: SinkContext) -> crate::Result<super::RouterSink> {
-    let host = config.host.clone();
-    let token = config.token.clone();
-    let host_key = config.host_key;
+impl HttpSink for HecSinkConfig {
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
 
-    let gzip = match config.compression.unwrap_or(Compression::None) {
-        Compression::None => false,
-        Compression::Gzip => true,
-    };
-    let batch = config.batch.unwrap_or(bytesize::mib(1u64), 1);
-    let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
-    let encoding = config.encoding.clone();
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
 
-    let uri = format!("{}/services/collector/event", host)
-        .parse::<Uri>()
-        .context(super::UriParseError)?;
-    let token = Bytes::from(format!("Splunk {}", token));
+        let mut event = event.into_log();
 
-    let tls_settings = TlsSettings::from_options(&config.tls)?;
+        let host = event.get(&self.host_key).cloned();
+        let timestamp = if let Some(Value::Timestamp(ts)) =
+            event.remove(&event::log_schema().timestamp_key())
+        {
+            ts.timestamp()
+        } else {
+            chrono::Utc::now().timestamp()
+        };
 
-    let build_request = move |body: Vec<u8>| {
+        let mut body = match self.encoding.codec() {
+            Encoding::Json => event_to_json(event, &self.indexed_fields, timestamp),
+            Encoding::Text => json!({
+                "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
+                "time": timestamp,
+            }),
+        };
+
+        if let Some(host) = host {
+            let host = host.to_string_lossy();
+            body["host"] = json!(host);
+        }
+
+        serde_json::to_vec(&body)
+            .map_err(|e| error!("Error encoding json body: {}", e))
+            .ok()
+    }
+
+    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+        let uri = format!("{}/services/collector/event", self.host)
+            .parse::<Uri>()
+            .expect("Unable to parse URI");
+
+        let token = Bytes::from(format!("Splunk {}", self.token));
+
         let mut builder = Request::builder();
         builder.method(Method::POST);
         builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/json");
 
-        if gzip {
+        if self.is_gzip() {
             builder.header("Content-Encoding", "gzip");
         }
 
         builder.header("Authorization", token.clone());
 
-        builder.body(body).unwrap()
-    };
+        builder.body(events).unwrap()
+    }
+}
 
-    let http_service = HttpBatchService::new(cx.resolver(), tls_settings, build_request);
-
-    let indexed_fields = config.indexed_fields.clone();
-
-    let sink = request
-        .batch_sink(HttpRetryLogic, http_service, cx.acker())
-        .batched_with_min(Buffer::new(gzip), &batch)
-        .with_flat_map(move |e| iter_ok(encode_event(&host_key, e, &indexed_fields, &encoding)));
-
-    Ok(Box::new(sink))
+impl HecSinkConfig {
+    fn is_gzip(&self) -> bool {
+        matches!(&self.compression, Some(Compression::Gzip))
+    }
 }
 
 #[derive(Debug, Snafu)]
@@ -196,45 +225,11 @@ fn event_to_json(event: LogEvent, indexed_fields: &[Atom], timestamp: i64) -> Js
     })
 }
 
-fn encode_event(
-    host_key: &Atom,
-    mut event: Event,
-    indexed_fields: &[Atom],
-    encoding: &EncodingConfigWithDefault<Encoding>,
-) -> Option<Vec<u8>> {
-    encoding.apply_rules(&mut event);
-    let mut event = event.into_log();
-
-    let host = event.get(&host_key).cloned();
-    let timestamp =
-        if let Some(Value::Timestamp(ts)) = event.remove(&event::log_schema().timestamp_key()) {
-            ts.timestamp()
-        } else {
-            chrono::Utc::now().timestamp()
-        };
-
-    let mut body = match encoding.codec {
-        Encoding::Json => event_to_json(event, &indexed_fields, timestamp),
-        Encoding::Text => json!({
-            "event": event.get(&event::log_schema().message_key()).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
-            "time": timestamp,
-        }),
-    };
-
-    if let Some(host) = host {
-        let host = host.to_string_lossy();
-        body["host"] = json!(host);
-    }
-
-    serde_json::to_vec(&body)
-        .map_err(|e| error!("Error encoding json body: {}", e))
-        .ok()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::event::{self, Event};
+    use crate::sinks::util::http::HttpSink;
     use serde::Deserialize;
     use std::collections::BTreeMap;
 
@@ -247,11 +242,22 @@ mod tests {
 
     #[test]
     fn splunk_encode_event_json() {
-        let host = "host".into();
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let bytes = encode_event(&host, event, &vec![], &Encoding::Json.into()).unwrap();
+        let (config, _, _) = crate::sinks::util::test::load_sink::<HecSinkConfig>(
+            r#"
+            host = "test.com"
+            token = "alksjdfo"
+            host_key = "host"
+
+            [encoding]
+            codec = "json"
+        "#,
+        )
+        .unwrap();
+
+        let bytes = config.encode_event(event).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
@@ -287,7 +293,7 @@ mod integration_tests {
     use crate::{
         assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
+        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures01::Sink;
@@ -304,7 +310,8 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text, vec![]), cx).unwrap();
+        let config = config(Encoding::Text, vec![]);
+        let (sink, _) = config.build(cx).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -336,7 +343,8 @@ mod integration_tests {
         let mut rt = runtime();
         let cx = SinkContext::new_test(rt.executor());
 
-        let sink = sinks::splunk_hec::hec(config(Encoding::Text, vec![]), cx).unwrap();
+        let config = config(Encoding::Text, vec![]);
+        let (sink, _) = config.build(cx).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -370,7 +378,8 @@ mod integration_tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let indexed_fields = vec![Atom::from("asdf")];
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json, indexed_fields), cx).unwrap();
+        let config = config(Encoding::Json, indexed_fields);
+        let (sink, _) = config.build(cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -403,7 +412,8 @@ mod integration_tests {
         let cx = SinkContext::new_test(rt.executor());
 
         let indexed_fields = vec![Atom::from("asdf")];
-        let sink = sinks::splunk_hec::hec(config(Encoding::Json, indexed_fields), cx).unwrap();
+        let config = config(Encoding::Json, indexed_fields);
+        let (sink, _) = config.build(cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -443,7 +453,7 @@ mod integration_tests {
             ..config(Encoding::Json, vec![Atom::from("asdf")])
         };
 
-        let sink = sinks::splunk_hec::hec(config, cx).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());

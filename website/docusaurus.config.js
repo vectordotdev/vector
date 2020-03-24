@@ -1,6 +1,6 @@
 module.exports = {
   title: 'Vector',
-  tagline: 'A High-Performance, Logs, Metrics, & Events Router',
+  tagline: 'A lightweight and ultra-fast tool for building observability pipelines',
   url: 'https://vector.dev',
   baseUrl: '/',
   favicon: 'img/favicon.ico',

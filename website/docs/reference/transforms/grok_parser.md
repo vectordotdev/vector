@@ -48,8 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-## Options
-
 import Fields from '@site/src/components/Fields';
 
 import Field from '@site/src/components/Field';
@@ -258,5 +256,5 @@ performance issues.
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/
 [urls.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [urls.rust_grok_library]: https://github.com/daschl/grok
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

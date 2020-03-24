@@ -465,6 +465,7 @@ services:
         - zookeeper
         - kafka
         - splunk
+        - pulsar
         - elasticsearch
         - elasticsearch-tls
         - clickhouse
@@ -518,6 +519,11 @@ services:
         KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
       volumes:
         - ./tests/data/localhost.p12:/certs/localhost.p12:ro
+    pulsar:
+      image: apachepulsar/pulsar
+      command: bin/pulsar standalone
+      ports:
+        - "6650:6650"
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:
@@ -560,7 +566,7 @@ services:
       environment:
         - PUBSUB_PROJECT1=testproject,topic1:subscription1
     loki:
-      image: grafana/loki
+      image: grafana/loki:master-89263b0-amd64
       ports:
         - "3100:3100"
       command: -config.file=/etc/loki/loki-config.yaml

@@ -424,12 +424,13 @@ features one has to pass a comma-separated list of component features.
 | `sinks-blackhole` | Enables building of [`blackhole` sink][docs.sinks.blackhole].  |
 | `sinks-clickhouse` | Enables building of [`clickhouse` sink][docs.sinks.clickhouse].  |
 | `sinks-console` | Enables building of [`console` sink][docs.sinks.console].  |
+| `sinks-datadog_logs` | Enables building of [`datadog_logs` sink][docs.sinks.datadog_logs].  |
 | `sinks-datadog_metrics` | Enables building of [`datadog_metrics` sink][docs.sinks.datadog_metrics].  |
 | `sinks-elasticsearch` | Enables building of [`elasticsearch` sink][docs.sinks.elasticsearch].  |
 | `sinks-file` | Enables building of [`file` sink][docs.sinks.file].  |
 | `sinks-gcp_cloud_storage` | Enables building of [`gcp_cloud_storage` sink][docs.sinks.gcp_cloud_storage].  |
 | `sinks-gcp_pubsub` | Enables building of [`gcp_pubsub` sink][docs.sinks.gcp_pubsub].  |
-| `sinks-gcp_stackdriver_logging` | Enables building of [`gcp_stackdriver_logging` sink][docs.sinks.gcp_stackdriver_logging].  |
+| `sinks-gcp_stackdriver_logs` | Enables building of [`gcp_stackdriver_logs` sink][docs.sinks.gcp_stackdriver_logs].  |
 | `sinks-honeycomb` | Enables building of [`honeycomb` sink][docs.sinks.honeycomb].  |
 | `sinks-http` | Enables building of [`http` sink][docs.sinks.http].  |
 | `sinks-humio_logs` | Enables building of [`humio_logs` sink][docs.sinks.humio_logs].  |
@@ -440,6 +441,7 @@ features one has to pass a comma-separated list of component features.
 | `sinks-new_relic_logs` | Enables building of [`new_relic_logs` sink][docs.sinks.new_relic_logs].  |
 | `sinks-papertrail` | Enables building of [`papertrail` sink][docs.sinks.papertrail].  |
 | `sinks-prometheus` | Enables building of [`prometheus` sink][docs.sinks.prometheus].  |
+| `sinks-pulsar` | Enables building of [`pulsar` sink][docs.sinks.pulsar].  |
 | `sinks-sematext_logs` | Enables building of [`sematext_logs` sink][docs.sinks.sematext_logs].  |
 | `sinks-socket` | Enables building of [`socket` sink][docs.sinks.socket].  |
 | `sinks-splunk_hec` | Enables building of [`splunk_hec` sink][docs.sinks.splunk_hec].  |
@@ -464,12 +466,13 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.blackhole]: /docs/reference/sinks/blackhole/
 [docs.sinks.clickhouse]: /docs/reference/sinks/clickhouse/
 [docs.sinks.console]: /docs/reference/sinks/console/
+[docs.sinks.datadog_logs]: /docs/reference/sinks/datadog_logs/
 [docs.sinks.datadog_metrics]: /docs/reference/sinks/datadog_metrics/
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
 [docs.sinks.file]: /docs/reference/sinks/file/
 [docs.sinks.gcp_cloud_storage]: /docs/reference/sinks/gcp_cloud_storage/
 [docs.sinks.gcp_pubsub]: /docs/reference/sinks/gcp_pubsub/
-[docs.sinks.gcp_stackdriver_logging]: /docs/reference/sinks/gcp_stackdriver_logging/
+[docs.sinks.gcp_stackdriver_logs]: /docs/reference/sinks/gcp_stackdriver_logs/
 [docs.sinks.honeycomb]: /docs/reference/sinks/honeycomb/
 [docs.sinks.http]: /docs/reference/sinks/http/
 [docs.sinks.humio_logs]: /docs/reference/sinks/humio_logs/
@@ -480,6 +483,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.new_relic_logs]: /docs/reference/sinks/new_relic_logs/
 [docs.sinks.papertrail]: /docs/reference/sinks/papertrail/
 [docs.sinks.prometheus]: /docs/reference/sinks/prometheus/
+[docs.sinks.pulsar]: /docs/reference/sinks/pulsar/
 [docs.sinks.sematext_logs]: /docs/reference/sinks/sematext_logs/
 [docs.sinks.socket]: /docs/reference/sinks/socket/
 [docs.sinks.splunk_hec]: /docs/reference/sinks/splunk_hec/
