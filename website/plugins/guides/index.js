@@ -9,7 +9,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs_extra_1 = __importDefault(require("fs-extra"));
 const lodash_1 = __importDefault(require("lodash"));
 const path_1 = __importDefault(require("path"));
 const utils_1 = require("@docusaurus/utils");
@@ -18,7 +17,6 @@ const DEFAULT_OPTIONS = {
     path: 'guides',
     routeBasePath: 'guides',
     include: ['**/*.md', '**/*.mdx'],
-    guidesPerPage: 10,
     guideListComponent: '@theme/GuideListPage',
     guideComponent: '@theme/GuidePage',
     guideTagsListComponent: '@theme/GuideTagsListPage',
@@ -58,7 +56,7 @@ function pluginContentGuide(context, opts) {
         },
         // Fetches guide contents and returns metadata for the necessary routes.
         async loadContent() {
-            const { guidesPerPage, routeBasePath } = options;
+            const { routeBasePath } = options;
             guides = await guideUtils_1.generateGuides(contentPath, context, options);
             if (!guides.length) {
                 return null;
@@ -83,33 +81,21 @@ function pluginContentGuide(context, opts) {
             // Guide pagination routes.
             // Example: `/guide`, `/guide/page/1`, `/guide/page/2`
             const totalCount = guides.length;
-            const numberOfPages = Math.ceil(totalCount / guidesPerPage);
             const { siteConfig: { baseUrl = '' }, } = context;
             const basePageUrl = utils_1.normalizeUrl([baseUrl, routeBasePath]);
             const guideListPaginated = [];
-            function guidePaginationPermalink(page) {
-                return page > 0
-                    ? utils_1.normalizeUrl([basePageUrl, `page/${page + 1}`])
-                    : basePageUrl;
-            }
-            for (let page = 0; page < numberOfPages; page += 1) {
-                guideListPaginated.push({
-                    metadata: {
-                        permalink: guidePaginationPermalink(page),
-                        page: page + 1,
-                        guidesPerPage,
-                        totalPages: numberOfPages,
-                        totalCount,
-                        previousPage: page !== 0 ? guidePaginationPermalink(page - 1) : null,
-                        nextPage: page < numberOfPages - 1
-                            ? guidePaginationPermalink(page + 1)
-                            : null,
-                    },
-                    items: guides
-                        .slice(page * guidesPerPage, (page + 1) * guidesPerPage)
-                        .map(item => item.id),
-                });
-            }
+            guideListPaginated.push({
+                metadata: {
+                    permalink: basePageUrl,
+                    page: 1,
+                    guidesPerPage: 1,
+                    totalPages: 1,
+                    totalCount,
+                    previousPage: basePageUrl,
+                    nextPage: basePageUrl,
+                },
+                items: guides.map(item => item.id),
+            });
             const guideTags = {};
             const tagsPath = utils_1.normalizeUrl([basePageUrl, 'tags']);
             guides.forEach(guide => {
@@ -297,26 +283,6 @@ function pluginContentGuide(context, opts) {
                     ],
                 },
             };
-        },
-        async postBuild({ outDir }) {
-            var _a;
-            if (!options.feedOptions) {
-                return;
-            }
-            const feed = await guideUtils_1.generateGuideFeed(context, options);
-            if (!feed) {
-                return;
-            }
-            const feedTypes = getFeedTypes((_a = options.feedOptions) === null || _a === void 0 ? void 0 : _a.type);
-            await Promise.all(feedTypes.map(feedType => {
-                const feedPath = path_1.default.join(outDir, options.routeBasePath, `${feedType}.xml`);
-                const feedContent = feedType === 'rss' ? feed.rss2() : feed.atom1();
-                return fs_extra_1.default.writeFile(feedPath, feedContent, err => {
-                    if (err) {
-                        throw new Error(`Generating ${feedType} feed failed: ${err}`);
-                    }
-                });
-            }));
         },
         injectHtmlTags() {
             var _a;

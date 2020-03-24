@@ -1,12 +1,5 @@
 ---
-id: kubernetes-source-alpha
-title: "Alpha Kubernetes Source"
-description: "Early adopters have something to chew on"
-author_github: https://github.com/Jeffail
-tags: ["type: announcement", "domain: platforms", "platform: kubernetes"]
----
-
----
+last_modified_on: "2020-03-23"
 id: kubernetes-source-alpha
 title: "Alpha Kubernetes Source"
 description: "Early adopters have something to chew on"

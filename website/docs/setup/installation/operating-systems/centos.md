@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Install Vector On CentOS
 sidebar_label: CentOS
 description: Install Vector on CentOS

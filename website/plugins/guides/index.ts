@@ -5,7 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import fs from 'fs-extra';
 import _ from 'lodash';
 import path from 'path';
 import {normalizeUrl, docuHash, aliasedSitePath} from '@docusaurus/utils';
@@ -24,18 +23,16 @@ import {
   LoadContext,
   PluginContentLoadedActions,
   ConfigureWebpackUtils,
-  Props,
   Plugin,
   HtmlTags,
 } from '@docusaurus/types';
 import {Configuration, Loader} from 'webpack';
-import {generateGuideFeed, generateGuides} from './guideUtils';
+import {generateGuides} from './guideUtils';
 
 const DEFAULT_OPTIONS: PluginOptions = {
   path: 'guides', // Path to data on filesystem, relative to site dir.
   routeBasePath: 'guides', // URL Route.
   include: ['**/*.md', '**/*.mdx'], // Extensions to include.
-  guidesPerPage: 10, // How many guides per page.
   guideListComponent: '@theme/GuideListPage',
   guideComponent: '@theme/GuidePage',
   guideTagsListComponent: '@theme/GuideTagsListPage',
@@ -89,7 +86,7 @@ export default function pluginContentGuide(
 
     // Fetches guide contents and returns metadata for the necessary routes.
     async loadContent() {
-      const {guidesPerPage, routeBasePath} = options;
+      const {routeBasePath} = options;
 
       guides = await generateGuides(contentPath, context, options);
       if (!guides.length) {
@@ -119,7 +116,6 @@ export default function pluginContentGuide(
       // Guide pagination routes.
       // Example: `/guide`, `/guide/page/1`, `/guide/page/2`
       const totalCount = guides.length;
-      const numberOfPages = Math.ceil(totalCount / guidesPerPage);
       const {
         siteConfig: {baseUrl = ''},
       } = context;
@@ -127,31 +123,18 @@ export default function pluginContentGuide(
 
       const guideListPaginated: GuidePaginated[] = [];
 
-      function guidePaginationPermalink(page: number) {
-        return page > 0
-          ? normalizeUrl([basePageUrl, `page/${page + 1}`])
-          : basePageUrl;
-      }
-
-      for (let page = 0; page < numberOfPages; page += 1) {
-        guideListPaginated.push({
-          metadata: {
-            permalink: guidePaginationPermalink(page),
-            page: page + 1,
-            guidesPerPage,
-            totalPages: numberOfPages,
-            totalCount,
-            previousPage: page !== 0 ? guidePaginationPermalink(page - 1) : null,
-            nextPage:
-              page < numberOfPages - 1
-                ? guidePaginationPermalink(page + 1)
-                : null,
-          },
-          items: guides
-            .slice(page * guidesPerPage, (page + 1) * guidesPerPage)
-            .map(item => item.id),
-        });
-      }
+      guideListPaginated.push({
+        metadata: {
+          permalink: basePageUrl,
+          page: 1,
+          guidesPerPage: 1,
+          totalPages: 1,
+          totalCount,
+          previousPage: basePageUrl,
+          nextPage: basePageUrl,
+        },
+        items: guides.map(item => item.id),
+      });
 
       const guideTags: GuideTags = {};
       const tagsPath = normalizeUrl([basePageUrl, 'tags']);
@@ -404,36 +387,6 @@ export default function pluginContentGuide(
           ],
         },
       };
-    },
-
-    async postBuild({outDir}: Props) {
-      if (!options.feedOptions) {
-        return;
-      }
-
-      const feed = await generateGuideFeed(context, options);
-
-      if (!feed) {
-        return;
-      }
-
-      const feedTypes = getFeedTypes(options.feedOptions?.type);
-
-      await Promise.all(
-        feedTypes.map(feedType => {
-          const feedPath = path.join(
-            outDir,
-            options.routeBasePath,
-            `${feedType}.xml`,
-          );
-          const feedContent = feedType === 'rss' ? feed.rss2() : feed.atom1();
-          return fs.writeFile(feedPath, feedContent, err => {
-            if (err) {
-              throw new Error(`Generating ${feedType} feed failed: ${err}`);
-            }
-          });
-        }),
-      );
     },
 
     injectHtmlTags() {

@@ -1,12 +1,5 @@
 ---
-id: custom-dns
-title: "Use Custom DNS Servers"
-description: "Point Vector to custom DNS servers"
-author_github: https://github.com/Jeffail
-tags: ["type: announcement", "domain: networking"]
----
-
----
+last_modified_on: "2020-03-23"
 id: custom-dns
 title: "Use Custom DNS Servers"
 description: "Point Vector to custom DNS servers"

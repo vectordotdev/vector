@@ -1,11 +1,11 @@
 ---
-id: "setup/platforms/docker/file"
+last_modified_on: "2020-03-23"
 title: "Send Docker logs to File"
 description: "A guide to quickly, and correctly, send Docker logs to File."
 platform_name: "docker"
 sink_name: "file"
 source_name: "docker"
-tags: ["category: setup","source: docker","sink: file"]
+tags: ["source: docker","sink: file"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
@@ -51,29 +51,12 @@ you up and running in minutes.
 
 ## How We'll Do It
 
-To send Docker logs to File _properly_, and accomplish all of the items above,
-we'll use [Vector][urls.vector_website] and deploy it as a
-daemon.
-
-### First, We'll Use Vector
-
-<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
-
-Written in [Rust][urls.rust], [Vector][urls.vector_website] is a lightweight
-and ultra-fast tool for building observability pipelines. Compared to Logstash
-and friends, Vector [improves throughput by ~10X while significanly reducing
-CPU and memory usage][urls.vector_performance] and it's the perfect tool for
-this task.
-
-### Second, We'll Deploy Vector As A Daemon
-
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
-As shown in the diagram above, the [daemon deployment strategy][docs.strategies.daemon]
-is designed for data collection on a single host. In the context of Docker,
-Vector is deplyed in it's own container, just like your other services, and it
-collects and forwards all data on the host.
-[Learn more...][docs.strategies.daemon]
+As shown in the diagram above, we'll be deploying [Vector][urls.vector_website]
+as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
+single host. We'll deploy Vector in it's own container, just like your other
+services, so that your workflow doesn't deviate.
 
 ## A Simple Step-By-Step Tutorial
 
@@ -111,6 +94,4 @@ collects and forwards all data on the host.
 
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
-[urls.rust]: https://www.rust-lang.org/
-[urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_website]: https://vector.dev

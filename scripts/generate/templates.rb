@@ -133,7 +133,7 @@ class Templates
     end
   end
 
-  def deployment_strategy(strategy, platform: nil)
+  def deployment_strategy(strategy, describe_vector: false, platform: nil)
     template_name =
       if platform
         "deployment_strategies/_#{platform.name}_#{strategy.name}"
@@ -448,7 +448,7 @@ class Templates
     content
   end
 
-  def setup_guide(id, platform: nil, source: nil, sink: nil)
+  def setup_guide(platform: nil, source: nil, sink: nil)
     if platform && source
       raise ArgumentError.new("You cannot pass both a platform and a source")
     end
@@ -502,7 +502,8 @@ class Templates
         path = DOCS_BASE_PATH + f.gsub(DOCS_ROOT, '').split(".").first
         name = File.basename(f).split(".").first.gsub("-", " ").humanize
 
-        front_matter = FrontMatterParser::Parser.parse_file(f).front_matter
+        loader = FrontMatterParser::Loader::Yaml.new(whitelist_classes: [Date])
+        front_matter = FrontMatterParser::Parser.parse_file(f, loader: loader).front_matter
         sidebar_label = front_matter.fetch("sidebar_label", "hidden")
         if sidebar_label != "hidden"
           name = sidebar_label

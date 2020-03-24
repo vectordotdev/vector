@@ -5,13 +5,26 @@
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-font-base-color);
   display: block;
-  margin-bottom: var(--ifm-spacing-vertical);
-  padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 2 );
+  min-height: 275px;
+  padding: calc( var(--ifm-spacing-vertical) * 1 ) calc( var(--ifm-spacing-horizontal) * 1.5 );
+
+  transform-origin: 0 50%;
+  transform: perspective(1000px) rotateY(0deg) translate3d(0,0,0);
+  backface-visibility: hidden;
+  will-change: transform,box-shadow;
+}
+
+.guide-item .category {
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .guide-item h2 {
   font-family: var(--ifm-font-family-base);
-  font-size: 1.6em;
+  font-size: 1.15em;
+  font-weight: 400;
+  line-height: 1.4;
   margin-bottom: calc( var(--ifm-spacing-vertical) / 4 );
 }
 
@@ -38,12 +51,14 @@
 }
 
 .guide-item:hover {
-  box-shadow: 0 0 30px 10px rgba( var(--ifm-color-primary-rgb), 0.4 );
-  color: var(--ifm-panel-color-active);
-  text-decoration: inherit;
+  background-color: var(--ifm-panel-background-active);
   border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-panel-color-active);
   text-decoration: none;
+  transition: all var(--ifm-transition-fast) ease;
+  transform: perspective(1000px) rotateY(-10deg) translate3d(-3px,0,0);
+  transform-origin: 0 50%;
 }
 
 .guide-item:hover h2 {

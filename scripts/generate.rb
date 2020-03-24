@@ -23,6 +23,7 @@ require_relative "setup"
 #
 
 require_relative "generate/post_processors/component_importer"
+require_relative "generate/post_processors/last_modified_setter"
 require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/option_linker"
 require_relative "generate/post_processors/section_referencer"
@@ -89,14 +90,17 @@ def page_valid?(path)
   File.exists?("#{PAGES_ROOT}#{path}.js")
 end
 
-def post_process(content, doc, links)
-  if doc.end_with?(".md")
+def post_process(content, target_path, links)
+  if target_path.end_with?(".md")
     content = content.clone
     content = PostProcessors::ComponentImporter.import!(content)
     content = PostProcessors::SectionSorter.sort!(content)
     content = PostProcessors::SectionReferencer.reference!(content)
-    content = PostProcessors::LinkDefiner.define!(content, doc, links)
+    content = PostProcessors::LinkDefiner.define!(content, target_path, links)
     content = PostProcessors::OptionLinker.link!(content)
+
+    # must be last
+    content = PostProcessors::LastModifiedSetter.set!(content, target_path)
   end
 
   content
@@ -152,7 +156,7 @@ metadata.installation.platforms_list.each do |platform|
     contents =
       <<~EOF
       <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-      <%= setup_guide("setup/platforms/\#{platform.name}", platform: platform) %>
+      <%= setup_guide(platform: platform) %>
       EOF
 
     File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -176,7 +180,7 @@ metadata.installation.platforms_list.each do |platform|
     contents =
       <<~EOF
       <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-      <%= setup_guide("setup/platforms/\#{platform.name}", platform: platform) %>
+      <%= setup_guide(platform: platform) %>
       EOF
 
     File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -198,7 +202,7 @@ metadata.installation.platforms_list.each do |platform|
           <<~EOF
           <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
           <%- sink = metadata.sinks.send("#{sink.name}") -%>
-          <%= setup_guide("setup/platforms/\#{platform.name}/\#{sink.name}", platform: platform, sink: sink) %>
+          <%= setup_guide(platform: platform, sink: sink) %>
           EOF
 
         File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -225,7 +229,7 @@ metadata.sources_list.
       contents =
         <<~EOF
         <%- source = metadata.sources.send("#{source.name}") -%>
-        <%= setup_guide("setup/sources/\#{source.name}", source: source) %>
+        <%= setup_guide(source: source) %>
         EOF
 
       File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -247,7 +251,7 @@ metadata.sources_list.
             <<~EOF
             <%- source = metadata.sources.send("#{source.name}") -%>
             <%- sink = metadata.sinks.send("#{sink.name}") -%>
-            <%= setup_guide("setup/sources/\#{source.name}/\#{sink.name}", source: source, sink: sink) %>
+            <%= setup_guide(source: source, sink: sink) %>
             EOF
 
           File.open(template_path, 'w+') { |file| file.write(contents) }

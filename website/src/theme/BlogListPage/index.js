@@ -33,7 +33,7 @@ function BlogListPage(props) {
   viewedNewPost();
 
   return (
-    <Layout title={title} description="Blog">
+    <Layout title={title} description="Vector blog posts, articles, and tips from the Vector core team.">
       <div className="blog-list container">
         <div className="blog-list--filters">
           <a href="/blog/rss.xml" style={{float: 'right', fontSize: '1.5em', marginTop: '0px', marginLeft: '-30px', width: '30px'}}><i className="feather icon-rss"></i></a>

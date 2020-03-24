@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 delivery_guarantee: "best_effort"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."

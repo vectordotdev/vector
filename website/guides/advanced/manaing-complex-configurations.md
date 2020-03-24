@@ -1,7 +1,8 @@
 ---
-title: Developing Complex Vector Config Files
-sidebar_label: Advanced Configs
-description: Strategies for building and maintaining complex Vector configs
+last_modified_on: "2020-03-23"
+title: Manage Complex Vector Config Files
+description: Strategies for building and managing complex Vector configs
+author_github: https://github.com/Jeffail
 ---
 
 Writing large configuration files is not yet an official olympic event. However,
@@ -14,18 +15,18 @@ free Vector configs that are easy to maintain.
 
      To make changes please edit the template located at:
 
-     website/docs/setup/guides/advanced-configs.md.erb
+     website/guides/advanced/manaing-complex-configurations.md.erb
 -->
 
 ## Test Driven Configuration
 
 Test driven configuration is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
-configs with [unit tests][docs.guides.unit-testing], and as it turns out they're
-also pretty useful during the building stage.
+configs with [unit tests][guides.advanced.unit-testing], and as it turns out
+they're also pretty useful during the building stage.
 
 Let's imagine we are in the process of building the config from the [unit test
-guide][docs.guides.unit-testing], we might start off with our source and
+guide][guides.unit-testing], we might start off with our source and
 the grok parser:
 
 ```toml
@@ -184,4 +185,5 @@ If you're running Vector in environments where it's not possible to issue
 automatically gobble up changes whenever the file is written to.
 
 
-[docs.guides.unit-testing]: /docs/setup/guides/unit-testing/
+[guides.advanced.unit-testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
+[guides.unit-testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/

@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."

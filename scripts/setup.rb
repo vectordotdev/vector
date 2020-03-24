@@ -21,6 +21,7 @@ require "rubygems"
 require "bundler"
 Bundler.require(:default)
 
+require "date"
 require_relative "util"
 
 #

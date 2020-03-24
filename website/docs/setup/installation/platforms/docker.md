@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -42,11 +43,10 @@ architectures.
 
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
-As shown in the diagram above, the [daemon deployment strategy][docs.strategies.daemon]
-is designed for data collection on a single host. In the context of Docker,
-Vector is deplyed in it's own container, just like your other services, and it
-collects and forwards all data on the host.
-[Learn more...][docs.strategies.daemon]
+As shown in the diagram above, we'll be deploying [Vector][urls.vector_website]
+as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
+single host. We'll deploy Vector in it's own container, just like your other
+services, so that your workflow doesn't deviate.
 
 ---
 
@@ -181,11 +181,10 @@ service that can send log data over the configured protocol.
 
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
-As shown in the diagram above, the [daemon deployment strategy][docs.strategies.daemon]
-is designed for data collection on a single host. In the context of Docker,
-Vector is deplyed in it's own container, just like your other services, and it
-collects and forwards all data on the host.
-[Learn more...][docs.strategies.daemon]
+As shown in the diagram above, we'll be deploying [Vector][urls.vector_website]
+as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
+single host. We'll deploy Vector in it's own container, just like your other
+services, so that your workflow doesn't deviate.
 
 ---
 
@@ -328,3 +327,4 @@ Vector's Docker source files are located
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
 [urls.vector_receiving_sources]: https://vector.dev/components?functions%5B%5D=receive
 [urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_website]: https://vector.dev

@@ -1,12 +1,5 @@
 ---
-id: prometheus-source
-title: "Prometheus Source"
-description: "Scrape prometheus metrics with Vector"
-author_github: https://github.com/Jeffail
-tags: ["type: announcement", "domain: sources", "source: prometheus"]
----
-
----
+last_modified_on: "2020-03-23"
 id: prometheus-source
 title: "Prometheus Source"
 description: "Scrape prometheus metrics with Vector"

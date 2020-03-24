@@ -1,16 +1,15 @@
 ---
-id: "setup/sources/stdin"
+last_modified_on: "2020-03-23"
 title: "Collect STDIN logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect STDIN logs and send them anywhere."
-platform_name: 
-sink_name: 
+platform_name: null
+sink_name: null
 source_name: "stdin"
-tags: ["category: setup","source: stdin"]
+tags: ["source: stdin"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
-import SVG from 'react-inlinesvg';
 
 > "I just wanna, like, collect my STDIN logs and send them somewhere -- why is all of this so complicated?"
 >
@@ -45,22 +44,6 @@ you up and running in minutes.
 </ol>
 
 ## How We'll Do It
-
-To collect STDIN logs and send them anywhere _properly_, and accomplish all of the items above,
-we'll use [Vector][urls.vector_website] and deploy it as a
-sidecar.
-
-### First, We'll Use Vector
-
-<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
-
-Written in [Rust][urls.rust], [Vector][urls.vector_website] is a lightweight
-and ultra-fast tool for building observability pipelines. Compared to Logstash
-and friends, Vector [improves throughput by ~10X while significanly reducing
-CPU and memory usage][urls.vector_performance] and it's the perfect tool for
-this task.
-
-### Second, We'll Deploy Vector As A Sidecar
 
 _sidecar.md.erb
 
@@ -103,6 +86,4 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 </div>
 
 
-[urls.rust]: https://www.rust-lang.org/
-[urls.vector_performance]: https://vector.dev/#performance
-[urls.vector_website]: https://vector.dev
+

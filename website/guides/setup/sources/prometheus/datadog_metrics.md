@@ -1,11 +1,11 @@
 ---
-id: "setup/sources/prometheus/datadog_metrics"
+last_modified_on: "2020-03-23"
 title: "Send Prometheus metrics to Datadog"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Datadog."
-platform_name: 
+platform_name: null
 sink_name: "datadog_metrics"
 source_name: "prometheus"
-tags: ["category: setup","source: prometheus","sink: datadog_metrics"]
+tags: ["source: prometheus","sink: datadog_metrics"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
@@ -52,22 +52,6 @@ you up and running in minutes.
 
 ## How We'll Do It
 
-To send Prometheus metrics to Datadog _properly_, and accomplish all of the items above,
-we'll use [Vector][urls.vector_website] and deploy it as a
-daemon.
-
-### First, We'll Use Vector
-
-<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
-
-Written in [Rust][urls.rust], [Vector][urls.vector_website] is a lightweight
-and ultra-fast tool for building observability pipelines. Compared to Logstash
-and friends, Vector [improves throughput by ~10X while significanly reducing
-CPU and memory usage][urls.vector_performance] and it's the perfect tool for
-this task.
-
-### Second, We'll Deploy Vector As A Daemon
-
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
 As shown in the diagram above, the daemon deployment strategy is designed for
@@ -113,6 +97,4 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 </div>
 
 
-[urls.rust]: https://www.rust-lang.org/
-[urls.vector_performance]: https://vector.dev/#performance
-[urls.vector_website]: https://vector.dev
+

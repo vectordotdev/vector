@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Glossary
 description: "Vector documentation glossary of terms"
 ---
@@ -55,7 +56,7 @@ The gloassary contains common terms and their definitions.
 
 ## Guide
 
-"Guide" is a tutorial or walk through on a specific subject. You can see Vector's guides in the [Guides][docs.guides] section.
+"Guide" is a tutorial or walk through on a specific subject. You can see Vector's guides in the [Guides][guides.index] section.
 
 ## Log
 
@@ -155,12 +156,12 @@ reducing cost, etc.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.data_model]: /docs/about/data-model/
-[docs.guides]: /docs/setup/guides/
 [docs.roles]: /docs/setup/deployment/roles/
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
 [docs.topologies]: /docs/setup/deployment/topologies/
 [docs.transforms]: /docs/reference/transforms/
+[guides.index]: /guides
 [pages.index#performance]: /#performance
 [urls.rust]: https://www.rust-lang.org/
 [urls.toml]: https://github.com/toml-lang/toml

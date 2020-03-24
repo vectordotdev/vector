@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Sidecar Deployment Strategy
 description: Deploy Vector as a sidecar to your service
 sidebar_label: Sidecar

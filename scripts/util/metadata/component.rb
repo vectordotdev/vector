@@ -124,7 +124,7 @@ class Component
   def logo_path
     return @logo_path if defined?(@logo_path)
 
-    variations = Set.new([name])
+    variations = Set.new([name, name.sub(/_logging/, "")])
 
     event_types.each do |event_name|
       variations << name.sub(/_#{event_name.pluralize}$/, "")

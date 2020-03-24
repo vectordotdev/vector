@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
 event_types: ["log"]

@@ -12,18 +12,12 @@ export interface GuideContent {
   guideTagsListPath: string | null;
 }
 
-export interface DateLink {
-  date: Date;
-  link: string;
-}
-
 export type FeedType = 'rss' | 'atom' | 'all';
 
 export interface PluginOptions {
   path: string;
   routeBasePath: string;
   include: string[];
-  guidesPerPage: number;
   guideListComponent: string;
   guideComponent: string;
   guideTagsListComponent: string;
@@ -71,10 +65,11 @@ export interface GuidePaginated {
 }
 
 export interface MetaData {
-  permalink: string;
-  source: string;
+  category: string;
   description: string;
-  date: Date;
+  permalink: string;
+  sort: number;
+  source: string;
   tags: (Tag | string)[];
   title: string;
   prevItem?: Paginator;

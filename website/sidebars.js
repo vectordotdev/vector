@@ -103,17 +103,6 @@ module.exports = {
             "setup/deployment/topologies",
           ]
         },
-        {
-          type: 'category',
-          label: 'Guides',
-          items: [
-            "setup/guides",
-            "setup/guides/getting-started",
-            "setup/guides/unit-testing",
-            "setup/guides/advanced-configs",
-            "setup/guides/troubleshooting",
-          ]
-        },
       ],
     },
     {

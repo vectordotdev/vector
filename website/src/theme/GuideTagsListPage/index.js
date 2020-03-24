@@ -48,7 +48,7 @@ function GuideTagsListPage(props) {
     .filter(item => item != null);
 
   return (
-    <Layout title="Tags" description="Guide Tags">
+    <Layout title="Tags" description="Vector guide tags">
       <div className="container margin-vert--xl">
         <div className="row">
           <div className="col col--8 col--offset-2">

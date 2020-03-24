@@ -1,11 +1,11 @@
 ---
-id: "setup/sources/file/gcp_cloud_storage"
+last_modified_on: "2020-03-23"
 title: "Send File logs to GCP Cloud Storage (GCS)"
 description: "A guide to quickly, and correctly, send File logs to GCP Cloud Storage (GCS)."
-platform_name: 
+platform_name: null
 sink_name: "gcp_cloud_storage"
 source_name: "file"
-tags: ["category: setup","source: file","sink: gcp_cloud_storage"]
+tags: ["source: file","sink: gcp_cloud_storage"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
@@ -59,22 +59,6 @@ you up and running in minutes.
 
 ## How We'll Do It
 
-To send File logs to GCP Cloud Storage (GCS) _properly_, and accomplish all of the items above,
-we'll use [Vector][urls.vector_website] and deploy it as a
-daemon.
-
-### First, We'll Use Vector
-
-<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
-
-Written in [Rust][urls.rust], [Vector][urls.vector_website] is a lightweight
-and ultra-fast tool for building observability pipelines. Compared to Logstash
-and friends, Vector [improves throughput by ~10X while significanly reducing
-CPU and memory usage][urls.vector_performance] and it's the perfect tool for
-this task.
-
-### Second, We'll Deploy Vector As A Daemon
-
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
 As shown in the diagram above, the daemon deployment strategy is designed for
@@ -120,6 +104,4 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 </div>
 
 
-[urls.rust]: https://www.rust-lang.org/
-[urls.vector_performance]: https://vector.dev/#performance
-[urls.vector_website]: https://vector.dev
+

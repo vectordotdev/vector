@@ -15,7 +15,13 @@ function blogColor(category) {
 
 function guidesColor(category) {
   switch(category) {
-    case 'category':
+    case 'source':
+      return 'primary';
+
+    case 'transform':
+      return 'blue';
+
+    case 'sink':
       return 'pink';
 
     default:

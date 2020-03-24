@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Validating
 description: How to validation Vector's configuration to ensure it is error free before applying it.
 ---

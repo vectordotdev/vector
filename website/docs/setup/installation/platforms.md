@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Install Vector On Platforms
 sidebar_label: hidden
 hide_pagination: true

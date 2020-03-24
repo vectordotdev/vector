@@ -25,6 +25,7 @@ class Platform
     {
       archs: archs,
       interfaces: interfaces,
+      logo_path: logo_path,
       name: name,
       oss: oss,
       strategies: strategies,

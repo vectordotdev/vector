@@ -1,10 +1,9 @@
 ---
-id: <%= id.to_json %>
 title: <%= guide.action_phrase.capitalize_first.to_json %>
 description: "A guide to quickly, and correctly, <%= guide.action_phrase %>."
-platform_name: <%= platform && platform.name.to_json %>
-sink_name: <%= sink && sink.name.to_json %>
-source_name: <%= source && source.name.to_json %>
+platform_name: <%= (platform && platform.name).to_json %>
+sink_name: <%= (sink && sink.name).to_json %>
+source_name: <%= (source && source.name).to_json %>
 tags: <%= guide.tags.to_json %>
 ---
 
@@ -37,23 +36,7 @@ you up and running in minutes.
 
 ## How We'll Do It
 
-To <%= guide.action_phrase %> _properly_, and accomplish all of the items above,
-we'll use [Vector][urls.vector_website] and deploy it as a
-<%= strategy.title.downcase %>.
-
-### First, We'll Use Vector
-
-<SVG src="/img/components.svg" width="80%" className="margin-vert--lg" />
-
-Written in [Rust][urls.rust], [Vector][urls.vector_website] is a lightweight
-and ultra-fast tool for building observability pipelines. Compared to Logstash
-and friends, Vector [improves throughput by ~10X while significanly reducing
-CPU and memory usage][urls.vector_performance] and it's the perfect tool for
-this task.
-
-### Second, We'll Deploy Vector As A <%= strategy.title %>
-
-<%= deployment_strategy(strategy, platform: platform) %>
+<%= deployment_strategy(strategy, describe_vector: true, platform: platform) %>
 
 ## A Simple Step-By-Step Tutorial
 

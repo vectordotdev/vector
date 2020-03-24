@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 delivery_guarantee: "best_effort"
 component_title: "Sematext Logs"
 description: "The Vector `sematext_logs` sink batches `log` events to Sematext via the Elasticsearch API."

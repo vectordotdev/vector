@@ -451,6 +451,7 @@ module.exports = {
           "docker-cli",
           "docker-compose"
         ],
+        "logo_path": "/img/logos/docker.svg",
         "name": "docker",
         "oss": [
           "Linux",
@@ -477,7 +478,7 @@ module.exports = {
   "latest_post": {
     "author_github": "https://github.com/Jeffail",
     "date": "2020-01-07",
-    "description": "---\nid: prometheus-source\ntitle: \"Prometheus Source\"\ndescription: \"Scrape prometheus metrics with Vector\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: sources\", \"source: prometheus\"]\n---",
+    "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
     "id": "prometheus-source",
     "path": "website/blog/2020-01-07-prometheus-source.md",
     "permalink": "https://vector.dev/blog/prometheus-source",
@@ -608,7 +609,7 @@ module.exports = {
     {
       "author_github": "https://github.com/lukesteensen",
       "date": "2019-06-28",
-      "description": "---\nid: introducing-vector\ntitle: Introducing Vector\ndescription: \"Hello World. Bringing Vector to life.\"\nauthor_github: https://github.com/lukesteensen\ntags: [\"type: announcement\"]\n---",
+      "description": "Today we're very excited to open source the Vector project! Vector is a tool for building flexible and robust pipelines for your logs and metrics data. We're still in the early stages, but our goal with Vector is to dramatically simplify your observability infrastructure while making it easy to get more value from your data.",
       "id": "introducing-vector",
       "path": "website/blog/2019-06-28-introducing-vector.md",
       "permalink": "https://vector.dev/blog/introducing-vector",
@@ -620,7 +621,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-19",
-      "description": "---\nid: arm-support-on-linux\ntitle: \"ARMv7 & ARM64 Support on Linux\"\ndescription: \"These architectures are widely used in embeded devices & servers\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: arm\"]\n---",
+      "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
       "id": "arm-support-on-linux",
       "path": "website/blog/2019-11-19-arm-support-on-linux.md",
       "permalink": "https://vector.dev/blog/arm-support-on-linux",
@@ -634,7 +635,7 @@ module.exports = {
     {
       "author_github": "https://github.com/binarylogic",
       "date": "2019-11-21",
-      "description": "---\nid: windows-support\ntitle: \"Windows Support Is Here!\"\ndescription: \"Bringing the performance and reliability of Vector to Windows\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: windows\"]\n---",
+      "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
       "id": "windows-support",
       "path": "website/blog/2019-11-21-windows-support.md",
       "permalink": "https://vector.dev/blog/windows-support",
@@ -648,7 +649,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-11-25",
-      "description": "---\nid: unit-testing-vector-config-files\ntitle: \"Unit Testing Your Vector Config Files\"\ndescription: \"Treating your Vector configuration files as code\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: config\"]\n---",
+      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
       "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
       "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -661,7 +662,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-13",
-      "description": "---\nid: custom-dns\ntitle: \"Use Custom DNS Servers\"\ndescription: \"Point Vector to custom DNS servers\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: networking\"]\n---",
+      "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
       "id": "custom-dns",
       "path": "website/blog/2019-12-13-custom-dns.md",
       "permalink": "https://vector.dev/blog/custom-dns",
@@ -674,7 +675,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-14",
-      "description": "---\nid: kubernetes-source-alpha\ntitle: \"Alpha Kubernetes Source\"\ndescription: \"Early adopters have something to chew on\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: kubernetes\"]\n---",
+      "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
       "id": "kubernetes-source-alpha",
       "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
       "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
@@ -688,7 +689,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2019-12-16",
-      "description": "---\nid: ec2-metadata\ntitle: \"EC2 Metadata Enrichments\"\ndescription: \"Enrich your events with EC2 metadata\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: transforms\", \"transform: ec2_metadata\"]\n---",
+      "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
       "id": "ec2-metadata",
       "path": "website/blog/2019-12-16-ec2-metadata.md",
       "permalink": "https://vector.dev/blog/ec2-metadata",
@@ -702,7 +703,7 @@ module.exports = {
     {
       "author_github": "https://github.com/Jeffail",
       "date": "2020-01-07",
-      "description": "---\nid: prometheus-source\ntitle: \"Prometheus Source\"\ndescription: \"Scrape prometheus metrics with Vector\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: sources\", \"source: prometheus\"]\n---",
+      "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
       "id": "prometheus-source",
       "path": "website/blog/2020-01-07-prometheus-source.md",
       "permalink": "https://vector.dev/blog/prometheus-source",
@@ -13117,7 +13118,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-19",
-          "description": "---\nid: arm-support-on-linux\ntitle: \"ARMv7 & ARM64 Support on Linux\"\ndescription: \"These architectures are widely used in embeded devices & servers\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: arm\"]\n---",
+          "description": "Vector now supports ARM architectures on the Linux platform! These\narchitectures are widely used in embeded devices and recently started to get\ntraction on servers. To get started, you can follow the installation\ninstructions for your preferred method:",
           "id": "arm-support-on-linux",
           "path": "website/blog/2019-11-19-arm-support-on-linux.md",
           "permalink": "https://vector.dev/blog/arm-support-on-linux",
@@ -13131,7 +13132,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "date": "2019-11-21",
-          "description": "---\nid: windows-support\ntitle: \"Windows Support Is Here!\"\ndescription: \"Bringing the performance and reliability of Vector to Windows\"\nauthor_github: https://github.com/binarylogic\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: windows\"]\n---",
+          "description": "We're excited to announce that Vector can now be installed on Windows!\nTo get started, check out the Windows installation instructions\nor head over to the releases section and download the\nappropriate Windows archive. Just like on Linux, installation on Windows is\nquick and easy. Let us know what you think!.",
           "id": "windows-support",
           "path": "website/blog/2019-11-21-windows-support.md",
           "permalink": "https://vector.dev/blog/windows-support",
@@ -13145,7 +13146,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-11-25",
-          "description": "---\nid: unit-testing-vector-config-files\ntitle: \"Unit Testing Your Vector Config Files\"\ndescription: \"Treating your Vector configuration files as code\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: config\"]\n---",
+          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
           "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
           "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
@@ -16475,7 +16476,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-13",
-          "description": "---\nid: custom-dns\ntitle: \"Use Custom DNS Servers\"\ndescription: \"Point Vector to custom DNS servers\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: networking\"]\n---",
+          "description": "We're modern progressive parents and aren't about to tell Vector who it can and\ncan't hang out with. As such, we're now allowing you to specify custom DNS\nservers in your configs.",
           "id": "custom-dns",
           "path": "website/blog/2019-12-13-custom-dns.md",
           "permalink": "https://vector.dev/blog/custom-dns",
@@ -16488,7 +16489,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-14",
-          "description": "---\nid: kubernetes-source-alpha\ntitle: \"Alpha Kubernetes Source\"\ndescription: \"Early adopters have something to chew on\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: platforms\", \"platform: kubernetes\"]\n---",
+          "description": "We're currently experimenting with Kubernetes integration\nThis functionality is undocumented and not yet ready for general use. However,\nwe consider it to be at Alpha stage and suitable for adventurous early adopters\nto try out.",
           "id": "kubernetes-source-alpha",
           "path": "website/blog/2019-12-14-kubernetes-source-alpha.md",
           "permalink": "https://vector.dev/blog/kubernetes-source-alpha",
@@ -16502,7 +16503,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2019-12-16",
-          "description": "---\nid: ec2-metadata\ntitle: \"EC2 Metadata Enrichments\"\ndescription: \"Enrich your events with EC2 metadata\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: transforms\", \"transform: ec2_metadata\"]\n---",
+          "description": "Are your events the laughing-stock of the data warehouse? Then enrich them with\nour brand spanking new `aws_ec2_metadata` transform.",
           "id": "ec2-metadata",
           "path": "website/blog/2019-12-16-ec2-metadata.md",
           "permalink": "https://vector.dev/blog/ec2-metadata",
@@ -16516,7 +16517,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "date": "2020-01-07",
-          "description": "---\nid: prometheus-source\ntitle: \"Prometheus Source\"\ndescription: \"Scrape prometheus metrics with Vector\"\nauthor_github: https://github.com/Jeffail\ntags: [\"type: announcement\", \"domain: sources\", \"source: prometheus\"]\n---",
+          "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
           "id": "prometheus-source",
           "path": "website/blog/2020-01-07-prometheus-source.md",
           "permalink": "https://vector.dev/blog/prometheus-source",
@@ -22037,7 +22038,7 @@ module.exports = {
       "input_types": [
         "log"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/gcp_stackdriver.svg",
       "name": "gcp_stackdriver_logging",
       "operating_systems": [
         "Linux",
@@ -22900,7 +22901,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "stdin_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/stdin.svg",
       "name": "stdin",
       "operating_systems": [
         "Linux",

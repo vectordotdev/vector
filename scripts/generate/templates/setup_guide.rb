@@ -82,7 +82,7 @@ class Templates
     def tags
       @tags ||=
         begin
-          strings = ["category: setup"]
+          strings = []
 
           if @platform
             strings << "platform: #{@platform.name}"

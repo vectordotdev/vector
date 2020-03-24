@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Vector Deployment Roles
 description: The various deployment roles Vector can serve.
 sidebar_label: hidden

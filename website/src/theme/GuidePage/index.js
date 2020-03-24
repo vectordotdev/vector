@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 
+import Avatar from '@site/src/components/Avatar';
 import CodeBlock from '@theme/CodeBlock';
 import Heading from '@theme/Heading';
 import InstallationCommand from '@site/src/components/InstallationCommand';
@@ -61,10 +62,9 @@ function GuidePage(props) {
 
   const {content: GuideContents} = props;
   const {frontMatter, metadata} = GuideContents;
-  const {category, id, platform_name: platformName, sink_name: sinkName, source_name: sourceName, title} = frontMatter;
-  const {date: dateString, tags} = metadata;
+  const {author_github: authorGithub, category, id, last_modified_on: lastModifiedOn, platform_name: platformName, sink_name: sinkName, source_name: sourceName, title} = frontMatter;
+  const {tags} = metadata;
   const readingStats = readingTime(GuideContents.toString());
-  const date = new Date(Date.parse(dateString));
 
   //
   // Site config
@@ -76,7 +76,8 @@ function GuidePage(props) {
   const platform = platformName && platforms[platformName];
   const sink = sinkName && sinks[sinkName];
   const source = sourceName && sources[sourceName];
-  const eventTypes = (platform || source || sink).event_types;
+  const eventTypes = (platform || source || sink || {}).event_types || [];
+
 
   let pathPrefix = '/guides/setup';
 
@@ -114,43 +115,49 @@ function GuidePage(props) {
             sources={false}
             transforms={false} />
       </Modal>}
-      <header className="hero domain-bg domain-bg--platforms">
-        <div className="container">
-          {(platform || source || sink) && (
-            <div className="component-icons">
-              {platform && <div className="icon panel">
-                {source.logo_path ?
-                  <SVG src={source.logo_path} alt={`${platform.title} Logo`} /> :
-                  <i className="feather icon-server"></i>}
-              </div>}
-              {source && !platform && <div className="icon panel">
-                {source.logo_path ?
-                  <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
-                  <i className="feather icon-server"></i>}
-              </div>}
-              {!source && !platform && <a href="#" className="icon panel" title="Select a source">
-                <i className="feather icon-plus"></i>
-              </a>}
-              {sink && <a href="#" className="icon panel" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
-                {sink.logo_path ?
-                  <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
-                  <i className="feather icon-database"></i>}
-               </a>}
-               {!sink && <a href="#" className="icon panel" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>
-                 <i className="feather icon-plus"></i>
-               </a>}
-            </div>
-           )}
-          <h1>{title}</h1>
-          <div className={styles.credit}>Written, with <i className="feather icon-heart"></i>, by the <Link to="/community/#team">Vector team</Link>, last updated March 22, 2020</div>
-          <Tags colorProfile="guides" tags={tags} />
-        </div>
-      </header>
-      <main className="container container--narrow margin-vert--xl">
-        <section className="markdown align-text-edges">
+      <article>
+        <header className="hero domain-bg domain-bg--platforms">
+          <div className="container">
+            {(platform || source || sink) && (
+              <div className="component-icons">
+                {platform && <div className="icon panel">
+                  {platform.logo_path ?
+                    <SVG src={platform.logo_path} alt={`${platform.title} Logo`} /> :
+                    <i className="feather icon-server"></i>}
+                </div>}
+                {source && !platform && <div className="icon panel">
+                  {source.logo_path ?
+                    <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
+                    <i className="feather icon-server"></i>}
+                </div>}
+                {!source && !platform && <a href="#" className="icon panel" title="Select a source">
+                  <i className="feather icon-plus"></i>
+                </a>}
+                {sink && <a href="#" className="icon panel" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
+                  {sink.logo_path ?
+                    <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
+                    <i className="feather icon-database"></i>}
+                 </a>}
+                 {!sink && <a href="#" className="icon panel" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>
+                   <i className="feather icon-plus"></i>
+                 </a>}
+              </div>
+            )}
+            {authorGithub && <Avatar
+              github={authorGithub}
+              size="lg"
+              nameSuffix={<> / <time pubdate="pubdate" dateTime={lastModifiedOn}>{lastModifiedOn}</time> / {readingStats.text}</>}
+              rel="author"
+              subTitle={false}
+              vertical={true} />}
+            <h1>{title}</h1>
+            <Tags colorProfile="guides" tags={tags} />
+          </div>
+        </header>
+        <section className="container container--narrow margin-vert--xl markdown align-text-edges">
           <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
         </section>
-      </main>
+      </article>
     </Layout>
   );
 }

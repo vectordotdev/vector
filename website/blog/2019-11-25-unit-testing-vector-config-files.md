@@ -1,12 +1,5 @@
 ---
-id: unit-testing-vector-config-files
-title: "Unit Testing Your Vector Config Files"
-description: "Treating your Vector configuration files as code"
-author_github: https://github.com/Jeffail
-tags: ["type: announcement", "domain: config"]
----
-
----
+last_modified_on: "2020-03-23"
 id: unit-testing-vector-config-files
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
@@ -87,7 +80,7 @@ configs will preemptively solve this problem.
 
 To help you get started we put together two documentation pages:
 
-1. [A unit testing guide][docs.guides.unit_testing]
+1. [A unit testing guide][guides.advanced.unit_testing]
 2. [A reference of the unit testing config spec][docs.reference.tests]
 
 These should be everything you need and will be actively maintained as this
@@ -102,9 +95,9 @@ works well for everyone. Please let us know what you think either in our
 [raising an issue](https://github.com/timberio/vector/issues/new).
 
 
-[docs.guides.unit_testing]: /docs/setup/guides/unit-testing/
 [docs.reference.tests]: /docs/reference/tests/
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms]: /docs/reference/transforms/
+[guides.advanced.unit_testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/

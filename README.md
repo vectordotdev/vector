@@ -62,7 +62,6 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
-* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
 
 ### Reference
 
@@ -147,7 +146,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
 * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
-* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][docs.guides.unit-testing] make Vector CI friendly.
+* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
 * **Configurable concurrency** - All CPU cores ([service][docs.roles.service]) or just one ([agent][docs.roles.agent]) via the [`--threads` flag][docs.process-management#starting].
 * **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
@@ -166,7 +165,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 ### UX
 
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
-* **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
+* **Config unit tests** - [Develop Vector config files like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
 * **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 
@@ -216,9 +215,6 @@ Or use your own [preferred method][docs.installation].
 [docs.global-options#dns_servers]: https://vector.dev/docs/reference/global-options/#dns_servers
 [docs.global-options#log_schema]: https://vector.dev/docs/reference/global-options/#log_schema
 [docs.guarantees]: https://vector.dev/docs/about/guarantees/
-[docs.guides.getting_started]: https://vector.dev/docs/setup/guides/getting-started/
-[docs.guides.unit-testing]: https://vector.dev/docs/setup/guides/unit-testing/
-[docs.guides]: https://vector.dev/docs/setup/guides/
 [docs.installation]: https://vector.dev/docs/setup/installation/
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems/
@@ -260,6 +256,7 @@ Or use your own [preferred method][docs.installation].
 [docs.updating]: https://vector.dev/docs/administration/updating/
 [docs.validating]: https://vector.dev/docs/administration/validating/
 [docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
+[guides.advanced.unit-testing]: https://vector.dev/guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
 [pages.releases]: https://vector.dev/releases/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.mailing_list]: https://vector.dev/community/

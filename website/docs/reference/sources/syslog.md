@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -449,6 +450,32 @@ More detail on the output schema is below.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={[{"custom_field1":"custom value 1"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  >
+
+### `[field-name]`
+
+In addition to the defined fields, any Syslog 5424 structured fields are parsed
+and inserted as root level fields.
+
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["app-name"]}
   groups={[]}
   name={"appname"}
@@ -672,32 +699,6 @@ then Vector will use the current time.
 
 The version extracted from the Syslog line. If a version is not found, then the
 key will not be added.
-
-
-
-
-</Field>
-
-
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"custom_field1":"custom value 1"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"*"}
-  unit={null}
-  >
-
-### `[field-name]`
-
-In addition to the defined fields, any Syslog 5424 structured fields are parsed
-and inserted as root level fields.
 
 
 

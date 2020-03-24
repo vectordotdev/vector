@@ -232,7 +232,9 @@ a.badge:hover {
   padding: 0 var(--bleed-padding);
 }
 
-.align-text-edges > blockquote {
+.align-text-edges > blockquote,
+.align-text-edges > .code-explanation,
+.align-text-edges > .code-header {
   margin-left: var(--bleed-margin);
   margin-right: var(--bleed-margin);
   padding-left: var(--bleed-padding);
@@ -662,8 +664,8 @@ header h1 {
 .hero {
   display: block;
   align-items: center;
-  min-height: 200px;
-  padding: 4em 0;
+  min-height: 175px;
+  padding: 2.5em 0 2.2em 0;
   position: relative;
   text-align: center;
 }
@@ -713,6 +715,11 @@ header h1 {
 .hero .hero--buttons .button:last-child {
   margin-right: 0;
 }
+.hero.hero--clean {
+  border-bottom: 0px none;
+  min-height: auto;
+  padding-bottom: 0;
+}
 .hero.hero--full-height {
   display: flex;
   flex-direction: column;
@@ -725,8 +732,8 @@ header h1 {
   overflow: hidden;
 }
 .hero.hero--animated-graph .overlay {
-  margin-top: -15.25em;
-  margin-bottom: 4em;
+  margin-top: -10.475em;
+  margin-bottom: 3.2em;
 }
 @media (max-width: 996px) {
   .hero {
@@ -805,6 +812,10 @@ input[type="text"]:focus {
   background: var(--ifm-panel-background-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
+}
+.input--block {
+  display: block !important;
+  width: 100%;
 }
 .input--lg {
   --ifm-button-size-multiplier: 1.35;

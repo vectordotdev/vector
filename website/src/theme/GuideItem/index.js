@@ -21,19 +21,18 @@ function GuideItem(props) {
     truncated,
     isGuidePage = false,
   } = props;
-  const {date: dateString, description, permalink, tags} = metadata;
-  const {author_github, title} = frontMatter;
+  const {category, description, permalink, tags} = metadata;
+  const {author_github, last_modified_on: lastModifiedOn, title} = frontMatter;
   const readingStats = readingTime(children.toString());
-  const date = new Date(Date.parse(dateString));
   const domainTag = enrichTags(tags, 'guides').find(tag => tag.category == 'domain');
   const domain = domainTag ? domainTag.value : null;
 
   return (
     <Link to={permalink + '/'} className={classnames('guide-item', 'domain-bg', 'domain-bg--hover', `domain-bg--${domain}`)}>
       <article>
+        <div className="category">{category}</div>
         <h2>{title}</h2>
-        <div className="guide-item--subtitle">{description}</div>
-        <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" />
+        <Avatar github={author_github} size="sm" subTitle={<><time pubdate="pubdate" dateTime={lastModifiedOn}>{lastModifiedOn}</time> / {readingStats.text}</>} rel="author" />
         <Tags colorProfile="guides" tags={tags} />
       </article>
     </Link>

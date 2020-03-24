@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-23"
 title: Service Deployment Strategy
 description: Deploy Vector as a service
 sidebar_label: Service
