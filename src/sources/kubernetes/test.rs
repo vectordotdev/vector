@@ -641,3 +641,33 @@ fn kube_diff_pod_uid() {
         false
     });
 }
+
+#[test]
+fn kube_partial() {
+    let namespace = format!("partial-{}", Uuid::new_v4());
+    let message = random_string(64 * 1024); // 64 kb
+    let user_namespace = user_namespace(&namespace);
+
+    let kube = Kube::new(&namespace);
+    let user = Kube::new(&user_namespace);
+
+    // Start vector
+    let vector = start_vector(&kube, user_namespace.as_str(), None);
+
+    // Start echo
+    let _echo = echo(&user, "echo", &message);
+    // Verify logs
+    wait_for(|| {
+        // If any daemon logged message, done.
+        for line in logs(&kube, &vector) {
+            if line["message"].as_str().unwrap() == message {
+                // Very long message arrived as a single (merged) message.
+                // DONE
+                return true;
+            } else {
+                debug!(namespace=%namespace,log=%line);
+            }
+        }
+        false
+    });
+}
