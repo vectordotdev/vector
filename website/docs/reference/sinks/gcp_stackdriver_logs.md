@@ -1,21 +1,21 @@
 ---
 delivery_guarantee: "best_effort"
-component_title: "GCP Stackdriver Logging"
-description: "The Vector `gcp_stackdriver_logging` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
+component_title: "GCP Stackdriver Logs"
+description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
 event_types: ["log"]
 function_category: "transmit"
-issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logging%22
+issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logs%22
 min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "GCP Stackdriver Logging"
-sidebar_label: "gcp_stackdriver_logging|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logging.rs
+service_name: "GCP Stackdriver Logs"
+sidebar_label: "gcp_stackdriver_logs|[\"log\"]"
+source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logs.rs
 status: "beta"
-title: "GCP Stackdriver Logging Sink"
+title: "GCP Stackdriver Logs Sink"
 unsupported_operating_systems: []
 ---
 
-The Vector `gcp_stackdriver_logging` sink
+The Vector `gcp_stackdriver_logs` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Google
 Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via
 the [REST Interface][urls.gcp_stackdriver_logging_rest].
@@ -25,7 +25,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 
      To make changes please edit the template located at:
 
-     website/docs/reference/sinks/gcp_stackdriver_logging.md.erb
+     website/docs/reference/sinks/gcp_stackdriver_logs.md.erb
 -->
 
 ## Configuration
@@ -47,7 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 ```toml
 [sinks.my_sink_id]
-  type = "gcp_stackdriver_logging" # required
+  type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
   credentials_path = "/path/to/credentials.json" # required
   healthcheck = true # optional, default
@@ -61,7 +61,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```toml
 [sinks.my_sink_id]
   # General
-  type = "gcp_stackdriver_logging" # required
+  type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
   credentials_path = "/path/to/credentials.json" # required
   log_id = "vector-logs" # required
@@ -1126,7 +1126,7 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
-The `gcp_stackdriver_logging` sink buffers & batches data as
+The `gcp_stackdriver_logs` sink buffers & batches data as
 shown in the diagram above. You'll notice that Vector treats these concepts
 differently, instead of treating them as global concepts, Vector treats them
 as sink specific concepts. This isolates sinks, ensuring services disruptions
@@ -1195,7 +1195,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_gcp_stackdriver_logging_sink_issue].
+with the Vector team by [opening an issie][urls.new_gcp_stackdriver_logs_sink_issue].
 
 ### Retry Policy
 
@@ -1217,4 +1217,4 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
 [urls.gcp_stackdriver_logging]: https://cloud.google.com/logging/docs/reference/v2/rest/
 [urls.gcp_stackdriver_logging_rest]: https://cloud.google.com/logging/
-[urls.new_gcp_stackdriver_logging_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logging
+[urls.new_gcp_stackdriver_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_stackdriver_logs
