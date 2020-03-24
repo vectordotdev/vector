@@ -62,7 +62,7 @@ common = false
 examples = ["custom_index"]
 required = false
 description = """\
-The name of the index which send the events to. If not specified, the default index is used.
+The name of the index where send the events to. If not specified, the default index is used.
 """
 
 [sinks.splunk_hec.options.token]

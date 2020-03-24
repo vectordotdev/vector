@@ -550,7 +550,7 @@ option][docs.reference.global-options#host_key].
 
 ### index
 
-The name of the index which send the events to. If not specified, the default
+The name of the index where send the events to. If not specified, the default
 index is used.
 
 
