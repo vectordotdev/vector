@@ -3,7 +3,7 @@
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
-  color: var(--ifm-font-base-color);
+  color: var(--ifm-heading-color);
   display: block;
   min-height: 17.5em;
   position: relative;
@@ -91,10 +91,9 @@
 }
 
 .guide-item:hover {
-  background-color: var(--ifm-panel-background-active);
-  border-color: var(--ifm-panel-border-color-active);
-  box-shadow: var(--ifm-panel-box-shadow-active);
-  color: var(--ifm-panel-color-active);
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0.4em 0 1em 0 rgba( var(--ifm-color-primary-rgb), 0.5 );
+  color: var(--ifm-color-primary);
   text-decoration: none;
   transform: perspective(1000px) rotateY(-10deg) translate3d(-3px,0,0);
   transform-origin: 0 50%;
