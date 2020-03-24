@@ -20,7 +20,8 @@ By default, Vector primarily operates on three fields: `host`, `message`, and `t
 }
 ```
 
-It may be that your data does not follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema` section of your `config.toml`.
+It may be that your data does not follow this convention. In this case you can modify the global defaults for all
+incoming data in the `log_schema` section of your `config.toml`.
 
 ```toml
 [log_schema]
@@ -33,7 +34,8 @@ timestamp_key = "datetime" # default "timestamp"
 
 > **Gotcha:** Not all sources use the `host` field.
 
-We find this feature is useful when used with simple configs! As your number of components grows, your needs will change and you'll likely need to configure this at a more fine grained level.
+We find this feature is useful when used with simple configs! As your number of components grows, your needs will change
+and you'll likely need to configure this at a more fine grained level.
 
 
 ### Example: Custom timestamp field
@@ -156,6 +158,7 @@ The applications for this include some of the reasons discussed in
 * Stripping off routing related fields
 * Ensuring a specific sink will only ever output specific fields (or never output certain fields)
 
+
 ### Example: Per host kafka topics
 
 Lets take a look at what that might look like:
@@ -173,6 +176,7 @@ Lets take a look at what that might look like:
 
 > Gotcha: Not all fields are templatable! Make sure to check the documentation and test before deploying. If you find
 > a field which you want templatable open an issue and let us know.
+
 
 ## Moving and Concatenating Fields
 
@@ -272,8 +276,8 @@ output format
   encoding = "json"
 ```
 
-You can also use a transform like [`json_parser`](/docs/reference/transforms/json_parser/),
-[`grok_parser`](/docs/reference/transforms/grok_parser/) or [`protobuf_parser`]() to parse out data in a given field.
+You can also use a transform like [`json_parser`](/docs/reference/transforms/json_parser/) or
+[`grok_parser`](/docs/reference/transforms/grok_parser/) to parse out data in a given field.
 
 ## Using a Schema
 
