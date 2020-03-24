@@ -1,65 +1,65 @@
 - name: "domain: blog"
-  description: Anything blog related
+  description: Anything  related
   color: 212f3e
 - name: "domain: buffers"
-  description: Anything buffers related
+  description: Anything  related
   color: 212f3e
 - name: "domain: cli"
-  description: Anything cli related
+  description: Anything  related
   color: 212f3e
 - name: "domain: config"
-  description: Anything config related
+  description: Anything  related
   color: 212f3e
 - name: "domain: dependencies"
-  description: Anything dependencies related
+  description: Anything  related
   color: 212f3e
 - name: "domain: docs"
-  description: Anything docs related
+  description: Anything  related
   color: 212f3e
 - name: "domain: guides"
-  description: Anything guides related
+  description: Anything  related
   color: 212f3e
 - name: "domain: marketing"
-  description: Anything marketing related
+  description: Anything  related
   color: 212f3e
 - name: "domain: networking"
-  description: Anything networking related
+  description: Anything  related
   color: 212f3e
 - name: "domain: observability"
-  description: Anything observability related
+  description: Anything  related
   color: 212f3e
 - name: "domain: operations"
-  description: Anything operations related
+  description: Anything  related
   color: 212f3e
 - name: "domain: platforms"
-  description: Anything platforms related
+  description: Anything  related
   color: 212f3e
 - name: "domain: security"
-  description: Anything security related
+  description: Anything  related
   color: 212f3e
 - name: "domain: setup"
-  description: Anything setup related
+  description: Anything  related
   color: 212f3e
 - name: "domain: sinks"
-  description: Anything sinks related
+  description: Anything  related
   color: 212f3e
 - name: "domain: sources"
-  description: Anything sources related
+  description: Anything  related
   color: 212f3e
 - name: "domain: templating"
-  description: Anything templating related
+  description: Anything  related
   color: 212f3e
 - name: "domain: testing"
-  description: Anything testing related
+  description: Anything  related
   color: 212f3e
 - name: "domain: topology"
-  description: Anything topology related
+  description: Anything  related
   color: 212f3e
 - name: "domain: transforms"
-  description: Anything transforms related
+  description: Anything  related
   color: 212f3e
 - name: "domain: website"
-  description: Anything website related
+  description: Anything  related
   color: 212f3e
 
 - name: "event type: log"
@@ -115,49 +115,49 @@
   color: feca57
 
 - name: "platform: amazon-linux"
-  description: Anything amazon-linux related
+  description: Anything Amazon Linux related
   color: ff9ff3
 - name: "platform: centos"
-  description: Anything centos related
+  description: Anything CentOS related
   color: ff9ff3
 - name: "platform: debian"
-  description: Anything debian related
+  description: Anything Debian related
   color: ff9ff3
 - name: "platform: macos"
-  description: Anything macos related
+  description: Anything MacOS related
   color: ff9ff3
 - name: "platform: nixos"
-  description: Anything nixos related
+  description: Anything NixOS related
   color: ff9ff3
 - name: "platform: rhel"
-  description: Anything rhel related
+  description: Anything RHEL related
   color: ff9ff3
 - name: "platform: raspbian"
-  description: Anything raspbian related
+  description: Anything Raspbian related
   color: ff9ff3
 - name: "platform: ubuntu"
-  description: Anything ubuntu related
+  description: Anything Ubuntu related
   color: ff9ff3
 - name: "platform: windows"
-  description: Anything windows related
+  description: Anything Windows related
   color: ff9ff3
 - name: "platform: dpkg"
-  description: Anything dpkg related
+  description: Anything DPKG related
   color: ff9ff3
 - name: "platform: homebrew"
-  description: Anything homebrew related
+  description: Anything Homebrew related
   color: ff9ff3
 - name: "platform: msi"
-  description: Anything msi related
+  description: Anything MSI related
   color: ff9ff3
 - name: "platform: nix"
-  description: Anything nix related
+  description: Anything Nix related
   color: ff9ff3
 - name: "platform: rpm"
-  description: Anything rpm related
+  description: Anything RPM related
   color: ff9ff3
 - name: "platform: docker"
-  description: Anything docker related
+  description: Anything Docker related
   color: ff9ff3
 
 - name: "provider: aws"
