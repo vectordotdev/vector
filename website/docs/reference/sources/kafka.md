@@ -252,8 +252,8 @@ not be added to the log event.
 
 ### librdkafka_options
 
-Advanced options. See [the [`librdkafka`](#librdkafka) documentation][urls.lib_rdkafka_config]
-for details.
+Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
+details.
 
 
 
