@@ -1,33 +1,22 @@
 use super::{
-    CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, Result, TcpBind,
-    TlsError, TlsSettings,
+    CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, Result, TcpBind, TlsError,
+    TlsSettings,
 };
-use futures01::{try_ready, Async, Future, Poll, Stream};
+use futures01::{try_ready, Async, Stream};
 use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::fmt::{self, Debug, Formatter};
 use std::net::SocketAddr;
 use tokio01::net::{tcp::Incoming, TcpListener, TcpStream};
-use tokio_openssl::{AcceptAsync, SslAcceptorExt};
 
 pub(crate) struct MaybeTlsIncoming<I: Stream> {
     incoming: I,
     acceptor: Option<SslAcceptor>,
-    state: MaybeTlsIncomingState<I::Item>,
-}
-
-enum MaybeTlsIncomingState<S> {
-    Inner,
-    Accepting(AcceptAsync<S>),
 }
 
 impl<I: Stream> MaybeTlsIncoming<I> {
     pub(crate) fn new(incoming: I, acceptor: Option<SslAcceptor>) -> Self {
-        Self {
-            incoming,
-            acceptor,
-            state: MaybeTlsIncomingState::Inner,
-        }
+        Self { incoming, acceptor }
     }
 }
 
@@ -35,39 +24,18 @@ impl Stream for MaybeTlsIncoming<Incoming> {
     type Item = MaybeTlsStream<TcpStream>;
     type Error = TlsError;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        loop {
-            match &mut self.state {
-                MaybeTlsIncomingState::Inner => {
-                    let stream = if let Some(stream) = try_ready!(self
-                        .incoming
-                        .poll()
-                        .map_err(Into::into)
-                        .context(IncomingListener))
-                    {
-                        stream
-                    } else {
-                        return Ok(Async::Ready(None));
-                    };
-
-                    if let Some(acceptor) = &mut self.acceptor {
-                        let fut = acceptor.accept_async(stream);
-
-                        self.state = MaybeTlsIncomingState::Accepting(fut);
-                        continue;
-                    } else {
-                        return Ok(Async::Ready(Some(MaybeTlsStream::Raw(stream))));
-                    }
-                }
-
-                MaybeTlsIncomingState::Accepting(fut) => {
-                    let stream = try_ready!(fut.poll().context(Handshake));
-                    self.state = MaybeTlsIncomingState::Inner;
-
-                    return Ok(Async::Ready(Some(MaybeTlsStream::Tls(stream))));
-                }
-            }
-        }
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>> {
+        Ok(Async::Ready(
+            match try_ready!(self
+                .incoming
+                .poll()
+                .map_err(Into::into)
+                .context(IncomingListener))
+            {
+                Some(stream) => Some(MaybeTlsStream::new_accepting(stream, &self.acceptor)?),
+                None => None,
+            },
+        ))
     }
 }
 
