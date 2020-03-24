@@ -116,10 +116,6 @@ impl MaybeTlsListener {
         let incoming = self.listener.incoming();
         MaybeTlsIncoming::new(incoming, self.acceptor)
     }
-
-    pub(crate) fn local_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {
-        self.listener.local_addr()
-    }
 }
 
 impl From<TcpListener> for MaybeTlsListener {

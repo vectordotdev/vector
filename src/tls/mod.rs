@@ -16,8 +16,6 @@ mod maybe_tls;
 mod outgoing;
 mod settings;
 
-#[cfg(feature = "sources-tls")]
-pub(crate) use incoming::MaybeTlsListener;
 pub(crate) use maybe_tls::MaybeTls;
 pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
