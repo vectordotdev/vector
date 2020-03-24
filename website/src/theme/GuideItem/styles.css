@@ -92,7 +92,7 @@
 
 .guide-item:hover {
   border-color: var(--ifm-color-primary);
-  box-shadow: 0.4em 0 0.75em 0 rgba( var(--ifm-color-primary-rgb), 0.5 );
+  box-shadow: 0.4em 0 0.75em 0 rgba( var(--ifm-color-primary-rgb), 0.25 );
   color: var(--ifm-color-primary);
   text-decoration: none;
   transform: perspective(1000px) rotateY(-10deg) translate3d(-3px,0,0);

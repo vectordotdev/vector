@@ -29,7 +29,7 @@
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
-  color: var(--ifm-panel-color);
+  color: var(--ifm-heading-color);
   font-weight: 500;
   padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
   transition: var(--ifm-transition-fast) ease;
