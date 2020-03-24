@@ -21,7 +21,7 @@ function GuideListPage(props) {
         <div className="container">
           <h1>Vector Guides</h1>
           <div className="hero--subtitle">
-            Thoughtful guides to help you get the most out of Vector. Created and curated by the Vector team.
+            Thoughtful guides to help you get the most out of Vector. Created and curated by the <Link to="/community#team">Vector team</Link>.
           </div>
         </div>
       </header>
