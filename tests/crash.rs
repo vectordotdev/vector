@@ -78,18 +78,18 @@ fn test_sink_panic() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let _ = std::panic::take_hook();
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -160,17 +160,17 @@ fn test_sink_error() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -228,17 +228,17 @@ fn test_source_error() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -299,18 +299,18 @@ fn test_source_panic() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     let _ = std::panic::take_hook();
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
