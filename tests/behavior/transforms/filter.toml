@@ -18,7 +18,7 @@
 
 [[tests]]
   name = "filter test 1a"
-  no_outputs_from = [ "filter_b", "filter_c" ]
+  no_outputs_from = []
   [[tests.inputs]]
     insert_at = "filter_a"
     value = "test filter 1"
@@ -29,28 +29,28 @@
 
 [[tests]]
   name = "filter test 1b"
-  no_outputs_from = [ "filter_a", "filter_b", "filter_c" ]
+  no_outputs_from = [ "filter_b" ]
   [[tests.inputs]]
     insert_at = "filter_b"
     value = "test filter 1"
 
 [[tests]]
   name = "filter test 1c"
-  no_outputs_from = [ "filter_a", "filter_b", "filter_c" ]
+  no_outputs_from = [ "filter_c" ]
   [[tests.inputs]]
     insert_at = "filter_c"
     value = "test filter 1"
 
 [[tests]]
   name = "filter test 2a"
-  no_outputs_from = [ "filter_a", "filter_b", "filter_c" ]
+  no_outputs_from = [ "filter_a" ]
   [[tests.inputs]]
     insert_at = "filter_a"
     value = "test filter 2"
 
 [[tests]]
   name = "filter test 2b"
-  no_outputs_from = [ "filter_a", "filter_c" ]
+  no_outputs_from = []
   [[tests.inputs]]
     insert_at = "filter_b"
     value = "test filter 2"
@@ -61,7 +61,7 @@
 
 [[tests]]
   name = "filter test 2c"
-  no_outputs_from = [ "filter_a", "filter_b", "filter_c" ]
+  no_outputs_from = [ "filter_c" ]
   [[tests.inputs]]
     insert_at = "filter_c"
     value = "test filter 2"
