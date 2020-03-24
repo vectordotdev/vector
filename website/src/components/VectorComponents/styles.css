@@ -32,7 +32,7 @@
   color: var(--ifm-heading-color);
   font-weight: 500;
   padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
-  transition: var(--ifm-transition-fast) ease;
+  transition: all var(--ifm-transition-fast) ease;
 }
 
 .vector-component:hover {

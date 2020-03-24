@@ -1,22 +1,22 @@
 ---
 last_modified_on: "2020-03-24"
-title: "Collect Journald logs and send them anywhere"
-description: "A guide to quickly, and correctly, collect Journald logs and send them anywhere."
+title: "Send File logs to GCP Stackdriver"
+description: "A guide to quickly, and correctly, send File logs to GCP Stackdriver."
 platform_name: null
-sink_name: null
-source_name: "journald"
-tags: ["source: journald"]
+sink_name: "gcp_stackdriver_logs"
+source_name: "file"
+tags: ["source: file","sink: gcp_stackdriver_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import SVG from 'react-inlinesvg';
 
-> "I just wanna, like, collect my Journald logs and send them somewhere -- why is all of this so complicated?"
+> "I just wanna, like, send my File logs to GCP Stackdriver -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to collect Journald logs and send them anywhere? Sounds simple! Sadly, it is not.
+So you want to send File logs to GCP Stackdriver? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
@@ -26,22 +26,29 @@ you up and running in minutes.
 
      To make changes please edit the template located at:
 
-     website/guides/setup/sources/journald/gcp_stackdriver_logging.md.erb
+     website/guides/setup/sources/file/gcp_stackdriver_logs.md.erb
 -->
 
 ## What We'll Accomplish In This Guide
 
 <ol className="list--checks list--lg list--semi-bold list--primary list--flush">
   <li>
-    Collect Journald/Systemd logs.
+    Tail one or more files.
     <ol>
-      <li>Filter which Systemd units you collect them from.</li>
+      <li>Automatically discover new files with glob patterns.</li>
+      <li>Merge multi-line logs into one event.</li>
       <li>Checkpoint your position to ensure data is not lost between restarts.</li>
-      <li>Enrich your logs with useful Systemd context.</li>
+      <li>Enrich your logs with useful file and host-level context.</li>
     </ol>
   </li>
   <li>
-    Send your logs to one or more destinations
+    Send logs to GCP Stackdriver.
+    <ol>
+      <li>Leverage any of GCP's IAM strategies.</li>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
   </li>
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
@@ -73,8 +80,8 @@ collecting and forwarding all data on the host.
 <ConfigExample
   format="toml"
   path="vector.toml"
-  sourceName={"journald"}
-  sinkName={null} />
+  sourceName={"file"}
+  sinkName={"gcp_stackdriver_logs"} />
 
 </li>
 <li>

@@ -1,6 +1,6 @@
 use crate::shutdown::ShutdownSignal;
 use crate::stream::StreamExt;
-use crate::tls::TlsSettings;
+use crate::tls::MaybeTlsSettings;
 use crate::Event;
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
@@ -39,7 +39,7 @@ pub trait TcpSource: Clone + Send + 'static {
         self,
         addr: SocketListenAddr,
         shutdown_timeout_secs: u64,
-        tls: Option<TlsSettings>,
+        tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<crate::sources::Source> {
@@ -148,12 +148,12 @@ fn accept_socket(
     tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
     host: Option<Bytes>,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
-    tls: Option<TlsSettings>,
+    tls: MaybeTlsSettings,
 ) {
     debug!("accepted a new socket.");
 
     match tls {
-        Some(tls) => match tls.acceptor() {
+        MaybeTlsSettings::Tls(tls) => match tls.acceptor() {
             Err(error) => error!(message = "Failed to create a TLS connection acceptor", %error),
             Ok(acceptor) => {
                 let inner_span = span.clone();
@@ -165,7 +165,7 @@ fn accept_socket(
                 tokio::spawn(handler.instrument(span.clone()));
             }
         },
-        None => handle_stream(span, socket, source, tripwire, host, out),
+        _ => handle_stream(span, socket, source, tripwire, host, out),
     }
 }
 

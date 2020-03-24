@@ -1,21 +1,21 @@
 ---
 last_modified_on: "2020-03-24"
-title: "Send STDIN logs to GCP Stackdriver Logging"
-description: "A guide to quickly, and correctly, send STDIN logs to GCP Stackdriver Logging."
+title: "Collect STDIN logs and send them anywhere"
+description: "A guide to quickly, and correctly, collect STDIN logs and send them anywhere."
 platform_name: null
-sink_name: "gcp_stackdriver_logging"
+sink_name: null
 source_name: "stdin"
-tags: ["source: stdin","sink: gcp_stackdriver_logging"]
+tags: ["source: stdin"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, send my STDIN logs to GCP Stackdriver Logging -- why is all of this so complicated?"
+> "I just wanna, like, collect my STDIN logs and send them somewhere -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send STDIN logs to GCP Stackdriver Logging? Sounds simple! Sadly, it is not.
+So you want to collect STDIN logs and send them anywhere? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
@@ -38,13 +38,7 @@ you up and running in minutes.
     </ol>
   </li>
   <li>
-    Send logs to GCP Stackdriver.
-    <ol>
-      <li>Leverage any of GCP's IAM strategies.</li>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    Send your logs to one or more destinations
   </li>
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
@@ -73,7 +67,7 @@ _sidecar.md.erb
   format="toml"
   path="vector.toml"
   sourceName={"stdin"}
-  sinkName={"gcp_stackdriver_logging"} />
+  sinkName={null} />
 
 </li>
 <li>

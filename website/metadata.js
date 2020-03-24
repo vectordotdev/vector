@@ -22023,10 +22023,10 @@ module.exports = {
 
       ]
     },
-    "gcp_stackdriver_logging": {
+    "gcp_stackdriver_logs": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logging\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
+        "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
@@ -22034,12 +22034,12 @@ module.exports = {
         "log"
       ],
       "function_category": "transmit",
-      "id": "gcp_stackdriver_logging_sink",
+      "id": "gcp_stackdriver_logs_sink",
       "input_types": [
         "log"
       ],
       "logo_path": "/img/logos/gcp_stackdriver.svg",
-      "name": "gcp_stackdriver_logging",
+      "name": "gcp_stackdriver_logs",
       "operating_systems": [
         "Linux",
         "MacOS",
@@ -22049,7 +22049,7 @@ module.exports = {
         "Google"
       ],
       "status": "beta",
-      "title": "GCP Stackdriver Logging",
+      "title": "GCP Stackdriver Logs",
       "type": "sink",
       "unsupported_operating_systems": [
 

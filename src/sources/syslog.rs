@@ -4,7 +4,7 @@ use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
     shutdown::ShutdownSignal,
-    tls::{TlsConfig, TlsSettings},
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 
@@ -90,7 +90,7 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                 };
                 let shutdown_secs = 30;
-                let tls = TlsSettings::from_config(&tls, true)?;
+                let tls = MaybeTlsSettings::from_config(&tls, true)?;
                 source.run(address, shutdown_secs, tls, shutdown, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),

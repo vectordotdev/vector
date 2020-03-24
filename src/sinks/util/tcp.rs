@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
     sinks::{Healthcheck, RouterSink},
-    tls::{tls_connector, TlsConfig, TlsSettings},
+    tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -15,10 +15,9 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
-    net::tcp::{ConnectFuture, TcpStream},
+    net::tcp::TcpStream,
     timer::Delay,
 };
-use tokio_openssl::{ConnectAsync as SslConnectAsync, ConnectConfigurationExt, SslStream};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
 
@@ -53,7 +52,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
 
-        let tls = TlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
         let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(host, port, cx.resolver());
@@ -66,7 +65,7 @@ pub struct TcpSink {
     host: String,
     port: u16,
     resolver: Resolver,
-    tls: Option<TlsSettings>,
+    tls: MaybeTlsSettings,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
     span: tracing::Span,
@@ -75,19 +74,15 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     ResolvingDns(crate::dns::ResolverFuture),
-    Connecting(ConnectFuture),
-    TlsConnecting(SslConnectAsync<TcpStream>),
+    Connecting(MaybeTlsConnector),
     Connected(TcpOrTlsStream),
     Backoff(Delay),
 }
 
-type TcpOrTlsStream = MaybeTlsStream<
-    FramedWrite<TcpStream, BytesCodec>,
-    FramedWrite<SslStream<TcpStream>, BytesCodec>,
->;
+type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
 
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver, tls: Option<TlsSettings>) -> Self {
+    pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
         let span = info_span!("connection", %host, %port);
         Self {
             host,
@@ -126,7 +121,13 @@ impl TcpSink {
                             let addr = SocketAddr::new(ip, self.port);
 
                             debug!(message = "connecting", %addr);
-                            TcpSinkState::Connecting(TcpStream::connect(&addr))
+                            match self.tls.connect(self.host.clone(), addr) {
+                                Ok(connector) => TcpSinkState::Connecting(connector),
+                                Err(error) => {
+                                    error!(message = "unable to connect", %error);
+                                    TcpSinkState::Backoff(self.next_delay())
+                                }
+                            }
                         } else {
                             error!("DNS resolved but there were no IP addresses.");
                             TcpSinkState::Backoff(self.next_delay())
@@ -148,24 +149,10 @@ impl TcpSink {
                     }
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
-                    Ok(Async::Ready(socket)) => {
+                    Ok(Async::Ready(stream)) => {
                         debug!(message = "connected");
                         self.backoff = Self::fresh_backoff();
-                        match self.tls {
-                            Some(ref tls) => match tls_connector(Some(tls.clone())) {
-                                Ok(connector) => TcpSinkState::TlsConnecting(
-                                    connector.connect_async(&self.host, socket),
-                                ),
-                                Err(err) => {
-                                    error!(message = "unable to establish TLS connection.", error = %err);
-                                    TcpSinkState::Backoff(self.next_delay())
-                                }
-                            },
-                            None => TcpSinkState::Connected(MaybeTlsStream::Raw(FramedWrite::new(
-                                socket,
-                                BytesCodec::new(),
-                            ))),
-                        }
+                        TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
                     }
                     Ok(Async::NotReady) => {
                         return Ok(Async::NotReady);
@@ -175,23 +162,6 @@ impl TcpSink {
                         TcpSinkState::Backoff(self.next_delay())
                     }
                 },
-                TcpSinkState::TlsConnecting(ref mut connect_future) => {
-                    match connect_future.poll() {
-                        Ok(Async::Ready(socket)) => {
-                            debug!(message = "negotiated TLS.");
-                            self.backoff = Self::fresh_backoff();
-                            TcpSinkState::Connected(MaybeTlsStream::Tls(FramedWrite::new(
-                                socket,
-                                BytesCodec::new(),
-                            )))
-                        }
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Err(error) => {
-                            error!(message = "unable to negotiate TLS.", %error);
-                            TcpSinkState::Backoff(self.next_delay())
-                        }
-                    }
-                }
                 TcpSinkState::Connected(ref mut connection) => {
                     return Ok(Async::Ready(connection));
                 }
@@ -256,7 +226,7 @@ pub fn raw_tcp(
     port: u16,
     cx: SinkContext,
     encoding: EncodingConfig<Encoding>,
-    tls: Option<TlsSettings>,
+    tls: MaybeTlsSettings,
 ) -> RouterSink {
     Box::new(
         TcpSink::new(host, port, cx.resolver(), tls)
@@ -294,32 +264,4 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
     });
 
     Box::new(check)
-}
-
-enum MaybeTlsStream<R, T> {
-    Raw(R),
-    Tls(T),
-}
-
-impl<R, T, I, E> Sink for MaybeTlsStream<R, T>
-where
-    R: Sink<SinkItem = I, SinkError = E>,
-    T: Sink<SinkItem = I, SinkError = E>,
-{
-    type SinkItem = I;
-    type SinkError = E;
-
-    fn start_send(&mut self, item: I) -> futures01::StartSend<I, E> {
-        match self {
-            MaybeTlsStream::Raw(r) => r.start_send(item),
-            MaybeTlsStream::Tls(t) => t.start_send(item),
-        }
-    }
-
-    fn poll_complete(&mut self) -> futures01::Poll<(), E> {
-        match self {
-            MaybeTlsStream::Raw(r) => r.poll_complete(),
-            MaybeTlsStream::Tls(t) => t.poll_complete(),
-        }
-    }
 }

@@ -1,22 +1,22 @@
 ---
 last_modified_on: "2020-03-24"
-title: "Send File logs to GCP Stackdriver Logging"
-description: "A guide to quickly, and correctly, send File logs to GCP Stackdriver Logging."
+title: "Collect File logs and send them anywhere"
+description: "A guide to quickly, and correctly, collect File logs and send them anywhere."
 platform_name: null
-sink_name: "gcp_stackdriver_logging"
+sink_name: null
 source_name: "file"
-tags: ["source: file","sink: gcp_stackdriver_logging"]
+tags: ["source: file"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import SVG from 'react-inlinesvg';
 
-> "I just wanna, like, send my File logs to GCP Stackdriver Logging -- why is all of this so complicated?"
+> "I just wanna, like, collect my File logs and send them somewhere -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send File logs to GCP Stackdriver Logging? Sounds simple! Sadly, it is not.
+So you want to collect File logs and send them anywhere? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
@@ -42,13 +42,7 @@ you up and running in minutes.
     </ol>
   </li>
   <li>
-    Send logs to GCP Stackdriver.
-    <ol>
-      <li>Leverage any of GCP's IAM strategies.</li>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
+    Send your logs to one or more destinations
   </li>
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
@@ -81,7 +75,7 @@ collecting and forwarding all data on the host.
   format="toml"
   path="vector.toml"
   sourceName={"file"}
-  sinkName={"gcp_stackdriver_logging"} />
+  sinkName={null} />
 
 </li>
 <li>

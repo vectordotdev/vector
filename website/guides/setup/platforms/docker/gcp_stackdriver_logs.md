@@ -1,22 +1,22 @@
 ---
 last_modified_on: "2020-03-24"
-title: "Collect Docker logs and send them anywhere"
-description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
+title: "Send Docker logs to GCP Stackdriver"
+description: "A guide to quickly, and correctly, send Docker logs to GCP Stackdriver."
 platform_name: "docker"
-sink_name: null
+sink_name: "gcp_stackdriver_logs"
 source_name: "docker"
-tags: ["source: docker"]
+tags: ["source: docker","sink: gcp_stackdriver_logs"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
 import SVG from 'react-inlinesvg';
 
-> "I just wanna, like, collect my Docker logs and send them somewhere -- why is all of this so complicated?"
+> "I just wanna, like, send my Docker logs to GCP Stackdriver -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to collect Docker logs and send them anywhere? Sounds simple! Sadly, it is not.
+So you want to send Docker logs to GCP Stackdriver? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
@@ -26,7 +26,7 @@ you up and running in minutes.
 
      To make changes please edit the template located at:
 
-     website/guides/setup/platforms/docker/gcp_stackdriver_logging.md.erb
+     website/guides/setup/platforms/docker/gcp_stackdriver_logs.md.erb
 -->
 
 ## What We'll Accomplish In This Guide
@@ -41,7 +41,13 @@ you up and running in minutes.
     </ol>
   </li>
   <li>
-    Send your logs to one or more destinations
+    Send logs to GCP Stackdriver.
+    <ol>
+      <li>Leverage any of GCP's IAM strategies.</li>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
   </li>
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
@@ -65,7 +71,7 @@ services, so that your workflow doesn't deviate.
     format="toml"
     path="vector.toml"
     sourceName={"docker"}
-    sinkName={null} />
+    sinkName={"gcp_stackdriver_logs"} />
 
 2. ### Start the Vector container
 

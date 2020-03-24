@@ -53,7 +53,7 @@ impl SinkConfig for DatadogLogsConfig {
             )
         };
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls);
+        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls.into());
         let healthcheck = tcp_healthcheck(host.clone(), port, cx.resolver());
 
         let encoding = self.encoding.clone();
