@@ -3,7 +3,7 @@ use crate::sources::Source;
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use std::path::PathBuf;
-use tokio::{
+use tokio01::{
     self,
     codec::{FramedRead, LinesCodec},
 };
@@ -62,7 +62,7 @@ pub fn build_unix_source(
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
-                tokio::spawn(handler.instrument(span))
+                tokio01::spawn(handler.instrument(span))
             })
     }))
 }

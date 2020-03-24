@@ -17,7 +17,7 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
-use tokio::{
+use tokio01::{
     self,
     codec::{BytesCodec, LinesCodec},
     net::{UdpFramed, UdpSocket},

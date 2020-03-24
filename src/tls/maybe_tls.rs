@@ -1,7 +1,7 @@
 use futures01::Poll;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Read, Write};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio01::io::{AsyncRead, AsyncWrite};
 
 /// A type wrapper for objects that can exist in either a raw state or
 /// wrapped by TLS handling.

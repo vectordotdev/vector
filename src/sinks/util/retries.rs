@@ -4,7 +4,7 @@ use std::{
     cmp,
     time::{Duration, Instant},
 };
-use tokio::timer::Delay;
+use tokio01::timer::Delay;
 use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {

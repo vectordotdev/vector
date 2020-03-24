@@ -15,9 +15,9 @@ use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
-use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::util::FutureExt;
+use tokio01::codec::{FramedRead, FramedWrite, LinesCodec};
+use tokio01::net::{TcpListener, TcpStream};
+use tokio01::util::FutureExt;
 use tokio_openssl::SslConnectorExt;
 
 #[macro_export]
@@ -109,7 +109,7 @@ pub fn send_lines_tls(
                             // and tests will be checking that contents
                             // are received anyways.
                             stream.get_mut().shutdown().ok();
-                            //tokio::io::shutdown(stream).map_err(|e| panic!("{:}", e))
+                            //tokio01::io::shutdown(stream).map_err(|e| panic!("{:}", e))
                             Ok(())
                         })
                         .map(|_| ())

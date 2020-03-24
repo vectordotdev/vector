@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap, VecDeque};
 use std::hash::Hash;
 use std::time::Duration;
-use tokio::timer::DelayQueue;
+use tokio01::timer::DelayQueue;
 
 #[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]

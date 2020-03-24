@@ -249,7 +249,7 @@ mod integration_tests {
     use futures01::Sink;
     use serde_json::Value;
     use std::time::Duration;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     #[test]
     fn insert_events() {

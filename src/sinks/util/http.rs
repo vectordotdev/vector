@@ -20,7 +20,7 @@ use hyper::Client;
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
-use tokio::executor::DefaultExecutor;
+use tokio01::executor::DefaultExecutor;
 use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;

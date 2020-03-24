@@ -274,7 +274,7 @@ mod tests {
                 let (parts, body) = req.into_parts();
 
                 let tx = tx.clone();
-                tokio::spawn(
+                tokio01::spawn(
                     body.concat2()
                         .map_err(|e| panic!(e))
                         .and_then(|body| tx.send((parts, body)))
