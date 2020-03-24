@@ -14,7 +14,7 @@ use futures::pin_mut;
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use tokio02::{
+use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
@@ -115,7 +115,7 @@ impl FileSink {
     async fn run(&mut self, input: impl Stream<Item = Event> + Send + Sync) -> crate::Result<()> {
         pin_mut!(input);
         loop {
-            tokio02::select! {
+            tokio::select! {
                 event = input.next() => {
                     match event {
                         None => {

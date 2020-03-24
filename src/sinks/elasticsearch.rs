@@ -260,7 +260,7 @@ impl ElasticSearchCommon {
                 let provider =
                     DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
 
-                let mut rt = tokio::runtime::current_thread::Runtime::new()?;
+                let mut rt = tokio01::runtime::current_thread::Runtime::new()?;
 
                 let credentials = rt
                     .block_on(provider.credentials())

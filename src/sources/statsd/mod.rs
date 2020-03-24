@@ -3,7 +3,7 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tokio::{
+use tokio01::{
     self,
     codec::BytesCodec,
     net::{UdpFramed, UdpSocket},

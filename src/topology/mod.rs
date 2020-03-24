@@ -21,7 +21,7 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
-use tokio::timer;
+use tokio01::timer;
 use tracing_futures::Instrument;
 
 #[allow(dead_code)]

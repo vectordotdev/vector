@@ -120,7 +120,7 @@ mod tests {
     use futures01::sync::mpsc;
     use futures01::Async::*;
     use std::io::Cursor;
-    use tokio::runtime::current_thread::Runtime;
+    use tokio01::runtime::current_thread::Runtime;
 
     #[test]
     fn stdin_create_event() {

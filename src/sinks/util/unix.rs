@@ -13,8 +13,8 @@ use snafu::Snafu;
 use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use tokio::codec::{BytesCodec, FramedWrite};
-use tokio::timer::Delay;
+use tokio01::codec::{BytesCodec, FramedWrite};
+use tokio01::timer::Delay;
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_uds::UnixStream;
 use tracing::field;
@@ -197,7 +197,7 @@ mod tests {
     use crate::test_util::{random_lines_with_stream, shutdown_on_idle};
     use futures01::{sync::mpsc, Sink, Stream};
     use stream_cancel::{StreamExt, Tripwire};
-    use tokio::codec::{FramedRead, LinesCodec};
+    use tokio01::codec::{FramedRead, LinesCodec};
     use tokio_uds::UnixListener;
 
     fn temp_uds_path(name: &str) -> PathBuf {

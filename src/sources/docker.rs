@@ -525,7 +525,7 @@ impl EventStreamBuilder {
             this.start_event_stream(ContainerLogInfo::new(id, metadata, this.core.now_timestamp))
         });
 
-        tokio::spawn(task);
+        tokio01::spawn(task);
 
         ContainerState::new()
     }
@@ -533,7 +533,7 @@ impl EventStreamBuilder {
     /// If info is present, restarts event stream
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
-            tokio::spawn(self.start_event_stream(info));
+            tokio01::spawn(self.start_event_stream(info));
         }
     }
 
@@ -563,7 +563,7 @@ impl EventStreamBuilder {
         let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
         let auto_partial_merge = self.core.config.auto_partial_merge;
         let mut partial_event_merge_state = None;
-        tokio::prelude::stream::poll_fn(move || {
+        tokio01::prelude::stream::poll_fn(move || {
             // !Hot code: from here
             if let Some(&mut (_, ref mut info)) = state.as_mut() {
                 // Main event loop
@@ -609,7 +609,7 @@ impl EventStreamBuilder {
                     id = field::display(info.id.as_str())
                 );
                 // TODO: I am not sure that it's necessary to drive this future to completition
-                tokio::spawn(
+                tokio01::spawn(
                     main.send(info)
                         .map_err(|e| error!(message="Unable to return ContainerLogInfo to main",%e))
                         .map(|_| ()),

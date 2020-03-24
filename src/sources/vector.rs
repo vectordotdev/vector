@@ -10,7 +10,7 @@ use bytes::{Bytes, BytesMut};
 use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio::codec::LengthDelimitedCodec;
+use tokio01::codec::LengthDelimitedCodec;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

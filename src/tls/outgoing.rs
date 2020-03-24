@@ -2,7 +2,7 @@ use super::{tls_connector, MaybeTlsSettings, MaybeTlsStream, Result, TlsError};
 use futures01::{Async, Future};
 use openssl::ssl::ConnectConfiguration;
 use std::net::SocketAddr;
-use tokio::net::tcp::{ConnectFuture, TcpStream};
+use tokio01::net::tcp::{ConnectFuture, TcpStream};
 use tokio_openssl::{ConnectAsync, ConnectConfigurationExt};
 
 enum State {

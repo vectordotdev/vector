@@ -10,7 +10,7 @@ use futures01::{
     Future, Stream,
 };
 use std::{collections::HashMap, time::Duration};
-use tokio::util::FutureExt;
+use tokio01::util::FutureExt;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
