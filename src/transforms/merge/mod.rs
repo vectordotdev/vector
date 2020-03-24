@@ -181,7 +181,7 @@ where
 /// to be removed according to the [`NormalizeLogEvent`] implementation
 /// semantics, the event contained at the [`MaybePartialLogEvent`] already has
 /// the partial event marker cleaned up.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MaybePartialLogEvent {
     Partial(LogEvent),
     NonPartial(LogEvent),

@@ -58,3 +58,124 @@ impl NormalizeLogEvent for TrailingNewlineNormalizer {
         MaybePartialLogEvent::NonPartial(event)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        MaybePartialLogEvent, NormalizeLogEvent, PartialEventMarkerFieldNormalizer,
+        TrailingNewlineNormalizer,
+    };
+    use crate::event::Event;
+
+    #[test]
+    fn partial_event_marker_field_normalizer_non_partial() {
+        let partial_event_marker_field = "_partial";
+
+        let normalizer = PartialEventMarkerFieldNormalizer {
+            partial_event_marker_field: partial_event_marker_field.into(),
+        };
+
+        let sample_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert("a", "qwe");
+            event.insert("b", 1);
+            // no partial event marker field - non-partial event
+            event
+        };
+
+        let expected_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert("a", "qwe");
+            event.insert("b", 1);
+            // no partial event marker field - non-partial event
+            event
+        };
+
+        assert_eq!(
+            normalizer.normalize(sample_event),
+            MaybePartialLogEvent::NonPartial(expected_event)
+        );
+    }
+
+    #[test]
+    fn partial_event_marker_field_normalizer_partial() {
+        let partial_event_marker_field = "_partial";
+
+        let normalizer = PartialEventMarkerFieldNormalizer {
+            partial_event_marker_field: partial_event_marker_field.into(),
+        };
+
+        let sample_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert("a", "qwe");
+            event.insert("b", 1);
+            event.insert(partial_event_marker_field, true); // partial
+            event
+        };
+
+        let expected_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert("a", "qwe");
+            event.insert("b", 1);
+            // doesn't have `partial_event_marker_field` anymore - normailized
+            event
+        };
+
+        assert_eq!(
+            normalizer.normalize(sample_event),
+            MaybePartialLogEvent::Partial(expected_event)
+        );
+    }
+
+    #[test]
+    fn trailing_newline_normalizer_non_partial() {
+        let message_field = "message";
+
+        let normalizer = TrailingNewlineNormalizer {
+            probe_field: message_field.into(),
+        };
+
+        let sample_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert(message_field, "hello world!\n"); // has trailing newline - non-partial
+            event
+        };
+
+        let expected_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert(message_field, "hello world!"); // normalized - doesn't have a trailing newline
+            event
+        };
+
+        assert_eq!(
+            normalizer.normalize(sample_event),
+            MaybePartialLogEvent::NonPartial(expected_event)
+        );
+    }
+
+    #[test]
+    fn trailing_newline_normalizer_partial() {
+        let message_field = "message";
+
+        let normalizer = TrailingNewlineNormalizer {
+            probe_field: message_field.into(),
+        };
+
+        let sample_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert(message_field, "hello "); // ..." world!\n" - partial message
+            event
+        };
+
+        let expected_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert(message_field, "hello "); // partial!
+            event
+        };
+
+        assert_eq!(
+            normalizer.normalize(sample_event),
+            MaybePartialLogEvent::Partial(expected_event)
+        );
+    }
+}
