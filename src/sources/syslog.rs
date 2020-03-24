@@ -3,7 +3,8 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
-    tls::{TlsConfig, TlsSettings},
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 
@@ -74,6 +75,7 @@ impl SourceConfig for SyslogConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let host_key = self
@@ -88,8 +90,8 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                 };
                 let shutdown_secs = 30;
-                let tls = TlsSettings::from_config(&tls, true)?;
-                source.run(address, shutdown_secs, tls, out)
+                let tls = MaybeTlsSettings::from_config(&tls, true)?;
+                source.run(address, shutdown_secs, tls, shutdown, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             #[cfg(unix)]

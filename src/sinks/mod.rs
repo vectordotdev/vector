@@ -1,6 +1,8 @@
 use futures01::{Future, Sink};
 use snafu::Snafu;
 
+pub mod streaming_sink;
+
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
 #[cfg(feature = "sinks-aws_cloudwatch_metrics")]
@@ -17,8 +19,8 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
-#[cfg(feature = "sinks-datadog_metrics")]
-pub mod datadog_metrics;
+#[cfg(feature = "sinks-datadog")]
+pub mod datadog;
 #[cfg(feature = "sinks-elasticsearch")]
 pub mod elasticsearch;
 #[cfg(feature = "sinks-file")]
@@ -45,6 +47,8 @@ pub mod new_relic_logs;
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
 pub mod prometheus;
+#[cfg(feature = "sinks-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sinks-sematext_logs")]
 pub mod sematext_logs;
 #[cfg(feature = "sinks-socket")]
@@ -66,7 +70,7 @@ pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("Unable to resolve DNS for {:?}", address))]
     DNSFailure { address: String },
     #[snafu(display("DNS errored {}", source))]
@@ -79,7 +83,7 @@ enum BuildError {
 
 /// Common healthcheck errors
 #[derive(Debug, Snafu)]
-enum HealthcheckError {
+pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
 }

@@ -1,0 +1,47 @@
+[sinks.pulsar]
+title = "Apache Pulsar"
+beta = true
+common = false
+delivery_guarantee = "at_least_once"
+egress_method = "streaming"
+function_category = "transmit"
+healthcheck = true
+input_types = ["log"]
+requirements = {}
+write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]"
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.pulsar.options",
+  encodings: ["json", "text"]
+) %>
+
+[sinks.pulsar.options.address]
+type = "string"
+common = true
+examples = ["127.0.0.1:6650"]
+required = true
+description = "A host and port pair that the pulsar client should connect to."
+
+[sinks.pulsar.options.topic]
+type = "string"
+common = true
+examples = ["topic-1234"]
+required = true
+description = "The Pulsar topic name to write events to."
+
+[sinks.pulsar.options.auth]
+type = "table"
+common = false
+description = "Options for the authentication strategy."
+
+[sinks.pulsar.options.auth.children.name]
+type = "string"
+examples = ["${NAME_ENV_VAR}", "name123"]
+required = false
+description = "The basic authentication name."
+
+[sinks.pulsar.options.auth.children.token]
+type = "string"
+examples = ["${TOKEN_ENV_VAR}", "123456789"]
+required = false
+description = "The basic authentication password."

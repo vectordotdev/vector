@@ -1,6 +1,7 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
-    tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
@@ -61,6 +62,7 @@ impl SourceConfig for SplunkConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();
@@ -84,8 +86,8 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        let tls = TlsSettings::from_config(&self.tls, true)?;
-        let incoming = MaybeTlsIncoming::bind(&self.address, tls)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let incoming = tls.bind(&self.address)?.incoming();
 
         let server =
             warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);

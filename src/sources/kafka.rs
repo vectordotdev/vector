@@ -1,6 +1,7 @@
 use crate::{
     event::Event,
     kafka::{KafkaCompression, KafkaTlsConfig},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -78,6 +79,7 @@ impl SourceConfig for KafkaSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         kafka_source(self.clone(), out)

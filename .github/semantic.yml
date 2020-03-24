@@ -117,12 +117,13 @@ scopes:
   - blackhole sink
   - clickhouse sink
   - console sink
+  - datadog_logs sink
   - datadog_metrics sink
   - elasticsearch sink
   - file sink
   - gcp_cloud_storage sink
   - gcp_pubsub sink
-  - gcp_stackdriver_logging sink
+  - gcp_stackdriver_logs sink
   - honeycomb sink
   - http sink
   - humio_logs sink
@@ -133,6 +134,7 @@ scopes:
   - new_relic_logs sink
   - papertrail sink
   - prometheus sink
+  - pulsar sink
   - sematext_logs sink
   - socket sink
   - splunk_hec sink

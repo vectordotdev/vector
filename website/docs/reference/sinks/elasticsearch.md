@@ -1343,4 +1343,4 @@ You can learn more about the complete syntax in the
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

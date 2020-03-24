@@ -15,7 +15,7 @@ use tokio::timer::Interval;
 
 pub mod cloud_storage;
 pub mod pubsub;
-pub mod stackdriver_logging;
+pub mod stackdriver_logs;
 
 #[derive(Debug, Snafu)]
 enum GcpError {

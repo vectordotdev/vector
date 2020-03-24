@@ -325,6 +325,9 @@
 - name: "sink: console"
   description: Anything `console` sink related
   color: 4ddbfb
+- name: "sink: datadog_logs"
+  description: Anything `datadog_logs` sink related
+  color: 4ddbfb
 - name: "sink: datadog_metrics"
   description: Anything `datadog_metrics` sink related
   color: 4ddbfb
@@ -340,8 +343,8 @@
 - name: "sink: gcp_pubsub"
   description: Anything `gcp_pubsub` sink related
   color: 4ddbfb
-- name: "sink: gcp_stackdriver_logging"
-  description: Anything `gcp_stackdriver_logging` sink related
+- name: "sink: gcp_stackdriver_logs"
+  description: Anything `gcp_stackdriver_logs` sink related
   color: 4ddbfb
 - name: "sink: honeycomb"
   description: Anything `honeycomb` sink related
@@ -372,6 +375,9 @@
   color: 4ddbfb
 - name: "sink: prometheus"
   description: Anything `prometheus` sink related
+  color: 4ddbfb
+- name: "sink: pulsar"
+  description: Anything `pulsar` sink related
   color: 4ddbfb
 - name: "sink: sematext_logs"
   description: Anything `sematext_logs` sink related

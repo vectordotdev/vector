@@ -225,6 +225,8 @@ module.exports = {
             
               "reference/sinks/console",
             
+              "reference/sinks/datadog_logs",
+            
               "reference/sinks/datadog_metrics",
             
               "reference/sinks/elasticsearch",
@@ -235,7 +237,7 @@ module.exports = {
             
               "reference/sinks/gcp_pubsub",
             
-              "reference/sinks/gcp_stackdriver_logging",
+              "reference/sinks/gcp_stackdriver_logs",
             
               "reference/sinks/honeycomb",
             
@@ -256,6 +258,8 @@ module.exports = {
               "reference/sinks/papertrail",
             
               "reference/sinks/prometheus",
+            
+              "reference/sinks/pulsar",
             
               "reference/sinks/sematext_logs",
             
