@@ -259,7 +259,7 @@ type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send +
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
-pub struct PartitionedBatchSink<B, S, K, Request, E = DefaultExecutor> {
+pub struct PartitionBatchSink<B, S, K, Request, E = DefaultExecutor> {
     batch: B,
     service: ServiceSink<S, Request>,
     exec: E,
@@ -276,7 +276,7 @@ enum LingerState<K> {
     Canceled,
 }
 
-impl<B, S, K, Request> PartitionedBatchSink<B, S, K, Request, DefaultExecutor>
+impl<B, S, K, Request> PartitionBatchSink<B, S, K, Request, DefaultExecutor>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -286,7 +286,7 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: fmt::Debug,
 {
-    pub fn new(service: S, batch: B, acker: Acker, settings: BatchSettings) -> Self {
+    pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
@@ -303,7 +303,7 @@ where
     }
 }
 
-impl<B, S, K, Request, E> PartitionedBatchSink<B, S, K, Request, E>
+impl<B, S, K, Request, E> PartitionBatchSink<B, S, K, Request, E>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -317,8 +317,8 @@ where
     pub fn with_executor(
         service: S,
         batch: B,
-        acker: Acker,
         settings: BatchSettings,
+        acker: Acker,
         exec: E,
     ) -> Self {
         let service = ServiceSink::new(service, acker);
@@ -375,7 +375,7 @@ where
     }
 }
 
-impl<B, S, K, Request, E> Sink for PartitionedBatchSink<B, S, K, Request, E>
+impl<B, S, K, Request, E> Sink for PartitionBatchSink<B, S, K, Request, E>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -498,7 +498,7 @@ where
     }
 }
 
-impl<B, S, K, Request> fmt::Debug for PartitionedBatchSink<B, S, K, Request>
+impl<B, S, K, Request> fmt::Debug for PartitionBatchSink<B, S, K, Request>
 where
     B: fmt::Debug,
     S: fmt::Debug,
@@ -900,7 +900,7 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
         let buffered =
-            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, SETTINGS, rt.executor());
+            PartitionBatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
 
         let (_buffered, _) = buffered
             .sink_map_err(drop)
@@ -939,7 +939,7 @@ mod tests {
         };
 
         let buffered =
-            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, settings, rt.executor());
+            PartitionBatchSink::with_executor(svc, Vec::new(), settings, acker, rt.executor());
 
         let input = vec![Partitions::A, Partitions::B];
 
@@ -974,7 +974,7 @@ mod tests {
         };
 
         let buffered =
-            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, settings, rt.executor());
+            PartitionBatchSink::with_executor(svc, Vec::new(), settings, acker, rt.executor());
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
 
@@ -1011,7 +1011,7 @@ mod tests {
         });
 
         let mut buffered =
-            PartitionedBatchSink::with_executor(svc, Vec::new(), acker, SETTINGS, rt.executor());
+            PartitionBatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
 
         clock.enter(|handle| {
             buffered.start_send(1 as usize).unwrap();

@@ -9,7 +9,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, Future};
+use futures01::{future, Future, Sink};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
@@ -121,7 +121,8 @@ impl SinkConfig for HttpSinkConfig {
             batch,
             Some(tls.clone()),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal http sink error: {}", e));
 
         let sink = Box::new(sink);
 

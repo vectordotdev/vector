@@ -1,6 +1,6 @@
 use super::{
     retries::{FixedRetryPolicy, RetryLogic},
-    Batch, BatchServiceSink,
+    Batch, BatchSettings, BatchSink,
 };
 use crate::buffers::Acker;
 use futures01::Poll;
@@ -16,8 +16,8 @@ use tower::{
     Service, ServiceBuilder,
 };
 
-pub type TowerBatchedSink<T, L, B, S> =
-    BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>;
+pub type TowerBatchedSink<S, B, L, Request> =
+    BatchSink<ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -117,23 +117,26 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn batch_sink<B, L, S, T>(
+    pub fn batch_sink<B, L, S, Request>(
         &self,
         retry_logic: L,
         service: S,
+        batch: B,
+        batch_settings: BatchSettings,
         acker: Acker,
-    ) -> TowerBatchedSink<T, L, B, S>
+    ) -> TowerBatchedSink<S, B, L, Request>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
     // `trait SinkExt` above), as it is missing a bound on the
     // associated types that cannot be expressed in stable Rust.
     where
-        L: RetryLogic<Error = S::Error, Response = S::Response>,
-        S: Clone + Service<T>,
-        S::Error: 'static + std::error::Error + Send + Sync,
-        S::Response: std::fmt::Debug,
-        T: Clone,
-        B: Batch<Output = T>,
+        L: RetryLogic<Error = S::Error, Response = S::Response> + Send + 'static,
+        S: Service<Request> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send + std::fmt::Debug,
+        S::Future: Send + 'static,
+        B: Batch<Output = Request>,
+        Request: Send + Clone + 'static,
     {
         let policy = self.retry_policy(retry_logic);
         let service = ServiceBuilder::new()
@@ -143,7 +146,7 @@ impl TowerRequestSettings {
             .timeout(self.timeout)
             .service(service);
 
-        BatchServiceSink::new(service, acker)
+        BatchSink::new(service, batch, batch_settings, acker)
     }
 }
 
@@ -158,7 +161,8 @@ impl<S, L, Request> tower::layer::Layer<S> for TowerRequestLayer<L, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
     S::Response: Send + 'static,
-    S::Error: std::error::Error + Send + Sync + 'static,
+    // S::Error: std::error::Error + Send + Sync + 'static,
+    S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     L: RetryLogic<Response = S::Response, Error = S::Error> + Send + 'static,
     Request: Clone + Send + 'static,

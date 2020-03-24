@@ -398,3 +398,6 @@ disable-resolv-conf = []
 [[bench]]
 name = "bench"
 harness = false
+
+[patch.crates-io]
+tower-timeout = { path = "../tower/tower-timeout" }

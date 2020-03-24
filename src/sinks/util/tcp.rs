@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
     tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
@@ -228,11 +228,9 @@ pub fn raw_tcp(
     encoding: EncodingConfig<Encoding>,
     tls: MaybeTlsSettings,
 ) -> RouterSink {
-    Box::new(
-        TcpSink::new(host, port, cx.resolver(), tls)
-            .stream_ack(cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-    )
+    let tcp = TcpSink::new(host, port, cx.resolver(), tls);
+    let sink = StreamSink::new(tcp, cx.acker());
+    Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))))
 }
 
 #[derive(Debug, Snafu)]

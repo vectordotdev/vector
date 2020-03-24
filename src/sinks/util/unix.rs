@@ -1,6 +1,5 @@
-use crate::sinks::util::SinkExt;
 use crate::{
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
@@ -33,12 +32,11 @@ impl UnixSinkConfig {
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let encoding = self.encoding.clone();
+        let unix = UnixSink::new(self.path.clone());
+        let sink = StreamSink::new(unix, cx.acker());
 
-        let sink = Box::new(
-            UnixSink::new(self.path.clone())
-                .stream_ack(cx.acker())
-                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-        );
+        let sink =
+            Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
         let healthcheck = unix_healthcheck(self.path.clone());
 
         Ok((sink, healthcheck))

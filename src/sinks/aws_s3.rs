@@ -6,8 +6,8 @@ use crate::{
     sinks::util::{
         encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-        SinkExt, TowerRequestConfig,
+        rusoto, BatchBytesConfig, Buffer, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -206,16 +206,11 @@ impl S3Sink {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        // let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
-        //     .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
-        //     .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
-
         let buffer = PartitionBuffer::new(Buffer::new(compression));
 
-        let sink =
-            crate::sinks::util::sink::PartitionedBatchSink::new(svc, buffer, cx.acker(), batch)
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+        let sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }

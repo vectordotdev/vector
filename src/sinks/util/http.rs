@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings, BatchSink,
+    Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -50,13 +50,13 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_complete` returns ready.
-pub struct BatchedHttpSink<T, B: Batch>
+pub struct BatchedHttpSink<T, B>
 where
+    B: Batch,
     B::Output: Clone,
 {
     sink: Arc<T>,
-    inner:
-        BatchSink<B, TowerBatchedSink<B::Output, HttpRetryLogic, B, HttpBatchService<B::Output>>>,
+    inner: TowerBatchedSink<HttpBatchService<B::Output>, B, HttpRetryLogic, B::Output>,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
@@ -66,7 +66,7 @@ where
 impl<T, B> BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: Clone,
+    B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -82,8 +82,8 @@ where
         let svc =
             HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
-        let service_sink = request_settings.batch_sink(HttpRetryLogic, svc, cx.acker());
-        let inner = BatchSink::from_settings(service_sink, batch, batch_settings);
+        let inner =
+            request_settings.batch_sink(HttpRetryLogic, svc, batch, batch_settings, cx.acker());
 
         Self {
             sink,
@@ -96,11 +96,11 @@ where
 impl<T, B> Sink for BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: Clone,
+    B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     type SinkItem = crate::Event;
-    type SinkError = ();
+    type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         if self.slot.is_some() {

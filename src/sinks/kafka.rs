@@ -3,10 +3,7 @@ use crate::{
     event::{self, Event},
     kafka::{KafkaCompression, KafkaTlsConfig},
     serde::to_string,
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-        MetadataFuture,
-    },
+    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
@@ -22,6 +19,8 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
+
+type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
 
 #[derive(Debug, Snafu)]
 enum BuildError {

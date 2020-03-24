@@ -1,7 +1,9 @@
-use super::util::encoding::{EncodingConfig, EncodingConfiguration};
-use super::util::SinkExt;
 use crate::{
     event::{self, Event},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        StreamSink,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
@@ -57,7 +59,7 @@ impl SinkConfig for ConsoleSinkConfig {
 
         let sink = WriterSink { output, encoding };
         let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
-        let sink = sink.stream_ack(cx.acker());
+        let sink = StreamSink::new(sink, cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }

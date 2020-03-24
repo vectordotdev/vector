@@ -10,7 +10,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::{uri::InvalidUri, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -98,7 +98,8 @@ impl SinkConfig for ElasticSearchConfig {
             && common.credentials.is_none();
 
         let sink =
-            BatchedHttpSink::new(common, Buffer::new(gzip), request, batch, tls_settings, &cx);
+            BatchedHttpSink::new(common, Buffer::new(gzip), request, batch, tls_settings, &cx)
+                .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
