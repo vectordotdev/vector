@@ -15,6 +15,8 @@ mod outgoing;
 mod settings;
 mod stream;
 
+#[cfg(feature = "sources-tls")]
+pub(crate) use incoming::MaybeTlsListener;
 pub(crate) use maybe_tls::MaybeTls;
 pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
