@@ -1,11 +1,10 @@
 use crate::{dns::Resolver, sinks::util::http::HttpClient, tls::TlsSettings};
 use bytes::Bytes;
 use futures01::{future::Future, stream::Stream};
-use http::{header, status::StatusCode, uri, Request, Uri};
+use http02::{header, status::StatusCode, uri, Request, Uri};
 use k8s_openapi::{
-    api::core::v1::{Pod, WatchPodForAllNamespacesResponse},
-    apimachinery::pkg::apis::meta::v1::WatchEvent,
-    RequestError, Response, ResponseError, WatchOptional,
+    api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::WatchEvent, RequestError, Response,
+    ResponseError, WatchOptional, WatchResponse,
 };
 use snafu::{futures01::future::FutureExt, ResultExt, Snafu};
 use tower::Service;
@@ -136,13 +135,9 @@ impl WatchClient {
             .flatten()
             // Extracts event from response
             .and_then(|response| match response {
-                WatchPodForAllNamespacesResponse::Ok(event) => Ok(event),
-                WatchPodForAllNamespacesResponse::Other(Ok(_)) => {
-                    Err(RuntimeError::WrongObjectInResponse)
-                }
-                WatchPodForAllNamespacesResponse::Other(Err(error)) => {
-                    Err(error).context(ResponseParseError)
-                }
+                WatchResponse::Ok(event) => Ok(event),
+                WatchResponse::Other(Ok(_)) => Err(RuntimeError::WrongObjectInResponse),
+                WatchResponse::Other(Err(error)) => Err(error).context(ResponseParseError),
             })
             // Extracts Pod metadata from event
             .and_then(|event| match event {
@@ -169,7 +164,7 @@ impl Decoder {
     fn decode(
         &mut self,
         chunk: Bytes,
-    ) -> impl Stream<Item = WatchPodForAllNamespacesResponse, Error = RuntimeError> {
+    ) -> impl Stream<Item = WatchResponse<Pod>, Error = RuntimeError> {
         // We need to process unused data as soon as we get
         // them. Because a watch on Kubernetes object behaves
         // like a never ending stream of bytes.
@@ -182,7 +177,7 @@ impl Decoder {
         // Removes used data.
         let mut decoded = Vec::new();
         loop {
-            match WatchPodForAllNamespacesResponse::try_from_parts(StatusCode::OK, &self.unused) {
+            match WatchResponse::try_from_parts(StatusCode::OK, &self.unused) {
                 Ok((response, used_bytes)) => {
                     assert!(used_bytes > 0, "Parser must consume some data");
                     // Remove used data.
@@ -194,7 +189,7 @@ impl Decoder {
                 Err(ResponseError::NeedMoreData) => break,
                 Err(error) => {
                     decoded.push(Err(RuntimeError::ParseResponseError {
-                        name: "WatchPodForAllNamespacesResponse".to_owned(),
+                        name: "WatchResponse<Pod>".to_owned(),
                         error,
                     }));
                     break;

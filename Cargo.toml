@@ -106,6 +106,7 @@ flate2 = "1.0.6"
 structopt = "0.2.16"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
+http02 = { version = "0.2", package = "http" }
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
@@ -148,7 +149,7 @@ notify = "4.0.14"
 once_cell = "1.3"
 getset = "0.1.0"
 lru = "0.4.3"
-k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
+k8s-openapi = { version = "0.7", features = ["api", "v1_15"], optional = true }
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
 
@@ -174,7 +175,7 @@ pretty_assertions = "0.6.1"
 proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
-kube = { version = "0.16.1", features = ["openapi"] }
+kube = { version = "0.30" }
 serde_yaml = "0.8.9"
 trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
