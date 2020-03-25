@@ -3,7 +3,7 @@ extern crate tracing;
 
 use futures01::{future, Future, Stream};
 use std::{
-    cmp::{max, min},
+    cmp::max,
     fs::File,
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -227,8 +227,8 @@ fn main() {
     info!("Log level {:?} is enabled.", level);
 
     if let Some(threads) = opts.threads {
-        if threads < 1 || threads > 4 {
-            error!("The `threads` argument must be between 1 and 4 (inclusive).");
+        if threads < 1 {
+            error!("The `threads` argument must be greater or equal to 1.");
             std::process::exit(exitcode::CONFIG);
         }
     }
@@ -267,8 +267,7 @@ fn main() {
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
-        let num_threads = min(4, threads);
-        runtime::Runtime::with_thread_count(num_threads).expect("Unable to create async runtime")
+        runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
     };
 
     let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
