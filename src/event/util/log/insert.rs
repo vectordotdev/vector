@@ -34,7 +34,7 @@ where
                 fields.insert(current, Value::Array(array))
             }
         }
-        _ => return None,
+        _ => None,
     }
 }
 
@@ -51,9 +51,7 @@ where
             while values.len() <= current {
                 values.push(Value::Null);
             }
-            let mut swapper = value;
-            std::mem::swap(&mut values[current], &mut swapper);
-            Some(swapper)
+            Some(std::mem::replace(&mut values[current], value))
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Key(_))) => {
             if let Some(Value::Map(map)) = values.get_mut(current) {
@@ -64,9 +62,7 @@ where
                 while values.len() <= current {
                     values.push(Value::Null);
                 }
-                let mut swapper = Value::Map(map);
-                std::mem::swap(&mut values[current], &mut swapper);
-                Some(swapper)
+                Some(std::mem::replace(&mut values[current], Value::Map(map)))
             }
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Index(next))) => {
@@ -78,12 +74,10 @@ where
                 while values.len() <= current {
                     values.push(Value::Null);
                 }
-                let mut swapper = Value::Array(array);
-                std::mem::swap(&mut values[current], &mut swapper);
-                Some(swapper)
+                Some(std::mem::replace(&mut values[current], Value::Array(array)))
             }
         }
-        _ => return None,
+        _ => None,
     }
 }
 
