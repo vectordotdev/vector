@@ -18,6 +18,9 @@ build-armv7: load-qemu-binfmt
 build-aarch64: load-qemu-binfmt
 	$(RUN) build-aarch64
 
+builder-x86_64:
+	$(RUN) builder-x86_64
+
 # run benchmarks
 bench: build
 	$(RUN) bench
@@ -35,7 +38,7 @@ test-docker: build
 	$(RUN) test-docker
 
 # run tests for Kubernetes
-test-kubernetes: build
+test-kubernetes: builder-x86_64
 	$(RUN) test-kubernetes
 
 # checks

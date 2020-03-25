@@ -452,6 +452,12 @@ services:
       user: $USER
       command: ["sh", "-c", "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml"]
 
+    builder-x86_64:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+      command: echo "Builder image done"
+
     test-kubernetes:
       build:
         context: .

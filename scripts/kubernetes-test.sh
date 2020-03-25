@@ -20,6 +20,7 @@ reg_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "${reg_name}")"
 
 # Build and push image
 echo "Build & push test image"
+cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 strip ./target/x86_64-unknown-linux-musl/debug/vector
 docker build -t "localhost:5000/vector-test:ts" -f - . << EOF
 FROM buildpack-deps:18.04-curl
