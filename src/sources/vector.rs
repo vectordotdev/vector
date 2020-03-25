@@ -74,7 +74,7 @@ impl TcpSource for VectorSource {
         LengthDelimitedCodec::new()
     }
 
-    fn build_event(&self, frame: BytesMut, _host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
                 trace!(

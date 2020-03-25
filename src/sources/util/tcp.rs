@@ -63,7 +63,7 @@ pub trait TcpSource: Clone + Send + 'static {
     fn build_event(
         &self,
         frame: <Self::Decoder as tokio01::codec::Decoder>::Item,
-        host: Option<Bytes>,
+        host: Bytes,
     ) -> Option<Event>;
 
     fn run(
@@ -157,7 +157,7 @@ fn handle_stream(
         .take_until(tripwire)
         .filter_map(move |frame| {
             let host = host.clone();
-            source.build_event(frame, Some(host))
+            source.build_event(frame, host)
         })
         .map_err(|error| warn!(message = "connection error.", %error))
         .forward(out)
