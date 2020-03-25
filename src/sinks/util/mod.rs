@@ -9,6 +9,7 @@ pub mod service;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
+pub mod udp;
 #[cfg(all(feature = "sinks-socket", unix))]
 pub mod unix;
 pub mod uri;
@@ -45,7 +46,7 @@ enum SinkBuildError {
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
  */
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
