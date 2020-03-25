@@ -1,6 +1,6 @@
 use super::{PeerAddress, TlsError};
 use futures01::{Async, Future};
-use openssl::ssl::SslAcceptor;
+use openssl::ssl::{HandshakeError, SslAcceptor};
 use snafu::ResultExt;
 use std::{
     io::{self, ErrorKind, Read, Write},
@@ -62,12 +62,24 @@ impl MaybeTlsStream<TcpStream> {
     }
 }
 
-fn poll_handshake(acceptor: &mut AcceptAsync<TcpStream>) -> io::Result<State<TcpStream>> {
+fn poll_handshake<S: Read + Write>(acceptor: &mut AcceptAsync<S>) -> io::Result<State<S>> {
     match acceptor.poll() {
-        Err(source) => Err(io::Error::new(
-            ErrorKind::Other,
-            TlsError::Handshake { source },
-        )),
+        Err(error) => match error {
+            HandshakeError::WouldBlock(_) => Err(io::Error::new(
+                ErrorKind::WouldBlock,
+                TlsError::HandshakeNotReady,
+            )),
+            HandshakeError::Failure(stream) => Err(io::Error::new(
+                ErrorKind::Other,
+                TlsError::Handshake {
+                    source: stream.into_error(),
+                },
+            )),
+            HandshakeError::SetupFailure(source) => Err(io::Error::new(
+                ErrorKind::Other,
+                TlsError::HandshakeSetup { source },
+            )),
+        },
         Ok(Async::Ready(tls)) => Ok(State::Tls(tls)),
         Ok(Async::NotReady) => Err(io::Error::new(
             ErrorKind::WouldBlock,
@@ -76,7 +88,7 @@ fn poll_handshake(acceptor: &mut AcceptAsync<TcpStream>) -> io::Result<State<Tcp
     }
 }
 
-impl Read for MaybeTlsStream<TcpStream> {
+impl<S: Read + Write> Read for MaybeTlsStream<S> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match &mut self.state {
             State::Raw(raw) => raw.read(buf),
@@ -89,7 +101,7 @@ impl Read for MaybeTlsStream<TcpStream> {
     }
 }
 
-impl Write for MaybeTlsStream<TcpStream> {
+impl<S: Read + Write> Write for MaybeTlsStream<S> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match &mut self.state {
             State::Raw(raw) => raw.write(buf),
@@ -110,9 +122,9 @@ impl Write for MaybeTlsStream<TcpStream> {
     }
 }
 
-impl AsyncRead for MaybeTlsStream<TcpStream> {}
+impl<S: Read + Write> AsyncRead for MaybeTlsStream<S> {}
 
-impl AsyncWrite for MaybeTlsStream<TcpStream> {
+impl<S: AsyncRead + AsyncWrite> AsyncWrite for MaybeTlsStream<S> {
     fn shutdown(&mut self) -> io::Result<Async<()>> {
         match &mut self.state {
             State::Raw(_) => Ok(Async::Ready(())),

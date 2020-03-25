@@ -1,12 +1,11 @@
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, HandshakeError, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
 use std::fmt::Debug;
 use std::io::Error as IoError;
 use std::path::PathBuf;
-use tokio01::net::TcpStream;
 
 #[cfg(feature = "sources-tls")]
 mod incoming;
@@ -71,7 +70,11 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: HandshakeError<TcpStream> },
+    Handshake { source: openssl::ssl::Error },
+    #[snafu(display("Not ready for I/O during TLS handshake"))]
+    HandshakeNotReady,
+    #[snafu(display("TLS handshake setup failed: {}", source))]
+    HandshakeSetup { source: ErrorStack },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: crate::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
@@ -96,8 +99,6 @@ pub enum TlsError {
     Connect { source: std::io::Error },
     #[snafu(display("Could not get peer address: {}", source))]
     PeerAddress { source: std::io::Error },
-    #[snafu(display("Not ready for I/O during TLS handshake"))]
-    HandshakeNotReady,
 }
 
 pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {
