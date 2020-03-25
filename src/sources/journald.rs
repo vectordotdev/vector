@@ -446,7 +446,7 @@ mod tests {
     use std::time::Duration;
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}

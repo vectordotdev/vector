@@ -11,7 +11,7 @@ use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tokio::timer::Interval;
+use tokio01::timer::Interval;
 
 pub mod cloud_storage;
 pub mod pubsub;
@@ -102,7 +102,7 @@ impl GcpCredentials {
                 |error| error!(message = "GCP authentication token regenerate interval failed", %error),
             );
 
-        tokio::spawn(renew_task);
+        tokio01::spawn(renew_task);
     }
 }
 

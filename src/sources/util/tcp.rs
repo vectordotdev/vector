@@ -13,7 +13,7 @@ use std::{
     time::{Duration, Instant},
 };
 use stream_cancel::Tripwire;
-use tokio::{
+use tokio01::{
     codec::{Decoder, FramedRead},
     net::{TcpListener, TcpStream},
     prelude::AsyncRead,
@@ -31,7 +31,7 @@ pub trait TcpSource: Clone + Send + 'static {
 
     fn build_event(
         &self,
-        frame: <Self::Decoder as tokio::codec::Decoder>::Item,
+        frame: <Self::Decoder as tokio01::codec::Decoder>::Item,
         host: Option<Bytes>,
     ) -> Option<Event>;
 
@@ -162,7 +162,7 @@ fn accept_socket(
                     .map_err(|error| warn!(message = "TLS connection accept error.", %error))
                     .map(|socket| handle_stream(inner_span, socket, source, tripwire, host, out));
 
-                tokio::spawn(handler.instrument(span.clone()));
+                tokio01::spawn(handler.instrument(span.clone()));
             }
         },
         _ => handle_stream(span, socket, source, tripwire, host, out),
@@ -187,7 +187,7 @@ fn handle_stream(
         .forward(out)
         .map(|_| debug!("connection closed."))
         .map_err(|_| warn!("Error received while processing TCP source"));
-    tokio::spawn(handler.instrument(span));
+    tokio01::spawn(handler.instrument(span));
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
