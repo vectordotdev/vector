@@ -3,15 +3,16 @@ use super::{
     Batch, BatchSettings, BatchSink,
 };
 use crate::buffers::Acker;
-use futures01::Poll;
+use futures01::{Async, Future, Poll};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::{error, fmt};
+use tokio01::timer::Delay;
 use tower::{
     layer::{util::Stack, Layer},
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,
-    timeout::Timeout,
     util::BoxService,
     Service, ServiceBuilder,
 };
@@ -143,7 +144,9 @@ impl TowerRequestSettings {
             .concurrency_limit(self.in_flight_limit)
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .timeout(self.timeout)
+            .layer(TimeoutLayer {
+                timeout: self.timeout,
+            })
             .service(service);
 
         BatchSink::new(service, batch, batch_settings, acker)
@@ -178,12 +181,16 @@ where
                 self.settings.rate_limit_duration,
             )
             .retry(policy)
-            .timeout(self.settings.timeout)
+            .layer(TimeoutLayer {
+                timeout: self.settings.timeout,
+            })
             .service(inner);
 
         BoxService::new(l)
     }
 }
+
+// === map ===
 
 pub struct MapLayer<R1, R2> {
     f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
@@ -223,7 +230,6 @@ where
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        use futures01::Future;
         self.inner.call(req).map_err(|e| e.into())
     }
 }
@@ -236,6 +242,115 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
         }
     }
 }
+
+// === timeout ===
+
+/// Applies a timeout to requests.
+///
+/// We require our own timeout layer because the current
+/// 0.1 version uses From intead of Into bounds for errors
+/// this casues the whole stack to not align and not compile.
+/// In future versions of tower this should be fixed.
+#[derive(Debug, Clone)]
+pub struct Timeout<T> {
+    inner: T,
+    timeout: Duration,
+}
+
+// ===== impl Timeout =====
+
+impl<S, Request> Service<Request> for Timeout<S>
+where
+    S: Service<Request>,
+    S::Error: Into<crate::Error>,
+{
+    type Response = S::Response;
+    type Error = crate::Error;
+    type Future = ResponseFuture<S::Future>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        self.inner.poll_ready().map_err(Into::into)
+    }
+
+    fn call(&mut self, request: Request) -> Self::Future {
+        let response = self.inner.call(request);
+        let sleep = Delay::new(Instant::now() + self.timeout);
+
+        ResponseFuture { response, sleep }
+    }
+}
+
+/// Applies a timeout to requests via the supplied inner service.
+#[derive(Debug)]
+pub struct TimeoutLayer {
+    timeout: Duration,
+}
+
+impl TimeoutLayer {
+    /// Create a timeout from a duration
+    pub fn new(timeout: Duration) -> Self {
+        TimeoutLayer { timeout }
+    }
+}
+
+impl<S> Layer<S> for TimeoutLayer {
+    type Service = Timeout<S>;
+
+    fn layer(&self, service: S) -> Self::Service {
+        Timeout {
+            inner: service,
+            timeout: self.timeout,
+        }
+    }
+}
+
+/// `Timeout` response future
+#[derive(Debug)]
+pub struct ResponseFuture<T> {
+    response: T,
+    sleep: Delay,
+}
+
+impl<T> Future for ResponseFuture<T>
+where
+    T: Future,
+    T::Error: Into<crate::Error>,
+{
+    type Item = T::Item;
+    type Error = crate::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        // First, try polling the future
+        match self.response.poll().map_err(Into::into)? {
+            Async::Ready(v) => return Ok(Async::Ready(v)),
+            Async::NotReady => {}
+        }
+
+        // Now check the sleep
+        match self.sleep.poll()? {
+            Async::NotReady => Ok(Async::NotReady),
+            Async::Ready(_) => Err(Elapsed(()).into()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Elapsed(pub(super) ());
+
+impl Elapsed {
+    /// Construct a new elapsed error
+    pub fn new() -> Self {
+        Elapsed(())
+    }
+}
+
+impl fmt::Display for Elapsed {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("request timed out")
+    }
+}
+
+impl error::Error for Elapsed {}
 
 #[cfg(test)]
 mod tests {

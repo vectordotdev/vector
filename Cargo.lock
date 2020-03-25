@@ -4347,6 +4347,8 @@ dependencies = [
 [[package]]
 name = "tower-timeout"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c06bbc2fbd056f810940a8c6f0cc194557d36da3c22999a755a7a6612447da9"
 dependencies = [
  "futures 0.1.29",
  "tokio-timer",

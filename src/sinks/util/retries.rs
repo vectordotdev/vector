@@ -1,3 +1,4 @@
+use super::service::Elapsed;
 use crate::Error;
 use futures01::{try_ready, Async, Future, Poll};
 use std::{
@@ -5,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio01::timer::Delay;
-use tower::{retry::Policy, timeout::error::Elapsed};
+use tower::retry::Policy;
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
