@@ -8089,6 +8089,14 @@ end
   # * type: string
   host_key = "hostname"
 
+  # The name of the index where send the events to. If not specified, the default
+  # index is used.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  index = "custom_index"
+
   # Fields to be added to Splunk index.
   #
   # * optional

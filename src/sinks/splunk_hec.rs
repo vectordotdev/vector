@@ -35,6 +35,7 @@ pub struct HecSinkConfig {
     pub host_key: Atom,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
+    pub index: Option<String>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -133,6 +134,10 @@ impl HttpSink for HecSinkConfig {
         if let Some(host) = host {
             let host = host.to_string_lossy();
             body["host"] = json!(host);
+        }
+
+        if let Some(index) = &self.index {
+            body["index"] = json!(index);
         }
 
         serde_json::to_vec(&body)
@@ -327,7 +332,7 @@ mod integration_tests {
         // we see it.
         let entry = (0..20)
             .find_map(|_| {
-                recent_entries()
+                recent_entries(None)
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
@@ -339,6 +344,39 @@ mod integration_tests {
 
         assert_eq!(message, entry["_raw"].as_str().unwrap());
         assert!(entry.get("message").is_none());
+    }
+
+    #[test]
+    fn splunk_insert_index() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test(rt.executor());
+
+        let mut config = config(Encoding::Text, vec![]);
+        config.index = Some("custom_index".to_string());
+        let (sink, _) = config.build(cx).unwrap();
+
+        let message = random_string(100);
+        let event = Event::from(message.clone());
+
+        let pump = sink.send(event);
+
+        rt.block_on(pump).unwrap();
+
+        // It usually takes ~1 second for the event to show up in search, so poll until
+        // we see it.
+        let entry = (0..20)
+            .find_map(|_| {
+                recent_entries(Some("custom_index"))
+                    .into_iter()
+                    .find(|entry| entry["index"].as_str().unwrap() == "custom_index")
+                    .or_else(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        None
+                    })
+            })
+            .expect("Didn't find event in Splunk");
+
+        assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
     }
 
     #[test]
@@ -357,7 +395,7 @@ mod integration_tests {
 
         let mut found_all = false;
         for _ in 0..20 {
-            let entries = recent_entries();
+            let entries = recent_entries(None);
 
             found_all = messages.iter().all(|message| {
                 entries
@@ -394,7 +432,7 @@ mod integration_tests {
 
         let entry = (0..20)
             .find_map(|_| {
-                recent_entries()
+                recent_entries(None)
                     .into_iter()
                     .find(|entry| entry["message"].as_str() == Some(message.as_str()))
                     .or_else(|| {
@@ -429,7 +467,7 @@ mod integration_tests {
 
         let entry = (0..20)
             .find_map(|_| {
-                recent_entries()
+                recent_entries(None)
                     .into_iter()
                     .find(|entry| entry["message"].as_str() == Some(message.as_str()))
                     .or_else(|| {
@@ -470,7 +508,7 @@ mod integration_tests {
 
         let entry = (0..20)
             .find_map(|_| {
-                recent_entries()
+                recent_entries(None)
                     .into_iter()
                     .find(|entry| entry["message"].as_str() == Some(message.as_str()))
                     .or_else(|| {
@@ -544,20 +582,30 @@ mod integration_tests {
         }
     }
 
-    fn recent_entries() -> Vec<JsonValue> {
+    fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
 
         // http://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
+        let search_query = match index {
+            Some(index) => format!("search index={}", index),
+            None => "search *".into(),
+        };
         let mut res = client
             .post("https://localhost:8089/services/search/jobs?output_mode=json")
-            .form(&[("search", "search *"), ("exec_mode", "oneshot"), ("f", "*")])
+            .form(&vec![
+                ("search", &search_query[..]),
+                ("exec_mode", "oneshot"),
+                ("f", "*"),
+            ])
             .basic_auth(USERNAME, Some(PASSWORD))
             .send()
             .unwrap();
         let json: JsonValue = res.json().unwrap();
+
+        println!("output: {:?}", json);
 
         json["results"].as_array().unwrap().clone()
     }
