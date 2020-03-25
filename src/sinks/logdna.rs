@@ -252,6 +252,7 @@ mod tests {
 
     #[test]
     fn smoke() {
+        crate::test_util::trace_init();
         let (mut config, cx, mut rt) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"

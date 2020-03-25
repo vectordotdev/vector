@@ -122,7 +122,6 @@ where
         if let Some(item) = self.slot.take() {
             if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
                 self.slot = Some(item);
-                self.inner.poll_complete()?;
                 return Ok(Async::NotReady);
             }
         }

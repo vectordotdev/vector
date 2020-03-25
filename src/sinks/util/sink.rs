@@ -201,6 +201,7 @@ where
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
                 if self.should_send() {
+                    println!("sending");
                     try_ready!(self.service.poll_ready());
 
                     let batch = self.batch.fresh_replace();
@@ -215,7 +216,17 @@ where
                     // Disable linger timeout
                     self.linger.take();
                 } else {
-                    return self.service.poll_complete();
+                    // We have a batch but we can't send any items
+                    // most likely because we have not hit either
+                    // our batch size or the timeout. Here we want
+                    // to poll the inner futures but still return
+                    // NotReady if the linger timeout is not complete yet.
+                    if let Some(linger) = &mut self.linger {
+                        self.service.poll_complete()?;
+                        return linger.poll().map_err(Into::into);
+                    } else {
+                        return self.service.poll_complete();
+                    }
                 }
             }
         }
@@ -454,6 +465,7 @@ where
         let max_size = self.settings.size;
 
         let mut partitions = Vec::new();
+
         while let Ok(Async::Ready(Some(linger))) = self.lingers.poll() {
             // Only if the linger has elapsed trigger the removal
             if let LingerState::Elapsed(partition) = linger {
@@ -489,7 +501,19 @@ where
             self.poll_send(batch)?;
         }
 
-        self.service.poll_complete()
+        // If we still have an inflight partition then
+        // we should have a linger associated with it that
+        // will wake up this task when it is ready to be flushed.
+        if !self.partitions.is_empty() {
+            assert!(
+                !self.lingers.is_empty(),
+                "If partitions are not empty, then there must be a linger"
+            );
+            self.service.poll_complete()?;
+            Ok(Async::NotReady)
+        } else {
+            self.service.poll_complete()
+        }
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
@@ -797,11 +821,12 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered = BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let mut buffered =
+            BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
 
         clock.enter(|_| {
-            let buffered = buffered.send(0).wait().unwrap();
-            let mut buffered = buffered.send(1).wait().unwrap();
+            assert!(buffered.start_send(0).unwrap().is_ready());
+            assert!(buffered.start_send(1).unwrap().is_ready());
 
             future::poll_fn(|| buffered.close()).wait().unwrap()
         });
@@ -825,11 +850,12 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered = BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let mut buffered =
+            BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
 
         clock.enter(|handle| {
-            let buffered = buffered.send(0).wait().unwrap();
-            let mut buffered = buffered.send(1).wait().unwrap();
+            assert!(buffered.start_send(0).unwrap().is_ready());
+            assert!(buffered.start_send(1).unwrap().is_ready());
 
             // Move clock forward by linger timeout + 1 sec
             handle.advance(SETTINGS.timeout + Duration::from_secs(1));
