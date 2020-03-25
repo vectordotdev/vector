@@ -113,15 +113,11 @@ pub trait TcpSource: Clone + Send + 'static {
                     )
                 })
                 .for_each(move |socket| {
-                    let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
+                    let peer_addr = socket.peer_addr().ip().to_string();
 
-                    let span = if let Some(addr) = &peer_addr {
-                        info_span!("connection", peer_addr = field::display(addr))
-                    } else {
-                        info_span!("connection")
-                    };
+                    let span = info_span!("connection", %peer_addr);
 
-                    let host = peer_addr.map(Bytes::from);
+                    let host = Bytes::from(peer_addr);
 
                     let tripwire = tripwire
                         .clone()
@@ -135,10 +131,8 @@ pub trait TcpSource: Clone + Send + 'static {
 
                     let source = self.clone();
                     span.in_scope(|| {
-                        debug!(
-                            message = "accepted a new connection",
-                            peer_addr = %socket.peer_addr().unwrap()
-                        );
+                        let peer_addr = socket.peer_addr();
+                        debug!(message = "accepted a new connection", %peer_addr);
                         handle_stream(span.clone(), socket, source, tripwire, host, out.clone())
                     });
                     Ok(())
@@ -156,14 +150,14 @@ fn handle_stream(
     socket: impl AsyncRead + Send + 'static,
     source: impl TcpSource,
     tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
-    host: Option<Bytes>,
+    host: Bytes,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
     let handler = FramedRead::new(socket, source.decoder())
         .take_until(tripwire)
         .filter_map(move |frame| {
             let host = host.clone();
-            source.build_event(frame, host)
+            source.build_event(frame, Some(host))
         })
         .map_err(|error| warn!(message = "connection error.", %error))
         .forward(out)

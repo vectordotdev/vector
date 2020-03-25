@@ -27,8 +27,8 @@ enum State<S> {
 }
 
 impl<S> MaybeTlsStream<S> {
-    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
-        Ok(self.peer_addr)
+    pub fn peer_addr(&self) -> SocketAddr {
+        self.peer_addr
     }
 }
 
