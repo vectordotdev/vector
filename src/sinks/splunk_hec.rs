@@ -36,7 +36,10 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Option<Compression>,
     #[serde(default)]
