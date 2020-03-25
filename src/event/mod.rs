@@ -119,7 +119,7 @@ impl LogEvent {
         self.fields.contains_key(key)
     }
 
-    pub fn insert<K, V>(&mut self, key: K, value: V)
+    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: AsRef<str>,
         V: Into<Value>,

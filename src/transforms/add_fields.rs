@@ -97,7 +97,14 @@ impl Transform for AddFields {
                 .into(),
                 TemplateOrValue::Value(v) => v,
             };
-            event.as_mut_log().insert(key, value);
+            let old_val = event.as_mut_log().insert(&key, value);
+            if old_val.is_some() {
+                debug!(
+                    message = "Field overwritten",
+                    field = key.as_ref(),
+                    rate_limit_secs = 30,
+                )
+            }
         }
 
         Some(event)

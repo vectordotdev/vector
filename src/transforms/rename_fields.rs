@@ -60,8 +60,24 @@ impl Transform for RenameFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            if let Some(v) = log.remove_prune(&old_key, self.drop_empty) {
-                log.insert(new_key.clone(), v)
+            match log.remove_prune(&old_key, self.drop_empty) {
+                Some(v) => {
+                    let old_val = log.insert(new_key.clone(), v);
+                    if old_val.is_some() {
+                        debug!(
+                            message = "Field overwritten",
+                            field = old_key.as_ref(),
+                            rate_limit_secs = 30,
+                        )
+                    }
+                }
+                None => {
+                    debug!(
+                        message = "Field did not exist",
+                        field = old_key.as_ref(),
+                        rate_limit_secs = 30,
+                    );
+                }
             }
         }
 
