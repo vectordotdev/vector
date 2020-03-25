@@ -9,7 +9,9 @@ pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, merge_fie
             Some(val) => val,
         };
         match current.get_mut(merge_field) {
-            None => current.insert(merge_field, incoming_val),
+            None => {
+                current.insert(merge_field, incoming_val);
+            }
             Some(current_val) => merge_value(current_val, incoming_val),
         }
     }
