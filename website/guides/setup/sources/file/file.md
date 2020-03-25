@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send File logs to File"
 description: "A guide to quickly, and correctly, send File logs to File."
+domain: configuring
 platform_name: null
 sink_name: "file"
 source_name: "file"

@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send Journald logs to GCP Stackdriver."
+domain: configuring
 platform_name: null
 sink_name: "gcp_stackdriver_logs"
 source_name: "journald"

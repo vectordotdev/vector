@@ -31,7 +31,6 @@ function GuideItem(props) {
         <header>
           <div className="category">{category}</div>
           <h2 title={title}>{title}</h2>
-          <Avatar github={author_github} size="sm" subTitle={<>{readingTime}</>} rel="author" />
           <Tags colorProfile="guides" tags={tags} />
         </header>
         <footer>

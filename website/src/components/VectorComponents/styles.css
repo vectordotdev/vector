@@ -55,6 +55,13 @@
   margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
 }
 
+.vector-component--name svg {
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: bottom;
+  width: 1em;
+}
+
 .vector-component--badges {
   margin-top: var(--ifm-badge-padding-vertical);
 }

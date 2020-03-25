@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to Apache Pulsar"
 description: "A guide to quickly, and correctly, send Journald logs to Apache Pulsar."
+domain: configuring
 platform_name: null
 sink_name: "pulsar"
 source_name: "journald"

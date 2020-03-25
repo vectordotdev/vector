@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send STDIN logs to Honeycomb"
 description: "A guide to quickly, and correctly, send STDIN logs to Honeycomb."
+domain: configuring
 platform_name: null
 sink_name: "honeycomb"
 source_name: "stdin"

@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send STDIN logs to Papertrail"
 description: "A guide to quickly, and correctly, send STDIN logs to Papertrail."
+domain: configuring
 platform_name: null
 sink_name: "papertrail"
 source_name: "stdin"

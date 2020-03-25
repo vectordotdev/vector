@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send STDIN logs to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send STDIN logs to AWS Cloudwatch."
+domain: configuring
 platform_name: null
 sink_name: "aws_cloudwatch_logs"
 source_name: "stdin"

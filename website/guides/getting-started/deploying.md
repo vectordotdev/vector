@@ -1,8 +1,10 @@
 ---
 last_modified_on: "2020-03-24"
-title: 3. Deploying Vector
+title: Deploying Vector
 description: How to parse log data in Vector
+series_position: 3
 author_github: https://github.com/binarylogic
+domain: administrating
 ---
 
 Fill me in

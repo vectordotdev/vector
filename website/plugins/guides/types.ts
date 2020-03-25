@@ -61,10 +61,12 @@ export interface MetaData {
   category: string;
   categorySort: string;
   description: string;
+  domain: string;
   nextItem?: Paginator;
   permalink: string;
   prevItem?: Paginator;
   readingTime: string;
+  seriesPosition: number;
   sort: number;
   source: string;
   tags: (Tag | string)[];

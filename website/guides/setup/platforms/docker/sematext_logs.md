@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Docker logs to Sematext"
 description: "A guide to quickly, and correctly, send Docker logs to Sematext."
+domain: configuring
 platform_name: "docker"
 sink_name: "sematext_logs"
 source_name: "docker"

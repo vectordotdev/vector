@@ -44,6 +44,7 @@ export async function generateGuides(
 
       let category = relativeSource.split('/')[0];
       let categorySort = category == 'getting-started' ? 'A' : category;
+      let domain = frontMatter.domain;
       let linkName = relativeSource.replace(/\.mdx?$/, '');
       frontMatter.title = frontMatter.title || linkName;
 
@@ -53,15 +54,17 @@ export async function generateGuides(
           category: category,
           categorySort: categorySort,
           description: frontMatter.description || excerpt,
+          domain: domain,
           permalink: normalizeUrl([
             baseUrl,
             routeBasePath,
             frontMatter.id || linkName,
           ]),
           readingTime: readingStats.text,
+          seriesPosition: frontMatter.series_position,
           sort: frontMatter.sort,
           source: aliasedSource,
-          tags: (frontMatter.tags || []).concat(category),
+          tags: (frontMatter.tags || []).concat(domain),
           title: frontMatter.title,
           truncated: truncateMarker?.test(content) || false,
         },
@@ -69,7 +72,7 @@ export async function generateGuides(
     }),
   );
 
-  return _.sortBy(guides, ['metadata.categorySort', 'metadata.title']);
+  return _.sortBy(guides, ['metadata.categorySort', 'metadata.seriesPosition', 'metadata.title']);
 }
 
 export function linkify(

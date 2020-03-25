@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to Splunk HEC"
 description: "A guide to quickly, and correctly, send Journald logs to Splunk HEC."
+domain: configuring
 platform_name: null
 sink_name: "splunk_hec"
 source_name: "journald"

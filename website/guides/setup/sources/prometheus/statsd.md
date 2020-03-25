@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Prometheus metrics to Statsd"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Statsd."
+domain: configuring
 platform_name: null
 sink_name: "statsd"
 source_name: "prometheus"

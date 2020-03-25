@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to Clickhouse"
 description: "A guide to quickly, and correctly, send Journald logs to Clickhouse."
+domain: configuring
 platform_name: null
 sink_name: "clickhouse"
 source_name: "journald"

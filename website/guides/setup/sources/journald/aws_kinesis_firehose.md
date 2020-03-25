@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to AWS Kinesis Firehose"
 description: "A guide to quickly, and correctly, send Journald logs to AWS Kinesis Firehose."
+domain: configuring
 platform_name: null
 sink_name: "aws_kinesis_firehose"
 source_name: "journald"

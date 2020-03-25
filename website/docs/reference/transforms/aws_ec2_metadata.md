@@ -34,8 +34,8 @@ AWS EC2 instance metadata.
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 
-* AWS IMDS v2 is required.
-* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See [AWS IMDS v2](#aws-imds-v2) for more info.
+* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on
+* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See ["How it works"](#how-it-works) for more info.
 
 </Alert>
 
@@ -465,13 +465,14 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 ### AWS IMDS v2
 
-v2 of the AWS IMDS service addresses a number of very serious security issues
-with v1. As part of tighening security, Amazon limited the number of network
-hops allowed to communicate with this service to 1. Unfortunately, when running
-Vector within Docker this introduces an additional hop. Therefore, you _must_
-configure your AWS instances to allow for 2 hops:
+v2 of the [AWS IMDS service][urls.aws_ec2_instance_metadata] addresses [a number
+of very serious security issues][urls.aws_imds_v1_security_problems] with v1.
+As part of tighening security, Amazon limited the number of network hops allowed
+to communicate with this service to 1. Unfortunately, when running Vector within
+Docker this introduces an additional hop. Therefore, you _must_ configure your
+AWS instances to allow for 2 hops:
 
-```
+```bash
 aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
 ```
 
@@ -495,4 +496,6 @@ You can learn more in the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.aws_ec2_instance_metadata]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+[urls.aws_imds_v1_security_problems]: https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

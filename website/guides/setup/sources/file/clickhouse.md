@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send File logs to Clickhouse"
 description: "A guide to quickly, and correctly, send File logs to Clickhouse."
+domain: configuring
 platform_name: null
 sink_name: "clickhouse"
 source_name: "file"

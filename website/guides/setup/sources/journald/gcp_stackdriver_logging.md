@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Collect Journald logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect Journald logs and send them anywhere."
+domain: configuring
 platform_name: null
 sink_name: null
 source_name: "journald"

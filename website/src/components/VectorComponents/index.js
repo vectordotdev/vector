@@ -3,6 +3,7 @@ import React, {useState} from 'react';
 import CheckboxList from '@site/src/components/CheckboxList';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
+import SVG from 'react-inlinesvg';
 
 import _ from 'lodash';
 import classnames from 'classnames';
@@ -12,7 +13,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Component({delivery_guarantee, description, event_types, function_category, name, pathPrefix, status, title, type}) {
+function Component({delivery_guarantee, description, event_types, function_category, logo_path, name, pathPrefix, status, title, type}) {
   let prefix = pathPrefix;
 
   if (!prefix) {
@@ -24,25 +25,26 @@ function Component({delivery_guarantee, description, event_types, function_categ
   let path = `${prefix}/${name}/`;
 
   return (
-    <Link to={path} className="vector-component">
+    <Link to={path} className="vector-component" title={description}>
       <div className="vector-component--header">
-        {description && <i className="feather icon-info" title={description}></i>}
-        <div className="vector-component--name">{title}</div>
+        <div className="vector-component--name">
+          {title}
+        </div>
       </div>
       <div className="vector-component--badges">
-        {event_types.includes("log") ?
-          <span className="badge badge--primary" title="This component works with log event types">L</span> :
-          ''}
-        {event_types.includes("metric") ?
-          <span className="badge badge--primary" title="This component works with metric event types">M</span> :
-          ''}
         {status == "beta" ?
           <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i></span> :
           <span className="badge badge--primary" title="This component has passed reliability standards that make it production ready"><i className="feather icon-award"></i></span>}
         {delivery_guarantee == "best_effort" ?
           <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i></span> :
           <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i></span>}
-        <span className="badge badge--secondary">{function_category}</span>
+        {event_types.includes("log") ?
+          <span className="badge badge--primary" title="This component works with log event types">log</span> :
+          ''}
+        {event_types.includes("metric") ?
+          <span className="badge badge--primary" title="This component works with metric event types">metric</span> :
+          ''}
+        <span className="badge badge--primary">{function_category}</span>
       </div>
     </Link>
   );

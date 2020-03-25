@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Docker logs to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send Docker logs to AWS Kinesis Data Streams."
+domain: configuring
 platform_name: "docker"
 sink_name: "aws_kinesis_streams"
 source_name: "docker"

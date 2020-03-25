@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Prometheus metrics to Datadog"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Datadog."
+domain: configuring
 platform_name: null
 sink_name: "datadog_metrics"
 source_name: "prometheus"

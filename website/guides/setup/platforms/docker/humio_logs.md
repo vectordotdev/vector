@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Docker logs to Humio"
 description: "A guide to quickly, and correctly, send Docker logs to Humio."
+domain: configuring
 platform_name: "docker"
 sink_name: "humio_logs"
 source_name: "docker"

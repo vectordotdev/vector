@@ -1,8 +1,10 @@
 ---
 last_modified_on: "2020-03-24"
-title: 6. Troubleshooting Vector
+title: Troubleshooting Vector
 description: A guide on debugging and troubleshooting Vector
+series_position: 6
 author_github: https://github.com/binarylogic
+domain: administrating
 ---
 
 import Alert from '@site/src/components/Alert';

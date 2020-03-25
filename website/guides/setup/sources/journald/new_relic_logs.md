@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to New Relic"
 description: "A guide to quickly, and correctly, send Journald logs to New Relic."
+domain: configuring
 platform_name: null
 sink_name: "new_relic_logs"
 source_name: "journald"

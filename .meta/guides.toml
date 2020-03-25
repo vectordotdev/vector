@@ -1,0 +1,18 @@
+[guides.categories.advanced]
+description = "Hello"
+
+[guides.categories.getting-started]
+description = "Hello"
+series = true
+
+[guides.categories.setup]
+description = "Hello"
+
+[guides.domains.administrating]
+title = "Administrating"
+
+[guides.domains.configuring]
+title = "Configuring"
+
+[guides.domains.setup]
+description = "Hello"

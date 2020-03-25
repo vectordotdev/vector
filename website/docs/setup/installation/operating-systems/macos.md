@@ -27,15 +27,15 @@ This document will cover installing Vector on MacOS.
 <Tabs
   centered={true}
   className="rounded"
-  defaultValue="dpkg"
-  values={[{"label":"DPKG","value":"dpkg"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
-<TabItem value="dpkg">
+  defaultValue="homebrew"
+  values={[{"label":"Homebrew","value":"homebrew"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+<TabItem value="homebrew">
 <Tabs
   block={true}
-  defaultValue="dpkg-daemon"
-  values={[{"label":"Daemon Strategy","value":"dpkg-daemon"},{"label":"Service Strategy","value":"dpkg-service"}]}>
+  defaultValue="homebrew-daemon"
+  values={[{"label":"Daemon Strategy","value":"homebrew-daemon"},{"label":"Service Strategy","value":"homebrew-service"}]}>
 
-<TabItem value="dpkg-daemon">
+<TabItem value="homebrew-daemon">
 
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
@@ -47,111 +47,32 @@ collecting and forwarding all data on the host.
 
 <div className="steps steps--h3">
 
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
-
-<TabItem value="x86_64">
-
-1.  ### Download the Vector `.deb` package
+1.  ### Add the Timber tap and install `vector`
 
     ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+    brew tap timberio/brew && brew install vector
     ```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+    [Looking for a specific version?][docs.package_managers.homebrew]
 
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i vector-amd64.deb
-    ```
-
-3.  ### Configure Vector
+2.  ### Configure Vector
 
     <ConfigExample
       format="toml"
       path="/etc/vector/vector.toml"
-      sourceName={"journald"}
+      sourceName={"file"}
       sinkName={null} />
 
-4.  ### Start Vector
+3.  ### Start Vector
 
     ```bash
-    sudo systemctl start vector
+    brew services start vector
     ```
-
-</TabItem>
-<TabItem value="arm64">
-
-1.  ### Download the Vector `.deb` package
-
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
-    ```
-
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
-
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i vector-arm64.deb
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"journald"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-<TabItem value="armv7">
-
-1.  ### Download the Vector `.deb` package
-
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
-    ```
-
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
-
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i vector-armhf.deb
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"journald"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-</Tabs>
 
 </div>
 </TabItem>
 
-<TabItem value="dpkg-service">
+<TabItem value="homebrew-service">
 
 _service.md.erb
 
@@ -159,29 +80,15 @@ _service.md.erb
 
 <div className="steps steps--h3">
 
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
-
-<TabItem value="x86_64">
-
-1.  ### Download the Vector `.deb` package
+1.  ### Add the Timber tap and install `vector`
 
     ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+    brew tap timberio/brew && brew install vector
     ```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+    [Looking for a specific version?][docs.package_managers.homebrew]
 
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i vector-amd64.deb
-    ```
-
-3.  ### Configure Vector
+2.  ### Configure Vector
 
     <ConfigExample
       format="toml"
@@ -189,76 +96,11 @@ _service.md.erb
       sourceName={"http"}
       sinkName={null} />
 
-4.  ### Start Vector
+3.  ### Start Vector
 
     ```bash
-    sudo systemctl start vector
+    brew services start vector
     ```
-
-</TabItem>
-<TabItem value="arm64">
-
-1.  ### Download the Vector `.deb` package
-
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
-    ```
-
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
-
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i vector-arm64.deb
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-<TabItem value="armv7">
-
-1.  ### Download the Vector `.deb` package
-
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
-    ```
-
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
-
-2.  ### Install the downloaded package
-
-    ```bash
-    sudo dpkg -i vector-armhf.deb
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-</Tabs>
 
 </div>
 </TabItem>
@@ -297,7 +139,7 @@ collecting and forwarding all data on the host.
 <ConfigExample
   format="toml"
   path="vector.toml"
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>
@@ -384,7 +226,7 @@ collecting and forwarding all data on the host.
    <ConfigExample
     format="toml"
     path="vector.toml"
-    sourceName={"journald"}
+    sourceName={"file"}
     sinkName={null} />
 
 2. ### Start the Vector container
@@ -392,12 +234,14 @@ collecting and forwarding all data on the host.
    ```bash
    docker run \
      -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+     -v /var/log \
      timberio/vector:latest-alpine
    ```
 
    <CodeExplanation>
 
    * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+   * The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
    </CodeExplanation>
@@ -486,5 +330,5 @@ compose!
 </Tabs>
 
 
-[docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions
+[docs.package_managers.homebrew]: /docs/setup/installation/package-managers/homebrew/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants

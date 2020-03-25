@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send File logs to Vector"
 description: "A guide to quickly, and correctly, send File logs to Vector."
+domain: configuring
 platform_name: null
 sink_name: "vector"
 source_name: "file"

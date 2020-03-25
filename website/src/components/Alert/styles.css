@@ -10,7 +10,7 @@
   box-shadow: var(--ifm-panel-box-shadow);
   font-size: 95%;
   font-weight: 500;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
 .alert.alert--fill {

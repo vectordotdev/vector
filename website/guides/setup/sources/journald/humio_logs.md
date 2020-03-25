@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Journald logs to Humio"
 description: "A guide to quickly, and correctly, send Journald logs to Humio."
+domain: configuring
 platform_name: null
 sink_name: "humio_logs"
 source_name: "journald"

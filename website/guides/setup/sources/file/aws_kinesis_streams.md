@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send File logs to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send File logs to AWS Kinesis Data Streams."
+domain: configuring
 platform_name: null
 sink_name: "aws_kinesis_streams"
 source_name: "file"

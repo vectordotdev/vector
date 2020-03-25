@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Prometheus metrics to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send Prometheus metrics to AWS Cloudwatch."
+domain: configuring
 platform_name: null
 sink_name: "aws_cloudwatch_metrics"
 source_name: "prometheus"

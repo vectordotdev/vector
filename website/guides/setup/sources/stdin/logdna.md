@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send STDIN logs to LogDNA"
 description: "A guide to quickly, and correctly, send STDIN logs to LogDNA."
+domain: configuring
 platform_name: null
 sink_name: "logdna"
 source_name: "stdin"

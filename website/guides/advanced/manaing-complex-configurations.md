@@ -3,7 +3,7 @@ last_modified_on: "2020-03-24"
 title: Manage Complex Vector Configs
 description: Strategies for building and managing complex Vector configs
 author_github: https://github.com/Jeffail
-tags: ["domain: config"]
+domain: configuring
 ---
 
 Writing large configuration files is not yet an official olympic event. However,

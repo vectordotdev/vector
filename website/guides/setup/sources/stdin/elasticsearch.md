@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send STDIN logs to Elasticsearch"
 description: "A guide to quickly, and correctly, send STDIN logs to Elasticsearch."
+domain: configuring
 platform_name: null
 sink_name: "elasticsearch"
 source_name: "stdin"

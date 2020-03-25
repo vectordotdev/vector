@@ -34,6 +34,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
         }
         let category = relativeSource.split('/')[0];
         let categorySort = category == 'getting-started' ? 'A' : category;
+        let domain = frontMatter.domain;
         let linkName = relativeSource.replace(/\.mdx?$/, '');
         frontMatter.title = frontMatter.title || linkName;
         guides.push({
@@ -42,21 +43,23 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
                 category: category,
                 categorySort: categorySort,
                 description: frontMatter.description || excerpt,
+                domain: domain,
                 permalink: utils_1.normalizeUrl([
                     baseUrl,
                     routeBasePath,
                     frontMatter.id || linkName,
                 ]),
                 readingTime: readingStats.text,
+                seriesPosition: frontMatter.series_position,
                 sort: frontMatter.sort,
                 source: aliasedSource,
-                tags: (frontMatter.tags || []).concat(category),
+                tags: (frontMatter.tags || []).concat(domain),
                 title: frontMatter.title,
                 truncated: (truncateMarker === null || truncateMarker === void 0 ? void 0 : truncateMarker.test(content)) || false,
             },
         });
     }));
-    return lodash_1.default.sortBy(guides, ['metadata.categorySort', 'metadata.title']);
+    return lodash_1.default.sortBy(guides, ['metadata.categorySort', 'metadata.seriesPosition', 'metadata.title']);
 }
 exports.generateGuides = generateGuides;
 function linkify(fileContent, siteDir, guidePath, guides) {

@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Send Docker logs to Socket"
 description: "A guide to quickly, and correctly, send Docker logs to Socket."
+domain: configuring
 platform_name: "docker"
 sink_name: "socket"
 source_name: "docker"

@@ -2,6 +2,7 @@
 last_modified_on: "2020-03-24"
 title: "Collect Docker logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
+domain: configuring
 platform_name: "docker"
 sink_name: null
 source_name: "docker"

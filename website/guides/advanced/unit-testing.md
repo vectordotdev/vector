@@ -3,6 +3,7 @@ last_modified_on: "2020-03-24"
 title: Unit Testing Your Vector Config
 description: Learn how to write and execute unit tests for your Vector configs
 author_github: https://github.com/Jeffail
+domain: configuring
 ---
 
 import CodeHeader from '@site/src/components/CodeHeader';
