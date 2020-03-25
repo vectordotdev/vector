@@ -21,6 +21,7 @@ use futures01::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::collections::HashMap;
 use std::hash::Hash;
 use tower::Service;
@@ -32,6 +33,14 @@ pub use buffer::partition::{Partition, PartitionedBatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
 pub use uri::UriSerde;
+
+#[derive(Debug, Snafu)]
+enum SinkBuildError {
+    #[snafu(display("Missing host in address field"))]
+    MissingHost,
+    #[snafu(display("Missing port in address field"))]
+    MissingPort,
+}
 
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
