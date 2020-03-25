@@ -591,7 +591,10 @@ where
             })
             .map_err(Into::into)
             .then(|res| {
-                tx.send(res).unwrap();
+                // If the rx end is dropped we still completed
+                // the request so this is a weird case that we can
+                // ignore for now.
+                let _ = tx.send(res);
                 Ok::<_, ()>(())
             });
 

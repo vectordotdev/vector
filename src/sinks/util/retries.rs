@@ -261,7 +261,7 @@ mod tests {
             assert_ready!(svc.poll_ready());
 
             let mut fut = svc.call("hello");
-            assert_request_eq!(handle, "hello").send_error(tower::timeout::error::Elapsed::new());
+            assert_request_eq!(handle, "hello").send_error(super::super::service::Elapsed::new());
             assert_not_ready!(fut.poll());
 
             clock.advance(Duration::from_secs(2));
