@@ -585,18 +585,24 @@ mod integration_tests {
             .build()
             .unwrap();
 
-        let mut query = vec![("search", "search *"), ("exec_mode", "oneshot"), ("f", "*")];
-        if let Some(index) = index {
-            query.push(("index", index));
-        }
         // http://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
+        let search_query = match index {
+            Some(index) => format!("search index={}", index),
+            None => "search *".into(),
+        };
         let mut res = client
             .post("https://localhost:8089/services/search/jobs?output_mode=json")
-            .form(&query)
+            .form(&vec![
+                ("search", &search_query[..]),
+                ("exec_mode", "oneshot"),
+                ("f", "*"),
+            ])
             .basic_auth(USERNAME, Some(PASSWORD))
             .send()
             .unwrap();
         let json: JsonValue = res.json().unwrap();
+
+        println!("output: {:?}", json);
 
         json["results"].as_array().unwrap().clone()
     }
