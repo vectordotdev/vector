@@ -269,7 +269,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("host", "127.0.0.1");
         let mut out = Vec::new();
-        let event = transform.transform_into(&mut out, event);
+        transform.transform_into(&mut out, event);
 
         assert_eq!(out.len(), 2);
     }
