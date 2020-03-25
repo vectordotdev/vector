@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn map_values_array() {
+    fn array_values_insertion_order() {
         let mut event_1 = LogEvent::new();
         event_1.insert("array[0]", "a");
         event_1.insert("array[1]", "b");
