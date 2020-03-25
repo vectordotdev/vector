@@ -17,8 +17,7 @@ pub enum RetryAction {
 }
 
 pub trait RetryLogic: Clone {
-    // type Error: std::error::Error + Send + Sync + 'static;
-    type Error;
+    type Error: std::error::Error + Send + Sync + 'static;
     type Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
@@ -120,23 +119,21 @@ where
                     return None;
                 }
 
-                todo!("figure out this error bound")
-
-                // if let Some(expected) = error.downcast_ref::<L::Error>() {
-                //     if self.logic.is_retriable_error(expected) {
-                //         warn!("retrying after error: {}", expected);
-                //         Some(self.build_retry())
-                //     } else {
-                //         error!(message = "encountered non-retriable error.", %error);
-                //         None
-                //     }
-                // } else if error.downcast_ref::<Elapsed>().is_some() {
-                //     warn!("request timedout.");
-                //     Some(self.build_retry())
-                // } else {
-                //     warn!(message = "unexpected error type.", %error);
-                //     None
-                // }
+                if let Some(expected) = error.downcast_ref::<L::Error>() {
+                    if self.logic.is_retriable_error(expected) {
+                        warn!("retrying after error: {}", expected);
+                        Some(self.build_retry())
+                    } else {
+                        error!(message = "encountered non-retriable error.", %error);
+                        None
+                    }
+                } else if error.downcast_ref::<Elapsed>().is_some() {
+                    warn!("request timedout.");
+                    Some(self.build_retry())
+                } else {
+                    warn!(message = "unexpected error type.", %error);
+                    None
+                }
             }
         }
     }

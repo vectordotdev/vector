@@ -201,7 +201,6 @@ where
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
                 if self.should_send() {
-                    println!("sending");
                     try_ready!(self.service.poll_ready());
 
                     let batch = self.batch.fresh_replace();
