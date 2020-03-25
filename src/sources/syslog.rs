@@ -127,8 +127,8 @@ impl TcpSource for SyslogTcpSource {
         LinesCodec::new_with_max_length(self.max_length)
     }
 
-    fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
-        event_from_str(&self.host_key, host, &frame).map(|event| {
+    fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
+        event_from_str(&self.host_key, Some(host), &frame).map(|event| {
             trace!(
                 message = "Received one event.",
                 event = field::debug(&event)

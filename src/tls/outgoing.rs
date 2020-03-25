@@ -1,6 +1,6 @@
 use super::{tls_connector, MaybeTlsSettings, MaybeTlsStream, Result, TlsError};
 use futures01::{Async, Future};
-use openssl::ssl::ConnectConfiguration;
+use openssl::ssl::{ConnectConfiguration, HandshakeError};
 use std::net::SocketAddr;
 use tokio01::net::tcp::{ConnectFuture, TcpStream};
 use tokio_openssl::{ConnectAsync, ConnectConfigurationExt};
@@ -52,7 +52,17 @@ impl Future for MaybeTlsConnector {
                     },
                 },
                 State::Negotiating(connector) => match connector.poll() {
-                    Err(source) => return Err(TlsError::Handshake { source }),
+                    Err(error) => {
+                        return Err(match error {
+                            HandshakeError::WouldBlock(_) => TlsError::HandshakeNotReady,
+                            HandshakeError::Failure(stream) => TlsError::Handshake {
+                                source: stream.into_error(),
+                            },
+                            HandshakeError::SetupFailure(source) => {
+                                TlsError::HandshakeSetup { source }
+                            }
+                        })
+                    }
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(stream)) => {
                         debug!(message = "negotiated TLS");
