@@ -73,6 +73,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   token = "${TOKEN_ENV_VAR}" # required
   healthcheck = true # optional, default
   host_key = "hostname" # optional, no default
+  index = "custom_index" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
 
   # Batch
@@ -525,6 +526,32 @@ Your Splunk HEC host.
 The name of the log field to be used as the hostname sent to Splunk HEC. This
 overrides the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
+
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["custom_index"]}
+  groups={[]}
+  name={"index"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### index
+
+The name of the index where send the events to. If not specified, the default
+index is used.
 
 
 

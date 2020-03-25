@@ -7,7 +7,7 @@ use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::fmt::{self, Debug, Formatter};
 use std::net::SocketAddr;
-use tokio::net::{tcp::Incoming, TcpListener, TcpStream};
+use tokio01::net::{tcp::Incoming, TcpListener, TcpStream};
 use tokio_openssl::{AcceptAsync, SslAcceptorExt};
 
 pub(crate) struct MaybeTlsIncoming<I: Stream> {
@@ -115,10 +115,6 @@ impl MaybeTlsListener {
     pub(crate) fn incoming(self) -> MaybeTlsIncoming<Incoming> {
         let incoming = self.listener.incoming();
         MaybeTlsIncoming::new(incoming, self.acceptor)
-    }
-
-    pub(crate) fn local_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {
-        self.listener.local_addr()
     }
 }
 

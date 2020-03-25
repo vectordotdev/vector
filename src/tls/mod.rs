@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::io::Error as IoError;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tokio::net::TcpStream;
+use tokio01::net::TcpStream;
 use tokio_openssl::SslStream;
 
 #[cfg(feature = "sources-tls")]
@@ -16,8 +16,6 @@ mod maybe_tls;
 mod outgoing;
 mod settings;
 
-#[cfg(feature = "sources-tls")]
-pub(crate) use incoming::MaybeTlsListener;
 pub(crate) use maybe_tls::MaybeTls;
 pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
