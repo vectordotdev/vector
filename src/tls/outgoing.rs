@@ -44,7 +44,7 @@ impl Future for MaybeTlsConnector {
                         // no TLS connector, just return ready with the
                         // raw stream. Otherwise, start the TLS
                         // negotiation and switch to that state.
-                        None => return Ok(Async::Ready(MaybeTlsStream::new_raw(stream)?)),
+                        None => return Ok(Async::Ready(MaybeTlsStream::Raw(stream))),
                         Some(tls_config) => {
                             let connector = tls_config.connect_async(&self.host, stream);
                             self.state = State::Negotiating(connector)
@@ -66,7 +66,7 @@ impl Future for MaybeTlsConnector {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(stream)) => {
                         debug!(message = "negotiated TLS");
-                        return Ok(Async::Ready(MaybeTlsStream::new_tls(stream)?));
+                        return Ok(Async::Ready(MaybeTlsStream::Tls(stream)));
                     }
                 },
             }
