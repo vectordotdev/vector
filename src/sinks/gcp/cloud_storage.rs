@@ -375,7 +375,7 @@ impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
         let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
-        let content_type = HeaderValue::from_str(config.encoding.codec.content_type()).unwrap();
+        let content_type = HeaderValue::from_str(config.encoding.codec().content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
@@ -436,7 +436,7 @@ fn encode_event(
         })
         .ok()?;
     let log = event.into_log();
-    let bytes = match encoding.codec {
+    let bytes = match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');

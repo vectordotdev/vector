@@ -47,13 +47,13 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
-    pub(crate) codec: E,
+    codec: E,
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<Atom>>,
+    only_fields: Option<Vec<Atom>>,
     #[serde(default)]
-    pub(crate) except_fields: Option<Vec<Atom>>,
+    except_fields: Option<Vec<Atom>>,
     #[serde(default)]
-    pub(crate) timestamp_format: Option<TimestampFormat>,
+    timestamp_format: Option<TimestampFormat>,
 }
 
 impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
@@ -63,11 +63,20 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn only_fields(&self) -> &Option<Vec<Atom>> {
         &self.only_fields
     }
+    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>> {
+        std::mem::replace(&mut self.only_fields, fields)
+    }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
         &self.except_fields
     }
+    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>> {
+        std::mem::replace(&mut self.only_fields, fields)
+    }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
+    }
+    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> Option<TimestampFormat> {
+        std::mem::replace(&mut self.timestamp_format, format)
     }
 }
 
@@ -83,25 +92,25 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) codec: E,
+    codec: E,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) only_fields: Option<Vec<Atom>>,
+    only_fields: Option<Vec<Atom>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) except_fields: Option<Vec<Atom>>,
+    except_fields: Option<Vec<Atom>>,
     /// Format for outgoing timestamps.
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) timestamp_format: Option<TimestampFormat>,
+    timestamp_format: Option<TimestampFormat>,
 }
 
 impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
@@ -111,15 +120,55 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn only_fields(&self) -> &Option<Vec<Atom>> {
         &self.only_fields
     }
+    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>> {
+        std::mem::replace(&mut self.only_fields, fields)
+    }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
         &self.except_fields
+    }
+    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>> {
+        std::mem::replace(&mut self.only_fields, fields)
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }
+    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> Option<TimestampFormat> {
+        std::mem::replace(&mut self.timestamp_format, format)
+    }
 }
 
-impl<E: Default + PartialEq> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E> {
+impl<E> EncodingConfigWithDefault<E>
+where
+    E: Default + PartialEq,
+{
+    pub(crate) fn transmute<X>(self) -> EncodingConfigWithDefault<X>
+    where
+        X: From<E> + Default + PartialEq,
+    {
+        EncodingConfigWithDefault {
+            codec: self.codec.into(),
+            only_fields: self.only_fields,
+            except_fields: self.except_fields,
+            timestamp_format: self.timestamp_format,
+        }
+    }
+    pub(crate) fn without_default<X>(self) -> EncodingConfig<X>
+    where
+        X: From<E> + PartialEq,
+    {
+        EncodingConfig {
+            codec: self.codec.into(),
+            only_fields: self.only_fields,
+            except_fields: self.except_fields,
+            timestamp_format: self.timestamp_format,
+        }
+    }
+}
+
+impl<E> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E>
+where
+    E: Default + PartialEq,
+{
     fn into(self) -> EncodingConfig<E> {
         EncodingConfig {
             codec: self.codec,
@@ -130,7 +179,10 @@ impl<E: Default + PartialEq> Into<EncodingConfig<E>> for EncodingConfigWithDefau
     }
 }
 
-impl<E: Default + PartialEq> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E> {
+impl<E> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E>
+where
+    E: Default + PartialEq,
+{
     fn into(self) -> EncodingConfigWithDefault<E> {
         EncodingConfigWithDefault {
             codec: self.codec,
@@ -143,12 +195,13 @@ impl<E: Default + PartialEq> Into<EncodingConfigWithDefault<E>> for EncodingConf
 
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {
-    // Required Accessors
-
     fn codec(&self) -> &E;
     fn only_fields(&self) -> &Option<Vec<Atom>>;
+    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>>;
     fn except_fields(&self) -> &Option<Vec<Atom>>;
+    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
+    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> Option<TimestampFormat>;
 
     fn apply_only_fields(&self, event: &mut Event) {
         if let Some(only_fields) = &self.only_fields() {
@@ -243,7 +296,7 @@ pub enum TimestampFormat {
 impl<E> From<E> for EncodingConfig<E> {
     fn from(codec: E) -> Self {
         Self {
-            codec: codec,
+            codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -254,7 +307,7 @@ impl<E> From<E> for EncodingConfig<E> {
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
-            codec: codec,
+            codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
