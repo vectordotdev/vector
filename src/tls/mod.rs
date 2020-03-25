@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::io::Error as IoError;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tokio::net::TcpStream;
+use tokio01::net::TcpStream;
 use tokio_openssl::SslStream;
 
 #[cfg(feature = "sources-tls")]

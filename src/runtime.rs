@@ -94,11 +94,11 @@ where
     }
 }
 
-impl tokio::executor::Executor for TaskExecutor {
+impl tokio01::executor::Executor for TaskExecutor {
     fn spawn(
         &mut self,
         fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-    ) -> Result<(), tokio::executor::SpawnError> {
+    ) -> Result<(), tokio01::executor::SpawnError> {
         Ok(self.inner.spawn(fut))
     }
 }

@@ -79,23 +79,29 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
 pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub(crate) codec: E,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub(crate) only_fields: Option<Vec<Atom>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub(crate) except_fields: Option<Vec<Atom>>,
     /// Format for outgoing timestamps.
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub(crate) timestamp_format: Option<TimestampFormat>,
-}
-
-/// For encodings, answers "Is it possible to skip serializing this value, because it's the
-/// default?"
-pub(crate) fn skip_serializing_if_default<E: Default + PartialEq>(e: &E) -> bool {
-    e == &E::default()
 }
 
 impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {

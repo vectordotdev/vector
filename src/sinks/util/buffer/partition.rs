@@ -9,7 +9,7 @@ use std::{
     hash::Hash,
     time::{Duration, Instant},
 };
-use tokio::timer::Delay;
+use tokio01::timer::Delay;
 
 pub trait Partition<K> {
     fn partition(&self) -> K;

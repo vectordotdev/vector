@@ -14,7 +14,7 @@ use std::{
     marker::PhantomData,
     time::Instant,
 };
-use tokio::{
+use tokio01::{
     executor::{DefaultExecutor, Executor},
     timer::Delay,
 };
@@ -1063,11 +1063,11 @@ mod tests {
         >,
     );
 
-    impl tokio::executor::Executor for MockExec {
+    impl tokio01::executor::Executor for MockExec {
         fn spawn(
             &mut self,
             fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-        ) -> Result<(), tokio::executor::SpawnError> {
+        ) -> Result<(), tokio01::executor::SpawnError> {
             let mut futs = self.0.lock().unwrap();
             Ok(futs.push((fut, false)))
         }
