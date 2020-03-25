@@ -1,16 +1,23 @@
 use super::{PeerAddress, TlsError};
-use futures01::{Async, Future};
+use futures01::Async;
+#[cfg(feature = "sources-tls")]
+use futures01::Future;
+#[cfg(feature = "sources-tls")]
 use openssl::ssl::{HandshakeError, SslAcceptor};
 use snafu::ResultExt;
+#[cfg(feature = "sources-tls")]
+use std::io::ErrorKind;
 use std::{
-    io::{self, ErrorKind, Read, Write},
+    io::{self, Read, Write},
     net::SocketAddr,
 };
 use tokio01::{
     io::{AsyncRead, AsyncWrite},
     net::TcpStream,
 };
-use tokio_openssl::{AcceptAsync, SslAcceptorExt, SslStream};
+use tokio_openssl::SslStream;
+#[cfg(feature = "sources-tls")]
+use tokio_openssl::{AcceptAsync, SslAcceptorExt};
 
 pub struct MaybeTlsStream<S> {
     state: State<S>,
@@ -23,6 +30,7 @@ pub struct MaybeTlsStream<S> {
 enum State<S> {
     Raw(S),
     Tls(SslStream<S>),
+    #[cfg(feature = "sources-tls")]
     Accepting(AcceptAsync<S>),
 }
 
@@ -33,6 +41,7 @@ impl<S> MaybeTlsStream<S> {
 }
 
 impl MaybeTlsStream<TcpStream> {
+    #[cfg(feature = "sources-tls")]
     pub(super) fn new_accepting(
         stream: TcpStream,
         acceptor: &Option<SslAcceptor>,
@@ -62,6 +71,7 @@ impl MaybeTlsStream<TcpStream> {
     }
 }
 
+#[cfg(feature = "sources-tls")]
 fn poll_handshake<S: Read + Write>(acceptor: &mut AcceptAsync<S>) -> io::Result<State<S>> {
     match acceptor.poll() {
         Err(error) => match error {
@@ -93,6 +103,7 @@ impl<S: Read + Write> Read for MaybeTlsStream<S> {
         match &mut self.state {
             State::Raw(raw) => raw.read(buf),
             State::Tls(tls) => tls.read(buf),
+            #[cfg(feature = "sources-tls")]
             State::Accepting(acceptor) => {
                 self.state = poll_handshake(acceptor)?;
                 self.read(buf)
@@ -106,6 +117,7 @@ impl<S: Read + Write> Write for MaybeTlsStream<S> {
         match &mut self.state {
             State::Raw(raw) => raw.write(buf),
             State::Tls(tls) => tls.write(buf),
+            #[cfg(feature = "sources-tls")]
             State::Accepting(acceptor) => {
                 self.state = poll_handshake(acceptor)?;
                 self.write(buf)
@@ -117,6 +129,7 @@ impl<S: Read + Write> Write for MaybeTlsStream<S> {
         match &mut self.state {
             State::Raw(raw) => raw.flush(),
             State::Tls(tls) => tls.flush(),
+            #[cfg(feature = "sources-tls")]
             State::Accepting(_) => Ok(()),
         }
     }
@@ -129,6 +142,7 @@ impl<S: AsyncRead + AsyncWrite> AsyncWrite for MaybeTlsStream<S> {
         match &mut self.state {
             State::Raw(_) => Ok(Async::Ready(())),
             State::Tls(tls) => tls.shutdown(),
+            #[cfg(feature = "sources-tls")]
             State::Accepting(_) => Ok(Async::Ready(())),
         }
     }
