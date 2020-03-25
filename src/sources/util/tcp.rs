@@ -135,7 +135,10 @@ pub trait TcpSource: Clone + Send + 'static {
 
                     let source = self.clone();
                     span.in_scope(|| {
-                        debug!("accepted a new connection");
+                        debug!(
+                            message = "accepted a new connection",
+                            peer_addr = %socket.peer_addr().unwrap()
+                        );
                         handle_stream(span.clone(), socket, source, tripwire, host, out.clone())
                     });
                     Ok(())
