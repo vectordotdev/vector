@@ -1,10 +1,9 @@
 ---
+$schema: "/.meta/.schemas/guides.json"
 title: <%= guide.action_phrase.capitalize_first.to_json %>
 description: "A guide to quickly, and correctly, <%= guide.action_phrase %>."
 domain: configuring
-platform_name: <%= (platform && platform.name).to_json %>
-sink_name: <%= (sink && sink.name).to_json %>
-source_name: <%= (source && source.name).to_json %>
+author_github: https://github.com/binarylogic
 tags: <%= guide.tags.to_json %>
 ---
 

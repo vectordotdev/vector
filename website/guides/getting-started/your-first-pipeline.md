@@ -1,10 +1,12 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
 series_position: 1
 author_github: https://github.com/Jeffail
 domain: configuring
+tags: ["domain: configuring"]
 ---
 
 import Alert from '@site/src/components/Alert';

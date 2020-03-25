@@ -69,4 +69,18 @@ export function enrichTags(tags, colorProfile) {
   });
 }
 
-export default {enrichTags};
+export function extractTagValue(tags, category) {
+  let prefix = category + ': ';
+
+  let tag = tags.find(tag => tag.startsWith(prefix));
+
+  console.log(tag)
+
+  if (tag) {
+    return tag.replace(prefix, '');
+  } else {
+    return null;
+  }
+}
+
+export default {enrichTags, extractTagValue};

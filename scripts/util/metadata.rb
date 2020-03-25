@@ -1,5 +1,5 @@
 require "erb"
-require "json_schemer"
+
 require "ostruct"
 require "toml-rb"
 
@@ -7,6 +7,7 @@ require_relative "metadata/batching_sink"
 require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
+require_relative "metadata/guide"
 require_relative "metadata/installation"
 require_relative "metadata/links"
 require_relative "metadata/post"
@@ -41,23 +42,27 @@ class Metadata
   class << self
     def load!(meta_dir, docs_root, guides_root, pages_root)
       metadata = load_metadata!(meta_dir)
-      json_schema = load_json_schema!(meta_dir)
-      validate_schema!(json_schema, metadata)
+      errors = metadata.validate_schema
+
+      if errors.any?
+        Printer.error!(
+          <<~EOF
+          The resulting hash from the `/.meta/**/*.toml` files failed
+          validation against the following schema:
+
+              /.meta/schema/meta.json
+
+          The errors include:
+
+              * #{errors[0..50].join("\n*    ")}
+          EOF
+        )
+      end
+
       new(metadata, docs_root, guides_root, pages_root)
     end
 
     private
-      def load_json_schema!(meta_dir)
-        json_schema = read_json("#{meta_dir}/.schema.json")
-
-        Dir.glob("#{meta_dir}/.schema/**/*.json").each do |file|
-          hash = read_json("#{meta_dir}/.schema.json")
-          json_schema.deep_merge!(hash)
-        end
-
-        json_schema
-      end
-
       def load_metadata!(meta_dir)
         metadata = {}
 
@@ -85,40 +90,20 @@ class Metadata
         TomlRB.parse(content)
       end
 
-      def posts
-        @posts ||=
-          Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-            Post.new(path)
-          end.sort_by { |post| [ post.date, post.id ] }
-      end
-
-      def read_json(path)
-        body = File.read(path)
-        JSON.parse(body)
-      end
-
-      def validate_schema!(schema, metadata)
-        schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
-        errors = schemer.validate(metadata).to_a
-        limit = 50
+      def validate_schema!(metadata)
+        errors = metadata.validate_schema
 
         if errors.any?
-          error_messages =
-            errors[0..(limit - 1)].collect do |error|
-              "The value at `#{error.fetch("data_pointer")}` failed validation for `#{error.fetch("schema_pointer")}`, reason: `#{error.fetch("type")}`"
-            end
-
-          if errors.size > limit
-            error_messages << "+ #{errors.size} errors"
-          end
-
           Printer.error!(
             <<~EOF
-            The metadata schema is invalid. This means the the resulting
-            hash from the `/.meta/**/*.toml` files violates the defined
-            schema. Errors include:
+            The resulting hash from the `/.meta/**/*.toml` files failed
+            validation against the following schema:
 
-            * #{error_messages.join("\n* ")}
+                /.meta/schema/meta.json
+
+            The errors include:
+
+                * #{errors[0..50].join("\n*    ")}
             EOF
           )
         end
@@ -129,6 +114,7 @@ class Metadata
     :data_model,
     :domains,
     :env_vars,
+    :guides,
     :installation,
     :links,
     :options,
@@ -153,6 +139,13 @@ class Metadata
     # domains
 
     @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
+
+    # guides
+
+    # @guides ||=
+    #   Dir.glob("#{GUIDES_ROOT}/**/*.md").collect do |path|
+    #     Guide.new(path)
+    #   end.sort_by { |guide| [ guide.title ] }
 
     # posts
 

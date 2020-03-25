@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send STDIN logs to AWS Kinesis Data Streams."
 domain: configuring
-platform_name: null
-sink_name: "aws_kinesis_streams"
-source_name: "stdin"
+author_github: https://github.com/binarylogic
 tags: ["source: stdin","sink: aws_kinesis_streams"]
 ---
 

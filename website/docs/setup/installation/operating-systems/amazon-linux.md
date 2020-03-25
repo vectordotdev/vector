@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 title: Install Vector On Amazon Linux
 sidebar_label: Amazon Linux
 description: Install Vector on Amazon Linux

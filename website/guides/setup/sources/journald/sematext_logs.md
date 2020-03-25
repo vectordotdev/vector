@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Sematext"
 description: "A guide to quickly, and correctly, send Journald logs to Sematext."
 domain: configuring
-platform_name: null
-sink_name: "sematext_logs"
-source_name: "journald"
+author_github: https://github.com/binarylogic
 tags: ["source: journald","sink: sematext_logs"]
 ---
 

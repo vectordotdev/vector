@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to GCP PubSub"
 description: "A guide to quickly, and correctly, send Docker logs to GCP PubSub."
 domain: configuring
-platform_name: "docker"
-sink_name: "gcp_pubsub"
-source_name: "docker"
+author_github: https://github.com/binarylogic
 tags: ["source: docker","sink: gcp_pubsub"]
 ---
 

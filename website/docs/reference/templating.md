@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 title: Templating
 description: Learn Vector's templating syntax used to creat dynamic values in Vector's configuration.
 status: beta

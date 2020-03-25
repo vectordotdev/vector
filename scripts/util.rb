@@ -5,6 +5,7 @@ require "active_support/core_ext/string/filters"
 require "active_support/core_ext/string/indent"
 
 require_relative "util/core_ext"
+require_relative "util/json_schema"
 require_relative "util/metadata"
 require_relative "util/printer"
 require_relative "util/version"

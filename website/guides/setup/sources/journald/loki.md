@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Loki"
 description: "A guide to quickly, and correctly, send Journald logs to Loki."
 domain: configuring
-platform_name: null
-sink_name: "loki"
-source_name: "journald"
+author_github: https://github.com/binarylogic
 tags: ["source: journald","sink: loki"]
 ---
 

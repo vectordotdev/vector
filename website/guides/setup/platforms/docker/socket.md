@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Socket"
 description: "A guide to quickly, and correctly, send Docker logs to Socket."
 domain: configuring
-platform_name: "docker"
-sink_name: "socket"
-source_name: "docker"
+author_github: https://github.com/binarylogic
 tags: ["source: docker","sink: socket"]
 ---
 

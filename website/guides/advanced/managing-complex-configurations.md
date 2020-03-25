@@ -1,9 +1,11 @@
 ---
-last_modified_on: "2020-03-24"
-title: Manage Complex Vector Configs
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
+title: Managing Complex Vector Configs
 description: Strategies for building and managing complex Vector configs
 author_github: https://github.com/Jeffail
 domain: configuring
+tags: []
 ---
 
 Writing large configuration files is not yet an official olympic event. However,
@@ -16,12 +18,12 @@ free Vector configs that are easy to maintain.
 
      To make changes please edit the template located at:
 
-     website/guides/advanced/manaing-complex-configurations.md.erb
+     website/guides/advanced/managing-complex-configurations.md.erb
 -->
 
 ## Test Driven Configuration
 
-Test driven configuration is a paradigm we just made up, so there's still time
+Test driven Configurationn is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
 configs with [unit tests][guides.advanced.unit-testing], and as it turns out
 they're also pretty useful during the building stage.

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 title: Data Model
 sidebar_label: hidden
 description: Vector's internal data model -- event and it's subtypes.

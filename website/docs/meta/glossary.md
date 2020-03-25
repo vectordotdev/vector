@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 title: Glossary
 description: "Vector documentation glossary of terms"
 ---

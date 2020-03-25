@@ -1,6 +1,7 @@
 .guide-item {
   background-color: var(--ifm-panel-background);
-  border: 1px solid var(--ifm-panel-border-color);
+  background-size: 10em;
+  border: 0.1em solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-heading-color);
@@ -22,6 +23,7 @@
 .guide-item > article > header {
   border-bottom: 0px none;
   margin-bottom: 0;
+  min-height: 50%;
   padding: 1em 1.25em;
   position: relative;
   top: 0;
@@ -42,7 +44,6 @@
   display: -webkit-box;
   font-family: var(--ifm-font-family-base);
   font-size: 1.1em;
-  font-weight: 500;
   height: 3em;
   line-height: 1.4;
   margin-bottom: calc( var(--ifm-spacing-vertical) / 4 );

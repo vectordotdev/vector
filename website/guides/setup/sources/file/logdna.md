@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to LogDNA"
 description: "A guide to quickly, and correctly, send File logs to LogDNA."
 domain: configuring
-platform_name: null
-sink_name: "logdna"
-source_name: "file"
+author_github: https://github.com/binarylogic
 tags: ["source: file","sink: logdna"]
 ---
 

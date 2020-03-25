@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Humio"
 description: "A guide to quickly, and correctly, send Docker logs to Humio."
 domain: configuring
-platform_name: "docker"
-sink_name: "humio_logs"
-source_name: "docker"
+author_github: https://github.com/binarylogic
 tags: ["source: docker","sink: humio_logs"]
 ---
 

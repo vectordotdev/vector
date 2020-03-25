@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Splunk HEC"
 description: "A guide to quickly, and correctly, send Journald logs to Splunk HEC."
 domain: configuring
-platform_name: null
-sink_name: "splunk_hec"
-source_name: "journald"
+author_github: https://github.com/binarylogic
 tags: ["source: journald","sink: splunk_hec"]
 ---
 

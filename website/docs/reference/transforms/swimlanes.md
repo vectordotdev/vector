@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]

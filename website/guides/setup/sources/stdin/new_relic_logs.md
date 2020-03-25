@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to New Relic"
 description: "A guide to quickly, and correctly, send STDIN logs to New Relic."
 domain: configuring
-platform_name: null
-sink_name: "new_relic_logs"
-source_name: "stdin"
+author_github: https://github.com/binarylogic
 tags: ["source: stdin","sink: new_relic_logs"]
 ---
 

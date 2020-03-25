@@ -66,4 +66,15 @@ class Hash
       end
     end
   end
+
+
+  def validate_schema
+    schema_path = self["$schema"]
+
+    if schema_path
+      JSONSchema.validate(schema_path, self)
+    else
+      []
+    end
+  end
 end

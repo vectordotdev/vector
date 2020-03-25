@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send File logs to GCP Stackdriver."
 domain: configuring
-platform_name: null
-sink_name: "gcp_stackdriver_logs"
-source_name: "file"
+author_github: https://github.com/binarylogic
 tags: ["source: file","sink: gcp_stackdriver_logs"]
 ---
 

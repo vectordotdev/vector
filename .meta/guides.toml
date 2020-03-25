@@ -13,6 +13,3 @@ title = "Administrating"
 
 [guides.domains.configuring]
 title = "Configuring"
-
-[guides.domains.setup]
-description = "Hello"

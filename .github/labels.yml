@@ -34,6 +34,9 @@
 - name: "domain: platforms"
   description: Anything platforms related
   color: 212f3e
+- name: "domain: schema"
+  description: Anything schema related
+  color: 212f3e
 - name: "domain: security"
   description: Anything security related
   color: 212f3e

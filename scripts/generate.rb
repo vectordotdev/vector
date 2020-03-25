@@ -23,6 +23,7 @@ require_relative "setup"
 #
 
 require_relative "generate/post_processors/component_importer"
+require_relative "generate/post_processors/front_matter_validator"
 require_relative "generate/post_processors/last_modified_setter"
 require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/option_linker"
@@ -96,11 +97,12 @@ def post_process(content, target_path, links)
     content = PostProcessors::ComponentImporter.import!(content)
     content = PostProcessors::SectionSorter.sort!(content)
     content = PostProcessors::SectionReferencer.reference!(content)
-    content = PostProcessors::LinkDefiner.define!(content, target_path, links)
     content = PostProcessors::OptionLinker.link!(content)
-
+    content = PostProcessors::LinkDefiner.define!(content, target_path, links)
     # must be last
     content = PostProcessors::LastModifiedSetter.set!(content, target_path)
+
+    PostProcessors::FrontMatterValidator.validate!(content, target_path)
   end
 
   content

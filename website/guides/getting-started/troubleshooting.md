@@ -1,10 +1,12 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: Troubleshooting Vector
 description: A guide on debugging and troubleshooting Vector
 series_position: 6
 author_github: https://github.com/binarylogic
 domain: administrating
+tags: ["domain: administrating"]
 ---
 
 import Alert from '@site/src/components/Alert';

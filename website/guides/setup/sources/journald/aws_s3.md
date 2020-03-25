@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to AWS S3"
 description: "A guide to quickly, and correctly, send Journald logs to AWS S3."
 domain: configuring
-platform_name: null
-sink_name: "aws_s3"
-source_name: "journald"
+author_github: https://github.com/binarylogic
 tags: ["source: journald","sink: aws_s3"]
 ---
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."

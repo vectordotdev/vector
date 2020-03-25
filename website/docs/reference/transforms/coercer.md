@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
 component_title: "Coercer"
 description: "The Vector `coercer` transform accepts and outputs `log` events allowing you to coerce log fields into fixed types."
 event_types: ["log"]

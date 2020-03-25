@@ -14,6 +14,8 @@
   --ifm-background-color-rgb: 255, 255, 255;
   --ifm-background-surface-color: var(--ifm-panel-background);
   --ifm-badge-border-radius: 0.25em;
+  --ifm-badge-padding-horizontal: 0.75em;
+  --ifm-badge-padding-vertical: 0.25em;
   --ifm-blockquote-color: var(--ifm-color-primary-lighter);
   --ifm-code-background: var(--ifm-color-emphasis-50);
   --ifm-code-font-size: 85%;
@@ -90,7 +92,7 @@
   --ifm-panel-border-color: var(--ifm-hr-border-color);
   --ifm-panel-border-color-active: var(--ifm-color-primary);
   --ifm-panel-box-shadow: 0 0px 10px 0px var(--ifm-color-emphasis-50);
-  --ifm-panel-box-shadow-active: var(--ifm-panel-box-shadow);
+  --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.35 );
   --ifm-panel-color: var(--ifm-color-emphasis-800);
   --ifm-panel-color-active: var(--ifm-link-color);
   --ifm-pre-line-height: var(--ifm-line-height-base);

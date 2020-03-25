@@ -43,10 +43,22 @@ export async function generateGuides(
       }
 
       let category = relativeSource.split('/')[0];
-      let categorySort = category == 'getting-started' ? 'A' : category;
+      let categorySort = category == 'getting-started' ? 'AA' : category;
       let domain = frontMatter.domain;
       let linkName = relativeSource.replace(/\.mdx?$/, '');
-      frontMatter.title = frontMatter.title || linkName;
+      let seriesPosition = frontMatter.series_position;
+      let tags = frontMatter.tags || [];
+      let title = frontMatter.title || linkName;
+
+      if (domain) {
+        tags.push(`domain: ${domain}`);
+      }
+
+      if (seriesPosition) {
+        tags.push('type: series');
+      } else {
+        tags.push('type: post');
+      }
 
       guides.push({
         id: frontMatter.id || frontMatter.title,
@@ -64,8 +76,8 @@ export async function generateGuides(
           seriesPosition: frontMatter.series_position,
           sort: frontMatter.sort,
           source: aliasedSource,
-          tags: (frontMatter.tags || []).concat(domain),
-          title: frontMatter.title,
+          tags: tags,
+          title: title,
           truncated: truncateMarker?.test(content) || false,
         },
       });

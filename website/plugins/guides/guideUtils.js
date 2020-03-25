@@ -53,7 +53,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
                 seriesPosition: frontMatter.series_position,
                 sort: frontMatter.sort,
                 source: aliasedSource,
-                tags: (frontMatter.tags || []).concat(domain),
+                tags: (frontMatter.tags || []),
                 title: frontMatter.title,
                 truncated: (truncateMarker === null || truncateMarker === void 0 ? void 0 : truncateMarker.test(content)) || false,
             },

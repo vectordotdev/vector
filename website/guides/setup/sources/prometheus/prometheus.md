@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send Prometheus metrics to Prometheus"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Prometheus."
 domain: configuring
-platform_name: null
-sink_name: "prometheus"
-source_name: "prometheus"
+author_github: https://github.com/binarylogic
 tags: ["source: prometheus","sink: prometheus"]
 ---
 

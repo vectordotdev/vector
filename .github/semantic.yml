@@ -29,6 +29,7 @@ scopes:
   - observability
   - operations
   - platforms
+  - schema
   - security
   - setup
   - sinks

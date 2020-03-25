@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Kafka"
 description: "A guide to quickly, and correctly, send STDIN logs to Kafka."
 domain: configuring
-platform_name: null
-sink_name: "kafka"
-source_name: "stdin"
+author_github: https://github.com/binarylogic
 tags: ["source: stdin","sink: kafka"]
 ---
 

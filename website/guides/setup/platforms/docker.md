@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Collect Docker logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
 domain: configuring
-platform_name: "docker"
-sink_name: null
-source_name: "docker"
+author_github: https://github.com/binarylogic
 tags: ["source: docker"]
 ---
 

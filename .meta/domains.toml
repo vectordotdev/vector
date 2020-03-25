@@ -35,6 +35,9 @@ name = "operations"
 name = "platforms"
 
 [[domains]]
+name = "schema"
+
+[[domains]]
 name = "security"
 
 [[domains]]

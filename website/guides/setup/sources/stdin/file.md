@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-24"
+last_modified_on: "2020-03-25"
+$schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to File"
 description: "A guide to quickly, and correctly, send STDIN logs to File."
 domain: configuring
-platform_name: null
-sink_name: "file"
-source_name: "stdin"
+author_github: https://github.com/binarylogic
 tags: ["source: stdin","sink: file"]
 ---
 
