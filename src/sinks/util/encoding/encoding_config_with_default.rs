@@ -13,6 +13,7 @@ use string_cache::DefaultAtom as Atom;
 /// This structure **does** assume that there is a default format. Consider
 /// `EncodingConfig<E>` instead if `E: !Default`.
 #[derive(Serialize, Debug, Eq, PartialEq, Clone, Default)]
+#[allow(dead_code)] // Required for `make check-component-features
 pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
@@ -69,6 +70,7 @@ impl<E> EncodingConfigWithDefault<E>
 where
     E: Default + PartialEq,
 {
+    #[allow(dead_code)] // Required for `make check-component-features`
     pub(crate) fn transmute<X>(self) -> EncodingConfigWithDefault<X>
     where
         X: From<E> + Default + PartialEq,
@@ -80,6 +82,7 @@ where
             timestamp_format: self.timestamp_format,
         }
     }
+    #[allow(dead_code)] // Required for `make check-component-features`
     pub(crate) fn without_default<X>(self) -> EncodingConfig<X>
     where
         X: From<E> + PartialEq,
