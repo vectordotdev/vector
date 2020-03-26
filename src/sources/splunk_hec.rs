@@ -387,7 +387,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(event::log_schema().message_key().clone(), string)
+                    log.insert(event::log_schema().message_key().clone(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -398,8 +398,12 @@ impl<R: Read> Stream for EventStream<R> {
                     if let Some(line) = object.remove("line") {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
-                            JsonValue::Array(_) | JsonValue::Object(_) => log.insert("line", line),
-                            _ => log.insert(event::log_schema().message_key(), line),
+                            JsonValue::Array(_) | JsonValue::Object(_) => {
+                                log.insert("line", line);
+                            }
+                            _ => {
+                                log.insert(event::log_schema().message_key(), line);
+                            }
                         }
                     }
 
@@ -453,7 +457,7 @@ impl<R: Read> Stream for EventStream<R> {
         match self.time.clone() {
             Time::Provided(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
             Time::Now(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
-        }
+        };
 
         // Extract default extracted fields
         for de in self.extractors.iter_mut() {

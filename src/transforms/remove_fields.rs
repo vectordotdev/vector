@@ -54,7 +54,14 @@ impl Transform for RemoveFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         for field in &self.fields {
-            log.remove_prune(field, self.drop_empty);
+            let old_val = log.remove_prune(field, self.drop_empty);
+            if old_val.is_none() {
+                debug!(
+                    message = "Field did not exist",
+                    field = field.as_ref(),
+                    rate_limit_secs = 30,
+                )
+            }
         }
 
         Some(event)
