@@ -106,7 +106,7 @@ jobs:
         AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
 
     - name: Post a comment with the results
-      uses: actions/github-script@0.4.0
+      uses: actions/github-script@0.9.0
       with:
         github-token: '${{secrets.GITHUB_TOKEN}}'
         script: |
