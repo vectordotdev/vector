@@ -15,6 +15,7 @@ use kube::{
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use std::fmt::Write;
 use uuid::Uuid;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
@@ -645,7 +646,14 @@ fn kube_diff_pod_uid() {
 #[test]
 fn kube_partial() {
     let namespace = format!("partial-{}", Uuid::new_v4());
-    let message = random_string(64 * 1024); // 64 kb
+    let message = {
+        let mut s = String::new();
+        for i in 0..8 {
+            write!(s, "{}", i.to_string().repeat(8 * 1024)).unwrap();
+        }
+        s
+    };
+    assert_eq!(message.len(), 64 * 1024); // 64 kb
     let user_namespace = user_namespace(&namespace);
 
     let kube = Kube::new(&namespace);
