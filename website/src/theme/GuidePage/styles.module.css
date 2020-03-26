@@ -32,6 +32,7 @@
 
 .tableOfContents {
   border-left: 0px none;
+  top: var(--ifm-spacing-vertical);
 }
 
 @media (max-width: 996px) {
