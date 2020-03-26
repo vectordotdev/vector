@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---

@@ -18,6 +18,12 @@ github = "https://github.com/hoverbear"
 keybase = "https://keybase.io/hoverbear"
 twitter = "https://twitter.com/a_hoverbear"
 name = "Ana"
+bio = """\
+Ana is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
+and member of the <a href="/community#team">core Vector team</a>. She is \
+actively invovled in the Rust community and contributing to project and \
+organizing meetups.\
+"""
 
 [[team]]
 id = "ashley"
@@ -26,6 +32,12 @@ github = "https://github.com/Jeffail"
 keybase = "https://keybase.io/jeffail"
 twitter = "https://twitter.com/jeffail"
 name = "Ashley"
+bio = """\
+Ashley is a Principal Engineer at <a href="https://timber.io">Timber.io</a> \
+and member of the <a href="/community#team">core Vector team</a>. He created \
+<a href="https://github.com/Jeffail/benthos">Benthos stream processor</a>, a \
+popular stream processor written Go.\
+"""
 
 [[team]]
 id = "ben"
@@ -34,6 +46,13 @@ github = "https://github.com/binarylogic"
 keybase = "https://keybase.io/binarylogic"
 twitter = "https://twitter.com/binarylogic"
 name = "Ben"
+bio = """\
+Ben is the CTO/Co-Founder at <a href="https://timber.io">Timber.io</a> and a \
+member of the <a href="/community#team">core Vector team</a>. He is an \
+open-source OG, creating \
+<a href="https://github.com/binarylogic/authlogic">Authlogic</a> back to 2005 \
+before helping to launch Vector.\
+"""
 
 [[team]]
 id = "bruce"

@@ -1,22 +1,50 @@
-.credit {
-  margin-bottom: 0.5em
-}
-
-.category {
-  text-transform: uppercase;
-}
-
 .header {
-  margin-top: calc( var(--ifm-spacing-vertical) * 1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+  margin-top: calc( var(--ifm-spacing-vertical) * 0.5 );
 }
 
-.sinkSwitcher {
-  background: var(--ifm-background-color);
-  height: 100%;
-  left: 0;
-  position: sticky;
-  top: 0;
-  width: 500px;
-  z-index: 201;
+.container {
+  display: flex;
+  flex-direction: row;
+}
+
+.container > aside {
+  max-width: 275px;
+}
+
+.container > article {
+  max-width: 700px;
+  margin-left: calc( var(--ifm-spacing-horizontal) * 2 );
+  margin-top: calc( (var(--ifm-spacing-vertical) * 1.5) + 8px );
+}
+
+.avatar {
+  background: var(--ifm-color-emphasis-50);
+  border: 0px none;
+  border-radius: var(--ifm-global-radius);
+  margin-top: 32px;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 1 );
+}
+
+.avatar > div {
+  margin-top: calc( ( var(--ifm-spacing-vertical) * -1.5 ) - 32px );
+}
+
+.tableOfContents {
+  border-left: 0px none;
+}
+
+@media (max-width: 996px) {
+  .container {
+    display: block;
+  }
+
+  .container > aside {
+    max-width: none;
+  }
+
+  .container > article {
+    max-width: none;
+    margin-left: 0;
+  }
 }

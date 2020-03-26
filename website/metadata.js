@@ -3,6 +3,23 @@ module.exports = {
     "log",
     "metric"
   ],
+  "guides": {
+    "advanced": {
+      "description": "Going beyond the basics. Extract the full potential Vector has to offer.",
+      "name": "advanced",
+      "title": "Advanced"
+    },
+    "getting-started": {
+      "description": "Take Vector from zero to production in under 10 minutes.",
+      "name": "getting-started",
+      "title": "Getting Started"
+    },
+    "setup": {
+      "description": "Targeted guides for setting up specific sources and sinks.",
+      "name": "setup",
+      "title": "Setup"
+    }
+  },
   "installation": {
     "downloads": {
       "x86_64-unknown-linux-musl-tar-gz": {
@@ -23004,6 +23021,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/hoverbear.png",
+      "bio": "Ana is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. She is actively invovled in the Rust community and contributing to project and organizing meetups.",
       "github": "https://github.com/hoverbear",
       "id": "ana",
       "keybase": "https://keybase.io/hoverbear",
@@ -23012,6 +23030,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/Jeffail.png",
+      "bio": "Ashley is a Principal Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://github.com/Jeffail/benthos\">Benthos stream processor and has deep experience with stream processing.",
       "github": "https://github.com/Jeffail",
       "id": "ashley",
       "keybase": "https://keybase.io/jeffail",
@@ -23020,6 +23039,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/binarylogic.png",
+      "bio": "Ben is the CTO/Co-Founder at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He is an open-source OG, creating <a href=\"https://github.com/binarylogic/authlogic\">Authlogic</a> back to 2005 before helping to launch Vector.",
       "github": "https://github.com/binarylogic",
       "id": "ben",
       "keybase": "https://keybase.io/binarylogic",

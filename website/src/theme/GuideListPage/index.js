@@ -13,15 +13,16 @@ import './styles.css';
 const AnchoredH2 = Heading('h2');
 
 function GuideListPage(props) {
-  const {metadata, items: guides} = props;
+  const {metadata, items} = props;
   const context = useDocusaurusContext();
-  const {siteConfig = {title: siteTitle}} = context;
+  const {siteConfig: {customFields, title: siteTitle}} = context;
+  const {metadata: {guides}} = customFields;
   const isGuideOnlyMode = metadata.permalink === '/';
   const title = isGuideOnlyMode ? siteTitle : 'Guides';
-  const groupedGuides = _.groupBy(guides, ((guide) => guide.content.metadata.category));
+  const groupedItems = _.groupBy(items, ((item) => item.content.metadata.category));
 
   return (
-    <Layout title={title} description="Vector guides, tutorials, and education.">
+    <Layout title={title} description="Guides, tutorials, and education.">
       <header className="hero hero--clean">
         <div className="container">
           <h1>Vector Guides</h1>
@@ -31,13 +32,15 @@ function GuideListPage(props) {
         </div>
       </header>
       <main className="container">
-        {Object.keys(groupedGuides).map((category, index) => {
-          let groupGuides = groupedGuides[category];
+        {Object.keys(groupedItems).map((categoryName, index) => {
+          let category = guides[categoryName];
+          let groupItems = groupedItems[categoryName];
 
           return (
             <section>
-              <AnchoredH2 id={category}>{humanizeString(category)}</AnchoredH2>
-              <GuideItems items={groupGuides.slice(0,25)} staggered={index == 0} />
+              <AnchoredH2 id={category.name}>{category.title}</AnchoredH2>
+              <div className="sub-title">{category.description}</div>
+              <GuideItems items={groupItems.slice(0,25)} staggered={index == 0} />
             </section>
           );
         })}

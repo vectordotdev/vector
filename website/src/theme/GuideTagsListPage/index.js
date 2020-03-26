@@ -1,62 +1,50 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React from 'react';
 
+import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import Tag from '@site/src/components/Tag';
 
-function getCategoryOfTag(tag) {
-  // tag's category should be customizable
-  return tag[0].toUpperCase();
-}
+import _ from 'lodash';
+import {enrichTags} from '@site/src/exports/tags';
+import humanizeString from 'humanize-string';
+import pluralize from 'pluralize';
+
+const AnchoredH2 = Heading('h2');
 
 function GuideTagsListPage(props) {
   const {tags} = props;
 
-  const tagCategories = {};
-  Object.keys(tags).forEach(tag => {
-    const category = getCategoryOfTag(tag);
-    tagCategories[category] = tagCategories[category] || [];
-    tagCategories[category].push(tag);
-  });
-  const tagsList = Object.entries(tagCategories).sort(([a], [b]) => {
-    if (a === b) {
-      return 0;
-    }
-    return a > b ? 1 : -1;
-  });
-  const tagsSection = tagsList
-    .map(([category, tagsForCategory]) => (
-      <div key={category}>
-        <h3>{category}</h3>
-        {tagsForCategory.map(tag => (
-          <Link
-            className="padding-right--md"
-            href={tags[tag].permalink}
-            key={tag}>
-            {tags[tag].name} ({tags[tag].count})
-          </Link>
-        ))}
-        <hr />
-      </div>
-    ))
-    .filter(item => item != null);
+  const normalizedTags = Object.values(tags).map(tag => ({
+    count: tag.count,
+    label: tag.name,
+    permalink: tag.permalink
+  }));
+
+  const enrichedTags = enrichTags(normalizedTags, 'guides');
+  const groupedTags = _.groupBy(enrichedTags, 'category');
 
   return (
     <Layout title="Tags" description="Vector guide tags">
-      <div className="container margin-vert--xl">
-        <div className="row">
-          <div className="col col--8 col--offset-2">
-            <h1>Tags</h1>
-            <div className="margin-vert--lg">{tagsSection}</div>
-          </div>
+      <header className="hero hero--clean">
+        <div className="container">
+          <h1>All Guide Tags</h1>
         </div>
-      </div>
+      </header>
+      <main className="container container--narrow">
+        {Object.keys(groupedTags).map((category, index) => {
+          let tags = groupedTags[category];
+          return (
+            <section>
+              <AnchoredH2 id={category.name}>{pluralize(humanizeString(category))}</AnchoredH2>
+
+              {tags.map((tag, idx) => (
+                <div><Tag key={idx} valueOnly={true} {...tag} /></div>
+              ))}
+            </section>
+          );
+        })}
+      </main>
     </Layout>
   );
 }

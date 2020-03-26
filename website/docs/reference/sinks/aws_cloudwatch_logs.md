@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."

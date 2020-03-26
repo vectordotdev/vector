@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---

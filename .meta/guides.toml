@@ -1,15 +1,17 @@
-[guides.categories.advanced]
-description = "Hello"
+[guides.advanced]
+title = "Advanced"
+description = """\
+Going beyond the basics. Extract the full potential Vector has to offer.\
+"""
 
-[guides.categories.getting-started]
-description = "Hello"
-series = true
+[guides.getting-started]
+title = "Getting Started"
+description = """\
+Take Vector from zero to production in under 10 minutes.\
+"""
 
-[guides.categories.setup]
-description = "Hello"
-
-[guides.domains.administrating]
-title = "Administrating"
-
-[guides.domains.configuring]
-title = "Configuring"
+[guides.setup]
+title = "Setup"
+description = """\
+Targeted guides for setting up specific sources and sinks.\
+"""

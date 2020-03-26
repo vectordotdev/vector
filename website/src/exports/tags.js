@@ -45,6 +45,7 @@ function enrichTag(tag, colorProfile) {
 
   return {
     category: category,
+    count: tag.count,
     label: tag.label,
     permalink: tag.permalink,
     style: style,
@@ -70,8 +71,6 @@ export function extractTagValue(tags, category) {
   let prefix = category + ': ';
 
   let tag = tags.find(tag => tag.startsWith(prefix));
-
-  console.log(tag)
 
   if (tag) {
     return tag.replace(prefix, '');

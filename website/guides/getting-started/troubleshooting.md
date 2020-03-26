@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 $schema: "/.meta/.schemas/guides.json"
 title: Troubleshooting Vector
 description: A guide on debugging and troubleshooting Vector

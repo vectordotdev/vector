@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 $schema: "/.meta/.schemas/guides.json"
 title: Making & Applying Changes
 description: How to change your Vector pipelines without disrupting flow.

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 title: Monitoring
 description: How to monitor and observe Vector with logs, metrics, and more.
 ---

@@ -34,7 +34,7 @@ const TOP_OFFSET = 100;
 function Headings({headings, isChild}) {
   if (!headings.length) return null;
   return (
-    <ul className={isChild ? '' : 'contents contents__left-border'}>
+    <ul className={isChild ? '' : 'contents'}>
       {headings.map(heading => (
         <li key={heading.id}>
           <a
@@ -46,12 +46,6 @@ function Headings({headings, isChild}) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function SinkSwitcher() {
-  return (
-    <div className={styles.sinkSwitcher}>Switcher!</div>
   );
 }
 
@@ -92,7 +86,6 @@ function GuidePage(props) {
   const source = sourceName && sources[sourceName];
   const eventTypes = (platform || source || sink || {}).event_types || [];
 
-
   let pathPrefix = '/guides/setup';
 
   if (platform) {
@@ -110,6 +103,8 @@ function GuidePage(props) {
   //
   // Render
   //
+
+  useTOCHighlight(LINK_CLASS_NAME, ACTIVE_LINK_CLASS_NAME, TOP_OFFSET);
 
   return (
     <Layout title={title} description={`${title}, in minutes, for free`}>
@@ -129,49 +124,72 @@ function GuidePage(props) {
             sources={false}
             transforms={false} />
       </Modal>}
-      <article>
-        <header className={`hero domain-bg domain-bg--${domainBG}`}>
-          <div className="container">
-            {(platform || source || sink) && (
-              <div className="component-icons">
-                {platform && <div className="icon panel">
-                  {platform.logo_path ?
-                    <SVG src={platform.logo_path} alt={`${platform.title} Logo`} /> :
-                    <i className="feather icon-server"></i>}
-                </div>}
-                {source && !platform && <div className="icon panel">
-                  {source.logo_path ?
-                    <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
-                    <i className="feather icon-server"></i>}
-                </div>}
-                {!source && !platform && <a href="#" className="icon panel" title="Select a source">
-                  <i className="feather icon-plus"></i>
-                </a>}
-                {sink && <a href="#" className="icon panel" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
-                  {sink.logo_path ?
-                    <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
-                    <i className="feather icon-database"></i>}
-                 </a>}
-                 {!sink && <a href="#" className="icon panel" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>
-                   <i className="feather icon-plus"></i>
-                 </a>}
-              </div>
-            )}
-            {authorGithub && <Avatar
+      <header className={`hero domain-bg domain-bg--${domainBG}`}>
+        <div className="container">
+          {(platform || source || sink) && (
+            <div className="component-icons">
+              {platform && <div className="icon panel">
+                {platform.logo_path ?
+                  <SVG src={platform.logo_path} alt={`${platform.title} Logo`} /> :
+                  <i className="feather icon-server"></i>}
+              </div>}
+              {source && !platform && <div className="icon panel">
+                {source.logo_path ?
+                  <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
+                  <i className="feather icon-server"></i>}
+              </div>}
+              {!source && !platform && <a href="#" className="icon panel" title="Select a source">
+                <i className="feather icon-plus"></i>
+              </a>}
+              {sink && <a href="#" className="icon panel" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
+                {sink.logo_path ?
+                  <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
+                  <i className="feather icon-database"></i>}
+               </a>}
+               {!sink && <a href="#" className="icon panel" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>
+                 <i className="feather icon-plus"></i>
+               </a>}
+            </div>
+          )}
+          {(!platform && !source && !sink) && (
+            <div className="hero--category">{category}</div>)}
+          <h1 className={styles.header}>{title}</h1>
+          <div className="hero--subtitle">{frontMatter.description}</div>
+          <Tags colorProfile="guides" tags={tags} />
+        </div>
+      </header>
+      <main className={classnames('container', 'container--wide', styles.container)}>
+        <aside>
+          <section className={styles.avatar}>
+            <Avatar
+              bio={true}
               github={authorGithub}
               size="lg"
-              nameSuffix={<> / {readingTime} / Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></>}
               rel="author"
               subTitle={false}
-              vertical={true} />}
-            <h1 className={styles.header}>{title}</h1>
-            <Tags colorProfile="guides" tags={tags} />
+              vertical={true} />
+          </section>
+          <section className={classnames('table-of-contents', styles.tableOfContents)}>
+            <div className="section">
+              <div className="title">Stats</div>
+
+              <div className="text--secondary text--bold"><i className="feather icon-book"></i> {readingTime}</div>
+              <div className="text--secondary text--bold"><i className="feather icon-clock"></i> Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></div>
+            </div>
+            {GuideContents.rightToc && (
+              <div className="section">
+                <div className="title">Contents</div>
+                <Headings headings={GuideContents.rightToc} />
+              </div>
+            )}
+          </section>
+        </aside>
+        <article>
+          <div className="markdown">
+            <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
           </div>
-        </header>
-        <section className="container container--narrow margin-vert--xl markdown align-text-edges">
-          <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
-        </section>
-      </article>
+        </article>
+      </main>
     </Layout>
   );
 }

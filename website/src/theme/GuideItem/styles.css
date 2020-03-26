@@ -41,7 +41,7 @@
 
 .guide-item > article > header > h2 {
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   display: -webkit-box;
   font-family: var(--ifm-font-family-base);
   font-size: 1.1em;

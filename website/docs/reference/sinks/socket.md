@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP or Unix domain socket."

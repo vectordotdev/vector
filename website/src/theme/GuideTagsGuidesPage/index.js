@@ -8,7 +8,7 @@
 import React from 'react';
 
 import Layout from '@theme/Layout';
-import GuideItem from '@theme/GuideItem';
+import GuideItems from '@theme/GuideItems';
 import Link from '@docusaurus/Link';
 
 function pluralize(count, word) {
@@ -23,28 +23,17 @@ function GuideTagsGuidesPage(props) {
     <Layout
       title={`Guides tagged "${tagName}"`}
       description={`Guide | Tagged "${tagName}"`}>
-      <div className="container margin-vert--xl">
-        <div className="row">
-          <div className="col col--8 col--offset-2">
-            <h1>
-              {count} {pluralize(count, 'guide')} tagged with &quot;{tagName}
-              &quot;
-            </h1>
+      <header className="hero hero--clean">
+        <div className="container">
+          <h1>{count} {pluralize(count, 'guide')} tagged with &quot;{tagName}&quot;</h1>
+          <div className="hero--subtitle">
             <Link href={allTagsPath}>View All Tags</Link>
-            <div className="margin-vert--xl">
-              {items.map(({content: GuideContent}) => (
-                <GuideItem
-                  key={GuideContent.metadata.permalink}
-                  frontMatter={GuideContent.frontMatter}
-                  metadata={GuideContent.metadata}
-                  truncated>
-                  <GuideContent />
-                </GuideItem>
-              ))}
-            </div>
           </div>
         </div>
-      </div>
+      </header>
+      <main className="container">
+        <GuideItems items={items} />
+      </main>
     </Layout>
   );
 }

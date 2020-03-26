@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect File logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect File logs and send them anywhere."

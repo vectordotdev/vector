@@ -8,6 +8,7 @@ require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
 require_relative "metadata/guide"
+require_relative "metadata/guides"
 require_relative "metadata/installation"
 require_relative "metadata/links"
 require_relative "metadata/post"
@@ -128,6 +129,7 @@ class Metadata
 
   def initialize(hash, docs_root, guides_root, pages_root)
     @data_model = DataModel.new(hash.fetch("data_model"))
+    @guides = hash.fetch("guides").to_struct_with_name(constructor: Guides)
     @installation = Installation.new(hash.fetch("installation"))
     @options = hash.fetch("options").to_struct_with_name(constructor: Field)
     @releases = OpenStruct.new()
@@ -347,6 +349,7 @@ class Metadata
   def to_h
     {
       event_types: event_types,
+      guides: guides.deep_to_h,
       installation: installation.deep_to_h,
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,

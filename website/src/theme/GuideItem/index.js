@@ -23,7 +23,6 @@ function GuideItem(props) {
   const {category, description, permalink, readingTime, seriesPosition, tags} = metadata;
   const {author_github, last_modified_on: lastModifiedOn, title} = frontMatter;
   const enrichedTags = enrichTags(tags, 'guides');
-  console.log(enrichedTags)
   const domainTag = enrichedTags.find(tag => tag.category == 'domain');
   const domainBG = domainTag ? domainTag.value : 'default';
 

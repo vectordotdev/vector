@@ -3,10 +3,6 @@
  *
  * Override the default Infima variables here. These values cascade down to
  * the rest of the elements.
- *
- * Note: The primary colors were generated with colorbox via:
- *
- * https://www.colorbox.io/#steps=6#hue_start=185#hue_end=200#hue_curve=easeInQuad#sat_start=48#sat_end=100#sat_curve=easeOutQuad#sat_rate=101#lum_start=100#lum_end=65#lum_curve=easeOutQuint#minor_steps_map=0
  */
 :root {
   --ifm-alert-color: var(--ifm-heading-color);
@@ -16,7 +12,7 @@
   --ifm-badge-border-radius: 0.25em;
   --ifm-badge-padding-horizontal: 0.75em;
   --ifm-badge-padding-vertical: 0.25em;
-  --ifm-blockquote-color: var(--ifm-color-primary-lighter);
+  --ifm-blockquote-color: var(--ifm-color-primary);
   --ifm-code-background: var(--ifm-color-emphasis-50);
   --ifm-code-font-size: 85%;
   --ifm-color-black: rgb(0, 27, 61);
@@ -24,7 +20,7 @@
   --ifm-color-blue: #438FFF;
   --ifm-color-blue-rgb: 67, 143 ,255;
   --ifm-color-content: var(--ifm-color-emphasis-800);
-  --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
+  --ifm-color-content-secondary: var(--ifm-color-emphasis-600);
   --ifm-color-danger: #ff1178;
   --ifm-color-danger-rgb: 255, 17, 120;
   --ifm-color-gray-25: rgba(0, 27, 61, 0.025);
@@ -49,15 +45,10 @@
   --ifm-color-pink-rgb: 244, 74 ,245;
   --ifm-color-primary: #28D9F2;
   --ifm-color-primary-rgb: 40, 217, 242;
-  --ifm-color-primary-dark: #0FBCE1;
-  --ifm-color-primary-darker: #0395C7;
-  --ifm-color-primary-darkest: #006EA6;
-  --ifm-color-primary-light: #51EBFB;
-  --ifm-color-primary-lighter: #6AF0FD;
-  --ifm-color-primary-lightest: #83F5FF;
+  --ifm-color-primary-dark: #00C6DD;
   --ifm-color-purple: #9988ff;
   --ifm-color-purple-rgb: 153, 136 ,255;
-  --ifm-color-secondary: var(--ifm-color-emphasis-100);
+  --ifm-color-secondary: var(--ifm-color-emphasis-600);
   --ifm-color-success: #00ff7f;
   --ifm-color-success-rgb: 0, 255, 127;
   --ifm-color-warning-rgb: 255, 186, 0;
@@ -298,12 +289,21 @@ blockquote > footer {
 .button.button--primary {
   --ifm-button-color: var(--ifm-background-color);
 }
+
 .button.button--highlight {
   animation: gradientBG 5s ease-in infinite;
   background-image: var(--ifm-highlight-gradient);
   background-size: 150% 150%;
   color: var(--ifm-background-color);
 }
+
+/**
+ * col
+ *
+ * Custom column widths
+ */
+
+
 
 /**
  * comparison
@@ -469,6 +469,10 @@ table.comparison tr td.bar.vector .bar {
 .container--narrow {
   box-sizing: border-box;
   max-width: 760px;
+}
+
+.container--wide {
+  --ifm-container-width: 1280px;
 }
 
 /**
@@ -673,9 +677,13 @@ header h1 {
 .hero h1 {
   font-size: 2.5rem;
 }
+.hero .hero--category {
+  text-transform: uppercase;
+}
 .hero .hero--subtitle {
-  font-size: 1.1rem;
-  margin-top: 0.3rem;
+  color: var(--ifm-color-emphasis-600);
+  font-size: 1.3em;
+  margin-top: 0.3em;
   margin-bottom: var(--ifm-spacing-vertical);
 }
 .hero .hero--subtitle a {
@@ -1291,7 +1299,8 @@ section {
 }
 section .sub-title {
   color: var(--ifm-color-emphasis-600);
-  margin-top: calc( var(--ifm-heading-margin-bottom) * -1 );
+  font-size: 1.15em;
+  margin-top: calc( var(--ifm-heading-margin-bottom) * -0.9 );
   margin-bottom: var(--ifm-heading-margin-bottom);
 }
 section.shade {
@@ -1557,6 +1566,7 @@ div.section-list.section-list--hover > .section:hover {
 .sidebar__logo svg [fill="#000000"] {
   fill: var(--ifm-heading-color);
 }
+
 .container svg [stroke="#000000"],
 .footer svg [stroke="#000000"],
 .markdown svg [stroke="#000000"],
@@ -1564,6 +1574,7 @@ div.section-list.section-list--hover > .section:hover {
 .sidebar__logo svg [stroke="#000000"] {
   stroke: var(--ifm-heading-color);
 }
+
 .container svg [stop-color="#000000"],
 .footer svg [stop-color="#000000"],
 .markdown svg [stop-color="#000000"],
@@ -1571,6 +1582,7 @@ div.section-list.section-list--hover > .section:hover {
 .sidebar__logo svg [stop-color="#000000"] {
   stop-color: var(--ifm-heading-color);
 }
+
 .container svg [fill="#FFFFFF"],
 .footer svg [fill="#FFFFFF"],
 .markdown svg [fill="#FFFFFF"],
@@ -1578,6 +1590,7 @@ div.section-list.section-list--hover > .section:hover {
 .sidebar__logo svg [fill="#FFFFFF"] {
   fill: var(--ifm-background-color);
 }
+
 .container svg [stroke="#FFFFFF"],
 .footer svg [stroke="#FFFFFF"],
 .markdown svg [stroke="#FFFFFF"],
@@ -1585,6 +1598,23 @@ div.section-list.section-list--hover > .section:hover {
 .sidebar__logo svg [stroke="#FFFFFF"] {
   stroke: var(--ifm-background-color);
 }
+
+.container svg [fill="#10E7FF"],
+.footer svg [fill="#10E7FF"],
+.markdown svg [fill="#10E7FF"],
+.navbar__brand svg [fill="#10E7FF"],
+.sidebar__logo svg [fill="#10E7FF"] {
+  fill: var(--ifm-color-primary);
+}
+
+.container svg [stroke="#10E7FF"],
+.footer svg [stroke="#10E7FF"],
+.markdown svg [stroke="#10E7FF"],
+.navbar__brand svg [stroke="#10E7FF"],
+.sidebar__logo svg [stroke="#10E7FF"] {
+  stroke: var(--ifm-color-primary);
+}
+
 
 /**
  * table
@@ -1617,8 +1647,8 @@ table {
 }
 .table-of-contents .section {
   border-bottom: 1px solid var(--ifm-hr-border-color);
-  padding: 0 0 0.5rem 0;
-  margin-bottom: 0.5rem;
+  padding: 0 0 var(--ifm-spacing-vertical) 0;
+  margin-bottom: var(--ifm-spacing-vertical);
 }
 .table-of-contents .section:last-child {
   border-bottom: 0px none;
@@ -1740,8 +1770,12 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 }
 
 /*
- * text--highlight
+ * text
  */
+
+.text--bold {
+  font-weight: bold;
+}
 
 .text--highlight {
   animation: gradientBG 5s ease-in infinite;
@@ -1751,10 +1785,6 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   -webkit-background-clip: text;
   color: transparent;
 }
-
-/*
- * text--upcase
- */
 
 .text--upcase {
   text-transform: uppercase;
@@ -1949,10 +1979,14 @@ div[class^='docPage_'] div[class^='sidebar_'] .menu__link.menu__link--active:not
  * Dark Theme
  ******************************************************************************/
 
+/**
+ * Root variables (dark)
+ */
+
 html[data-theme="dark"] {
   --ifm-background-color: #191927;
   --ifm-background-color-rgb: 25, 25, 39;
-  --ifm-color-content-secondary: var(--ifm-color-emphasis-400);
+  --ifm-color-content-secondary: var(--ifm-color-emphasis-600);
   --ifm-color-emphasis-25: var(--ifm-color-gray-975);
   --ifm-color-emphasis-40: var(--ifm-color-gray-960);
   --ifm-color-emphasis-50: var(--ifm-color-gray-950);

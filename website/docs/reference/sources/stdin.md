@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-25"
+last_modified_on: "2020-03-26"
 delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
