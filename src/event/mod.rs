@@ -46,9 +46,7 @@ pub struct LogEvent {
 
 impl Event {
     pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        })
+        Event::Log(LogEvent::new())
     }
 
     pub fn as_log(&self) -> &LogEvent {
@@ -95,6 +93,12 @@ impl Event {
 }
 
 impl LogEvent {
+    pub fn new() -> Self {
+        Self {
+            fields: BTreeMap::new(),
+        }
+    }
+
     pub fn get(&self, key: &Atom) -> Option<&Value> {
         util::log::get(&self.fields, key)
     }
