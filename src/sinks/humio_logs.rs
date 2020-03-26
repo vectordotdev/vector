@@ -1,9 +1,6 @@
 use crate::{
     sinks::splunk_hec::{self, HecSinkConfig},
-    sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        BatchBytesConfig, TowerRequestConfig,
-    },
+    sinks::util::{encoding::EncodingConfigWithDefault, BatchBytesConfig, TowerRequestConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -50,9 +47,6 @@ impl From<Encoding> for splunk_hec::Encoding {
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        if self.encoding.codec() != &Encoding::Json {
-            error!("Using an unsupported encoding for Humio");
-        }
         let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
 
         HecSinkConfig {

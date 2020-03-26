@@ -299,8 +299,8 @@ mod integration_tests {
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
-        let mut encoding = EncodingConfigWithDefault::default();
-        encoding.set_timestamp_format(TimestampFormat::Unix);
+        let mut encoding =
+            EncodingConfigWithDefault::default().set_timestamp_format(TimestampFormat::Unix);
 
         let config = ClickhouseConfig {
             host: host.clone(),

@@ -1,11 +1,12 @@
-use crate::sinks::util::encoding::{
-    EncodingConfig, EncodingConfiguration, InnerWithDefault, TimestampFormat,
+use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat};
+use serde::{
+    de::{self, DeserializeOwned, Deserializer, IntoDeserializer, MapAccess, Visitor},
+    Deserialize, Serialize,
 };
-use serde::de::{DeserializeOwned, IntoDeserializer, MapAccess, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize};
-use std::fmt;
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use std::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 use string_cache::DefaultAtom as Atom;
 
 /// A structure to wrap sink encodings and enforce field privacy.
@@ -48,20 +49,27 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn only_fields(&self) -> &Option<Vec<Atom>> {
         &self.only_fields
     }
-    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>> {
-        std::mem::replace(&mut self.only_fields, fields)
-    }
     fn except_fields(&self) -> &Option<Vec<Atom>> {
         &self.except_fields
-    }
-    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>> {
-        std::mem::replace(&mut self.only_fields, fields)
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }
-    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> Option<TimestampFormat> {
-        std::mem::replace(&mut self.timestamp_format, format)
+    fn set_codec(&mut self, codec: E) -> &mut Self {
+        self.codec = codec;
+        self
+    }
+    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
+        self.only_fields = fields;
+        self
+    }
+    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self {
+        self.only_fields = fields;
+        self
+    }
+    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self {
+        self.timestamp_format = format;
+        self
     }
 }
 
@@ -191,4 +199,16 @@ where
             .map_err(|e| serde::de::Error::custom(e))?;
         Ok(concrete)
     }
+}
+
+#[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
+pub struct InnerWithDefault<E: Default> {
+    #[serde(default)]
+    codec: E,
+    #[serde(default)]
+    only_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    except_fields: Option<Vec<Atom>>,
+    #[serde(default)]
+    timestamp_format: Option<TimestampFormat>,
 }

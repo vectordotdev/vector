@@ -29,18 +29,14 @@
 //       `Encoder` that defines some `encode` function which this config then calls internally as
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
-mod encoding_config;
-pub use encoding_config::EncodingConfig;
-mod encoding_config_with_default;
-pub use encoding_config_with_default::EncodingConfigWithDefault;
-mod inner;
-mod inner_with_default;
-use inner_with_default::InnerWithDefault;
+mod config;
+pub use config::EncodingConfig;
+mod with_default;
+pub use with_default::EncodingConfigWithDefault;
 
 use crate::{event::Value, Event, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-use std::fmt::Debug;
+use std::{collections::VecDeque, fmt::Debug};
 use string_cache::DefaultAtom as Atom;
 
 /// The behavior of a encoding configuration.
@@ -53,9 +49,10 @@ pub trait EncodingConfiguration<E> {
     /// If `Some(_)` this configuration will configure the timestamp output.
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
-    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>>;
-    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> Option<Vec<Atom>>;
-    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> Option<TimestampFormat>;
+    fn set_codec(&mut self, codec: E) -> &mut Self;
+    fn set_only_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self;
+    fn set_except_fields(&mut self, fields: Option<Vec<Atom>>) -> &mut Self;
+    fn set_timestamp_format(&mut self, format: Option<TimestampFormat>) -> &mut Self;
 
     fn apply_only_fields(&self, event: &mut Event) {
         if let Some(only_fields) = &self.only_fields() {
@@ -162,9 +159,9 @@ mod tests {
         encoding: EncodingConfig<TestEncoding>,
     }
 
-    const TOML_SIMPLE_STRING: &str = "
-        encoding = \"Snoot\"
-    ";
+    const TOML_SIMPLE_STRING: &str = r#"
+        encoding = "Snoot"
+    "#;
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -172,11 +169,11 @@ mod tests {
         assert_eq!(config.encoding.codec(), &TestEncoding::Snoot);
     }
 
-    const TOML_SIMPLE_STRUCT: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-        encoding.only_fields = [\"Boop\"]
-    ";
+    const TOML_SIMPLE_STRUCT: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+        encoding.only_fields = ["Boop"]
+    "#;
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
@@ -186,21 +183,21 @@ mod tests {
         assert_eq!(config.encoding.only_fields(), &Some(vec!["Boop".into()]));
     }
 
-    const TOML_EXCLUSIVITY_VIOLATION: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-        encoding.only_fields = [\"Doop\"]
-    ";
+    const TOML_EXCLUSIVITY_VIOLATION: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+        encoding.only_fields = ["Doop"]
+    "#;
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
         assert!(config.is_err())
     }
 
-    const TOML_EXCEPT_FIELD: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.except_fields = [\"Doop\"]
-    ";
+    const TOML_EXCEPT_FIELD: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.except_fields = ["Doop"]
+    "#;
     #[test]
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
@@ -216,10 +213,10 @@ mod tests {
         assert!(event.as_mut_log().contains(&Atom::from("Beep")));
     }
 
-    const TOML_ONLY_FIELD: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.only_fields = [\"Doop\"]
-    ";
+    const TOML_ONLY_FIELD: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.only_fields = ["Doop"]
+    "#;
     #[test]
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
@@ -235,10 +232,10 @@ mod tests {
         assert!(!event.as_mut_log().contains(&Atom::from("Beep")));
     }
 
-    const TOML_TIMESTAMP_FORMAT: &str = "
-        encoding.codec = \"Snoot\"
-        encoding.timestamp_format = \"unix\"
-    ";
+    const TOML_TIMESTAMP_FORMAT: &str = r#"
+        encoding.codec = "Snoot"
+        encoding.timestamp_format = "unix"
+    "#;
     #[test]
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
