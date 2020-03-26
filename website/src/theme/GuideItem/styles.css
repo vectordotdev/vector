@@ -61,6 +61,7 @@
 .guide-item > article > footer > .action {
   font-size: 0.75em;
   font-weight: 600;
+  margin-top: 0.5em;
   opacity: 0;
   position: relative;
   text-decoration: underline;

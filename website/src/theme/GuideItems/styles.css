@@ -1,7 +1,7 @@
 .guide-items {
   display: grid;
   font-size: 1.275em;
-  grid-template-columns: repeat(auto-fit, 12.6em);
+  grid-template-columns: repeat(5, 1fr);
   grid-gap: 1.5rem;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
@@ -25,4 +25,33 @@
 .guide-items--staggered > a:first-child:hover {
   -webkit-transform:perspective(1000px) rotateY(-5deg) translate3d(-3px,0,0);
   transform:perspective(1000px) rotateY(-5deg) translate3d(-3px,0,0);
+}
+
+@media (max-width: 996px) {
+  .guide-items {
+    grid-template-columns: repeat(4, 1fr);
+    font-size: 1rem;
+  }
+
+  .guide-items--staggered > a:first-child {
+    grid-column-end: span 1;
+    grid-row-end: span 1;
+    font-size: 1em;
+  }
+
+  .guide-items--staggered {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 867px) {
+  .guide-items {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 609px) {
+  .guide-items {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
