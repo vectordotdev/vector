@@ -133,7 +133,7 @@ function VectorComponents(props) {
   const [onlyOperatingSystems, setOnlyOperatingSystems] = useState(new Set(queryObj['operating-systems']));
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
   const [onlyProviders, setOnlyProviders] = useState(new Set(queryObj['providers']));
-  const [searchTerm, setSearchTerm] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(queryObj['search']);
 
   //
   // Filtering

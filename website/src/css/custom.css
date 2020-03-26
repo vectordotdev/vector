@@ -680,6 +680,19 @@ header h1 {
 .hero .hero--category {
   text-transform: uppercase;
 }
+.hero .hero--component-icons {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+.hero .hero--component-icons .icon {
+  border-radius: 1.5em;
+  margin: 0 auto;
+  padding: 1.5em;
+  width: 135px;
+  height: 135px;
+}
+.hero .hero--component-icons .icon img {
+  width: 100%;
+}
 .hero .hero--subtitle {
   color: var(--ifm-color-emphasis-600);
   font-size: 1.3em;
@@ -693,23 +706,19 @@ header h1 {
 .hero .hero--subtitle a:hover {
   color: var(--ifm-link-color);
 }
+.hero .hero--search {
+  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
+}
+.hero .hero--search input {
+  display: block;
+  margin: 0 auto;
+  max-width: 700px;
+  width: 100%;
+}
 .hero .hero--subsubtitle {
   color: var(--ifm-hero-text-color);
   font-size: 0.9rem;
   margin-top: 0.3rem;
-}
-.hero .hero--component-icons {
-  margin-bottom: var(--ifm-spacing-vertical);
-}
-.hero .hero--component-icons .icon {
-  border-radius: 1.5em;
-  margin: 0 auto;
-  padding: 1.5em;
-  width: 135px;
-  height: 135px;
-}
-.hero .hero--component-icons .icon img {
-  width: 100%;
 }
 .hero .hero--buttons {
   --ifm-button-padding-vertical: 0.5rem;
@@ -828,6 +837,9 @@ input[type="text"]:focus {
 }
 .input--lg {
   --ifm-button-size-multiplier: 1.35;
+}
+.input--xl {
+  --ifm-button-size-multiplier: 1.7;
 }
 .input--highlight-wrapper {
   animation: gradientBG 5s ease-in infinite;

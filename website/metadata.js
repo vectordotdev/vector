@@ -5,7 +5,7 @@ module.exports = {
   ],
   "guides": {
     "advanced": {
-      "description": "Going beyond the basics. Extract the full potential Vector has to offer.",
+      "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
       "name": "advanced",
       "title": "Advanced"
     },

@@ -176,7 +176,7 @@ function GuidePage(props) {
               <div className="text--secondary text--bold"><i className="feather icon-book"></i> {readingTime}</div>
               <div className="text--secondary text--bold"><i className="feather icon-clock"></i> Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></div>
             </div>
-            {GuideContents.rightToc && (
+            {GuideContents.rightToc.length > 0 && (
               <div className="section">
                 <div className="title">Contents</div>
                 <Headings headings={GuideContents.rightToc} />

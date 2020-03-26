@@ -2,9 +2,9 @@
 last_modified_on: "2020-03-26"
 $schema: "/.meta/.schemas/guides.json"
 title: Making & Applying Changes
-description: How to change your Vector pipelines without disrupting flow.
+description: How to apply changes to your Vector config on-the-fly.
 series_position: 5
-author_github: https://github.com/binarylogic
+author_github: https://github.com/a-rodin
 tags: ["domain: operations"]
 ---
 
