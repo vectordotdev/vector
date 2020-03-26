@@ -178,4 +178,30 @@ mod tests {
             MaybePartialLogEvent::Partial(expected_event)
         );
     }
+
+    #[test]
+    fn trailing_newline_normalizer_special_case_bare_newline() {
+        let message_field = "message";
+
+        let normalizer = TrailingNewlineNormalizer {
+            probe_field: message_field.into(),
+        };
+
+        let sample_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert(message_field, "\n");
+            event
+        };
+
+        let expected_event = {
+            let mut event = Event::new_empty_log().into_log();
+            event.insert(message_field, "");
+            event
+        };
+
+        assert_eq!(
+            normalizer.normalize(sample_event),
+            MaybePartialLogEvent::NonPartial(expected_event)
+        );
+    }
 }
