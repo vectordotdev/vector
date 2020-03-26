@@ -1,3 +1,37 @@
+//! This module contains all our internal sink utilities
+//!
+//! All vector "sinks" are built around the `Sink` type which
+//! we use to "push" events into. Within the different types of
+//! vector "sinks" we need to support three main use cases:
+//!
+//! - Streaming sinks
+//! - Single partition batching
+//! - Multiple partition batching
+//!
+//! For each of these types this module provides one external type
+//! that can be used within sinks. The simplest type being the `StreamSink`
+//! type should be used when you do not want to batch events but you want
+//! to _stream_ them to the downstream service. `BatchSink` and `PartitonBatchSink`
+//! are similar in the sense that they both take some `tower::Service`, `Batch` and
+//! `Acker` and will provide full batching, request dipstaching and acking based on
+//! the settings passed.
+//!
+//! For more advanced use cases like http based sinks, one should use the
+//! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
+//!
+//! # Driving to completetion
+//!
+//! Each sink utility provided here strictly follows the patterns described in
+//! the `futures01::Sink` docs. Each sink utility must be polled from a valid
+//! tokio context wether that may be an actual runtime or using any of the
+//! `tokio01-test` utilities.
+//!
+//! For service based sinks like `BatchSink` and `PartitionBatchSink` they also
+//! must be polled within a valid tokio executor context or passed a valid executor.
+//! This is due to the fact that they will spawn service requests to allow them to be
+//! driven independently from the sink. A oneshot channel is used to tie them back into
+//! the sink to allow it to notify the consumer that the request has succeeded.
+
 use super::batch::{Batch, BatchSettings};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
@@ -297,19 +331,13 @@ where
     S::Response: fmt::Debug,
 {
     pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
-        let service = ServiceSink::new(service, acker);
-
-        Self {
-            batch,
+        PartitionBatchSink::with_executor(
             service,
-            exec: DefaultExecutor::current(),
-            partitions: HashMap::new(),
+            batch,
             settings,
-            closing: false,
-            sending: VecDeque::new(),
-            lingers: FuturesUnordered::new(),
-            linger_handles: HashMap::new(),
-        }
+            acker,
+            DefaultExecutor::current(),
+        )
     }
 }
 
