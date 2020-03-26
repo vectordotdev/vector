@@ -48,7 +48,7 @@
   --ifm-color-primary-dark: #00C6DD;
   --ifm-color-purple: #9988ff;
   --ifm-color-purple-rgb: 153, 136 ,255;
-  --ifm-color-secondary: var(--ifm-color-emphasis-600);
+  --ifm-color-secondary: var(--ifm-color-emphasis-100);
   --ifm-color-success: #00ff7f;
   --ifm-color-success-rgb: 0, 255, 127;
   --ifm-color-warning-rgb: 255, 186, 0;
@@ -251,6 +251,14 @@ a.badge:hover {
     --bleed-padding: var(--ifm-spacing-horizontal);
     --bleed-margin: calc( var(--bleed-padding) * -1 );
   }
+}
+
+/**
+ * avatar
+ */
+
+.avatar__name {
+  color: inherit;
 }
 
 /**
@@ -516,13 +524,19 @@ table.comparison tr td.bar.vector .bar {
 
 .empty {
   color: var(--ifm-color-emphasis-400);
+  font-size: 1.4em;
   padding: calc( var(--ifm-spacing-vertical) * 3 );
   text-align: center;
 }
+
 .empty .icon {
   font-size: 4rem;
   font-weight: bold;
   line-height: 1;
+}
+
+.empty .icon img {
+  height: 100px;
 }
 
 /**

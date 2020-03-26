@@ -23014,12 +23014,6 @@ module.exports = {
       "name": "Alexander"
     },
     {
-      "avatar": "https://github.com/loony-bean.png",
-      "github": "https://github.com/loony-bean",
-      "id": "alexey",
-      "name": "Alexey"
-    },
-    {
       "avatar": "https://github.com/hoverbear.png",
       "bio": "Ana is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. She is actively invovled in the Rust community and contributing to project and organizing meetups.",
       "github": "https://github.com/hoverbear",
@@ -23045,6 +23039,12 @@ module.exports = {
       "keybase": "https://keybase.io/binarylogic",
       "name": "Ben",
       "twitter": "https://twitter.com/binarylogic"
+    },
+    {
+      "avatar": "https://github.com/timber-bradybot.png",
+      "github": "https://github.com/timber-bradybot",
+      "id": "brady",
+      "name": "Brady"
     },
     {
       "avatar": "https://github.com/bruceg.png",
@@ -23073,6 +23073,12 @@ module.exports = {
       "keybase": "https://keybase.io/lukesteensen",
       "name": "Luke",
       "twitter": "https://twitter.com/lukesteensen"
+    },
+    {
+      "avatar": "https://github.com/vector-vic.png",
+      "github": "https://github.com/vector-vic",
+      "id": "vic",
+      "name": "Vic"
     }
   ],
   "transforms": {

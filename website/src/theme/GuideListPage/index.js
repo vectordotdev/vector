@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 
+import Empty from '@site/src/components/Empty';
 import GuideItems from '@theme/GuideItems';
 import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
@@ -16,9 +17,7 @@ const AnchoredH2 = Heading('h2');
 function Guides({filtering, guidesMetadata, items}) {
   if (items.length == 0) {
     return (
-      <section className="empty">
-        No guides found
-      </section>
+      <Empty text="no guides found" />
     );
   } else if (filtering) {
     return <GuideItems items={items.slice(0,25)} />

@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 
 import CheckboxList from '@site/src/components/CheckboxList';
+import Empty from '@site/src/components/Empty';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
 import SVG from 'react-inlinesvg';
@@ -97,10 +98,7 @@ function Components({components, headingLevel, pathPrefix, titles}) {
     );
   } else {
     return (
-      <div className="empty">
-        <div className="icon">☹</div>
-        <div>No components found</div>
-      </div>
+      <Empty text="no components found" />
     );
   }
 }
