@@ -53,6 +53,7 @@ use tokio01::{
     timer::Delay,
 };
 use tower::Service;
+use tracing_futures::Instrument;
 
 // === StreamSink ===
 
@@ -86,9 +87,11 @@ impl<T: Sink> Sink for StreamSink<T> {
     type SinkError = T::SinkError;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        trace!("sending item.");
         match self.inner.start_send(item)? {
             AsyncSink::Ready => {
                 self.pending += 1;
+                trace!(message = "submit successful.", pending_acks = self.pending);
 
                 if self.pending >= STREAM_SINK_MAX {
                     self.poll_complete()?;
@@ -97,13 +100,17 @@ impl<T: Sink> Sink for StreamSink<T> {
                 Ok(AsyncSink::Ready)
             }
 
-            AsyncSink::NotReady(item) => Ok(AsyncSink::NotReady(item)),
+            AsyncSink::NotReady(item) => {
+                trace!("Inner sink applying back pressure.");
+                Ok(AsyncSink::NotReady(item))
+            }
         }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         try_ready!(self.inner.poll_complete());
 
+        trace!(message = "Acking events.", acking_num = self.pending);
         self.acker.ack(self.pending);
         self.pending = 0;
 
@@ -206,6 +213,7 @@ where
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         if self.batch.len() >= self.settings.size {
+            trace!("batch full.");
             self.poll_complete()?;
 
             if self.batch.len() > self.settings.size {
@@ -215,6 +223,7 @@ where
         }
 
         if self.batch.len() == 0 {
+            trace!("Creating new batch.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
             let deadline = Instant::now() + self.settings.timeout;
@@ -229,6 +238,7 @@ where
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         loop {
             if self.batch.is_empty() {
+                trace!("no batches; driving service to completion.");
                 return self.service.poll_complete();
             } else {
                 // We have data to send, so check if we should send it and either attempt the send
@@ -237,6 +247,7 @@ where
                 if self.should_send() {
                     try_ready!(self.service.poll_ready());
 
+                    trace!("Service ready; Sending batch.");
                     let batch = self.batch.fresh_replace();
 
                     let batch_size = batch.num_items();
@@ -255,6 +266,7 @@ where
                     // to poll the inner futures but still return
                     // NotReady if the linger timeout is not complete yet.
                     if let Some(linger) = &mut self.linger {
+                        trace!("polling batch linger.");
                         self.service.poll_complete()?;
                         return linger.poll().map_err(Into::into);
                     } else {
@@ -266,6 +278,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
+        trace!("closing batch sink.");
         self.closing = true;
         self.poll_complete()
     }
@@ -432,6 +445,10 @@ where
         // 5 batches, this should only happen if the inner sink
         // is apply back pressure.
         if self.sending.len() > 5 {
+            trace!(
+                message = "too many sending batches.",
+                amount = self.sending.len()
+            );
             self.poll_complete()?;
 
             if self.sending.len() > 5 {
@@ -448,6 +465,7 @@ where
 
         if let Some(batch) = self.partitions.get_mut(&partition) {
             if batch.len() >= self.settings.size {
+                trace!("Batch full; driving service to completion.");
                 self.poll_complete()?;
 
                 if let Some(batch) = self.partitions.get_mut(&partition) {
@@ -464,11 +482,13 @@ where
                     }
                 }
             } else {
+                trace!("adding event to batch.");
                 batch.push(item);
                 return Ok(AsyncSink::Ready);
             }
         }
 
+        trace!("replacing batch.");
         // We fall through to this case, when there is no batch already
         // or the batch got submitted by polling_complete above.
         let mut batch = self.batch.fresh();
@@ -496,6 +516,7 @@ where
         while let Ok(Async::Ready(Some(linger))) = self.lingers.poll() {
             // Only if the linger has elapsed trigger the removal
             if let LingerState::Elapsed(partition) = linger {
+                trace!("batch linger expired.");
                 self.linger_handles.remove(&partition);
 
                 if let Some(batch) = self.partitions.remove(&partition) {
@@ -544,6 +565,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
+        trace!("closing partition batch sink.");
         self.closing = true;
         self.poll_complete()
     }
@@ -572,6 +594,7 @@ struct ServiceSink<S, Request> {
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashMap<usize, usize>,
+    next_request_id: usize,
     _pd: PhantomData<Request>,
 }
 
@@ -590,6 +613,7 @@ where
             seq_head: 0,
             seq_tail: 0,
             pending_acks: HashMap::new(),
+            next_request_id: 0,
             _pd: PhantomData,
         }
     }
@@ -610,6 +634,12 @@ where
 
         self.in_flight.push(rx);
 
+        let request_id = self.next_request_id.wrapping_add(1);
+
+        trace!(
+            message = "submitting service request.",
+            in_flight_requests = self.in_flight.len()
+        );
         let response = self
             .service
             .call(req)
@@ -624,7 +654,8 @@ where
                 // ignore for now.
                 let _ = tx.send(res);
                 Ok::<_, ()>(())
-            });
+            })
+            .instrument(info_span!("request", %request_id));
 
         Box::new(response)
     }
@@ -642,6 +673,7 @@ where
                         num_to_ack += ack_size;
                         self.seq_tail += 1
                     }
+                    trace!(message = "acking events.", acking_num = num_to_ack);
                     self.acker.ack(num_to_ack);
                 }
                 Ok(Async::Ready(Some(Err(error)))) => {
