@@ -39,14 +39,15 @@ consistent when they're nearby in the same file, doing so across all of our
 components poses a significant challenge. If nothing else, it's a mental burden
 for developers to maintain manually.
 
-And short of `grep`, there is no easy way to catalog and display these
+Short of `grep`, there is no easy way to catalog and display these
 instrumentation points to users. Particularly for metrics, this can be very
 valuable.
 
 ## Prior Art
 
 This work is based primarily on the implementation within Timber's closed-source
-hosted service. We can't use it because it's written in Elixir.
+hosted service (https://timber.io). We can't use it because it's written in
+Elixir.
 
 It also builds on top of the excellent work done on the `tracing` and `metrics`
 crates. While it presents a different API for contributors, it still uses the
