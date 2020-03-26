@@ -55,15 +55,18 @@ full flexibility and performance of these great libraries under the hood.
 
 ## Guide-level Proposal
 
-At any point in the code where something happens that a user might want to know
-about (i.e. an _event_ occurs), instead of reaching for our usual log statements
-or metrics collectors, we should define a new internal event.
+At any point in the code where something happens that a user might want to
+collect data about (i.e. an _event_ occurs), instead of reaching for our usual
+log statements and metrics collectors, we should define a new internal event.
+This doesn't necessarily include one-time log messages around startup or
+shutdown, but does include all metrics collection and log events that can happen
+repeatedly at runtime.
 
 Internal events are simply structs which implement the `InternalEvent` trait.
 The idea is quite simple:
 
-1. Go to the `internal_events` module and define a new struct with fields for
-   whatever relevant data you have.
+1. Go to the top-level `internal_events` module and define a new struct with
+   fields for whatever relevant data you have.
 
 2. Implement the `InternalEvent` trait for your new struct. There are two
    methods, `emit_logs` and `emit_metrics`, and both default to doing nothing.
