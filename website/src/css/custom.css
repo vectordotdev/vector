@@ -77,8 +77,8 @@
   --ifm-navbar-background-color: var(--ifm-background-color);
   --ifm-navbar-link-color: var(--ifm-heading-color);
   --ifm-panel-background: var(--ifm-background-color);
-  --ifm-panel-background-rgb: 249, 249, 250;
-  --ifm-panel-background-solid: #f9f9fa;
+  --ifm-panel-background-rgb: 255, 255, 255;
+  --ifm-panel-background-solid: #FFFFFF;
   --ifm-panel-background-active: rgba( var(--ifm-color-primary-rgb), 0.2 );
   --ifm-panel-border-color: var(--ifm-hr-border-color);
   --ifm-panel-border-color-active: var(--ifm-color-primary);
