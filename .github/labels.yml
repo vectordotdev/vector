@@ -1,6 +1,3 @@
-- name: "domain: blog"
-  description: Anything blog related
-  color: 212f3e
 - name: "domain: buffers"
   description: Anything buffers related
   color: 212f3e
@@ -13,15 +10,6 @@
 - name: "domain: dependencies"
   description: Anything dependencies related
   color: 212f3e
-- name: "domain: docs"
-  description: Anything docs related
-  color: 212f3e
-- name: "domain: guides"
-  description: Anything guides related
-  color: 212f3e
-- name: "domain: marketing"
-  description: Anything marketing related
-  color: 212f3e
 - name: "domain: networking"
   description: Anything networking related
   color: 212f3e
@@ -31,14 +19,8 @@
 - name: "domain: operations"
   description: Anything operations related
   color: 212f3e
-- name: "domain: platforms"
-  description: Anything platforms related
-  color: 212f3e
 - name: "domain: security"
   description: Anything security related
-  color: 212f3e
-- name: "domain: setup"
-  description: Anything setup related
   color: 212f3e
 - name: "domain: sinks"
   description: Anything sinks related
@@ -46,17 +28,17 @@
 - name: "domain: sources"
   description: Anything sources related
   color: 212f3e
-- name: "domain: templating"
-  description: Anything templating related
-  color: 212f3e
-- name: "domain: testing"
-  description: Anything testing related
+- name: "domain: tests"
+  description: Anything tests related
   color: 212f3e
 - name: "domain: topology"
   description: Anything topology related
   color: 212f3e
 - name: "domain: transforms"
   description: Anything transforms related
+  color: 212f3e
+- name: "domain: ux"
+  description: Anything ux related
   color: 212f3e
 - name: "domain: website"
   description: Anything website related
@@ -67,6 +49,9 @@
   color: 1cd1a1
 - name: "event type: metric"
   description: Anything metric event related
+  color: 1cd1a1
+- name: "event type: trace"
+  description: Anything trace event related
   color: 1cd1a1
 - name: "meta: announcement"
   description: Any issues that serve as announcements (pinned issues)
