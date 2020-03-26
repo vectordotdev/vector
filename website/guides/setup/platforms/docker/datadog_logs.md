@@ -3,7 +3,6 @@ last_modified_on: "2020-03-25"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Datadog"
 description: "A guide to quickly, and correctly, send Docker logs to Datadog."
-domain: configuring
 author_github: https://github.com/binarylogic
 tags: ["source: docker","sink: datadog_logs"]
 ---

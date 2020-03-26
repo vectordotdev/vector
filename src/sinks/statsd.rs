@@ -192,7 +192,7 @@ fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
 
 impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
-    type Error = tokio::io::Error;
+    type Error = tokio01::io::Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -221,7 +221,7 @@ mod test {
     use bytes::Bytes;
     use futures01::{stream, stream::Stream, sync::mpsc, Sink};
     use std::time::{Duration, Instant};
-    use tokio::{
+    use tokio01::{
         self,
         codec::BytesCodec,
         net::{UdpFramed, UdpSocket},
@@ -361,7 +361,7 @@ mod test {
         // Add a delay to the write side to let the read side
         // poll for read interest. Otherwise, this could cause
         // a race condition in noisy environments.
-        let sender = tokio::timer::Delay::new(deadline)
+        let sender = tokio01::timer::Delay::new(deadline)
             .map_err(drop)
             .and_then(|_| sender);
 

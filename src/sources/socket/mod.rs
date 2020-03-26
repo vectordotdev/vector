@@ -144,7 +144,7 @@ mod test {
     use std::sync::Arc;
     use std::{net::SocketAddr, thread, time::Duration, time::Instant};
     #[cfg(unix)]
-    use tokio::codec::{FramedWrite, LinesCodec};
+    use tokio01::codec::{FramedWrite, LinesCodec};
     #[cfg(unix)]
     use tokio_uds::UnixStream;
 
@@ -608,7 +608,7 @@ mod test {
                     .map(|(_source, sink)| sink)
                     .and_then(|sink| {
                         let socket = sink.into_inner().into_inner();
-                        tokio::io::shutdown(socket)
+                        tokio01::io::shutdown(socket)
                             .map(|_| ())
                             .map_err(|e| panic!("{:}", e))
                     })

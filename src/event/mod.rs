@@ -119,7 +119,7 @@ impl LogEvent {
         self.fields.contains_key(key)
     }
 
-    pub fn insert<K, V>(&mut self, key: K, value: V)
+    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: AsRef<str>,
         V: Into<Value>,
@@ -215,10 +215,13 @@ pub fn log_schema() -> &'static LogSchema {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
 #[serde(default)]
 pub struct LogSchema {
+    #[serde(default = "LogSchema::default_message_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     message_key: Atom,
+    #[serde(default = "LogSchema::default_timestamp_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     timestamp_key: Atom,
+    #[serde(default = "LogSchema::default_host_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
 }
@@ -230,6 +233,18 @@ impl Default for LogSchema {
             timestamp_key: Atom::from("timestamp"),
             host_key: Atom::from("host"),
         }
+    }
+}
+
+impl LogSchema {
+    fn default_message_key() -> Atom {
+        Atom::from("message")
+    }
+    fn default_timestamp_key() -> Atom {
+        Atom::from("timestamp")
+    }
+    fn default_host_key() -> Atom {
+        Atom::from("host")
     }
 }
 

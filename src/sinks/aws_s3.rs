@@ -4,7 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     serde::to_string,
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
         rusoto, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
         SinkExt, TowerRequestConfig,
@@ -46,7 +46,10 @@ pub struct S3SinkConfig {
     options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Compression,
     #[serde(default)]

@@ -3,7 +3,6 @@ last_modified_on: "2020-03-25"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to AWS S3"
 description: "A guide to quickly, and correctly, send File logs to AWS S3."
-domain: configuring
 author_github: https://github.com/binarylogic
 tags: ["source: file","sink: aws_s3"]
 ---

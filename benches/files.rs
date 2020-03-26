@@ -3,8 +3,8 @@ use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures01::{sink::Sink, stream::Stream, Future};
 use std::path::PathBuf;
 use tempfile::tempdir;
-use tokio::codec::{BytesCodec, FramedWrite};
-use tokio::fs::OpenOptions;
+use tokio01::codec::{BytesCodec, FramedWrite};
+use tokio01::fs::OpenOptions;
 use vector::test_util::random_lines;
 use vector::{
     runtime, sinks, sources,

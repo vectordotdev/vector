@@ -1,8 +1,7 @@
 use crate::{
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault},
-        BatchBytesConfig, Compression, TowerRequestConfig,
+        encoding::EncodingConfigWithDefault, BatchBytesConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
@@ -17,7 +16,10 @@ pub struct SematextLogsConfig {
     host: Option<String>,
     token: String,
 
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]

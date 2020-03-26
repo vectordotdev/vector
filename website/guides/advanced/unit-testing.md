@@ -4,8 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: Unit Testing Your Vector Config
 description: Learn how to write and execute unit tests for your Vector configs
 author_github: https://github.com/Jeffail
-domain: configuring
-tags: []
+tags: ["domain: config"]
 ---
 
 import CodeHeader from '@site/src/components/CodeHeader';

@@ -5,8 +5,7 @@ title: Making & Applying Changes
 description: How to change your Vector pipelines without disrupting flow.
 series_position: 5
 author_github: https://github.com/binarylogic
-domain: administrating
-tags: ["domain: administrating"]
+tags: ["domain: operations"]
 ---
 
 Fill me in

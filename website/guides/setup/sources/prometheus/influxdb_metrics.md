@@ -3,7 +3,6 @@ last_modified_on: "2020-03-25"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send Prometheus metrics to InfluxDB"
 description: "A guide to quickly, and correctly, send Prometheus metrics to InfluxDB."
-domain: configuring
 author_github: https://github.com/binarylogic
 tags: ["source: prometheus","sink: influxdb_metrics"]
 ---

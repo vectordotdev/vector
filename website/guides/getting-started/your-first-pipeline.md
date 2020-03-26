@@ -5,8 +5,7 @@ title: Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
 series_position: 1
 author_github: https://github.com/Jeffail
-domain: configuring
-tags: ["domain: configuring"]
+tags: ["domain: config"]
 ---
 
 import Alert from '@site/src/components/Alert';

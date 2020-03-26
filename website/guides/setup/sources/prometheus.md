@@ -3,7 +3,6 @@ last_modified_on: "2020-03-25"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect Prometheus metrics and send them anywhere"
 description: "A guide to quickly, and correctly, collect Prometheus metrics and send them anywhere."
-domain: configuring
 author_github: https://github.com/binarylogic
 tags: ["source: prometheus"]
 ---

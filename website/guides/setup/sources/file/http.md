@@ -3,7 +3,6 @@ last_modified_on: "2020-03-25"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to HTTP"
 description: "A guide to quickly, and correctly, send File logs to HTTP."
-domain: configuring
 author_github: https://github.com/binarylogic
 tags: ["source: file","sink: http"]
 ---

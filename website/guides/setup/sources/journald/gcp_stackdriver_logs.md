@@ -3,7 +3,6 @@ last_modified_on: "2020-03-25"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send Journald logs to GCP Stackdriver."
-domain: configuring
 author_github: https://github.com/binarylogic
 tags: ["source: journald","sink: gcp_stackdriver_logs"]
 ---
