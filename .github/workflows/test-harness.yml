@@ -29,7 +29,7 @@ jobs:
           })
 
     - name: Check user permissions
-      uses: MOZGIII/repo-permission-check-action@input-fix
+      uses: lannonbr/repo-permission-check-action@2.0.1
       with:
         permission: write
       env:
