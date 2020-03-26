@@ -692,6 +692,7 @@ header h1 {
   font-size: 2.5rem;
 }
 .hero .hero--category {
+  color: var(--ifm-heading-color);
   text-transform: uppercase;
 }
 .hero .hero--component-icons {
@@ -826,9 +827,10 @@ input[type="checkbox"]:checked {
 
 input[type="email"],
 input[type="text"] {
+  --ifm-button-size-multiplier: 1;
   background: var(--ifm-panel-background);
   border: 1px solid var(--ifm-panel-border-color);
-  border-radius: var(--ifm-global-radius);
+  border-radius: calc( var(--ifm-global-radius) * var(--ifm-button-size-multiplier) );
   box-shadow: var(--ifm-panel-box-shadow);
   box-sizing: border-box;
   color: var(--ifm-font-base-color);
@@ -852,7 +854,7 @@ input[type="text"]:focus {
 .input--lg {
   --ifm-button-size-multiplier: 1.35;
 }
-.input--xl {
+input[type="text"].input--xl {
   --ifm-button-size-multiplier: 1.7;
 }
 .input--highlight-wrapper {
@@ -1810,6 +1812,10 @@ ul.tabs.rounded li.tab-item.tab-item--active {
   background-size: 150% 150%;
   -webkit-background-clip: text;
   color: transparent;
+}
+
+.text--secondary {
+  color: var(--ifm-color-content-secondary);
 }
 
 .text--upcase {
