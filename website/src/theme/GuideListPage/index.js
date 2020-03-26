@@ -38,8 +38,10 @@ function GuideListPage(props) {
 
           return (
             <section>
-              <AnchoredH2 id={category.name}>{category.title}</AnchoredH2>
-              <div className="sub-title">{category.description}</div>
+              {index > 0 && <>
+                <AnchoredH2 id={category.name}>{category.title}</AnchoredH2>
+                <div className="sub-title">{category.description}</div>
+              </>}
               <GuideItems items={groupItems.slice(0,25)} staggered={index == 0} />
             </section>
           );

@@ -28,7 +28,7 @@ you up and running in minutes.
      website/guides/setup/sources/journald/splunk_hec.md.erb
 -->
 
-## What We'll Accomplish In This Guide
+## What We'll Accomplish
 
 <ol className="list--checks list--lg list--semi-bold list--primary list--flush">
   <li>
@@ -51,7 +51,7 @@ you up and running in minutes.
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
 
-## How We'll Do It
+## How It Works
 
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
@@ -59,7 +59,7 @@ As shown in the diagram above, the daemon deployment strategy is designed for
 data collection on a single host. Vector is deplyed in it's own container,
 collecting and forwarding all data on the host.
 
-## A Simple Step-By-Step Tutorial
+## A Step-By-Step Tutorial
 
 <div className="steps steps--h3">
 

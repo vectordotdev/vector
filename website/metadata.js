@@ -23030,7 +23030,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/Jeffail.png",
-      "bio": "Ashley is a Principal Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://github.com/Jeffail/benthos\">Benthos stream processor and has deep experience with stream processing.",
+      "bio": "Ashley is a Principal Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://github.com/Jeffail/benthos\">Benthos stream processor</a>, a popular stream processor written Go.",
       "github": "https://github.com/Jeffail",
       "id": "ashley",
       "keybase": "https://keybase.io/jeffail",

@@ -27,7 +27,7 @@ you up and running in minutes.
      website/guides/setup/sources/stdin/file.md.erb
 -->
 
-## What We'll Accomplish In This Guide
+## What We'll Accomplish
 
 <ol className="list--checks list--lg list--semi-bold list--primary list--flush">
   <li>
@@ -45,11 +45,11 @@ you up and running in minutes.
   <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
 </ol>
 
-## How We'll Do It
+## How It Works
 
 _sidecar.md.erb
 
-## A Simple Step-By-Step Tutorial
+## A Step-By-Step Tutorial
 
 <div className="steps steps--h3">
 
