@@ -37,7 +37,7 @@ jobs:
 
     - name: Get Pull Request info
       id: pr-info
-      uses: MOZGIII/github-script@core-access
+      uses: actions/github-script@0.9.0
       with:
         script: |
           const pr_info_response = await github.pulls.get({
