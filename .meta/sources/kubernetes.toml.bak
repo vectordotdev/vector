@@ -38,6 +38,14 @@ of `kube-system`. Which is by default excluded, \
 unless there are any non empty `include` options.\
 """
 
+[sources.kubernetes.options.auto_partial_merge]
+type = "bool"
+common = true
+default = true
+description = """\
+Setting this to `false` will disable the automatic merging of partial events.\
+"""
+
 [sources.kubernetes.output.log.fields.container_name]
 type = "string"
 examples = ["vector"]
