@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to HTTP"
 description: "A guide to quickly, and correctly, send Docker logs to HTTP."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: http"]
+tags: ["domain: config","source: docker","sink: http"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

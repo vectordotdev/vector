@@ -5,7 +5,7 @@ title: Next Steps
 description: Where to go after the basics
 series_position: 7
 author_github: https://github.com/binarylogic
-tags: []
+tags: ["domain: ux"]
 ---
 
 Fill me in

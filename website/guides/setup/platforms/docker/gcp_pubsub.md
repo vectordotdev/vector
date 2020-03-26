@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to GCP PubSub"
 description: "A guide to quickly, and correctly, send Docker logs to GCP PubSub."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: gcp_pubsub"]
+tags: ["domain: config","source: docker","sink: gcp_pubsub"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

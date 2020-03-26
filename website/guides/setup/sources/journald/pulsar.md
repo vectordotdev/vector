@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Apache Pulsar"
 description: "A guide to quickly, and correctly, send Journald logs to Apache Pulsar."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: pulsar"]
+tags: ["domain: config","source: journald","sink: pulsar"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

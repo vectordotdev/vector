@@ -1,12 +1,11 @@
 .guide-item {
-  background-color: var(--ifm-panel-background);
-  background-size: 10em;
-  border: 0.1em solid var(--ifm-panel-border-color);
+  background-color: var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-heading-color);
   display: block;
   min-height: 17.5em;
+  padding: 0.1em;
   position: relative;
 
   transform-origin: 0 50%;
@@ -16,8 +15,10 @@
 }
 
 .guide-item > article {
-  position: relative;
+  background-color: var(--ifm-panel-background-solid);
+  border-radius: var(--ifm-global-radius);
   height: 100%;
+  position: relative;
 }
 
 .guide-item > article > header {
@@ -59,7 +60,7 @@
 
 .guide-item > article > footer > .action {
   font-size: 0.75em;
-  font-weight: 500;
+  font-weight: 600;
   opacity: 0;
   position: relative;
   text-decoration: underline;
@@ -92,7 +93,7 @@
 }
 
 .guide-item:hover {
-  border-color: var(--ifm-color-primary);
+  background: linear-gradient( to right, rgba( var(--ifm-color-primary-rgb), 0.2 ), var(--ifm-color-primary) );
   box-shadow: 0.4em 0 0.75em 0 rgba( var(--ifm-color-primary-rgb), 0.25 );
   color: var(--ifm-color-primary);
   text-decoration: none;

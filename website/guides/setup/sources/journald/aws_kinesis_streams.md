@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send Journald logs to AWS Kinesis Data Streams."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: aws_kinesis_streams"]
+tags: ["domain: config","source: journald","sink: aws_kinesis_streams"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to LogDNA"
 description: "A guide to quickly, and correctly, send Docker logs to LogDNA."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: logdna"]
+tags: ["domain: config","source: docker","sink: logdna"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

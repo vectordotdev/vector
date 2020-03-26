@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Splunk HEC"
 description: "A guide to quickly, and correctly, send Docker logs to Splunk HEC."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: splunk_hec"]
+tags: ["domain: config","source: docker","sink: splunk_hec"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

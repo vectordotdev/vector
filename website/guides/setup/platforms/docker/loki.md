@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Loki"
 description: "A guide to quickly, and correctly, send Docker logs to Loki."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: loki"]
+tags: ["domain: config","source: docker","sink: loki"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

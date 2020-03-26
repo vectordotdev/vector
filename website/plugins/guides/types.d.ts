@@ -53,7 +53,6 @@ export interface MetaData {
     category: string;
     categorySort: string;
     description: string;
-    domain: string;
     nextItem?: Paginator;
     permalink: string;
     prevItem?: Paginator;

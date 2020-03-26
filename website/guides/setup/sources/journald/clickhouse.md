@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Clickhouse"
 description: "A guide to quickly, and correctly, send Journald logs to Clickhouse."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: clickhouse"]
+tags: ["domain: config","source: journald","sink: clickhouse"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

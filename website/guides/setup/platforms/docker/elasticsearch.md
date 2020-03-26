@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Elasticsearch"
 description: "A guide to quickly, and correctly, send Docker logs to Elasticsearch."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: elasticsearch"]
+tags: ["domain: config","source: docker","sink: elasticsearch"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

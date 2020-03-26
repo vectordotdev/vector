@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Datadog"
 description: "A guide to quickly, and correctly, send Journald logs to Datadog."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: datadog_logs"]
+tags: ["domain: config","source: journald","sink: datadog_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

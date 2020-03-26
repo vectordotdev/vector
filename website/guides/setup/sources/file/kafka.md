@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Kafka"
 description: "A guide to quickly, and correctly, send File logs to Kafka."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: kafka"]
+tags: ["domain: config","source: file","sink: kafka"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

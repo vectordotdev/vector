@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Datadog"
 description: "A guide to quickly, and correctly, send Docker logs to Datadog."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: datadog_logs"]
+tags: ["domain: config","source: docker","sink: datadog_logs"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

@@ -476,19 +476,16 @@ table.comparison tr td.bar.vector .bar {
  */
 
 .domain-bg {
-  background-image: url(/img/vector-bg-light.svg);
+  background-image: url(/img/nodes-bg-light.svg);
 }
 .domain-bg.domain-bg--config {
   background-image: url(/img/cogs-bg-light.svg);
 }
-.domain-bg.domain-bg--platforms {
-  background-image: url(/img/circuit-bg-light.svg);
+.domain-bg.domain-bg--observability {
+  background-image: url(/img/charts-bg-light.svg);
 }
-.domain-bg.domain-bg--networking,
-.domain-bg.domain-bg--sinks,
-.domain-bg.domain-bg--sources,
-.domain-bg.domain-bg--transforms {
-  background-image: url(/img/nodes-bg-light.svg);
+.domain-bg.domain-bg--operations {
+  background-image: url(/img/circuit-bg-light.svg);
 }
 .domain-bg--hover:not(:hover) {
   background-image: none !important;
@@ -1996,19 +1993,16 @@ html[data-theme="dark"] {
  */
 
 html[data-theme='dark'] .domain-bg {
-  background-image: url(/img/vector-bg-dark.svg);
+  background-image: url(/img/nodes-bg-dark.svg);
 }
 html[data-theme='dark'] .domain-bg.domain-bg--config {
   background-image: url(/img/cogs-bg-dark.svg);
 }
-html[data-theme='dark'] .domain-bg.domain-bg--platforms {
-  background-image: url(/img/circuit-bg-dark.svg);
+html[data-theme='dark'] .domain-bg.domain-bg--observability {
+  background-image: url(/img/charts-bg-dark.svg);
 }
-html[data-theme='dark'] .domain-bg.domain-bg--networking,
-html[data-theme='dark'] .domain-bg.domain-bg--sinks,
-html[data-theme='dark'] .domain-bg.domain-bg--sources,
-html[data-theme='dark'] .domain-bg.domain-bg--transforms {
-  background-image: url(/img/nodes-bg-dark.svg);
+html[data-theme='dark'] .domain-bg.domain-bg--operations {
+  background-image: url(/img/circuit-bg-dark.svg);
 }
 
 /*

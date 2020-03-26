@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Kafka"
 description: "A guide to quickly, and correctly, send STDIN logs to Kafka."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: kafka"]
+tags: ["domain: config","source: stdin","sink: kafka"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Sematext"
 description: "A guide to quickly, and correctly, send Docker logs to Sematext."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: sematext_logs"]
+tags: ["domain: config","source: docker","sink: sematext_logs"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

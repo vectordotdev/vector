@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Clickhouse"
 description: "A guide to quickly, and correctly, send Docker logs to Clickhouse."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: clickhouse"]
+tags: ["domain: config","source: docker","sink: clickhouse"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

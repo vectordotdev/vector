@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to File"
 description: "A guide to quickly, and correctly, send STDIN logs to File."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: file"]
+tags: ["domain: config","source: stdin","sink: file"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

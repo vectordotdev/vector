@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Clickhouse"
 description: "A guide to quickly, and correctly, send STDIN logs to Clickhouse."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: clickhouse"]
+tags: ["domain: config","source: stdin","sink: clickhouse"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

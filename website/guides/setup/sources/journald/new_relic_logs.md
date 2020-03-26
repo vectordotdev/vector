@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to New Relic"
 description: "A guide to quickly, and correctly, send Journald logs to New Relic."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: new_relic_logs"]
+tags: ["domain: config","source: journald","sink: new_relic_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect File logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect File logs and send them anywhere."
 author_github: https://github.com/binarylogic
-tags: ["source: file"]
+tags: ["domain: config","source: file"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Elasticsearch"
 description: "A guide to quickly, and correctly, send Journald logs to Elasticsearch."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: elasticsearch"]
+tags: ["domain: config","source: journald","sink: elasticsearch"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

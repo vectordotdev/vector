@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Sematext"
 description: "A guide to quickly, and correctly, send File logs to Sematext."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: sematext_logs"]
+tags: ["domain: config","source: file","sink: sematext_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect STDIN logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect STDIN logs and send them anywhere."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin"]
+tags: ["domain: config","source: stdin"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

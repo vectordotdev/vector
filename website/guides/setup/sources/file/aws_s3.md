@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to AWS S3"
 description: "A guide to quickly, and correctly, send File logs to AWS S3."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: aws_s3"]
+tags: ["domain: config","source: file","sink: aws_s3"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

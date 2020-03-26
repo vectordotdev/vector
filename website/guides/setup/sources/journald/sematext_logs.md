@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Sematext"
 description: "A guide to quickly, and correctly, send Journald logs to Sematext."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: sematext_logs"]
+tags: ["domain: config","source: journald","sink: sematext_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

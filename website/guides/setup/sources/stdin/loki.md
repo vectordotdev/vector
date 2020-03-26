@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Loki"
 description: "A guide to quickly, and correctly, send STDIN logs to Loki."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: loki"]
+tags: ["domain: config","source: stdin","sink: loki"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send Docker logs to AWS Kinesis Data Streams."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: aws_kinesis_streams"]
+tags: ["domain: config","source: docker","sink: aws_kinesis_streams"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

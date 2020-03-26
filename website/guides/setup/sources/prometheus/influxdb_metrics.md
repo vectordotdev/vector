@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Prometheus metrics to InfluxDB"
 description: "A guide to quickly, and correctly, send Prometheus metrics to InfluxDB."
 author_github: https://github.com/binarylogic
-tags: ["source: prometheus","sink: influxdb_metrics"]
+tags: ["domain: config","source: prometheus","sink: influxdb_metrics"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

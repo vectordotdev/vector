@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Honeycomb"
 description: "A guide to quickly, and correctly, send File logs to Honeycomb."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: honeycomb"]
+tags: ["domain: config","source: file","sink: honeycomb"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

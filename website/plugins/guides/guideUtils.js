@@ -33,17 +33,23 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             return;
         }
         let category = relativeSource.split('/')[0];
-        let categorySort = category == 'getting-started' ? 'A' : category;
-        let domain = frontMatter.domain;
+        let categorySort = category == 'getting-started' ? 'AA' : category;
         let linkName = relativeSource.replace(/\.mdx?$/, '');
-        frontMatter.title = frontMatter.title || linkName;
+        let seriesPosition = frontMatter.series_position;
+        let tags = frontMatter.tags || [];
+        let title = frontMatter.title || linkName;
+        if (seriesPosition) {
+            tags.unshift('type: series');
+        }
+        else {
+            tags.unshift('type: post');
+        }
         guides.push({
             id: frontMatter.id || frontMatter.title,
             metadata: {
                 category: category,
                 categorySort: categorySort,
                 description: frontMatter.description || excerpt,
-                domain: domain,
                 permalink: utils_1.normalizeUrl([
                     baseUrl,
                     routeBasePath,
@@ -53,8 +59,8 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
                 seriesPosition: frontMatter.series_position,
                 sort: frontMatter.sort,
                 source: aliasedSource,
-                tags: (frontMatter.tags || []),
-                title: frontMatter.title,
+                tags: tags,
+                title: title,
                 truncated: (truncateMarker === null || truncateMarker === void 0 ? void 0 : truncateMarker.test(content)) || false,
             },
         });

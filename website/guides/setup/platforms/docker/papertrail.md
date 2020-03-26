@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Papertrail"
 description: "A guide to quickly, and correctly, send Docker logs to Papertrail."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: papertrail"]
+tags: ["domain: config","source: docker","sink: papertrail"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

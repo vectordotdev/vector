@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to GCP PubSub"
 description: "A guide to quickly, and correctly, send Journald logs to GCP PubSub."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: gcp_pubsub"]
+tags: ["domain: config","source: journald","sink: gcp_pubsub"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

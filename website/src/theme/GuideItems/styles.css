@@ -18,6 +18,10 @@
   font-size: 1.7em;
 }
 
+.guide-items--staggered > a:first-child > article {
+  background-size: 125%;
+}
+
 .guide-items--staggered > a:first-child:hover {
   -webkit-transform:perspective(1000px) rotateY(-5deg) translate3d(-3px,0,0);
   transform:perspective(1000px) rotateY(-5deg) translate3d(-3px,0,0);

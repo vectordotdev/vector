@@ -44,20 +44,15 @@ export async function generateGuides(
 
       let category = relativeSource.split('/')[0];
       let categorySort = category == 'getting-started' ? 'AA' : category;
-      let domain = frontMatter.domain;
       let linkName = relativeSource.replace(/\.mdx?$/, '');
       let seriesPosition = frontMatter.series_position;
       let tags = frontMatter.tags || [];
       let title = frontMatter.title || linkName;
 
-      if (domain) {
-        tags.push(`domain: ${domain}`);
-      }
-
       if (seriesPosition) {
-        tags.push('type: series');
+        tags.unshift('type: series');
       } else {
-        tags.push('type: post');
+        tags.unshift('type: post');
       }
 
       guides.push({
@@ -66,7 +61,6 @@ export async function generateGuides(
           category: category,
           categorySort: categorySort,
           description: frontMatter.description || excerpt,
-          domain: domain,
           permalink: normalizeUrl([
             baseUrl,
             routeBasePath,

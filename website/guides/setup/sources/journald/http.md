@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to HTTP"
 description: "A guide to quickly, and correctly, send Journald logs to HTTP."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: http"]
+tags: ["domain: config","source: journald","sink: http"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

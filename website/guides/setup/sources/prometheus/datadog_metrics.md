@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Prometheus metrics to Datadog"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Datadog."
 author_github: https://github.com/binarylogic
-tags: ["source: prometheus","sink: datadog_metrics"]
+tags: ["domain: config","source: prometheus","sink: datadog_metrics"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

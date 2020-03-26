@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send STDIN logs to AWS Kinesis Data Streams."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: aws_kinesis_streams"]
+tags: ["domain: config","source: stdin","sink: aws_kinesis_streams"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

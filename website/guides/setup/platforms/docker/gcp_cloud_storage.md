@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to GCP Cloud Storage (GCS)"
 description: "A guide to quickly, and correctly, send Docker logs to GCP Cloud Storage (GCS)."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: gcp_cloud_storage"]
+tags: ["domain: config","source: docker","sink: gcp_cloud_storage"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

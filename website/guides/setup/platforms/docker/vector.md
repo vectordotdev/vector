@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Vector"
 description: "A guide to quickly, and correctly, send Docker logs to Vector."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: vector"]
+tags: ["domain: config","source: docker","sink: vector"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

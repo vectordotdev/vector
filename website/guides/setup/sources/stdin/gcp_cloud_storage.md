@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to GCP Cloud Storage (GCS)"
 description: "A guide to quickly, and correctly, send STDIN logs to GCP Cloud Storage (GCS)."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: gcp_cloud_storage"]
+tags: ["domain: config","source: stdin","sink: gcp_cloud_storage"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

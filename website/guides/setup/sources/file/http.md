@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to HTTP"
 description: "A guide to quickly, and correctly, send File logs to HTTP."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: http"]
+tags: ["domain: config","source: file","sink: http"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

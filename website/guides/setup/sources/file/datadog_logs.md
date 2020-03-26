@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Datadog"
 description: "A guide to quickly, and correctly, send File logs to Datadog."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: datadog_logs"]
+tags: ["domain: config","source: file","sink: datadog_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

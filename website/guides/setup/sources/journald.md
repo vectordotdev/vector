@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect Journald logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect Journald logs and send them anywhere."
 author_github: https://github.com/binarylogic
-tags: ["source: journald"]
+tags: ["domain: config","source: journald"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Socket"
 description: "A guide to quickly, and correctly, send Docker logs to Socket."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: socket"]
+tags: ["domain: config","source: docker","sink: socket"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect Prometheus metrics and send them anywhere"
 description: "A guide to quickly, and correctly, collect Prometheus metrics and send them anywhere."
 author_github: https://github.com/binarylogic
-tags: ["source: prometheus"]
+tags: ["domain: config","source: prometheus"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

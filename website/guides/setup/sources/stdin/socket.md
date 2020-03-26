@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Socket"
 description: "A guide to quickly, and correctly, send STDIN logs to Socket."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: socket"]
+tags: ["domain: config","source: stdin","sink: socket"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

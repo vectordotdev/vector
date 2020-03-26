@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send Docker logs to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: aws_cloudwatch_logs"]
+tags: ["domain: config","source: docker","sink: aws_cloudwatch_logs"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

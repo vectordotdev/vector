@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send STDIN logs to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: aws_cloudwatch_logs"]
+tags: ["domain: config","source: stdin","sink: aws_cloudwatch_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -8,6 +8,7 @@ import Tags from '@site/src/components/Tags';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
+import {enrichTags} from '@site/src/exports/tags';
 
 import './styles.css';
 
@@ -19,12 +20,16 @@ function GuideItem(props) {
     truncated,
     isGuidePage = false,
   } = props;
-  const {category, description, domain, permalink, readingTime, seriesPosition, tags} = metadata;
+  const {category, description, permalink, readingTime, seriesPosition, tags} = metadata;
   const {author_github, last_modified_on: lastModifiedOn, title} = frontMatter;
+  const enrichedTags = enrichTags(tags, 'guides');
+  console.log(enrichedTags)
+  const domainTag = enrichedTags.find(tag => tag.category == 'domain');
+  const domainBG = domainTag ? domainTag.value : 'default';
 
   return (
-    <Link to={permalink + '/'} className={`guide-item domain-bg domain-bg--${domain} domain-bg--hover`}>
-      <article>
+    <Link to={permalink + '/'} className={`guide-item`}>
+      <article className={`domain-bg domain-bg--${domainBG} domain-bg--hover`}>
         <header>
           <div className="category">{category}</div>
           <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{title}</h2>

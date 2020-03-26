@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Apache Pulsar"
 description: "A guide to quickly, and correctly, send File logs to Apache Pulsar."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: pulsar"]
+tags: ["domain: config","source: file","sink: pulsar"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Apache Pulsar"
 description: "A guide to quickly, and correctly, send STDIN logs to Apache Pulsar."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: pulsar"]
+tags: ["domain: config","source: stdin","sink: pulsar"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

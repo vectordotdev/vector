@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Apache Pulsar"
 description: "A guide to quickly, and correctly, send Docker logs to Apache Pulsar."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: pulsar"]
+tags: ["domain: config","source: docker","sink: pulsar"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

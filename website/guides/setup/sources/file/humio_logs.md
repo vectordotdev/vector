@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Humio"
 description: "A guide to quickly, and correctly, send File logs to Humio."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: humio_logs"]
+tags: ["domain: config","source: file","sink: humio_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to AWS S3"
 description: "A guide to quickly, and correctly, send STDIN logs to AWS S3."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: aws_s3"]
+tags: ["domain: config","source: stdin","sink: aws_s3"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

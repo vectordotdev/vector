@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Loki"
 description: "A guide to quickly, and correctly, send Journald logs to Loki."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: loki"]
+tags: ["domain: config","source: journald","sink: loki"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

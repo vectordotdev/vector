@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Sematext"
 description: "A guide to quickly, and correctly, send STDIN logs to Sematext."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: sematext_logs"]
+tags: ["domain: config","source: stdin","sink: sematext_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to AWS Kinesis Firehose"
 description: "A guide to quickly, and correctly, send File logs to AWS Kinesis Firehose."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: aws_kinesis_firehose"]
+tags: ["domain: config","source: file","sink: aws_kinesis_firehose"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

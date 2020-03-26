@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send Journald logs to GCP Stackdriver."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: gcp_stackdriver_logs"]
+tags: ["domain: config","source: journald","sink: gcp_stackdriver_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

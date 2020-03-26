@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Journald logs to Papertrail"
 description: "A guide to quickly, and correctly, send Journald logs to Papertrail."
 author_github: https://github.com/binarylogic
-tags: ["source: journald","sink: papertrail"]
+tags: ["domain: config","source: journald","sink: papertrail"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Prometheus metrics to Statsd"
 description: "A guide to quickly, and correctly, send Prometheus metrics to Statsd."
 author_github: https://github.com/binarylogic
-tags: ["source: prometheus","sink: statsd"]
+tags: ["domain: config","source: prometheus","sink: statsd"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

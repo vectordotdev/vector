@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Loki"
 description: "A guide to quickly, and correctly, send File logs to Loki."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: loki"]
+tags: ["domain: config","source: file","sink: loki"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

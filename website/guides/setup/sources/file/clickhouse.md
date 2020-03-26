@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Clickhouse"
 description: "A guide to quickly, and correctly, send File logs to Clickhouse."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: clickhouse"]
+tags: ["domain: config","source: file","sink: clickhouse"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

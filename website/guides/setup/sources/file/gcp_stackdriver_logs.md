@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send File logs to GCP Stackdriver."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: gcp_stackdriver_logs"]
+tags: ["domain: config","source: file","sink: gcp_stackdriver_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

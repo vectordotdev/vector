@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect Docker logs and send them anywhere"
 description: "A guide to quickly, and correctly, collect Docker logs and send them anywhere."
 author_github: https://github.com/binarylogic
-tags: ["source: docker"]
+tags: ["domain: config","source: docker"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

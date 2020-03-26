@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Vector"
 description: "A guide to quickly, and correctly, send STDIN logs to Vector."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: vector"]
+tags: ["domain: config","source: stdin","sink: vector"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

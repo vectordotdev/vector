@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to AWS S3"
 description: "A guide to quickly, and correctly, send Docker logs to AWS S3."
 author_github: https://github.com/binarylogic
-tags: ["source: docker","sink: aws_s3"]
+tags: ["domain: config","source: docker","sink: aws_s3"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';

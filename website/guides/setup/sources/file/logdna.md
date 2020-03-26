@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to LogDNA"
 description: "A guide to quickly, and correctly, send File logs to LogDNA."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: logdna"]
+tags: ["domain: config","source: file","sink: logdna"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

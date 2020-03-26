@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Splunk HEC"
 description: "A guide to quickly, and correctly, send STDIN logs to Splunk HEC."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: splunk_hec"]
+tags: ["domain: config","source: stdin","sink: splunk_hec"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

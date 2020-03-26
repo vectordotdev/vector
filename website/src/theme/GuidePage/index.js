@@ -16,7 +16,7 @@ import VectorComponents from '@site/src/components/VectorComponents';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
-import {extractTagValue} from '@site/src/exports/tags';
+import {enrichTags} from '@site/src/exports/tags';
 import styles from './styles.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useTOCHighlight from '@theme/hooks/useTOCHighlight';
@@ -77,12 +77,18 @@ function GuidePage(props) {
   // Variables
   //
 
+  const enrichedTags = enrichTags(tags, 'guides');
+  const domainTag = enrichedTags.find(tag => tag.category == 'domain');
+  const domainBG = domainTag ? domainTag.value : 'default';
   const lastModified = Date.parse(lastModifiedOn);
-  const platformName = extractTagValue(tags, 'platform: ');
+  const platformTag = enrichedTags.find(tag => tag.category == 'platform');
+  const platformName = platformTag ? platformTag.value : null;
   const platform = platformName && platforms[platformName];
-  const sinkName = extractTagValue(tags, 'sink: ');
+  const sinkTag = enrichedTags.find(tag => tag.category == 'sink');
+  const sinkName = sinkTag ? sinkTag.value : null;
   const sink = sinkName && sinks[sinkName];
-  const sourceName = extractTagValue(tags, 'source: ');
+  const sourceTag = enrichedTags.find(tag => tag.category == 'source');
+  const sourceName = sourceTag ? sourceTag.value : null;
   const source = sourceName && sources[sourceName];
   const eventTypes = (platform || source || sink || {}).event_types || [];
 
@@ -124,7 +130,7 @@ function GuidePage(props) {
             transforms={false} />
       </Modal>}
       <article>
-        <header className="hero domain-bg domain-bg--networking">
+        <header className={`hero domain-bg domain-bg--${domainBG}`}>
           <div className="container">
             {(platform || source || sink) && (
               <div className="component-icons">

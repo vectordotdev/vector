@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Elasticsearch"
 description: "A guide to quickly, and correctly, send File logs to Elasticsearch."
 author_github: https://github.com/binarylogic
-tags: ["source: file","sink: elasticsearch"]
+tags: ["domain: config","source: file","sink: elasticsearch"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';

@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to Elasticsearch"
 description: "A guide to quickly, and correctly, send STDIN logs to Elasticsearch."
 author_github: https://github.com/binarylogic
-tags: ["source: stdin","sink: elasticsearch"]
+tags: ["domain: config","source: stdin","sink: elasticsearch"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
