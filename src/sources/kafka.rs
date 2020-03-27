@@ -1,6 +1,7 @@
 use crate::{
     event::Event,
     kafka::{KafkaCompression, KafkaTlsConfig},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -78,6 +79,7 @@ impl SourceConfig for KafkaSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         kafka_source(self.clone(), out)
@@ -128,7 +130,9 @@ fn kafka_source(
                                 Some(Err(e)) => {
                                     return Err(error!(message = "Cannot extract key", error = ?e))
                                 }
-                                Some(Ok(key)) => event.as_mut_log().insert(key_field.clone(), key),
+                                Some(Ok(key)) => {
+                                    event.as_mut_log().insert(key_field.clone(), key);
+                                }
                             }
                         }
                         consumer_ref.store_offset(&msg).map_err(

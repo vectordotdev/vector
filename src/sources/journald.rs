@@ -1,6 +1,7 @@
 use crate::{
     event,
     event::{Event, LogEvent, Value},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use chrono::TimeZone;
@@ -60,6 +61,7 @@ impl SourceConfig for JournaldConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
@@ -444,7 +446,7 @@ mod tests {
     use std::time::Duration;
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}

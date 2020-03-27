@@ -1,7 +1,8 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
-    tls::{TlsConfig, TlsSettings},
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
@@ -9,7 +10,7 @@ use bytes::{Bytes, BytesMut};
 use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio::codec::LengthDelimitedCodec;
+use tokio01::codec::LengthDelimitedCodec;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -46,11 +47,12 @@ impl SourceConfig for VectorConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
-        let tls = TlsSettings::from_config(&self.tls, true)?;
-        vector.run(self.address, self.shutdown_timeout_secs, tls, out)
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -72,7 +74,7 @@ impl TcpSource for VectorSource {
         LengthDelimitedCodec::new()
     }
 
-    fn build_event(&self, frame: BytesMut, _host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
                 trace!(
@@ -93,6 +95,7 @@ impl TcpSource for VectorSource {
 #[cfg(test)]
 mod test {
     use super::VectorConfig;
+    use crate::shutdown::ShutdownSignal;
     use crate::{
         sinks::vector::VectorSinkConfig,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
@@ -107,7 +110,12 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
 
         let server = source
-            .build("default", &GlobalOptions::default(), tx)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);

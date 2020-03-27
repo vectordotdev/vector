@@ -162,7 +162,7 @@ impl Transform for RegexParser {
                                     Some(target) => Atom::from(format!("{}.{}", target, name)),
                                     None => name.clone(),
                                 };
-                                log.insert(name, value)
+                                log.insert(name, value);
                             }
                             Err(error) => {
                                 debug!(

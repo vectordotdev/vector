@@ -1,5 +1,6 @@
 use crate::{
     event::Event,
+    shutdown::ShutdownSignal,
     sources::{file::FileConfig, Source},
     topology::config::{GlobalOptions, SourceConfig},
 };
@@ -26,6 +27,7 @@ impl<'a> FileSourceBuilder<'a> {
         mut self,
         kube_name: &str,
         globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
     ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
         self.file_config.include.extend(
             Self::file_source_include(self.config)?
@@ -55,7 +57,7 @@ impl<'a> FileSourceBuilder<'a> {
         let (file_send, file_recv) = mpsc::channel(1000);
         let file_source = self
             .file_config
-            .build("file_source", globals, file_send)
+            .build("file_source", globals, shutdown, file_send)
             .map_err(|e| format!("Failed in creating file source with error: {}", e))?;
 
         Ok((file_recv, file_source))

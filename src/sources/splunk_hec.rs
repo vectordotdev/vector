@@ -1,6 +1,7 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
-    tls::{MaybeTlsIncoming, TlsConfig, TlsSettings},
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
@@ -61,6 +62,7 @@ impl SourceConfig for SplunkConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();
@@ -84,8 +86,8 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        let tls = TlsSettings::from_config(&self.tls, true)?;
-        let incoming = MaybeTlsIncoming::bind(&self.address, tls)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let incoming = tls.bind(&self.address)?.incoming();
 
         let server =
             warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);
@@ -385,7 +387,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(event::log_schema().message_key().clone(), string)
+                    log.insert(event::log_schema().message_key().clone(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -396,8 +398,12 @@ impl<R: Read> Stream for EventStream<R> {
                     if let Some(line) = object.remove("line") {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
-                            JsonValue::Array(_) | JsonValue::Object(_) => log.insert("line", line),
-                            _ => log.insert(event::log_schema().message_key(), line),
+                            JsonValue::Array(_) | JsonValue::Object(_) => {
+                                log.insert("line", line);
+                            }
+                            _ => {
+                                log.insert(event::log_schema().message_key(), line);
+                            }
                         }
                     }
 
@@ -451,7 +457,7 @@ impl<R: Read> Stream for EventStream<R> {
         match self.time.clone() {
             Time::Provided(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
             Time::Now(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
-        }
+        };
 
         // Extract default extracted fields
         for de in self.extractors.iter_mut() {

@@ -3,8 +3,8 @@
 use approx::assert_relative_eq;
 use futures01::{Future, Stream};
 use stream_cancel::{StreamExt, Tripwire};
-use tokio::codec::{FramedRead, LinesCodec};
-use tokio::net::TcpListener;
+use tokio01::codec::{FramedRead, LinesCodec};
+use tokio01::net::TcpListener;
 use vector::test_util::{
     block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
 };
