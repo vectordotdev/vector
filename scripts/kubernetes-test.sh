@@ -52,7 +52,7 @@ containerdConfigPatches:
 EOF
 
   # Test Kubernetes
-  KUBE_TEST_IMAGE=localhost:5000/vector-test:ts cargo test --lib --no-default-features --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=2 kubernetes
+  KUBE_TEST_IMAGE=localhost:5000/vector-test:ts cargo test --lib --no-default-features --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
 
   delete_cluster
 
