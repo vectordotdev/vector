@@ -7847,7 +7847,7 @@ end
     # * unit: seconds
     timeout_secs = 60
 
-# Streams `log` events to a socket, such as a TCP or Unix domain socket.
+# Streams `log` events to a socket, such as a TCP, UDP, or Unix domain socket.
 [sinks.socket]
   #
   # General
@@ -7871,15 +7871,16 @@ end
   #
   # * required
   # * type: string
-  # * required when mode = "tcp"
+  # * required when mode = "tcp" or mode = "udp"
   address = "92.12.333.224:5000"
 
   # The type of socket to use.
   #
   # * required
   # * type: string
-  # * enum: "tcp" or "unix"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
+  mode = "udp"
   mode = "unix"
 
   # The unix socket path. This should be the absolute path.
