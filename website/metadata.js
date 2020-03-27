@@ -23513,7 +23513,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"socket\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required, required when mode = \"tcp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to a socket, such as a TCP or Unix domain socket.",
+      "description": "Streams log events to a socket, such as a TCP, UDP, or Unix domain socket.",
       "event_types": [
         "log"
       ],
