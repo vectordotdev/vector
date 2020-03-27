@@ -3473,10 +3473,10 @@ end
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * default: 5
+    # * default: 50
     # * type: int
     # * unit: requests
-    in_flight_limit = 5
+    in_flight_limit = 50
 
     # The time window, in seconds, used for the `rate_limit_num` option.
     #
@@ -3490,9 +3490,9 @@ end
     # time window.
     #
     # * optional
-    # * default: 5
+    # * default: 250
     # * type: int
-    rate_limit_num = 5
+    rate_limit_num = 250
 
     # The maximum number of retries to make for failed requests.
     #
