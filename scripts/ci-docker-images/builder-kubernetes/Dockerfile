@@ -1,4 +1,4 @@
-FROM vector_builder-x86_64:latest
+FROM vector_build-x86_64:latest
 
 WORKDIR /vector
 

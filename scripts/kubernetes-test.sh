@@ -1,9 +1,12 @@
 set -eu
 
-
+## Cleanup setup
 delete_cluster() {
-  kind delete cluster --name ${KIND_CLUSTER_NAME}
+  (kind delete cluster --name ${KIND_CLUSTER_NAME} || true)
 }
+trap delete_cluster EXIT
+
+## Actual purpose
 
 # desired cluster name
 KIND_CLUSTER_NAME="vector_test_cluster"
@@ -29,8 +32,10 @@ ENTRYPOINT ["/usr/local/bin/vector"]
 EOF
 docker push localhost:5000/vector-test:ts
 
-# Create a cluster with the local registry enabled in containerd
-trap delete_cluster EXIT
+# Creates a cluster with the local registry enabled in containerd and runs the tests
+
+# Eagerly try to delete cluster
+delete_cluster
 
 run_test(){
   KUBE_IMAGE=$1
@@ -47,7 +52,7 @@ containerdConfigPatches:
 EOF
 
   # Test Kubernetes
-  KUBE_TEST_IMAGE=localhost:5000/vector-test:ts cargo test --lib --no-default-features --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=1 kubernetes
+  KUBE_TEST_IMAGE=localhost:5000/vector-test:ts cargo test --lib --no-default-features --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" -- --test-threads=2 kubernetes
 
   delete_cluster
 
