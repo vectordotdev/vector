@@ -34,4 +34,4 @@ default = "intake.logs.datadoghq.com:10516"
 examples = ["127.0.0.1:8080", "example.com:12345"]
 description = "The endpoint to stream logs to."
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.datadog_logs.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.datadog_logs.options", can_enable: true, can_verify_certificate: true, can_verify_hostname: true) %>
