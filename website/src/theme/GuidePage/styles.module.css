@@ -2,11 +2,15 @@
   margin-top: calc( var(--ifm-spacing-vertical) * 0.5 );
 }
 
+.container {
+  margin-top: calc( var(--ifm-spacing-vertical) * 4 );
+}
+
 .avatar {
   background: var(--ifm-color-emphasis-50);
   border: 0px none;
   border-radius: var(--ifm-global-radius);
-  margin-top: 32px;
+  margin-top: 0;
   margin-bottom: var(--ifm-spacing-vertical);
   padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 1 );
 }
@@ -21,14 +25,14 @@
 }
 
 .rightCol {
-  --ifm-width: calc(7.15 / 12 * 100%);
+  --ifm-width: calc(7.1 / 12 * 100%);
   flex: 0 0 var(--ifm-width) !important;
   max-width: var(--ifm-width) !important;
   padding-left: calc( var(--ifm-spacing-horizontal) * 2 ) !important;
 }
 
 .paginator {
-  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  margin: 0 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
   padding-top: calc( var(--ifm-spacing-vertical) * 2 );
 }
 

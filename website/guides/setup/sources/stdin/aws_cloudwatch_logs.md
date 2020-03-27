@@ -1,10 +1,10 @@
 ---
-last_modified_on: "2020-03-26"
+last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send STDIN logs to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send STDIN logs to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
-tags: ["domain: config","source: stdin","sink: aws_cloudwatch_logs"]
+tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: aws_cloudwatch_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
@@ -52,7 +52,7 @@ you up and running in minutes.
 
 _sidecar.md.erb
 
-## A Step-By-Step Tutorial
+## Tutorial
 
 <div className="steps steps--h3">
 

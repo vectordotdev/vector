@@ -20,6 +20,9 @@ name = "observability"
 name = "operations"
 
 [[domains]]
+name = "platforms"
+
+[[domains]]
 name = "security"
 
 [[domains]]

@@ -5,7 +5,7 @@ title: Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
 series_position: 1
 author_github: https://github.com/Jeffail
-tags: ["domain: config"]
+tags: ["type: tutorial", "domain: config"]
 ---
 
 import Alert from '@site/src/components/Alert';
@@ -22,7 +22,13 @@ Vector is a simple beast to tame, in this guide we'll send an
      website/guides/getting-started/your-first-pipeline.md.erb
 -->
 
-## 1. Install Vector
+## Tutorial
+
+<div className="steps steps--h3">
+<ol>
+<li>
+
+### Install Vector
 
 If you haven't already, install Vector. Here's a script for the lazy:
 
@@ -32,7 +38,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or [choose your preferred installation method][docs.installation].
 
-## 2. Configure it
+</li>
+<li>
+
+### Configure it
 
 Vector runs with a [configuration file][docs.configuration] that tells it which
 components to run and how they should interact. Let's create one that simply
@@ -54,6 +63,11 @@ pipes a [`stdin` source][docs.sources.stdin] to a
 Every component within a Vector config has an identifier chosen by you. This
 allows you to specify where a sink should gather its data from (using the
 `inputs` field).
+
+</li>
+<li>
+
+### Test It
 
 That's it for our first config, now pipe an event through it:
 
@@ -79,6 +93,9 @@ Hey, kid, if you want to see something cool try setting `encoding.codec = "json"
 in the sink config.
 
 </Alert>
+</li>
+</ol>
+</div>
 
 ## Next Steps
 

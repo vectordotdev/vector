@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 title: Install Vector via DPKG
 sidebar_label: DPKG
 description: Install Vector through the DKG package manager
@@ -53,97 +54,136 @@ collecting and forwarding all data on the host.
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i vector-amd64.deb
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i vector-amd64.deb
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"journald"}
-      sinkName={null} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"journald"}
+  sinkName={null} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 <TabItem value="arm64">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i vector-arm64.deb
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i vector-arm64.deb
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"journald"}
-      sinkName={null} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"journald"}
+  sinkName={null} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 <TabItem value="armv7">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i vector-armhf.deb
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i vector-armhf.deb
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"journald"}
-      sinkName={null} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"journald"}
+  sinkName={null} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 </Tabs>
 
@@ -165,97 +205,136 @@ _service.md.erb
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i vector-amd64.deb
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i vector-amd64.deb
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 <TabItem value="arm64">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i vector-arm64.deb
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i vector-arm64.deb
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 <TabItem value="armv7">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i vector-armhf.deb
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i vector-armhf.deb
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 </Tabs>
 

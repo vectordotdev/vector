@@ -3,7 +3,7 @@ export interface GuideContent {
   guideListPaginated: GuidePaginated[];
   guideTags: GuideTags;
   guideTagsListPath: string | null;
-  guideCategories: string[];
+  guideCategorySlugs: string[];
 }
 
 export interface PluginOptions {
@@ -51,8 +51,8 @@ export interface GuidePaginated {
 }
 
 export interface MetaData {
-  category: string;
-  categorySort: string;
+  categories: string[];
+  categorySlug: string;
   description: string;
   nextItem?: Paginator;
   permalink: string;

@@ -4,11 +4,13 @@ import Avatar from '@site/src/components/Avatar';
 import Link from '@docusaurus/Link';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
+import SVG from 'react-inlinesvg';
 import Tags from '@site/src/components/Tags';
 
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
 import {enrichTags} from '@site/src/exports/tags';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
@@ -20,21 +22,30 @@ function GuideItem(props) {
     truncated,
     isGuidePage = false,
   } = props;
-  const {category, description, permalink, readingTime, seriesPosition, tags} = metadata;
+  const {categories, description, permalink, readingTime, seriesPosition, tags} = metadata;
   const {author_github, last_modified_on: lastModifiedOn, title} = frontMatter;
   const enrichedTags = enrichTags(tags, 'guides');
   const domainTag = enrichedTags.find(tag => tag.category == 'domain');
   const domainBG = domainTag ? domainTag.value : 'default';
+  const sourceTag = enrichedTags.find(tag => tag.category == 'source');
+  const sourceName = sourceTag ? sourceTag.value : null;
+
+  const {siteConfig} = useDocusaurusContext();
+  const {metadata: {installation, sources, sinks}} = siteConfig.customFields;
+  const {platforms} = installation;
+  const source = sourceName && sources[sourceName];
+  const logoPath = source ? source.logo_path : null;
 
   return (
     <Link to={permalink + '/'} className={`guide-item`}>
       <article className={`domain-bg domain-bg--${domainBG} domain-bg--hover`}>
         <header>
-          <div className="category">{category}</div>
+          <div className="category">{categories[0]}</div>
           <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{title}</h2>
         </header>
         <footer>
-          <Tags colorProfile="guides" tags={tags} />
+          {logoPath && <SVG src={source.logo_path} className="logo" />}
+          {!logoPath && <Tags colorProfile="guides" tags={tags} />}
           <div className="action">read now</div>
         </footer>
       </article>

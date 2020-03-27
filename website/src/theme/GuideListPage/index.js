@@ -22,11 +22,11 @@ function Guides({filtering, guidesMetadata, items}) {
   } else if (filtering) {
     return <GuideItems items={items.slice(0,25)} />
   } else {
-    const groupedItems = _.groupBy(items, ((item) => item.content.metadata.category));
+    const groupedItems = _.groupBy(items, ((item) => item.content.metadata.categorySlug.split('/')[0]));
 
-    return Object.keys(groupedItems).map((categoryName, index) => {
-      let category = guidesMetadata[categoryName];
-      let groupItems = groupedItems[categoryName];
+    return Object.keys(groupedItems).map((categorySlug, index) => {
+      let category = guidesMetadata[categorySlug];
+      let groupItems = groupedItems[categorySlug];
 
       return (
         <section>
@@ -34,7 +34,7 @@ function Guides({filtering, guidesMetadata, items}) {
             <AnchoredH2 id={category.name}>{category.title}</AnchoredH2>
             <div className="sub-title">{category.description}</div>
           </>}
-          <GuideItems items={groupItems.slice(0,25)} staggered={index == 0} />
+          <GuideItems items={groupItems.slice(0,25)} large={index == 1} staggered={index == 0} />
         </section>
       );
     });
@@ -53,7 +53,13 @@ function GuideListPage(props) {
   const [searchTerm, setSearchTerm] = useState(queryObj['search']);
 
   let filtering = false;
-  let filteredItems = items;
+  let filteredItems = items.filter(item => {
+    let tags = item.content.metadata.tags;
+    let hasPlatform = tags.some(tag => tag.label.startsWith('platform: '));
+    let hasSource = tags.some(tag => tag.label.startsWith('source: '));
+    let hasSink = tags.some(tag => tag.label.startsWith('sink: '));
+    return !((hasPlatform || hasSource) && hasSink);
+  });
 
   if (searchTerm) {
     filtering = true;

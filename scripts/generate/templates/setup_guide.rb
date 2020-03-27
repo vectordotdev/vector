@@ -3,10 +3,6 @@ require_relative "setup_guide"
 class Templates
   class SetupGuide
     def initialize(interfaces, strategy, platform: nil, source: nil, sink: nil)
-      if platform && source
-        raise ArgumentError.new("You cannot provide both a platform and a source")
-      end
-
       if platform.nil? && source.nil? && sink.nil?
         raise ArgumentError.new("You must supply at least a platform, source, or sink")
       end
@@ -82,13 +78,28 @@ class Templates
     def tags
       @tags ||=
         begin
-          strings = ["domain: config"]
+          # types first
+          strings = ["type: tutorial"]
 
+          # domains next
+          if @platform
+            strings << "domain: platforms"
+          end
+
+          if @source && !@platform
+            strings << "domain: sources"
+          end
+
+          if @sink
+            strings << "domain: sinks"
+          end
+
+          # types last
           if @platform
             strings << "platform: #{@platform.name}"
           end
 
-          if @source
+          if @source && !@platform
             strings << "source: #{@source.name}"
           end
 

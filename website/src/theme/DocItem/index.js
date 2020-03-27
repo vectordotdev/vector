@@ -2,6 +2,7 @@ import React from 'react';
 
 import Head from '@docusaurus/Head';
 import Link from '@docusaurus/Link';
+import PagePaginator from '@theme/PagePaginator';
 
 import _ from 'lodash';
 import styles from './styles.module.css';

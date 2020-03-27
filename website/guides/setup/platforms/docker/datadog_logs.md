@@ -1,10 +1,10 @@
 ---
-last_modified_on: "2020-03-26"
+last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send Docker logs to Datadog"
 description: "A guide to quickly, and correctly, send Docker logs to Datadog."
 author_github: https://github.com/binarylogic
-tags: ["domain: config","source: docker","sink: datadog_logs"]
+tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: datadog_logs"]
 ---
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
@@ -60,36 +60,45 @@ as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
 single host. We'll deploy Vector in it's own container, just like your other
 services, so that your workflow doesn't deviate.
 
-## A Step-By-Step Tutorial
+## Tutorial
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"docker"}
-    sinkName={"datadog_logs"} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"docker"}
+  sinkName={"datadog_logs"} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     -v /var/run/docker.sock:/var/run/docker.sock \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `-v /var/run/docke...` flag ensures that Vector has access to the Docker API.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 

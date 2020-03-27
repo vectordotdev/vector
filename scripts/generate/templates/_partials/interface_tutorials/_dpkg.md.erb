@@ -8,35 +8,48 @@
 
 <%- downloads.each do |download| -%>
 <TabItem value="<%= download.arch.parameterize %>">
+<ol>
+<li>
 
-1.  ### Download the Vector `.deb` package
+### Download the Vector `.deb` package
 
-    ```bash
-    curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version.minor_x}/#{download.file_name}") %>
-    ```
+```bash
+curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version.minor_x}/#{download.file_name}") %>
+```
 
-    [Looking for a different version?][docs.package_managers.dpkg#versions]
+[Looking for a different version?][docs.package_managers.dpkg#versions]
 
-2.  ### Install the downloaded package
+</li>
+<li>
 
-    ```bash
-    sudo dpkg -i <%= download.file_name %>
-    ```
+### Install the downloaded package
 
-3.  ### Configure Vector
+```bash
+sudo dpkg -i <%= download.file_name %>
+```
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={<%= (source && source.name).to_json %>}
-      sinkName={<%= (sink && sink.name).to_json %>} />
+</li>
+<li>
 
-4.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
 
+</li>
+<li>
+
+### Start Vector
+
+```bash
+sudo systemctl start vector
+```
+
+</li>
+</ol>
 </TabItem>
 <%- end -%>
 </Tabs>

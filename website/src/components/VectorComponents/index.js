@@ -134,7 +134,7 @@ function VectorComponents(props) {
   const [searchTerm, setSearchTerm] = useState(queryObj['search']);
 
   //
-  // Filtering
+  // State Filtering
   //
 
   if (searchTerm) {
@@ -166,6 +166,18 @@ function VectorComponents(props) {
 
   if (onlyProviders.size > 0) {
     components = components.filter(component => Array.from(onlyProviders).every(x => component.service_providers && component.service_providers.includes(x)));
+  }
+
+  //
+  // Prop Filtering
+  //
+
+  if (props.exceptNames && props.exceptNames.length > 0) {
+    components = components.filter(component => !props.exceptNames.includes(component.name) );
+  }
+
+  if (props.exceptFunctions && props.exceptFunctions.length > 0) {
+    components = components.filter(component => !props.exceptFunctions.includes(component.function_category) );
   }
 
   //

@@ -468,7 +468,7 @@ class Templates
       strategy = metadata.installation.strategies.first
     end
 
-    guide = SetupGuide.new(interfaces, strategy, source: source, sink: sink)
+    guide = SetupGuide.new(interfaces, strategy, platform: platform, source: source, sink: sink)
 
     render("#{partials_path}/_setup_guide.md", binding).strip
   end

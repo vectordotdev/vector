@@ -42,24 +42,18 @@ export async function generateGuides(
         return;
       }
 
-      let category = relativeSource.split('/')[0];
-      let categorySort = category == 'getting-started' ? 'AA' : category;
+      let categories = relativeSource.split('/').slice(0, -1);
+      let categorySlug = categories.join('/');
       let linkName = relativeSource.replace(/\.mdx?$/, '');
       let seriesPosition = frontMatter.series_position;
       let tags = frontMatter.tags || [];
       let title = frontMatter.title || linkName;
 
-      if (seriesPosition) {
-        tags.unshift('type: series');
-      } else {
-        tags.unshift('type: post');
-      }
-
       guides.push({
         id: frontMatter.id || frontMatter.title,
         metadata: {
-          category: category,
-          categorySort: categorySort,
+          categories: categories,
+          categorySlug: categorySlug,
           description: frontMatter.description || excerpt,
           permalink: normalizeUrl([
             baseUrl,
@@ -67,7 +61,7 @@ export async function generateGuides(
             frontMatter.id || linkName,
           ]),
           readingTime: readingStats.text,
-          seriesPosition: frontMatter.series_position,
+          seriesPosition: seriesPosition,
           sort: frontMatter.sort,
           source: aliasedSource,
           tags: tags,
@@ -78,7 +72,19 @@ export async function generateGuides(
     }),
   );
 
-  return _.sortBy(guides, ['metadata.categorySort', 'metadata.seriesPosition', 'metadata.title']);
+  return _.sortBy(guides, [
+    ((guide) => {
+      let categories = guide.metadata.categories;
+
+      if (categories[0] == 'getting-started') {
+        return ['AA'].concat(categories.slice(1));
+      } else {
+        return categories;
+      }
+    }),
+    'metadata.seriesPosition',
+    'metadata.title'
+  ]);
 }
 
 export function linkify(

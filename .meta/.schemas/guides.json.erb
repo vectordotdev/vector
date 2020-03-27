@@ -41,6 +41,7 @@
       "items": {
         "type": "string",
         "enum": <%= (
+          ["type: guide", "type: post", "type: tutorial"] +
           metadata.domains.collect { |d| "domain: #{d.name}" } +
           metadata.installation.platforms_list.collect { |p| "platform: #{p.name}" } +
           metadata.sources_list.collect { |s| "source: #{s.name}" } +

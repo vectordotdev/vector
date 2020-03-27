@@ -1,24 +1,33 @@
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="<%= tutorial.config_path %>"
-    sourceName={<%= (source && source.name).to_json %>}
-    sinkName={<%= (sink && sink.name).to_json %>} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="<%= tutorial.config_path %>"
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
 
-   ```bash
-   docker run \
-<%= tutorial.start_command_lines.join(" \\\n").indent(5) %>
-   ```
+</li>
+<li>
 
-   <%- if tutorial.start_command_explanations.any? -%>
-   <CodeExplanation>
+### Start the Vector container
 
-   * <%= tutorial.start_command_explanations.join("\n   * ") %>
+```bash
+docker run \
+<%= tutorial.start_command_lines.join(" \\\n").indent(2) %>
+```
 
-   </CodeExplanation>
-   <%- end -%>
+<%- if tutorial.start_command_explanations.any? -%>
+<CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+* <%= tutorial.start_command_explanations.join("\n   * ") %>
+
+</CodeExplanation>
+<%- end -%>
+
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>

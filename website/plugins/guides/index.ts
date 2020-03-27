@@ -4,9 +4,9 @@ import {normalizeUrl, docuHash, aliasedSitePath} from '@docusaurus/utils';
 
 import {
   PluginOptions,
+  GuideItemsToMetadata,
   GuideTags,
   GuideContent,
-  GuideItemsToMetadata,
   TagsModule,
   GuidePaginated,
   Guide,
@@ -151,14 +151,25 @@ export default function pluginContentGuide(
 
 
       // Guide categories
-      const guideCategories = _.uniq(guides.map(guide => guide.metadata.category));
+      let guideCategorySlugs = guides.flatMap(guide => {
+        let categories = [...guide.metadata.categories];
+        let categorySlugs = [];
+
+        while (categories.length > 0) {
+          categorySlugs.push(categories.join('/'));
+          categories.pop();
+        }
+
+        return categorySlugs;
+      });
+      guideCategorySlugs = _.uniq(guideCategorySlugs);
 
       return {
         guides,
         guideListPaginated,
         guideTags,
         guideTagsListPath,
-        guideCategories,
+        guideCategorySlugs,
       };
     },
 
@@ -189,34 +200,13 @@ export default function pluginContentGuide(
         guideListPaginated,
         guideTags,
         guideTagsListPath,
-        guideCategories,
+        guideCategorySlugs,
       } = guideContents;
 
       const guideItemsToMetadata: GuideItemsToMetadata = {};
-
-      // Guide pages
-      await Promise.all(
-        guides.map(async guide => {
-          const {id, metadata} = guide;
-          await createData(
-            // Note that this created data path must be in sync with
-            // metadataPath provided to mdx-loader.
-            `${docuHash(metadata.source)}.json`,
-            JSON.stringify(metadata, null, 2),
-          );
-
-          addRoute({
-            path: metadata.permalink,
-            component: guideComponent,
-            exact: true,
-            modules: {
-              content: metadata.source,
-            },
-          });
-
-          guideItemsToMetadata[id] = metadata;
-        }),
-      );
+      guides.map(guide => {
+        guideItemsToMetadata[guide.id] = guide.metadata;
+      });
 
       // Guides list
       await Promise.all(
@@ -317,23 +307,23 @@ export default function pluginContentGuide(
       }
 
       // Guide categories
-      if (guideCategories.length > 0) {
+      if (guideCategorySlugs.length > 0) {
         await Promise.all(
-          guideCategories.map(async category => {
-            const permalink = `/guides/${category}`;
-            const metadata = {category: category};
+          guideCategorySlugs.map(async categorySlug => {
+            const permalink = `/guides/${categorySlug}`;
+            const metadata = {categorySlug: categorySlug};
             const categoryMetadataPath = await createData(
               `${docuHash(permalink)}.json`,
               JSON.stringify(metadata, null, 2),
             );
 
             addRoute({
-              path: `/guides/${category}`,
+              path: permalink,
               component: guideCategoryComponent,
               exact: true,
               modules: {
                 items: guides.
-                  filter(guide => guide.metadata.category == category).
+                  filter(guide => guide.metadata.categorySlug.startsWith(categorySlug)).
                   map(guide => {
                     const metadata = guideItemsToMetadata[guide.id];
                     // To tell routes.js this is an import and not a nested object to recurse.
@@ -353,6 +343,28 @@ export default function pluginContentGuide(
           })
         );
       }
+
+      // Guide pages
+      await Promise.all(
+        guides.map(async guide => {
+          const {metadata} = guide;
+          await createData(
+            // Note that this created data path must be in sync with
+            // metadataPath provided to mdx-loader.
+            `${docuHash(metadata.source)}.json`,
+            JSON.stringify(metadata, null, 2),
+          );
+
+          addRoute({
+            path: metadata.permalink,
+            component: guideComponent,
+            exact: true,
+            modules: {
+              content: metadata.source,
+            },
+          });
+        }),
+      );
     },
 
     configureWebpack(

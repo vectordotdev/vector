@@ -60,6 +60,11 @@
   width: 100%;
 }
 
+.guide-item > article > footer > .logo {
+  height: 3em;
+  width: 3em;
+}
+
 .guide-item > article > footer > .action {
   font-size: 0.75em;
   font-weight: 600;

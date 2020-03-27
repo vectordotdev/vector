@@ -4,7 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: Troubleshooting
 description: A guide on debugging and troubleshooting Vector
 author_github: https://github.com/binarylogic
-tags: ["domain: operations"]
+tags: ["type: guide", "domain: operations"]
 ---
 
 import Alert from '@site/src/components/Alert';

@@ -7,10 +7,10 @@ import classnames from 'classnames';
 
 import './styles.css';
 
-function GuideItems({items, staggered}) {
+function GuideItems({items, large, staggered}) {
   return (
     <div className="guides">
-      <div className={classnames('guide-items', {'guide-items--staggered': staggered})}>
+      <div className={classnames('guide-items', {'guide-items--l': large, 'guide-items--staggered': staggered})}>
         {items.map(({content: GuideContent}) => (
           <GuideItem
             key={GuideContent.metadata.permalink}

@@ -21,7 +21,7 @@ const DEFAULT_OPTIONS = {
     truncateMarker: /<!--\s*(truncate)\s*-->/,
 };
 function pluginContentGuide(context, opts) {
-    const options = Object.assign(Object.assign({}, DEFAULT_OPTIONS), opts);
+    const options = { ...DEFAULT_OPTIONS, ...opts };
     const { siteDir, generatedFilesDir } = context;
     const contentPath = path_1.default.resolve(siteDir, options.path);
     const dataDir = path_1.default.join(generatedFilesDir, 'guides');
@@ -112,13 +112,22 @@ function pluginContentGuide(context, opts) {
             });
             const guideTagsListPath = Object.keys(guideTags).length > 0 ? tagsPath : null;
             // Guide categories
-            const guideCategories = lodash_1.default.uniq(guides.map(guide => guide.metadata.category));
+            let guideCategorySlugs = guides.flatMap(guide => {
+                let categories = [...guide.metadata.categories];
+                let categorySlugs = [];
+                while (categories.length > 0) {
+                    categorySlugs.push(categories.join('/'));
+                    categories.pop();
+                }
+                return categorySlugs;
+            });
+            guideCategorySlugs = lodash_1.default.uniq(guideCategorySlugs);
             return {
                 guides,
                 guideListPaginated,
                 guideTags,
                 guideTagsListPath,
-                guideCategories,
+                guideCategorySlugs,
             };
         },
         async contentLoaded({ content: guideContents, actions, }) {
@@ -128,25 +137,11 @@ function pluginContentGuide(context, opts) {
             const { guideListComponent, guideComponent, guideTagListComponent, guideTagComponent, guideCategoryComponent, } = options;
             const aliasedSource = (source) => `~guide/${path_1.default.relative(dataDir, source)}`;
             const { addRoute, createData } = actions;
-            const { guides, guideListPaginated, guideTags, guideTagsListPath, guideCategories, } = guideContents;
+            const { guides, guideListPaginated, guideTags, guideTagsListPath, guideCategorySlugs, } = guideContents;
             const guideItemsToMetadata = {};
-            // Guide pages
-            await Promise.all(guides.map(async (guide) => {
-                const { id, metadata } = guide;
-                await createData(
-                // Note that this created data path must be in sync with
-                // metadataPath provided to mdx-loader.
-                `${utils_1.docuHash(metadata.source)}.json`, JSON.stringify(metadata, null, 2));
-                addRoute({
-                    path: metadata.permalink,
-                    component: guideComponent,
-                    exact: true,
-                    modules: {
-                        content: metadata.source,
-                    },
-                });
-                guideItemsToMetadata[id] = metadata;
-            }));
+            guides.map(guide => {
+                guideItemsToMetadata[guide.id] = guide.metadata;
+            });
             // Guides list
             await Promise.all(guideListPaginated.map(async (listPage) => {
                 const { metadata, items } = listPage;
@@ -223,18 +218,18 @@ function pluginContentGuide(context, opts) {
                 });
             }
             // Guide categories
-            if (guideCategories.length > 0) {
-                await Promise.all(guideCategories.map(async (category) => {
-                    const permalink = `/guides/${category}`;
-                    const metadata = { category: category };
+            if (guideCategorySlugs.length > 0) {
+                await Promise.all(guideCategorySlugs.map(async (categorySlug) => {
+                    const permalink = `/guides/${categorySlug}`;
+                    const metadata = { categorySlug: categorySlug };
                     const categoryMetadataPath = await createData(`${utils_1.docuHash(permalink)}.json`, JSON.stringify(metadata, null, 2));
                     addRoute({
-                        path: `/guides/${category}`,
+                        path: permalink,
                         component: guideCategoryComponent,
                         exact: true,
                         modules: {
                             items: guides.
-                                filter(guide => guide.metadata.category == category).
+                                filter(guide => guide.metadata.categorySlug.startsWith(categorySlug)).
                                 map(guide => {
                                 const metadata = guideItemsToMetadata[guide.id];
                                 // To tell routes.js this is an import and not a nested object to recurse.
@@ -253,6 +248,22 @@ function pluginContentGuide(context, opts) {
                     });
                 }));
             }
+            // Guide pages
+            await Promise.all(guides.map(async (guide) => {
+                const { metadata } = guide;
+                await createData(
+                // Note that this created data path must be in sync with
+                // metadataPath provided to mdx-loader.
+                `${utils_1.docuHash(metadata.source)}.json`, JSON.stringify(metadata, null, 2));
+                addRoute({
+                    path: metadata.permalink,
+                    component: guideComponent,
+                    exact: true,
+                    modules: {
+                        content: metadata.source,
+                    },
+                });
+            }));
         },
         configureWebpack(_config, isServer, { getBabelLoader, getCacheLoader }) {
             const { rehypePlugins, remarkPlugins, truncateMarker } = options;

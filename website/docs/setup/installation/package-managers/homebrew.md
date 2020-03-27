@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 title: Install Vector via Homebrew
 sidebar_label: Homebrew
 description: Install Vector through the Homebrew package manager
@@ -46,27 +47,39 @@ collecting and forwarding all data on the host.
 
 <div className="steps steps--h3">
 
-1.  ### Add the Timber tap and install `vector`
+<ol>
+<li>
 
-    ```bash
-    brew tap timberio/brew && brew install vector
-    ```
+### Add the Timber tap and install `vector`
 
-    [Looking for a specific version?][docs.package_managers.homebrew]
+```bash
+brew tap timberio/brew && brew install vector
+```
 
-2.  ### Configure Vector
+[Looking for a specific version?][docs.package_managers.homebrew]
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"file"}
-      sinkName={null} />
+</li>
+<li>
 
-3.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    brew services start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"file"}
+  sinkName={null} />
+
+</li>
+<li>
+
+### Start Vector
+
+```bash
+brew services start vector
+```
+
+</li>
+</ol>
 
 </div>
 </TabItem>
@@ -79,27 +92,39 @@ _service.md.erb
 
 <div className="steps steps--h3">
 
-1.  ### Add the Timber tap and install `vector`
+<ol>
+<li>
 
-    ```bash
-    brew tap timberio/brew && brew install vector
-    ```
+### Add the Timber tap and install `vector`
 
-    [Looking for a specific version?][docs.package_managers.homebrew]
+```bash
+brew tap timberio/brew && brew install vector
+```
 
-2.  ### Configure Vector
+[Looking for a specific version?][docs.package_managers.homebrew]
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
+</li>
+<li>
 
-3.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    brew services start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
+
+</li>
+<li>
+
+### Start Vector
+
+```bash
+brew services start vector
+```
+
+</li>
+</ol>
 
 </div>
 </TabItem>

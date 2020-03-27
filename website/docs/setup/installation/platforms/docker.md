@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -51,32 +52,41 @@ services, so that your workflow doesn't deviate.
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"docker"}
-    sinkName={null} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"docker"}
+  sinkName={null} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     -v /var/run/docker.sock:/var/run/docker.sock \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `-v /var/run/docke...` flag ensures that Vector has access to the Docker API.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 </TabItem>
@@ -93,32 +103,41 @@ relationship with each service on the host. [Learn more...][docs.strategies.side
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"file"}
-    sinkName={null} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"file"}
+  sinkName={null} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     -v /var/log \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -v /var/log \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 </TabItem>
@@ -139,32 +158,41 @@ service that can send log data over the configured protocol.
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"http"}
-    sinkName={null} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     -p 80:80 \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -p 80:80 \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `-p 80:80` flag ensures that port 80 is exposed for network communication.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 </TabItem>

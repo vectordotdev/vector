@@ -10,22 +10,13 @@ module.exports = {
       "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
       "guides": [
         {
-          "author_github": "https://github.com/a-rodin",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/making-changes",
-          "last_modified_on": null,
-          "path": "website/guides/advanced/making-changes.md",
-          "series_position": null,
-          "title": "Making & Applying Changes"
-        },
-        {
           "author_github": "https://github.com/Jeffail",
           "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/managing-complex-configurations",
           "last_modified_on": null,
           "path": "website/guides/advanced/managing-complex-configurations.md",
           "series_position": null,
-          "title": "Managing Complex Vector Configs"
+          "title": "Managing Complex Configs"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -34,7 +25,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/advanced/troubleshooting.md",
           "series_position": null,
-          "title": "Troubleshooting Vector"
+          "title": "Troubleshooting"
         },
         {
           "author_github": "https://github.com/Jeffail",
@@ -43,7 +34,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/advanced/unit-testing.md",
           "series_position": null,
-          "title": "Unit Testing Your Vector Config"
+          "title": "Unit Testing Your Configs"
         }
       ],
       "name": "advanced",
@@ -108,7 +99,7 @@ module.exports = {
     "setup": {
       "children": {
       },
-      "description": "Targeted guides for setting up specific sources and sinks.",
+      "description": "Targeted guides for setting up specific platforms, sources and sinks.",
       "guides": [
         {
           "author_github": "https://github.com/binarylogic",
@@ -23510,7 +23501,7 @@ module.exports = {
     "socket": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"socket\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required, required when mode = \"tcp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  type = \"socket\" # required\n  inputs = [\"in\"] # required\n  address = \"92.12.333.224:5000\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\"\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "Streams log events to a socket, such as a TCP, UDP, or Unix domain socket.",

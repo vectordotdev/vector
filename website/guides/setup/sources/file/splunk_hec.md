@@ -1,10 +1,10 @@
 ---
-last_modified_on: "2020-03-26"
+last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send File logs to Splunk HEC"
 description: "A guide to quickly, and correctly, send File logs to Splunk HEC."
 author_github: https://github.com/binarylogic
-tags: ["domain: config","source: file","sink: splunk_hec"]
+tags: ["type: tutorial","domain: sources","domain: sinks","source: file","sink: splunk_hec"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
@@ -60,7 +60,7 @@ As shown in the diagram above, the daemon deployment strategy is designed for
 data collection on a single host. Vector is deplyed in it's own container,
 collecting and forwarding all data on the host.
 
-## A Step-By-Step Tutorial
+## Tutorial
 
 <div className="steps steps--h3">
 

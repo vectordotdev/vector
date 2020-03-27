@@ -36,6 +36,15 @@ function Headings({headings, isChild}) {
   if (!headings.length) return null;
   return (
     <ul className={isChild ? '' : 'contents'}>
+      {!isChild && (
+        <li>
+          <a
+            href="#overview"
+            className={LINK_CLASS_NAME}>
+            Overview
+          </a>
+        </li>
+      )}
       {headings.map(heading => (
         <li key={heading.id}>
           <a
@@ -58,9 +67,7 @@ function GuidePage(props) {
   const {content: GuideContents} = props;
   const {frontMatter, metadata} = GuideContents;
   const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, series_position: seriesPosition, title} = frontMatter;
-  const {category: categoryName, readingTime, tags} = metadata;
-
-  console.log(metadata)
+  const {categories, readingTime, tags} = metadata;
 
   //
   // Site config
@@ -69,7 +76,7 @@ function GuidePage(props) {
   const {siteConfig} = useDocusaurusContext();
   const {metadata: {guides: guidesMetadata, installation, sources, sinks}} = siteConfig.customFields;
   const {platforms} = installation;
-  const category = guidesMetadata[categoryName];
+  const category = guidesMetadata[categories[0]];
 
   //
   // Variables
@@ -88,7 +95,7 @@ function GuidePage(props) {
   const sourceTag = enrichedTags.find(tag => tag.category == 'source');
   const sourceName = sourceTag ? sourceTag.value : null;
   const source = sourceName && sources[sourceName];
-  const eventTypes = (platform || source || sink || {}).event_types || [];
+  const eventTypes = (source || sink || {}).event_types || [];
 
   let pathPrefix = '/guides/setup';
 
@@ -102,7 +109,7 @@ function GuidePage(props) {
   // State
   //
 
-  const [showSinkSwitcher, setShowSinkSwitcher] = useState(false);
+  const [showComponentSwitcher, setShowComponentSwitcher] = useState(null);
 
   //
   // Render
@@ -112,16 +119,18 @@ function GuidePage(props) {
 
   return (
     <Layout title={title} description={`${title}, in minutes, for free`}>
-      {showSinkSwitcher && <Modal
+      {showComponentSwitcher && <Modal
         className="modal"
-        onRequestClose={() => setShowSinkSwitcher(false)}
+        onRequestClose={() => setShowComponentSwitcher(false)}
         overlayClassName="modal-overlay"
-        isOpen={showSinkSwitcher}
+        isOpen={showComponentSwitcher !== null}
         contentLabel="Minimal Modal Example">
           <header>
             <h1>Where do you want to send your data?</h1>
           </header>
           <VectorComponents
+            exceptFunctions={['test']}
+            exceptNames={[source && source.name]}
             eventTypes={eventTypes}
             pathPrefix={pathPrefix}
             titles={false}
@@ -137,22 +146,25 @@ function GuidePage(props) {
                   <SVG src={platform.logo_path} alt={`${platform.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
-              {source && !platform && <div className="icon panel">
+              {source && !platform && <div className="icon panel link" title="Change your source" onClick={(event) => setShowComponentSwitcher('source')}>
                 {source.logo_path ?
                   <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
-              {!source && !platform && <a href="#" className="icon panel" title="Select a source">
+              {!source && !platform && <div className="icon panel link" title="Select a source" onClick={(event) => setShowComponentSwitcher('source')}>
+                 <i className="feather icon-plus"></i>
+               </div>}
+              {!source && !platform && <div className="icon panel link" title="Select a source">
                 <i className="feather icon-plus"></i>
-              </a>}
-              {sink && <a href="#" className="icon panel" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
+              </div>}
+              {sink && <div className="icon panel link" title="Change your destination" onClick={(event) => setShowComponentSwitcher('sink')}>
                 {sink.logo_path ?
                   <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
                   <i className="feather icon-database"></i>}
-               </a>}
-               {!sink && <a href="#" className="icon panel" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>
+               </div>}
+               {!sink && <div className="icon panel link" title="Select a destination" onClick={(event) => setShowComponentSwitcher('sink')}>
                  <i className="feather icon-plus"></i>
-               </a>}
+               </div>}
             </div>
           )}
           {(!platform && !source && !sink) && (
@@ -164,40 +176,41 @@ function GuidePage(props) {
       </header>
       <main className={classnames('container', 'container--l', styles.container)}>
         <div className="row">
-        <aside className="col col--2-5">
-          <section className={styles.avatar}>
-            <Avatar
-              bio={true}
-              github={authorGithub}
-              size="lg"
-              rel="author"
-              subTitle={false}
-              vertical={true} />
-          </section>
-          <section className={classnames('table-of-contents', styles.tableOfContents)}>
-            <div className="section">
-              <div className="title">Stats</div>
-
-              <div className="text--secondary text--bold"><i className="feather icon-book"></i> {readingTime}</div>
-              <div className="text--secondary text--bold"><i className="feather icon-clock"></i> Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></div>
-            </div>
-            {GuideContents.rightToc.length > 0 && (
+          <aside className="col col--2-5">
+            <section className={styles.avatar}>
+              <Avatar
+                bio={true}
+                github={authorGithub}
+                size="lg"
+                rel="author"
+                subTitle={false}
+                vertical={true} />
+            </section>
+            <section className={classnames('table-of-contents', styles.tableOfContents)}>
               <div className="section">
-                <div className="title">Contents</div>
-                <Headings headings={GuideContents.rightToc} />
+                <div className="title">Stats</div>
+
+                <div className="text--secondary text--bold"><i className="feather icon-book"></i> {readingTime}</div>
+                <div className="text--secondary text--bold"><i className="feather icon-clock"></i> Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></div>
               </div>
-            )}
-          </section>
-        </aside>
-        <div className={classnames('col', styles.rightCol)}>
-          <article>
-            <div className="markdown">
-              <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
-            </div>
-          </article>
-          <PagePaginator previous={metadata.previousItem} next={metadata.nextItem} className={styles.paginator} />
+              {GuideContents.rightToc.length > 0 && (
+                <div className="section">
+                  <div className="title">Contents</div>
+                  <Headings headings={GuideContents.rightToc} />
+                </div>
+              )}
+            </section>
+          </aside>
+          <div className={classnames('col', styles.rightCol)}>
+            <article>
+              <div className="markdown">
+                <a aria-hidden="true" tabindex="-1" class="anchor" id="overview"></a>
+                <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
+              </div>
+            </article>
+            <PagePaginator previous={metadata.previousItem} next={metadata.nextItem} className={styles.paginator} />
+          </div>
         </div>
-      </div>
       </main>
     </Layout>
   );

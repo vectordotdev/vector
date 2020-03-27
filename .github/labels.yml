@@ -19,6 +19,9 @@
 - name: "domain: operations"
   description: Anything operations related
   color: 212f3e
+- name: "domain: platforms"
+  description: Anything platforms related
+  color: 212f3e
 - name: "domain: security"
   description: Anything security related
   color: 212f3e

@@ -1259,6 +1259,7 @@ ol li.list--li--pink {
   font-size: 0.95em;
   opacity: 0.5;
 }
+.link.panel:hover,
 a.panel:hover {
   background: var(--ifm-panel-background-active) !important;
   border-color: var(--ifm-color-primary);

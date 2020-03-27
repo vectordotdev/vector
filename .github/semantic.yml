@@ -24,6 +24,7 @@ scopes:
   - networking
   - observability
   - operations
+  - platforms
   - security
   - sinks
   - sources

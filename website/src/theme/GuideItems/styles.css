@@ -1,9 +1,13 @@
 .guide-items {
   display: grid;
-  font-size: 1.4em;
-  grid-template-columns: repeat(3, minmax(100px, 1fr));
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
   grid-gap: 1.5rem;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+.guide-items--l {
+  font-size: 1.4em;
+  grid-template-columns: repeat(3, minmax(100px, 1fr));
 }
 
 .guide-items--staggered {

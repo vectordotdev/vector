@@ -5,7 +5,7 @@ title: Structuring Your Log Data
 description: How to parse log data in Vector
 series_position: 2
 author_github: https://github.com/Jeffail
-tags: ["domain: config"]
+tags: ["type: tutorial", "domain: config"]
 ---
 
 import Alert from '@site/src/components/Alert';
@@ -45,7 +45,13 @@ And have them coming out the other end in a structured format like this:
      website/guides/getting-started/structuring.md.erb
 -->
 
-## 1. Basic pipeline
+## Tutorial
+
+<div className="steps steps--h3">
+<ol>
+<li>
+
+### Basic pipeline
 
 In the last guide we simply piped stdin to stdout, I'm not trying to diminish
 your sense of achievement but that was pretty basic.
@@ -66,13 +72,11 @@ The basic source to sink version of our pipeline looks like this:
 <CodeHeader text="vector.toml" />
 
 ```toml
-# Consume data
 [sources.foo]
   type = "socket"
   address = "0.0.0.0:9000"
   mode = "tcp"
 
-# Write the data
 [sinks.bar]
   inputs = ["foo"]
   type = "elasticsearch"
@@ -90,7 +94,10 @@ like this:
 
 That's hardly structured at all! Let's remedy that by adding our first transform.
 
-## 2. Add a transform
+</li>
+<li>
+
+### Add a transform
 
 Nothing in this world is ever good enough for you, why should events be any
 different?
@@ -121,21 +128,18 @@ Let's place our new transform in between our existing source and sink:
 <CodeHeader text="vector.toml" />
 
 ```diff
- # Consume data
  [sources.foo]
    type = "socket"
    address = "0.0.0.0:9000"
    mode = "tcp"
 
 
-+# Structure the data
 +[transforms.apache_parser]
 +  inputs = ["foo"]
 +  type = "regex_parser"
 +  field = "message"
 +  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<mathod>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 +
- # Write the data
  [sinks.bar]
 -  inputs = ["foo"]
 +  inputs = ["apache_parser"]
@@ -150,20 +154,17 @@ Let's place our new transform in between our existing source and sink:
 <CodeHeader text="vector.toml" />
 
 ```toml
-# Consume data
 [sources.foo]
   type = "socket"
   address = "0.0.0.0:9000"
   mode = "tcp"
 
-# Structure the data
 [transforms.apache_parser]
   inputs = ["foo"]
   type = "regex_parser"
   field = "message"
   regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<mathod>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
 
-# Write the data
 [sinks.bar]
   inputs = ["apache_parser"]
   type = "elasticsearch"
@@ -177,7 +178,10 @@ Let's place our new transform in between our existing source and sink:
 This regular expression looks great and it probably works, but it's best to be
 sure, right? Which leads us onto the next step.
 
-## 3. Test it
+</li>
+<li>
+
+### Test it
 
 No one is saying that unplanned explosions aren't cool, but you should be doing
 that in your own time. In order to test our transform we _could_ set up a local
@@ -318,8 +322,16 @@ test vector.toml: test apache regex ... passed
 Success! Next, try experimenting by adding more [transforms][docs.transforms] to
 your pipeline before moving onto the next guide.
 
-Good luck, now that you're a Vector pro you'll have endless ragtag groups of
-misfits trying to recruit you as their hacker.
+
+</li>
+</ol>
+</div>
+
+## Next Steps
+
+Now that you're a Vector pro you'll have endless ragtag groups of misfits
+trying to recruit you as their hacker, but it won't mean much if you can't
+deploy Vector. Onto the next guide!
 
 
 [docs.data-model]: /docs/about/data-model/

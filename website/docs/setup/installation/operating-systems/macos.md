@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS
@@ -46,27 +47,39 @@ collecting and forwarding all data on the host.
 
 <div className="steps steps--h3">
 
-1.  ### Add the Timber tap and install `vector`
+<ol>
+<li>
 
-    ```bash
-    brew tap timberio/brew && brew install vector
-    ```
+### Add the Timber tap and install `vector`
 
-    [Looking for a specific version?][docs.package_managers.homebrew]
+```bash
+brew tap timberio/brew && brew install vector
+```
 
-2.  ### Configure Vector
+[Looking for a specific version?][docs.package_managers.homebrew]
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"file"}
-      sinkName={null} />
+</li>
+<li>
 
-3.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    brew services start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"file"}
+  sinkName={null} />
+
+</li>
+<li>
+
+### Start Vector
+
+```bash
+brew services start vector
+```
+
+</li>
+</ol>
 
 </div>
 </TabItem>
@@ -79,27 +92,39 @@ _service.md.erb
 
 <div className="steps steps--h3">
 
-1.  ### Add the Timber tap and install `vector`
+<ol>
+<li>
 
-    ```bash
-    brew tap timberio/brew && brew install vector
-    ```
+### Add the Timber tap and install `vector`
 
-    [Looking for a specific version?][docs.package_managers.homebrew]
+```bash
+brew tap timberio/brew && brew install vector
+```
 
-2.  ### Configure Vector
+[Looking for a specific version?][docs.package_managers.homebrew]
 
-    <ConfigExample
-      format="toml"
-      path="/etc/vector/vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
+</li>
+<li>
 
-3.  ### Start Vector
+### Configure Vector
 
-    ```bash
-    brew services start vector
-    ```
+<ConfigExample
+  format="toml"
+  path="/etc/vector/vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
+
+</li>
+<li>
+
+### Start Vector
+
+```bash
+brew services start vector
+```
+
+</li>
+</ol>
 
 </div>
 </TabItem>
@@ -220,32 +245,41 @@ collecting and forwarding all data on the host.
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"file"}
-    sinkName={null} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"file"}
+  sinkName={null} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     -v /var/log \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -v /var/log \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 </TabItem>
@@ -258,32 +292,41 @@ _service.md.erb
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"http"}
-    sinkName={null} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"http"}
+  sinkName={null} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     -p 80:80 \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  -p 80:80 \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `-p 80:80` flag ensures that port 80 is exposed for network communication.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 </TabItem>

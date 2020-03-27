@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 title: Install Vector On Raspbian
 sidebar_label: Raspbian
 description: Install Vector On Raspbian
@@ -100,30 +101,39 @@ collecting and forwarding all data on the host.
 
 <div className="steps steps--h3">
 
-1. ### Configure Vector
+<ol>
+<li>
 
-   <ConfigExample
-    format="toml"
-    path="vector.toml"
-    sourceName={"journald"}
-    sinkName={null} />
+### Configure Vector
 
-2. ### Start the Vector container
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"journald"}
+  sinkName={null} />
 
-   ```bash
-   docker run \
-     -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-     timberio/vector:latest-alpine
-   ```
+</li>
+<li>
 
-   <CodeExplanation>
+### Start the Vector container
 
-   * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+```bash
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  timberio/vector:latest-alpine
+```
+
+<CodeExplanation>
+
+* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
-   </CodeExplanation>
+</CodeExplanation>
 
-   That's it! Simple and to the point. Hit `ctrl+c` to exit.
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
 
 </div>
 </TabItem>
