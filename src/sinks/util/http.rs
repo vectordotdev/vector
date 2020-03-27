@@ -153,7 +153,7 @@ where
         let tls = tls_connector_builder(&settings)?;
         let mut https = HttpsConnector::with_connector(http, tls)?;
 
-        let settings = settings.tls().map(Clone::clone);
+        let settings = settings.tls().cloned();
         https.set_callback(move |c, _uri| {
             if let Some(settings) = &settings {
                 settings.apply_connect_configuration(c);
