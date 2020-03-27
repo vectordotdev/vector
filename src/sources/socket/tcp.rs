@@ -53,7 +53,7 @@ impl TcpSource for RawTcpSource {
         BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
     }
 
-    fn build_event(&self, frame: Bytes, host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
         let mut event = Event::from(frame);
 
         let host_key = if let Some(key) = &self.config.host_key {
@@ -62,9 +62,7 @@ impl TcpSource for RawTcpSource {
             &event::log_schema().host_key()
         };
 
-        if let Some(host) = host {
-            event.as_mut_log().insert(host_key.clone(), host);
-        }
+        event.as_mut_log().insert(host_key.clone(), host);
 
         trace!(
             message = "Received one event.",

@@ -359,7 +359,7 @@ impl PrometheusSink {
             .with_graceful_shutdown(tripwire.clone())
             .map_err(|e| eprintln!("server error: {}", e));
 
-        tokio::spawn(server);
+        tokio01::spawn(server);
         self.server_shutdown_trigger = Some(trigger);
     }
 }

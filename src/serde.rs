@@ -15,6 +15,12 @@ pub fn to_string(value: impl serde::Serialize) -> String {
     value.as_str().unwrap().into()
 }
 
+/// Answers "Is it possible to skip serializing this value, because it's the
+/// default?"
+pub(crate) fn skip_serializing_if_default<E: Default + PartialEq>(e: &E) -> bool {
+    e == &E::default()
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum FieldsOrValue<V> {

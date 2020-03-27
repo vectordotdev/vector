@@ -49,12 +49,12 @@ pub trait StreamExt: Stream {
     /// extern crate futures;
     ///
     /// use stream_cancel::StreamExt;
-    /// use tokio::prelude::*;
+    /// use tokio01::prelude::*;
     ///
-    /// let listener = tokio::net::TcpListener::bind(&"0.0.0.0:0".parse().unwrap()).unwrap();
+    /// let listener = tokio01::net::TcpListener::bind(&"0.0.0.0:0".parse().unwrap()).unwrap();
     /// let (tx, rx) = futures01::sync::oneshot::channel();
     ///
-    /// let mut rt = tokio::runtime::Runtime::new().unwrap();
+    /// let mut rt = tokio01::runtime::Runtime::new().unwrap();
     /// rt.spawn(
     ///     listener
     ///         .incoming()
@@ -62,8 +62,8 @@ pub trait StreamExt: Stream {
     ///         .map_err(|e| eprintln!("accept failed = {:?}", e))
     ///         .for_each(|sock| {
     ///             let (reader, writer) = sock.split();
-    ///             tokio::spawn(
-    ///                 tokio::io::copy(reader, writer)
+    ///             tokio01::spawn(
+    ///                 tokio01::io::copy(reader, writer)
     ///                     .map(|amt| println!("wrote {:?} bytes", amt))
     ///                     .map_err(|err| eprintln!("IO error {:?}", err)),
     ///             )

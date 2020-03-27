@@ -6,7 +6,7 @@ use super::{
 use crate::{
     dns::Resolver,
     event::Event,
-    tls::{tls_connector_builder, TlsSettings},
+    tls::{tls_connector_builder, MaybeTlsSettings},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
@@ -20,7 +20,7 @@ use hyper::Client;
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
-use tokio::executor::DefaultExecutor;
+use tokio01::executor::DefaultExecutor;
 use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
@@ -74,7 +74,7 @@ where
         batch: B,
         request_settings: TowerRequestSettings,
         batch_settings: BatchSettings,
-        tls_settings: impl Into<Option<TlsSettings>>,
+        tls_settings: impl Into<MaybeTlsSettings>,
         cx: &SinkContext,
     ) -> Self {
         let sink = Arc::new(sink);
@@ -134,7 +134,7 @@ where
 pub struct HttpClient<B = Body> {
     client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
     span: Span,
-    version: HeaderValue,
+    user_agent: HeaderValue,
 }
 
 impl<B> HttpClient<B>
@@ -144,12 +144,12 @@ where
 {
     pub fn new(
         resolver: Resolver,
-        tls_settings: impl Into<Option<TlsSettings>>,
+        tls_settings: impl Into<MaybeTlsSettings>,
     ) -> crate::Result<HttpClient<B>> {
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector_builder(tls_settings.into())?;
+        let tls = tls_connector_builder(&tls_settings.into())?;
         let https = HttpsConnector::with_connector(http, tls)?;
 
         let client = hyper::Client::builder()
@@ -157,13 +157,15 @@ where
             .build(https);
 
         let version = crate::get_version();
+        let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
+            .expect("Invalid header value for version!");
 
         let span = tracing::info_span!("http");
 
         Ok(HttpClient {
             client,
             span,
-            version: HeaderValue::from_str(&version).expect("Invalid header value for version!"),
+            user_agent,
         })
     }
 
@@ -188,9 +190,11 @@ where
     fn call(&mut self, mut request: Request<B>) -> Self::Future {
         let _enter = self.span.enter();
 
-        request
-            .headers_mut()
-            .insert("User-Agent", self.version.clone());
+        if !request.headers().contains_key("User-Agent") {
+            request
+                .headers_mut()
+                .insert("User-Agent", self.user_agent.clone());
+        }
 
         debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
 
@@ -215,7 +219,7 @@ impl<B> Clone for HttpClient<B> {
         Self {
             client: self.client.clone(),
             span: self.span.clone(),
-            version: self.version.clone(),
+            user_agent: self.user_agent.clone(),
         }
     }
 }
@@ -224,7 +228,7 @@ impl<B> fmt::Debug for HttpClient<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpClient")
             .field("client", &self.client)
-            .field("version", &self.version)
+            .field("user_agent", &self.user_agent)
             .finish()
     }
 }
@@ -238,7 +242,7 @@ pub struct HttpBatchService<B = Vec<u8>> {
 impl<B> HttpBatchService<B> {
     pub fn new(
         resolver: Resolver,
-        tls_settings: impl Into<Option<TlsSettings>>,
+        tls_settings: impl Into<MaybeTlsSettings>,
         request_builder: impl Fn(B) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     ) -> HttpBatchService<B> {
         let inner =

@@ -268,9 +268,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.1.2"
+version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fb8038c1ddc0a5f73787b130f4cc75151e96ed33e417fde765eb5a81e3532f4"
+checksum = "12ae9db68ad7fac5fe51304d20f016c911539251075a214f8e663babefa35187"
 
 [[package]]
 name = "byte-tools"
@@ -3078,8 +3078,8 @@ dependencies = [
 
 [[package]]
 name = "rlua"
-version = "0.16.4-alpha.0"
-source = "git+https://github.com/timberio/rlua#c41bfa06cfaf3df543796d3104ec910dd1a24c44"
+version = "0.17.1-alpha.0"
+source = "git+https://github.com/kyren/rlua#25bd7e6bffef9597466a98bfca80a3056c9e6320"
 dependencies = [
  "bitflags",
  "bstr",

@@ -3,9 +3,7 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            encoding::{
-                skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration,
-            },
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -40,7 +38,10 @@ pub struct StackdriverConfig {
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
@@ -88,7 +89,7 @@ pub struct StackdriverResource {
 }
 
 inventory::submit! {
-    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logging")
+    SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
 lazy_static! {
@@ -102,7 +103,7 @@ lazy_static! {
         .unwrap();
 }
 
-#[typetag::serde(name = "gcp_stackdriver_logging")]
+#[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
@@ -135,7 +136,7 @@ impl SinkConfig for StackdriverConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "gcp_stackdriver_logging"
+        "gcp_stackdriver_logs"
     }
 }
 

@@ -1,7 +1,7 @@
 use futures01::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use tokio::timer::Delay;
+use tokio01::timer::Delay;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct BatchBytesConfig {

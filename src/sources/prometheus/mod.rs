@@ -6,7 +6,7 @@ use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
-use tokio::timer::Interval;
+use tokio01::timer::Interval;
 
 pub mod parser;
 

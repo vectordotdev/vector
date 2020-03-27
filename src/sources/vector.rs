@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
     shutdown::ShutdownSignal,
-    tls::{TlsConfig, TlsSettings},
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
@@ -10,7 +10,7 @@ use bytes::{Bytes, BytesMut};
 use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio::codec::LengthDelimitedCodec;
+use tokio01::codec::LengthDelimitedCodec;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -51,7 +51,7 @@ impl SourceConfig for VectorConfig {
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
-        let tls = TlsSettings::from_config(&self.tls, true)?;
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
     }
 
@@ -74,7 +74,7 @@ impl TcpSource for VectorSource {
         LengthDelimitedCodec::new()
     }
 
-    fn build_event(&self, frame: BytesMut, _host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
                 trace!(

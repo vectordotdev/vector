@@ -56,6 +56,15 @@ The name of the log field to be used as the hostname sent to Splunk HEC. This ov
 [global `host_key` option][docs.reference.global-options#host_key].\
 """
 
+[sinks.splunk_hec.options.index]
+type = "string"
+common = false
+examples = ["custom_index"]
+required = false
+description = """\
+The name of the index where send the events to. If not specified, the default index is used.
+"""
+
 [sinks.splunk_hec.options.token]
 type = "string"
 common = true

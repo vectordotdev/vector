@@ -1,5 +1,5 @@
 use crate::event::Event;
-use crate::tls::{MaybeTlsIncoming, TlsConfig, TlsSettings};
+use crate::tls::{MaybeTlsSettings, TlsConfig};
 use futures01::{sync::mpsc, Future, IntoFuture, Sink};
 use serde::Serialize;
 use std::error::Error;
@@ -99,8 +99,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
         info!(message = "building http server", addr = %address);
 
-        let tls = TlsSettings::from_config(tls, true)?;
-        let incoming = MaybeTlsIncoming::bind(&address, tls)?;
+        let tls = MaybeTlsSettings::from_config(tls, true)?;
+        let incoming = tls.bind(&address)?.incoming();
 
         let server = warp::serve(routes).serve_incoming_with_graceful_shutdown(incoming, tripwire);
 

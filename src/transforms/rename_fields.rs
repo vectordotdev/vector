@@ -12,10 +12,12 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
     pub fields: Fields<String>,
+    drop_empty: Option<bool>,
 }
 
 pub struct RenameFields {
     fields: IndexMap<Atom, Atom>,
+    drop_empty: bool,
 }
 
 inventory::submit! {
@@ -31,6 +33,7 @@ impl TransformConfig for RenameFieldsConfig {
                 .all_fields()
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect(),
+            self.drop_empty.unwrap_or(false),
         )?))
     }
 
@@ -48,8 +51,8 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<Atom, Atom>) -> crate::Result<Self> {
-        Ok(RenameFields { fields })
+    pub fn new(fields: IndexMap<Atom, Atom>, drop_empty: bool) -> crate::Result<Self> {
+        Ok(RenameFields { fields, drop_empty })
     }
 }
 
@@ -57,8 +60,23 @@ impl Transform for RenameFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            if let Some(v) = log.remove(&old_key) {
-                log.insert(new_key.clone(), v)
+            match log.remove_prune(&old_key, self.drop_empty) {
+                Some(v) => {
+                    if let Some(_) = event.as_mut_log().insert(&new_key.clone(), v) {
+                        debug!(
+                            message = "Field overwritten",
+                            field = old_key.as_ref(),
+                            rate_limit_secs = 30,
+                        )
+                    }
+                }
+                None => {
+                    debug!(
+                        message = "Field did not exist",
+                        field = old_key.as_ref(),
+                        rate_limit_secs = 30,
+                    );
+                }
             }
         }
 
@@ -81,7 +99,7 @@ mod tests {
         fields.insert("to_move".into(), "moved".into());
         fields.insert("not_present".into(), "should_not_exist".into());
 
-        let mut transform = RenameFields::new(fields).unwrap();
+        let mut transform = RenameFields::new(fields, false).unwrap();
 
         let new_event = transform.transform(event).unwrap();
 

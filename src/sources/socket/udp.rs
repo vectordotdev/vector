@@ -8,7 +8,7 @@ use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
-use tokio::net::udp::{UdpFramed, UdpSocket};
+use tokio01::net::udp::{UdpFramed, UdpSocket};
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone)]

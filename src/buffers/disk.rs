@@ -189,7 +189,7 @@ impl Stream for Reader {
 
         // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
         // the app), this will have to go to disk.
-        let next = tokio02::task::block_in_place(|| {
+        let next = tokio::task::block_in_place(|| {
             self.db
                 .get(ReadOptions::new(), Key(self.read_offset))
                 .unwrap()

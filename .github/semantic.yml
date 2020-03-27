@@ -17,26 +17,20 @@ scopes:
   - new sink
 
   # domains
-  - blog
   - buffers
   - cli
   - config
   - dependencies
-  - docs
-  - guides
-  - marketing
   - networking
   - observability
   - operations
-  - platforms
   - security
-  - setup
   - sinks
   - sources
-  - templating
-  - testing
+  - tests
   - topology
   - transforms
+  - ux
   - website
 
   # platforms
@@ -116,12 +110,13 @@ scopes:
   - blackhole sink
   - clickhouse sink
   - console sink
+  - datadog_logs sink
   - datadog_metrics sink
   - elasticsearch sink
   - file sink
   - gcp_cloud_storage sink
   - gcp_pubsub sink
-  - gcp_stackdriver_logging sink
+  - gcp_stackdriver_logs sink
   - honeycomb sink
   - http sink
   - humio_logs sink
