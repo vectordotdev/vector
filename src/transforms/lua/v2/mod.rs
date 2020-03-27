@@ -12,9 +12,11 @@ use snafu::{ResultExt, Snafu};
 enum BuildError {
     #[snafu(display("Invalid \"search_dirs\": {}", source))]
     InvalidSearchDirs { source: rlua::Error },
-    #[snafu(display("Cannot evaluate Lua code from \"source\" section: {}", source))]
-    InvalidSource { source: rlua::Error },
-    #[snafu(display("Cannot evaluate Lua code from \"hooks.process\" section: {}", source))]
+    #[snafu(display("Cannot evaluate Lua code defining \"hooks.init\": {}", source))]
+    InvalidHooksInit { source: rlua::Error },
+    #[snafu(display("Runtime error in \"hooks.init\" function: {}", source))]
+    RuntimeErrorHooksInit { source: rlua::Error },
+    #[snafu(display("Cannot evaluate Lua code defining \"hooks.process\": {}", source))]
     InvalidHooksProcess { source: rlua::Error },
 }
 
@@ -23,12 +25,12 @@ enum BuildError {
 pub struct LuaConfig {
     #[serde(default)]
     search_dirs: Vec<String>,
-    source: Option<String>,
     hooks: HooksConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 struct HooksConfig {
+    init: Option<String>,
     process: String,
 }
 
@@ -90,8 +92,10 @@ impl Lua {
                 package.set("path", paths)?;
             }
 
-            if let Some(source) = &config.source {
-                ctx.load(source).eval().context(InvalidSource)?;
+            if let Some(hooks_init) = &config.hooks.init {
+                let hooks_init: rlua::Function<'_> =
+                    ctx.load(hooks_init).eval().context(InvalidHooksInit)?;
+                hooks_init.call(()).context(RuntimeErrorHooksInit)?;
             }
 
             let hooks_process: rlua::Function<'_> = ctx

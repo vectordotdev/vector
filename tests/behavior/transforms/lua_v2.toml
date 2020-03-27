@@ -21,6 +21,31 @@
       "a.exists" = false
       "b.equals" = "example value"
 
+[transforms.lua_v2_hooks_init]
+  inputs = []
+  type = "lua"
+  version = "2"
+  hooks.init = """
+    function ()
+      global_variable = 123
+    end
+  """
+  hooks.process = """
+    function (event, emit)
+      event.global_variable = global_variable
+      emit(event)
+    end
+  """
+[[tests]]
+  name = "lua_v2_hooks_init"
+  [tests.input]
+    insert_at = "lua_v2_hooks_init"
+    type = "log"
+  [[tests.outputs]]
+    extract_from = "lua_v2_hooks_init"
+      "global_variable.equals" = "example value"
+
+
 [transforms.lua_v2_metric]
   inputs = []
   type = "lua"

@@ -1829,8 +1829,12 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
-# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine.
 [transforms.lua]
+  #
+  # General
+  #
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -1861,6 +1865,13 @@ if event["host"] == nil then
 end
 """
 
+  # Transform API version
+  #
+  # * required
+  # * type: string
+  # * must be: "2"
+  version = "2"
+
   # A list of directories search when loading a Lua file via the `require`
   # function.
   #
@@ -1869,13 +1880,37 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
-  # transform API version
   #
-  # * optional
-  # * default: "1"
-  # * type: string
-  # * must be: "1" (if supplied)
-  version = "1"
+  # Hooks
+  #
+
+  [transforms.lua.hooks]
+    # A function which is called for each incoming event. It can produce new events
+    # using `emit` function.
+    #
+    # * required
+    # * type: string
+    process = """
+  function (event, emit)
+    event.log.field = "value" -- set value of a field
+    event.log.another_field = nil -- remove field
+    event.log.first, event.log.second = nil, event.log.first -- rename field
+    emit(event) -- emit the processed event
+  end
+  """
+
+    # A function which is called when the trasnform is initialized.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    init = """
+  function ()
+    local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
+    hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
+    f:close() -- close the pipe
+  end
+  """
 
 # Accepts and outputs `log` events allowing you to merge partial log events into a single event.
 [transforms.merge]

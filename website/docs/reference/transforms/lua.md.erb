@@ -37,11 +37,14 @@
 Add a field to an event. Supply this as a the `source` value:
 
 ```lua
-# Add root level field
-event["new_field"] = "new value"
+function (event, emit)
+  # Add root level field
+  event.log.new_field = "new value"
+  # Add nested field
+  event.log.nested.field = "nested value"
 
-# Add nested field
-event["parent.child"] = "nested value"
+  emit(event)
+end
 ```
 
 </TabItem>
@@ -50,11 +53,14 @@ event["parent.child"] = "nested value"
 Remove a field from an event. Supply this as a the `source` value:
 
 ```lua
-# Remove root level field
-event["field"] = nil
+function (event, emit)
+  # Remove root level field
+  event.log.field = nil
+  # Remove nested field
+  event.log.nested.field = nil
 
-# Remove nested field
-event["parent.child"] = nil
+  emit(event)
+end
 ```
 
 </TabItem>
@@ -63,8 +69,9 @@ event["parent.child"] = nil
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
-# Drop event entirely
-event = nil
+function (event, emit)
+  # Drop event entirely by not calling the emitting function
+end
 ```
 
 </TabItem>
@@ -76,25 +83,15 @@ event = nil
 
 ### Dropping Events
 
-To drop events, simply set the `event` variable to `nil`. For example:
+To drop events, simply not call the emitting function with it. For example:
 
 ```lua
-if event["message"].match(str, "debug") then
-  event = nil
+function (event, emit)
+  if not event["message"].match(str, "debug") then
+    emit(event)
+  end
 end
 ```
-
-### Global Variables
-
-When evaluating the provided `source`, Vector will provide a single global
-variable representing the event:
-
-| Name    |           Type           | Description                                                                                                                                                                       |
-|:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#schema]. |
-
-Note, a Lua `table` is an associative array. You can read more about
-[Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
 
 ### Types
 
@@ -111,22 +108,26 @@ name:
 
 ```lua
 # Add nested field
-event["parent.child"] = "nested value"
+event.log.nested.field = "nested value"
 
 # Remove nested field
-event["parent.child"] = nil
+event.log.nested.field = nil
 ```
 
 ### Iterate over fields
 
-To iterate over all fields of an `event` use the `pairs` method.  For example:
+To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs] method.  For example:
 
 ```lua
-# Remove all fields where the value is "-"
-for f,v in pairs(event) do
-  if v == "-" then
-    event[f] = nil
+function (event, emit)
+  # Remove all fields where the value is "-"
+  for f,v in pairs(event) do
+    if v == "-" then
+      event[f] = nil
+    end
   end
+
+  emit(event)
 end
 ```
 

@@ -4,23 +4,29 @@ allow_you_to_description = "transform events with a full embedded [Lua][urls.lua
 beta = true
 common = true
 function_category = "program"
-input_types = ["log"]
-output_types = ["log"]
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "lua") %>
+<%= render(
+  "_partials/_component_options.toml",
+  groups: ["v1", "v2"],
+  name: "lua",
+  type: "transform"
+) %>
 
 [transforms.lua.options.version]
 type = "string"
 common = true
-required = false
-description = "transform API version"
-default = "1"
-enum = { 1 = "transform API version 1" }
+required = true
+groups = ["v2"]
+description = "Transform API version"
+enum = { 2 = "Lua transform API version 2" }
 
 [transforms.lua.options.source]
 type = "string"
 common = true
+groups = ["v1"]
 examples = [
 """\
 require("script") # a `script.lua` file must be in your `search_dirs`
@@ -39,9 +45,55 @@ description = "The inline Lua source to evaluate."
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
+groups = ["v1", "v2"]
 examples = [["/etc/vector/lua"]]
 common = true
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
 """
+
+[transforms.lua.options.hooks]
+type = "table"
+category = "Hooks"
+common = true
+required = true
+groups = ["v2"]
+description = "Configures hooks handlers."
+
+[transforms.lua.options.hooks.children.init]
+type = "string"
+groups = ["v2"]
+common = true
+required = false
+description = """\
+A function which is called when the trasnform is initialized.\
+"""
+examples = [
+"""\
+function ()
+  local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
+  hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
+  f:close() -- close the pipe
+end\
+"""
+]
+
+[transforms.lua.options.hooks.children.process]
+type = "string"
+groups = ["v2"]
+common = true
+required = true
+description = """\
+A function which is called for each incoming event. It can produce new events using `emit` function.\
+"""
+examples = [
+"""\
+function (event, emit)
+  event.log.field = "value" -- set value of a field
+  event.log.another_field = nil -- remove field
+  event.log.first, event.log.second = nil, event.log.first -- rename field
+  emit(event) -- emit the processed event
+end\
+"""
+]
