@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Sinks
 description: "Vector sinks fan-out logs and metrics data to a variety of downstream destinations. These could be exact services, like Elasticsearch, or generic protocols, like HTTP or TCP."
 sidebar_label: hidden

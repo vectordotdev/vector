@@ -235,7 +235,7 @@ vector_docker_source_files = "https://github.com/timberio/vector/tree/master/dis
 vector_docs = "https://vector.dev/docs/"
 vector_download = "https://vector.dev/releases/latest/download"
 vector_enriching_transforms = "https://vector.dev/components?functions%5B%5D=enrich"
-vector_getting_started = "https://vector.dev/docs/setup/guides/getting-started/"
+vector_getting_started = "https://vector.dev/guides/getting-started/"
 vector_homebrew_source_files = "https://github.com/timberio/homebrew-brew/blob/master/Formula/vector.rb"
 vector_initd_service = "https://github.com/timberio/vector/blob/master/distribution/init.d/vector"
 vector_issues = "https://github.com/timberio/vector/issues"

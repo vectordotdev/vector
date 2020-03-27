@@ -5,18 +5,1068 @@ module.exports = {
   ],
   "guides": {
     "advanced": {
+      "children": {
+      },
       "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
+      "guides": [
+        {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/making-changes",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/making-changes.md",
+          "series_position": null,
+          "title": "Making & Applying Changes"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/managing-complex-configurations",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/managing-complex-configurations.md",
+          "series_position": null,
+          "title": "Managing Complex Vector Configs"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/troubleshooting",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/troubleshooting.md",
+          "series_position": null,
+          "title": "Troubleshooting Vector"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/unit-testing.md",
+          "series_position": null,
+          "title": "Unit Testing Your Vector Config"
+        }
+      ],
       "name": "advanced",
+      "series": false,
       "title": "Advanced"
     },
     "getting-started": {
+      "children": {
+      },
       "description": "Take Vector from zero to production in under 10 minutes.",
+      "guides": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/deploying",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/deploying.md",
+          "series_position": null,
+          "title": "Deploying Vector"
+        },
+        {
+          "author_github": "https://github.com/Jeffail",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/your-first-pipeline",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/your-first-pipeline.md",
+          "series_position": null,
+          "title": "Hello World. Your First Vector Pipeline."
+        },
+        {
+          "author_github": "https://github.com/lukesteensen",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/monitoring",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/monitoring.md",
+          "series_position": null,
+          "title": "Monitoring Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/next-steps",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/next-steps.md",
+          "series_position": null,
+          "title": "Next Steps"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/structuring",
+          "last_modified_on": null,
+          "path": "website/guides/getting-started/structuring.md",
+          "series_position": null,
+          "title": "Structuring Your Log Data"
+        }
+      ],
       "name": "getting-started",
+      "series": true,
       "title": "Getting Started"
     },
     "setup": {
+      "children": {
+      },
       "description": "Targeted guides for setting up specific sources and sinks.",
+      "guides": [
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker.md",
+          "series_position": null,
+          "title": "Collect Docker logs and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file.md",
+          "series_position": null,
+          "title": "Collect File logs and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald.md",
+          "series_position": null,
+          "title": "Collect Journald logs and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/prometheus.md",
+          "series_position": null,
+          "title": "Collect Prometheus metrics and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin.md",
+          "series_position": null,
+          "title": "Collect STDIN logs and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send Docker logs to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send Docker logs to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send Docker logs to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/aws_s3.md",
+          "series_position": null,
+          "title": "Send Docker logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/pulsar.md",
+          "series_position": null,
+          "title": "Send Docker logs to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/clickhouse.md",
+          "series_position": null,
+          "title": "Send Docker logs to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/datadog_logs.md",
+          "series_position": null,
+          "title": "Send Docker logs to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/elasticsearch.md",
+          "series_position": null,
+          "title": "Send Docker logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/file",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/file.md",
+          "series_position": null,
+          "title": "Send Docker logs to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send Docker logs to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send Docker logs to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send Docker logs to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/http",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/http.md",
+          "series_position": null,
+          "title": "Send Docker logs to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/honeycomb.md",
+          "series_position": null,
+          "title": "Send Docker logs to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/humio_logs.md",
+          "series_position": null,
+          "title": "Send Docker logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/kafka.md",
+          "series_position": null,
+          "title": "Send Docker logs to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/logdna.md",
+          "series_position": null,
+          "title": "Send Docker logs to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/loki",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/loki.md",
+          "series_position": null,
+          "title": "Send Docker logs to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send Docker logs to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/papertrail.md",
+          "series_position": null,
+          "title": "Send Docker logs to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/sematext_logs.md",
+          "series_position": null,
+          "title": "Send Docker logs to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/socket",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/socket.md",
+          "series_position": null,
+          "title": "Send Docker logs to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/splunk_hec.md",
+          "series_position": null,
+          "title": "Send Docker logs to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/vector",
+          "last_modified_on": null,
+          "path": "website/guides/setup/platforms/docker/vector.md",
+          "series_position": null,
+          "title": "Send Docker logs to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send File logs to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send File logs to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send File logs to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/aws_s3.md",
+          "series_position": null,
+          "title": "Send File logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/pulsar.md",
+          "series_position": null,
+          "title": "Send File logs to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/clickhouse.md",
+          "series_position": null,
+          "title": "Send File logs to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/datadog_logs.md",
+          "series_position": null,
+          "title": "Send File logs to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/elasticsearch.md",
+          "series_position": null,
+          "title": "Send File logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/file",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/file.md",
+          "series_position": null,
+          "title": "Send File logs to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send File logs to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send File logs to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send File logs to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/http",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/http.md",
+          "series_position": null,
+          "title": "Send File logs to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/honeycomb.md",
+          "series_position": null,
+          "title": "Send File logs to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/humio_logs.md",
+          "series_position": null,
+          "title": "Send File logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/kafka.md",
+          "series_position": null,
+          "title": "Send File logs to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/logdna.md",
+          "series_position": null,
+          "title": "Send File logs to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/loki",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/loki.md",
+          "series_position": null,
+          "title": "Send File logs to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send File logs to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/papertrail.md",
+          "series_position": null,
+          "title": "Send File logs to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/sematext_logs.md",
+          "series_position": null,
+          "title": "Send File logs to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/socket",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/socket.md",
+          "series_position": null,
+          "title": "Send File logs to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/splunk_hec.md",
+          "series_position": null,
+          "title": "Send File logs to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/vector",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/file/vector.md",
+          "series_position": null,
+          "title": "Send File logs to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send Journald logs to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send Journald logs to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send Journald logs to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/aws_s3.md",
+          "series_position": null,
+          "title": "Send Journald logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/pulsar.md",
+          "series_position": null,
+          "title": "Send Journald logs to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/clickhouse.md",
+          "series_position": null,
+          "title": "Send Journald logs to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/datadog_logs.md",
+          "series_position": null,
+          "title": "Send Journald logs to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/elasticsearch.md",
+          "series_position": null,
+          "title": "Send Journald logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/file",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/file.md",
+          "series_position": null,
+          "title": "Send Journald logs to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send Journald logs to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send Journald logs to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send Journald logs to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/http",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/http.md",
+          "series_position": null,
+          "title": "Send Journald logs to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/honeycomb.md",
+          "series_position": null,
+          "title": "Send Journald logs to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/humio_logs.md",
+          "series_position": null,
+          "title": "Send Journald logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/kafka.md",
+          "series_position": null,
+          "title": "Send Journald logs to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/logdna.md",
+          "series_position": null,
+          "title": "Send Journald logs to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/loki",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/loki.md",
+          "series_position": null,
+          "title": "Send Journald logs to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send Journald logs to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/papertrail.md",
+          "series_position": null,
+          "title": "Send Journald logs to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/sematext_logs.md",
+          "series_position": null,
+          "title": "Send Journald logs to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/socket",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/socket.md",
+          "series_position": null,
+          "title": "Send Journald logs to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/splunk_hec.md",
+          "series_position": null,
+          "title": "Send Journald logs to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/vector",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/journald/vector.md",
+          "series_position": null,
+          "title": "Send Journald logs to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/prometheus/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send Prometheus metrics to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/prometheus/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send Prometheus metrics to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/prometheus/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send Prometheus metrics to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/prometheus/prometheus.md",
+          "series_position": null,
+          "title": "Send Prometheus metrics to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/prometheus/statsd.md",
+          "series_position": null,
+          "title": "Send Prometheus metrics to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send STDIN logs to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send STDIN logs to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send STDIN logs to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/aws_s3.md",
+          "series_position": null,
+          "title": "Send STDIN logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/pulsar.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/clickhouse.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/datadog_logs.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/elasticsearch.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/file",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/file.md",
+          "series_position": null,
+          "title": "Send STDIN logs to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send STDIN logs to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send STDIN logs to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send STDIN logs to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/http",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/http.md",
+          "series_position": null,
+          "title": "Send STDIN logs to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/honeycomb.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/humio_logs.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/kafka.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/logdna.md",
+          "series_position": null,
+          "title": "Send STDIN logs to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/loki",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/loki.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send STDIN logs to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/papertrail.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/sematext_logs.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/socket",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/socket.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/splunk_hec.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/vector",
+          "last_modified_on": null,
+          "path": "website/guides/setup/sources/stdin/vector.md",
+          "series_position": null,
+          "title": "Send STDIN logs to Vector"
+        }
+      ],
       "name": "setup",
+      "series": false,
       "title": "Setup"
     }
   },
@@ -23033,7 +24083,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/binarylogic.png",
-      "bio": "Ben is the CTO/Co-Founder at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He is an open-source OG, creating <a href=\"https://github.com/binarylogic/authlogic\">Authlogic</a> back to 2005 before helping to launch Vector.",
+      "bio": "Ben is the CTO/Co-Founder at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He is an open-source OG, creating <a href=\"https://github.com/binarylogic/authlogic\">Authlogic</a> over 15 years ago before helping to launch Vector.",
       "github": "https://github.com/binarylogic",
       "id": "ben",
       "keybase": "https://keybase.io/binarylogic",
@@ -23070,6 +24120,14 @@ module.exports = {
       "avatar": "https://github.com/lukesteensen.png",
       "github": "https://github.com/lukesteensen",
       "id": "luke",
+      "keybase": "https://keybase.io/lukesteensen",
+      "name": "Luke",
+      "twitter": "https://twitter.com/lukesteensen"
+    },
+    {
+      "avatar": "https://github.com/lukesteensen.png",
+      "github": "https://github.com/lukesteensen",
+      "id": "mike",
       "keybase": "https://keybase.io/lukesteensen",
       "name": "Luke",
       "twitter": "https://twitter.com/lukesteensen"

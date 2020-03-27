@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 delivery_guarantee: "best_effort"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."

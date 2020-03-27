@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Install Vector via DPKG
 sidebar_label: DPKG
 description: Install Vector through the DKG package manager

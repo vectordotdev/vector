@@ -77,6 +77,30 @@
   force = true
 
 [[redirects]]
+  from = "/docs/setup/guides/getting-started/"
+  to = "/guides/getting-started/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/guides/advanced-configs/"
+  to = "/guides/advanced/managing-complex-configurations/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/guides/troubleshooting"
+  to = "/guides/getting-started/troubleshooting/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/guides/unit-testing"
+  to = "/guides/advanced/unit-testing/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/reference/sinks/tcp/"
   to = "/docs/reference/sinks/socket/"
   status = 301

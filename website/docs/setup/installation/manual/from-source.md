@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code

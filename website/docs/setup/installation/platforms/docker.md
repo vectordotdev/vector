@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform

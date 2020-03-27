@@ -1,10 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React from 'react';
 
 import Head from '@docusaurus/Head';
@@ -40,6 +33,10 @@ function Layout(props) {
   const metaImage = image || defaultImage;
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
+  const myURL = new URL(location);
+  // purposefully hardcoded to protect against people copying our site
+  const canonURL = 'https://vector.dev' + myURL.pathname
+
   return (
     <ThemeProvider>
       <Head>
@@ -65,6 +62,7 @@ function Layout(props) {
         )}
         {permalink && <meta property="og:url" content={siteUrl + permalink} />}
         <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href={canonURL} />
       </Head>
       <Navbar />
       <div className="main-wrapper">{children}</div>

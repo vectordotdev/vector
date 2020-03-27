@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars

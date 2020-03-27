@@ -438,7 +438,7 @@ function Home() {
             <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
           </p>
           <div className="hero--buttons">
-            <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
+            <Link to="/guides/getting-started" className="button button--primary">Get Started</Link>
             <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />

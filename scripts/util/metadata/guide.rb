@@ -5,10 +5,10 @@ class Guide
 
   attr_reader :author_github,
     :description,
-    :domain,
     :id,
     :last_modified_on,
     :path,
+    :series_position,
     :title
 
   def initialize(path)
@@ -28,5 +28,17 @@ class Guide
 
   def eql?(other)
     self.<=>(other) == 0
+  end
+
+  def to_h
+    {
+      author_github: author_github,
+      description: description,
+      id: id,
+      last_modified_on: last_modified_on,
+      path: path,
+      series_position: series_position,
+      title: title
+    }
   end
 end

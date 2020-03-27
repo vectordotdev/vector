@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Install Vector Through Your Package Manager
 sidebar_label: hidden
 hide_pagination: true

@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]

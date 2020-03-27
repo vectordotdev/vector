@@ -3,9 +3,8 @@ export interface GuideContent {
   guideListPaginated: GuidePaginated[];
   guideTags: GuideTags;
   guideTagsListPath: string | null;
+  guideCategories: string[];
 }
-
-export type FeedType = 'rss' | 'atom' | 'all';
 
 export interface PluginOptions {
   path: string;
@@ -13,18 +12,12 @@ export interface PluginOptions {
   include: string[];
   guideListComponent: string;
   guideComponent: string;
-  guideTagsListComponent: string;
-  guideTagsGuidesComponent: string;
+  guideTagListComponent: string;
+  guideTagComponent: string;
+  guideCategoryComponent: string;
   remarkPlugins: string[];
   rehypePlugins: string[];
   truncateMarker: RegExp;
-  feedOptions?: {
-    type: FeedType;
-    title?: string;
-    description?: string;
-    copyright: string;
-    language?: string;
-  };
 }
 
 export interface GuideTags {

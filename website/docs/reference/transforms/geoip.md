@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]

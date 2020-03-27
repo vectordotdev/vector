@@ -4,6 +4,7 @@
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-heading-color);
   display: block;
+  height: 100%;
   min-height: 17.5em;
   padding: 0.1em;
   position: relative;

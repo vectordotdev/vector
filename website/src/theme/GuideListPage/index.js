@@ -60,9 +60,13 @@ function GuideListPage(props) {
 
     filteredItems = filteredItems.filter(item => {
       let normalizedTerm = searchTerm.toLowerCase();
-      let normalizedTitle = item.content.frontMatter.title.toLowerCase();
+      let frontMatter = item.content.frontMatter;
+      let metadata = item.content.metadata;
+      let normalizedTitle = frontMatter.title.toLowerCase();
 
       if (normalizedTitle.includes(normalizedTerm)) {
+        return true;
+      } else if (metadata.tags.some(tag => tag.label.toLowerCase().includes(normalizedTerm))) {
         return true;
       } else {
         return false;
@@ -83,11 +87,11 @@ function GuideListPage(props) {
               type="text"
               className="input--xl"
               onChange={(event) => setSearchTerm(event.currentTarget.value)}
-              placeholder="🔍 Search..." />
+              placeholder="🔍 Search by guide name or tag..." />
           </div>
         </div>
       </header>
-      <main className="container">
+      <main className="container container--s">
         <Guides
           filtering={filtering}
           guidesMetadata={guidesMetadata}

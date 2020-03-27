@@ -28,6 +28,10 @@ module PostProcessors
 
                 * #{errors[0..50].join("\n    * ")}
 
+            The front matter is:
+
+                #{JSON.pretty_generate(front_matter)}
+
             Please fix these errors and try again.
             EOF
           )
@@ -45,7 +49,7 @@ module PostProcessors
 
           Stacktrace:
 
-            #{e.stracktrace.join("\n")}
+            #{e.backtrace.join("\n  ")}
 
           EOF
         )

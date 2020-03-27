@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."

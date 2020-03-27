@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: "What is Vector?"
 description: "High-level description of the Vector observability data collector and router."
 ---
@@ -37,7 +36,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * Vector is **used by multiple fortune 500 companies** with stringent production requirements.
 * Vector has **over 15 active contributors** and growing.
 
-<Jump to="/docs/setup/guides/getting-started/">Get started</Jump>
+<Jump to="/guides/getting-started/">Get started</Jump>
 
 
 [docs.data-model.log]: /docs/about/data-model/log/

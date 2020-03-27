@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Daemon Deployment Strategy
 description: Deploy Vector as a daemon
 sidebar_label: Daemon

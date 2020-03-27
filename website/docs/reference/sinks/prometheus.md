@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."

@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Vector as a Service
 sidebar_label: Service
 description: Deploying and running Vector as a service

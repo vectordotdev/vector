@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Topologies
 description: The various topologies that Vector can accomplish and when to use each.
 ---

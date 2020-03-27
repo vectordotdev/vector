@@ -7,7 +7,6 @@ require_relative "metadata/batching_sink"
 require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
-require_relative "metadata/guide"
 require_relative "metadata/guides"
 require_relative "metadata/installation"
 require_relative "metadata/links"
@@ -81,7 +80,7 @@ class Metadata
                 The error received was:
 
                   #{e.message}
-                  #{e.stacktrace.join("\n")}
+                  #{e.backtrace.join("\n  ")}
                 EOF
               )
             end
@@ -141,13 +140,6 @@ class Metadata
     # domains
 
     @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
-
-    # guides
-
-    # @guides ||=
-    #   Dir.glob("#{GUIDES_ROOT}/**/*.md").collect do |path|
-    #     Guide.new(path)
-    #   end.sort_by { |guide| [ guide.title ] }
 
     # posts
 

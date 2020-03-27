@@ -8,12 +8,12 @@
 }
 
 .container > aside {
-  max-width: 275px;
+  width: 275px;
 }
 
 .container > article {
   max-width: 700px;
-  margin-left: calc( var(--ifm-spacing-horizontal) * 2 );
+  margin-left: calc( var(--ifm-spacing-horizontal) * 3.75 );
   margin-top: calc( (var(--ifm-spacing-vertical) * 1.5) + 8px );
 }
 
@@ -41,7 +41,7 @@
   }
 
   .container > aside {
-    max-width: none;
+    width: auto;
   }
 
   .container > article {

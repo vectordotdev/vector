@@ -12,7 +12,7 @@ import pluralize from 'pluralize';
 
 const AnchoredH2 = Heading('h2');
 
-function GuideTagsListPage(props) {
+function GuideTagListPage(props) {
   const {tags} = props;
 
   const normalizedTags = Object.values(tags).map(tag => ({
@@ -31,7 +31,7 @@ function GuideTagsListPage(props) {
           <h1>All Guide Tags</h1>
         </div>
       </header>
-      <main className="container container--narrow">
+      <main className="container container--xs">
         {Object.keys(groupedTags).map((category, index) => {
           let tags = groupedTags[category];
           return (
@@ -49,4 +49,4 @@ function GuideTagsListPage(props) {
   );
 }
 
-export default GuideTagsListPage;
+export default GuideTagListPage;

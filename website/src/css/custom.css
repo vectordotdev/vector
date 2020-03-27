@@ -467,6 +467,10 @@ table.comparison tr td.bar.vector .bar {
 
 /**
  * container
+ *
+ * A note about container sizes. The default container is 1140px. Our grid
+ * system is 12 columns wide. Therefore, we should increase and decrease
+ * sizes by 95px.
  */
 
 .container--flush {
@@ -474,13 +478,18 @@ table.comparison tr td.bar.vector .bar {
   padding-right: 0;
 }
 
-.container--narrow {
+.container--s {
+  box-sizing: border-box;
+  max-width: 950px;
+}
+
+.container--xs {
   box-sizing: border-box;
   max-width: 760px;
 }
 
-.container--wide {
-  --ifm-container-width: 1280px;
+.container--l {
+  --ifm-container-width: 13330px;
 }
 
 /**
@@ -498,6 +507,9 @@ table.comparison tr td.bar.vector .bar {
 }
 .domain-bg.domain-bg--operations {
   background-image: url(/img/circuit-bg-light.svg);
+}
+.domain-bg.domain-bg--vector {
+  background-image: url(/img/vector-bg-light.svg);
 }
 .domain-bg--hover:not(:hover) {
   background-image: none !important;
@@ -847,17 +859,17 @@ input[type="text"]:focus {
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
 }
-.input--block {
+input.input--block {
   display: block !important;
   width: 100%;
 }
-.input--lg {
+input.input--lg {
   --ifm-button-size-multiplier: 1.35;
 }
-input[type="text"].input--xl {
+input.input--xl {
   --ifm-button-size-multiplier: 1.7;
 }
-.input--highlight-wrapper {
+input.input--highlight-wrapper {
   animation: gradientBG 5s ease-in infinite;
   background-image: var(--ifm-highlight-gradient);
   background-size: 150% 150%;
@@ -2069,6 +2081,9 @@ html[data-theme='dark'] .domain-bg.domain-bg--observability {
 }
 html[data-theme='dark'] .domain-bg.domain-bg--operations {
   background-image: url(/img/circuit-bg-dark.svg);
+}
+html[data-theme='dark'] .domain-bg.domain-bg--vector {
+  background-image: url(/img/vector-bg-dark.svg);
 }
 
 /*

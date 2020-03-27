@@ -31,7 +31,7 @@ function Avatar({bio, className, github, inline, nameSuffix, rel, size, subTitle
         <div className="avatar__intro">
           <div className="avatar__name"><a href={member.github} target="_blank" rel={rel}>{member.name}</a>{nameSuffix}</div>
           {subTitle !== false && <small className="avatar__subtitle">{subTitle || 'Vector core team'}</small>}
-          {bio !== false && <small className="avatar__subtitle" dangerouslySetInnerHTML={{__html: member.bio}} />}
+          {bio === true && <small className="avatar__subtitle" dangerouslySetInnerHTML={{__html: member.bio}} />}
         </div>
       </div>
     );

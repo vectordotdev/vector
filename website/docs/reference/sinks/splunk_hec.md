@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."

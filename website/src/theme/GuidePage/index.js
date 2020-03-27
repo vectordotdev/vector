@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 
 import Avatar from '@site/src/components/Avatar';
 import CodeBlock from '@theme/CodeBlock';
+import DocPaginator from '@theme/DocPaginator';
 import Heading from '@theme/Heading';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import Jump from '@site/src/components/Jump';
@@ -56,16 +57,19 @@ function GuidePage(props) {
 
   const {content: GuideContents} = props;
   const {frontMatter, metadata} = GuideContents;
-  const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, title} = frontMatter;
-  const {category, readingTime, tags} = metadata;
+  const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, series_position: seriesPosition, title} = frontMatter;
+  const {category: categoryName, readingTime, tags} = metadata;
+
+  console.log(metadata)
 
   //
   // Site config
   //
 
   const {siteConfig} = useDocusaurusContext();
-  const {metadata: {installation, sources, sinks}} = siteConfig.customFields;
+  const {metadata: {guides: guidesMetadata, installation, sources, sinks}} = siteConfig.customFields;
   const {platforms} = installation;
+  const category = guidesMetadata[categoryName];
 
   //
   // Variables
@@ -152,13 +156,13 @@ function GuidePage(props) {
             </div>
           )}
           {(!platform && !source && !sink) && (
-            <div className="hero--category">{category}</div>)}
+            <div className="hero--category"><Link to={`/guides/${category.name}/`}>{category.title}{category.series && <> Series - {seriesPosition} of {category.guides.length}</>}</Link></div>)}
           <h1 className={styles.header}>{title}</h1>
           <div className="hero--subtitle">{frontMatter.description}</div>
           <Tags colorProfile="guides" tags={tags} />
         </div>
       </header>
-      <main className={classnames('container', 'container--wide', styles.container)}>
+      <main className={classnames('container', 'container--l', styles.container)}>
         <aside>
           <section className={styles.avatar}>
             <Avatar
@@ -188,6 +192,8 @@ function GuidePage(props) {
           <div className="markdown">
             <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
           </div>
+          ben johnson
+          <DocPaginator metadata={metadata} />
         </article>
       </main>
     </Layout>

@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 title: Install Vector via RPM
 sidebar_label: RPM
 description: Install Vector through the RPM package manager

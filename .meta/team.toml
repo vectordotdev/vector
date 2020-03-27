@@ -44,8 +44,8 @@ bio = """\
 Ben is the CTO/Co-Founder at <a href="https://timber.io">Timber.io</a> and a \
 member of the <a href="/community#team">core Vector team</a>. He is an \
 open-source OG, creating \
-<a href="https://github.com/binarylogic/authlogic">Authlogic</a> back to 2005 \
-before helping to launch Vector.\
+<a href="https://github.com/binarylogic/authlogic">Authlogic</a> over 15 years \
+ago before helping to launch Vector.\
 """
 
 [[team]]
@@ -76,6 +76,14 @@ name = "Lucio"
 
 [[team]]
 id = "luke"
+avatar = "https://github.com/lukesteensen.png"
+github = "https://github.com/lukesteensen"
+keybase = "https://keybase.io/lukesteensen"
+twitter = "https://twitter.com/lukesteensen"
+name = "Luke"
+
+[[team]]
+id = "mike"
 avatar = "https://github.com/lukesteensen.png"
 github = "https://github.com/lukesteensen"
 keybase = "https://keybase.io/lukesteensen"

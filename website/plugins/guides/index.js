@@ -13,27 +13,12 @@ const DEFAULT_OPTIONS = {
     include: ['**/*.md', '**/*.mdx'],
     guideListComponent: '@theme/GuideListPage',
     guideComponent: '@theme/GuidePage',
-    guideTagsListComponent: '@theme/GuideTagsListPage',
-    guideTagsGuidesComponent: '@theme/GuideTagsGuidesPage',
+    guideTagListComponent: '@theme/GuideTagListPage',
+    guideTagComponent: '@theme/GuideTagPage',
+    guideCategoryComponent: '@theme/GuideCategoryPage',
     remarkPlugins: [],
     rehypePlugins: [],
     truncateMarker: /<!--\s*(truncate)\s*-->/,
-};
-function assertFeedTypes(val) {
-    if (typeof val !== 'string' && !['rss', 'atom', 'all'].includes(val)) {
-        throw new Error(`Invalid feedOptions type: ${val}. It must be either 'rss', 'atom', or 'all'`);
-    }
-}
-const getFeedTypes = (type) => {
-    assertFeedTypes(type);
-    let feedTypes = [];
-    if (type === 'all') {
-        feedTypes = ['rss', 'atom'];
-    }
-    else {
-        feedTypes.push(type);
-    }
-    return feedTypes;
 };
 function pluginContentGuide(context, opts) {
     const options = Object.assign(Object.assign({}, DEFAULT_OPTIONS), opts);
@@ -90,6 +75,7 @@ function pluginContentGuide(context, opts) {
                 },
                 items: guides.map(item => item.id),
             });
+            // Guide tags
             const guideTags = {};
             const tagsPath = utils_1.normalizeUrl([basePageUrl, 'tags']);
             guides.forEach(guide => {
@@ -125,23 +111,26 @@ function pluginContentGuide(context, opts) {
                 });
             });
             const guideTagsListPath = Object.keys(guideTags).length > 0 ? tagsPath : null;
+            // Guide categories
+            const guideCategories = lodash_1.default.uniq(guides.map(guide => guide.metadata.category));
             return {
                 guides,
                 guideListPaginated,
                 guideTags,
                 guideTagsListPath,
+                guideCategories,
             };
         },
         async contentLoaded({ content: guideContents, actions, }) {
             if (!guideContents) {
                 return;
             }
-            const { guideListComponent, guideComponent, guideTagsListComponent, guideTagsGuidesComponent, } = options;
+            const { guideListComponent, guideComponent, guideTagListComponent, guideTagComponent, guideCategoryComponent, } = options;
             const aliasedSource = (source) => `~guide/${path_1.default.relative(dataDir, source)}`;
             const { addRoute, createData } = actions;
-            const { guides, guideListPaginated, guideTags, guideTagsListPath, } = guideContents;
+            const { guides, guideListPaginated, guideTags, guideTagsListPath, guideCategories, } = guideContents;
             const guideItemsToMetadata = {};
-            // Create routes for guide entries.
+            // Guide pages
             await Promise.all(guides.map(async (guide) => {
                 const { id, metadata } = guide;
                 await createData(
@@ -158,7 +147,7 @@ function pluginContentGuide(context, opts) {
                 });
                 guideItemsToMetadata[id] = metadata;
             }));
-            // Create routes for guide's paginated list entries.
+            // Guides list
             await Promise.all(guideListPaginated.map(async (listPage) => {
                 const { metadata, items } = listPage;
                 const { permalink } = metadata;
@@ -185,7 +174,7 @@ function pluginContentGuide(context, opts) {
                     },
                 });
             }));
-            // Tags.
+            // Tags
             if (guideTagsListPath === null) {
                 return;
             }
@@ -202,7 +191,7 @@ function pluginContentGuide(context, opts) {
                 const tagsMetadataPath = await createData(`${utils_1.docuHash(permalink)}.json`, JSON.stringify(tagsModule[tag], null, 2));
                 addRoute({
                     path: permalink,
-                    component: guideTagsGuidesComponent,
+                    component: guideTagComponent,
                     exact: true,
                     modules: {
                         items: items.map(guideID => {
@@ -226,12 +215,43 @@ function pluginContentGuide(context, opts) {
                 const tagsListPath = await createData(`${utils_1.docuHash(`${guideTagsListPath}-tags`)}.json`, JSON.stringify(tagsModule, null, 2));
                 addRoute({
                     path: guideTagsListPath,
-                    component: guideTagsListComponent,
+                    component: guideTagListComponent,
                     exact: true,
                     modules: {
                         tags: aliasedSource(tagsListPath),
                     },
                 });
+            }
+            // Guide categories
+            if (guideCategories.length > 0) {
+                await Promise.all(guideCategories.map(async (category) => {
+                    const permalink = `/guides/${category}`;
+                    const metadata = { category: category };
+                    const categoryMetadataPath = await createData(`${utils_1.docuHash(permalink)}.json`, JSON.stringify(metadata, null, 2));
+                    addRoute({
+                        path: `/guides/${category}`,
+                        component: guideCategoryComponent,
+                        exact: true,
+                        modules: {
+                            items: guides.
+                                filter(guide => guide.metadata.category == category).
+                                map(guide => {
+                                const metadata = guideItemsToMetadata[guide.id];
+                                // To tell routes.js this is an import and not a nested object to recurse.
+                                return {
+                                    content: {
+                                        __import: true,
+                                        path: metadata.source,
+                                        query: {
+                                            truncated: true,
+                                        },
+                                    },
+                                };
+                            }),
+                            metadata: aliasedSource(categoryMetadataPath),
+                        },
+                    });
+                }));
             }
         },
         configureWebpack(_config, isServer, { getBabelLoader, getCacheLoader }) {
@@ -279,44 +299,7 @@ function pluginContentGuide(context, opts) {
             };
         },
         injectHtmlTags() {
-            var _a;
-            if (!options.feedOptions) {
-                return {};
-            }
-            const feedTypes = getFeedTypes((_a = options.feedOptions) === null || _a === void 0 ? void 0 : _a.type);
-            const { siteConfig: { title }, baseUrl, } = context;
-            const feedsConfig = {
-                rss: {
-                    type: 'application/rss+xml',
-                    path: 'guide/rss.xml',
-                    title: `${title} Guide RSS Feed`,
-                },
-                atom: {
-                    type: 'application/atom+xml',
-                    path: 'guide/atom.xml',
-                    title: `${title} Guide Atom Feed`,
-                },
-            };
-            const headTags = [];
-            feedTypes.map(feedType => {
-                const feedConfig = feedsConfig[feedType] || {};
-                if (!feedsConfig) {
-                    return;
-                }
-                const { type, path, title } = feedConfig;
-                headTags.push({
-                    tagName: 'link',
-                    attributes: {
-                        rel: 'alternate',
-                        type,
-                        href: utils_1.normalizeUrl([baseUrl, path]),
-                        title,
-                    },
-                });
-            });
-            return {
-                headTags,
-            };
+            return {};
         },
     };
 }

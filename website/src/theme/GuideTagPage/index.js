@@ -1,10 +1,3 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React from 'react';
 
 import Layout from '@theme/Layout';
@@ -15,7 +8,7 @@ function pluralize(count, word) {
   return count > 1 ? `${word}s` : word;
 }
 
-function GuideTagsGuidesPage(props) {
+function GuideTagPage(props) {
   const {metadata, items} = props;
   const {allTagsPath, name: tagName, count} = metadata;
 
@@ -38,4 +31,4 @@ function GuideTagsGuidesPage(props) {
   );
 }
 
-export default GuideTagsGuidesPage;
+export default GuideTagPage;

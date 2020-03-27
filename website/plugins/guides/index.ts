@@ -9,7 +9,6 @@ import {
   GuideItemsToMetadata,
   TagsModule,
   GuidePaginated,
-  FeedType,
   Guide,
 } from './types';
 import {
@@ -17,7 +16,6 @@ import {
   PluginContentLoadedActions,
   ConfigureWebpackUtils,
   Plugin,
-  HtmlTags,
 } from '@docusaurus/types';
 import {Configuration, Loader} from 'webpack';
 import {generateGuides} from './guideUtils';
@@ -28,31 +26,12 @@ const DEFAULT_OPTIONS: PluginOptions = {
   include: ['**/*.md', '**/*.mdx'], // Extensions to include.
   guideListComponent: '@theme/GuideListPage',
   guideComponent: '@theme/GuidePage',
-  guideTagsListComponent: '@theme/GuideTagsListPage',
-  guideTagsGuidesComponent: '@theme/GuideTagsGuidesPage',
+  guideTagListComponent: '@theme/GuideTagListPage',
+  guideTagComponent: '@theme/GuideTagPage',
+  guideCategoryComponent: '@theme/GuideCategoryPage',
   remarkPlugins: [],
   rehypePlugins: [],
   truncateMarker: /<!--\s*(truncate)\s*-->/, // Regex.
-};
-
-function assertFeedTypes(val: any): asserts val is FeedType {
-  if (typeof val !== 'string' && !['rss', 'atom', 'all'].includes(val)) {
-    throw new Error(
-      `Invalid feedOptions type: ${val}. It must be either 'rss', 'atom', or 'all'`,
-    );
-  }
-}
-
-const getFeedTypes = (type?: FeedType) => {
-  assertFeedTypes(type);
-  let feedTypes: ('rss' | 'atom')[] = [];
-
-  if (type === 'all') {
-    feedTypes = ['rss', 'atom'];
-  } else {
-    feedTypes.push(type);
-  }
-  return feedTypes;
 };
 
 export default function pluginContentGuide(
@@ -129,6 +108,7 @@ export default function pluginContentGuide(
         items: guides.map(item => item.id),
       });
 
+      // Guide tags
       const guideTags: GuideTags = {};
       const tagsPath = normalizeUrl([basePageUrl, 'tags']);
       guides.forEach(guide => {
@@ -169,11 +149,16 @@ export default function pluginContentGuide(
       const guideTagsListPath =
         Object.keys(guideTags).length > 0 ? tagsPath : null;
 
+
+      // Guide categories
+      const guideCategories = _.uniq(guides.map(guide => guide.metadata.category));
+
       return {
         guides,
         guideListPaginated,
         guideTags,
         guideTagsListPath,
+        guideCategories,
       };
     },
 
@@ -191,8 +176,9 @@ export default function pluginContentGuide(
       const {
         guideListComponent,
         guideComponent,
-        guideTagsListComponent,
-        guideTagsGuidesComponent,
+        guideTagListComponent,
+        guideTagComponent,
+        guideCategoryComponent,
       } = options;
 
       const aliasedSource = (source: string) =>
@@ -203,11 +189,12 @@ export default function pluginContentGuide(
         guideListPaginated,
         guideTags,
         guideTagsListPath,
+        guideCategories,
       } = guideContents;
 
       const guideItemsToMetadata: GuideItemsToMetadata = {};
 
-      // Create routes for guide entries.
+      // Guide pages
       await Promise.all(
         guides.map(async guide => {
           const {id, metadata} = guide;
@@ -231,7 +218,7 @@ export default function pluginContentGuide(
         }),
       );
 
-      // Create routes for guide's paginated list entries.
+      // Guides list
       await Promise.all(
         guideListPaginated.map(async listPage => {
           const {metadata, items} = listPage;
@@ -265,7 +252,7 @@ export default function pluginContentGuide(
         }),
       );
 
-      // Tags.
+      // Tags
       if (guideTagsListPath === null) {
         return;
       }
@@ -291,7 +278,7 @@ export default function pluginContentGuide(
 
           addRoute({
             path: permalink,
-            component: guideTagsGuidesComponent,
+            component: guideTagComponent,
             exact: true,
             modules: {
               items: items.map(guideID => {
@@ -321,12 +308,50 @@ export default function pluginContentGuide(
 
         addRoute({
           path: guideTagsListPath,
-          component: guideTagsListComponent,
+          component: guideTagListComponent,
           exact: true,
           modules: {
             tags: aliasedSource(tagsListPath),
           },
         });
+      }
+
+      // Guide categories
+      if (guideCategories.length > 0) {
+        await Promise.all(
+          guideCategories.map(async category => {
+            const permalink = `/guides/${category}`;
+            const metadata = {category: category};
+            const categoryMetadataPath = await createData(
+              `${docuHash(permalink)}.json`,
+              JSON.stringify(metadata, null, 2),
+            );
+
+            addRoute({
+              path: `/guides/${category}`,
+              component: guideCategoryComponent,
+              exact: true,
+              modules: {
+                items: guides.
+                  filter(guide => guide.metadata.category == category).
+                  map(guide => {
+                    const metadata = guideItemsToMetadata[guide.id];
+                    // To tell routes.js this is an import and not a nested object to recurse.
+                    return {
+                      content: {
+                        __import: true,
+                        path: metadata.source,
+                        query: {
+                          truncated: true,
+                        },
+                      },
+                    };
+                  }),
+                metadata: aliasedSource(categoryMetadataPath),
+              },
+            });
+          })
+        );
       }
     },
 
@@ -383,52 +408,7 @@ export default function pluginContentGuide(
     },
 
     injectHtmlTags() {
-      if (!options.feedOptions) {
-        return {};
-      }
-
-      const feedTypes = getFeedTypes(options.feedOptions?.type);
-      const {
-        siteConfig: {title},
-        baseUrl,
-      } = context;
-      const feedsConfig = {
-        rss: {
-          type: 'application/rss+xml',
-          path: 'guide/rss.xml',
-          title: `${title} Guide RSS Feed`,
-        },
-        atom: {
-          type: 'application/atom+xml',
-          path: 'guide/atom.xml',
-          title: `${title} Guide Atom Feed`,
-        },
-      };
-      const headTags: HtmlTags = [];
-
-      feedTypes.map(feedType => {
-        const feedConfig = feedsConfig[feedType] || {};
-
-        if (!feedsConfig) {
-          return;
-        }
-
-        const {type, path, title} = feedConfig;
-
-        headTags.push({
-          tagName: 'link',
-          attributes: {
-            rel: 'alternate',
-            type,
-            href: normalizeUrl([baseUrl, path]),
-            title,
-          },
-        });
-      });
-
-      return {
-        headTags,
-      };
+      return {}
     },
   };
 }

@@ -1,5 +1,4 @@
 ---
-last_modified_on: "2020-03-26"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
