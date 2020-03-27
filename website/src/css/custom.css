@@ -311,6 +311,13 @@ blockquote > footer {
  * Custom column widths
  */
 
+.col.col--2-5 {
+  --ifm-col-width: calc(2.5 / 12 * 100%);
+}
+
+.col.col--7-5 {
+  --ifm-col-width: calc(7.5 / 12 * 100%);
+}
 
 
 /**
@@ -489,7 +496,7 @@ table.comparison tr td.bar.vector .bar {
 }
 
 .container--l {
-  --ifm-container-width: 13330px;
+  --ifm-container-width: 1330px;
 }
 
 /**

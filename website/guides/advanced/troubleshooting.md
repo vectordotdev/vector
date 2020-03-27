@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: Troubleshooting Vector
+title: Troubleshooting
 description: A guide on debugging and troubleshooting Vector
 author_github: https://github.com/binarylogic
 tags: ["domain: operations"]

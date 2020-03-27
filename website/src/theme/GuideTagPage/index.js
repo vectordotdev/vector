@@ -24,7 +24,7 @@ function GuideTagPage(props) {
           </div>
         </div>
       </header>
-      <main className="container">
+      <main className="container container--s">
         <GuideItems items={items} />
       </main>
     </Layout>

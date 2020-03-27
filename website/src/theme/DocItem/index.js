@@ -1,21 +1,13 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React from 'react';
 
 import Head from '@docusaurus/Head';
 import Link from '@docusaurus/Link';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-import DocPaginator from '@theme/DocPaginator';
-import useTOCHighlight from '@theme/hooks/useTOCHighlight';
 
 import _ from 'lodash';
 import styles from './styles.module.css';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useTOCHighlight from '@theme/hooks/useTOCHighlight';
 
 const LINK_CLASS_NAME = 'contents__link';
 const ACTIVE_LINK_CLASS_NAME = 'contents__link--active';
@@ -214,7 +206,7 @@ function DocItem(props) {
               </div>
               {!metadata.hide_pagination && (
                 <div className={styles.paginator}>
-                  <DocPaginator metadata={metadata} />
+                  <PagePaginator metadata={metadata} />
                 </div>
               )}
             </div>

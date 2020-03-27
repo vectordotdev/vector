@@ -2,7 +2,6 @@ import React, {useState} from 'react';
 
 import Avatar from '@site/src/components/Avatar';
 import CodeBlock from '@theme/CodeBlock';
-import DocPaginator from '@theme/DocPaginator';
 import Heading from '@theme/Heading';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import Jump from '@site/src/components/Jump';
@@ -11,6 +10,7 @@ import Link from '@docusaurus/Link';
 import Modal from 'react-modal';
 import MDXComponents from '@theme/MDXComponents';
 import {MDXProvider} from '@mdx-js/react';
+import PagePaginator from '@theme/PagePaginator';
 import SVG from 'react-inlinesvg';
 import Tags from '@site/src/components/Tags';
 import VectorComponents from '@site/src/components/VectorComponents';
@@ -163,7 +163,8 @@ function GuidePage(props) {
         </div>
       </header>
       <main className={classnames('container', 'container--l', styles.container)}>
-        <aside>
+        <div className="row">
+        <aside className="col col--2-5">
           <section className={styles.avatar}>
             <Avatar
               bio={true}
@@ -188,13 +189,15 @@ function GuidePage(props) {
             )}
           </section>
         </aside>
-        <article>
-          <div className="markdown">
-            <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
-          </div>
-          ben johnson
-          <DocPaginator metadata={metadata} />
-        </article>
+        <div className={classnames('col', styles.rightCol)}>
+          <article>
+            <div className="markdown">
+              <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
+            </div>
+          </article>
+          <PagePaginator previous={metadata.previousItem} next={metadata.nextItem} className={styles.paginator} />
+        </div>
+      </div>
       </main>
     </Layout>
   );

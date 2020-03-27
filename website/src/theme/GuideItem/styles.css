@@ -1,6 +1,6 @@
 .guide-item {
   background-color: var(--ifm-panel-border-color);
-  border-radius: var(--ifm-global-radius);
+  border-radius: 0.2em;
   box-shadow: var(--ifm-panel-box-shadow);
   color: var(--ifm-heading-color);
   display: block;
@@ -17,7 +17,7 @@
 
 .guide-item > article {
   background-color: var(--ifm-panel-background-solid);
-  border-radius: var(--ifm-global-radius);
+  border-radius: 0.2em;
   height: 100%;
   position: relative;
 }
@@ -47,7 +47,7 @@
   font-family: var(--ifm-font-family-base);
   font-size: 1.1em;
   font-weight: 600;
-  height: 3em;
+  hyphens: auto;
   line-height: 1.4;
   margin-bottom: calc( var(--ifm-spacing-vertical) / 4 );
   overflow: hidden;

@@ -92,7 +92,7 @@ module.exports = {
           "title": "Next Steps"
         },
         {
-          "author_github": "https://github.com/binarylogic",
+          "author_github": "https://github.com/Jeffail",
           "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/structuring",
           "last_modified_on": null,

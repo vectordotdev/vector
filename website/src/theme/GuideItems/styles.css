@@ -1,7 +1,7 @@
 .guide-items {
   display: grid;
-  font-size: 1.275em;
-  grid-template-columns: repeat(4, 1fr);
+  font-size: 1.4em;
+  grid-template-columns: repeat(3, minmax(100px, 1fr));
   grid-gap: 1.5rem;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
 }

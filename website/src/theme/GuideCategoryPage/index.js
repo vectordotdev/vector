@@ -24,7 +24,7 @@ function GuideTagPage(props) {
           <div><Link to="/guides">View All Guides</Link></div>
         </div>
       </header>
-      <main className="container">
+      <main className="container container--s">
         <GuideItems items={items} staggered={category.series} />
       </main>
     </Layout>

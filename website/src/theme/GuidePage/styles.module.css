@@ -2,21 +2,6 @@
   margin-top: calc( var(--ifm-spacing-vertical) * 0.5 );
 }
 
-.container {
-  display: flex;
-  flex-direction: row;
-}
-
-.container > aside {
-  width: 275px;
-}
-
-.container > article {
-  max-width: 700px;
-  margin-left: calc( var(--ifm-spacing-horizontal) * 3.75 );
-  margin-top: calc( (var(--ifm-spacing-vertical) * 1.5) + 8px );
-}
-
 .avatar {
   background: var(--ifm-color-emphasis-50);
   border: 0px none;
@@ -35,6 +20,18 @@
   top: var(--ifm-spacing-vertical);
 }
 
+.rightCol {
+  --ifm-width: calc(7.15 / 12 * 100%);
+  flex: 0 0 var(--ifm-width) !important;
+  max-width: var(--ifm-width) !important;
+  padding-left: calc( var(--ifm-spacing-horizontal) * 2 ) !important;
+}
+
+.paginator {
+  margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  padding-top: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
 @media (max-width: 996px) {
   .container {
     display: block;
@@ -44,7 +41,7 @@
     width: auto;
   }
 
-  .container > article {
+  .container > div {
     max-width: none;
     margin-left: 0;
   }

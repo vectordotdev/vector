@@ -1,7 +1,7 @@
 ---
-last_modified_on: "2020-03-26"
+last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: Managing Complex Vector Configs
+title: Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
 author_github: https://github.com/Jeffail
 tags: ["domain: config"]

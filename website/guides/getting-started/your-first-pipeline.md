@@ -93,4 +93,4 @@ that by following the next guide in the series: [Structuring Your Log Data][guid
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.console]: /docs/reference/sinks/console/
 [docs.sources.stdin]: /docs/reference/sources/stdin/
-[guides.getting-started.structuring]: /guides/getting-started/structuring/
+[guides.getting-started.structuring]: /guides/Users/benjohnson/Code/timber/vector/website/guides/getting-started/structuring/
