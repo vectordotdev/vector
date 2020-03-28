@@ -397,7 +397,7 @@ class Templates
       strategy = fetch_strategy(source.strategies.first)
     elsif sink
       interfaces = metadata.installation.interfaces_list
-      strategy = metadata.installation.strategies.first
+      strategy = metadata.installation.strategies_list.first
     end
 
     guide = IntegrationGuide.new(interfaces, strategy, platform: platform, source: source, sink: sink)

@@ -46,6 +46,10 @@ class Installation
     downloads
   end
 
+  def strategies_list
+    @strategies_list ||= strategies.to_h.values.sort_by(&:title)
+  end
+
   def to_h
     {
       downloads: downloads,

@@ -101,6 +101,8 @@ function GuidePage(props) {
     sinkPathTemplate = `/guides/integrate/platforms/${platform.name}/<name>/`;
   } else if (source) {
     sinkPathTemplate = `/guides/integrate/sources/${source.name}/<name>/`;
+  } else if (sink) {
+    sinkPathTemplate = `/guides/integrate/sinks/<name>/`;
   }
 
   let sourcePathTemplate = sink ?
@@ -133,7 +135,7 @@ function GuidePage(props) {
           </header>
           <VectorComponents
             exceptFunctions={['test']}
-            exceptNames={[source && source.name]}
+            exceptNames={[source && source.name, 'docker']}
             eventTypes={sink && sink.event_types}
             pathTemplate={sourcePathTemplate}
             titles={false}
@@ -174,12 +176,9 @@ function GuidePage(props) {
                   <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
-              {!source && !platform && <div className="icon panel link" title="Select a source" onClick={(event) => setShowSinkSwitcher(true)}>
+              {!source && !platform && <div className="icon panel link" title="Select a source" onClick={(event) => setShowSourceSwitcher(true)}>
                  <i className="feather icon-plus"></i>
                </div>}
-              {!source && !platform && <div className="icon panel link" title="Select a source">
-                <i className="feather icon-plus"></i>
-              </div>}
               {sink && <div className="icon panel link" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
                 {sink.logo_path ?
                   <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :

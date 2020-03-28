@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 id: arm-support-on-linux
 title: "ARMv7 & ARM64 Support on Linux"
 description: "These architectures are widely used in embeded devices & servers"

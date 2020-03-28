@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 id: prometheus-source
 title: "Prometheus Source"
 description: "Scrape prometheus metrics with Vector"

@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es2019",
+    "target": "es2017",
     "module": "commonjs",
-    "lib": ["es2019"],
+    "lib": ["es2017"],
     "declaration": true,
     "declarationMap": true,
 

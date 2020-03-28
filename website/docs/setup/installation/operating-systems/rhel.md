@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 title: Install Vector On Red Hat Enterprise Linux
 sidebar_label: RHEL
 description: Install Vector on Red Hat Enterprise Linux

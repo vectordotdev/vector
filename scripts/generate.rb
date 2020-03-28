@@ -134,6 +134,19 @@ def url_valid?(url)
   end
 end
 
+def write_new_file(path, contents)
+  if !File.exists?(path)
+    dirname = File.dirname(path)
+
+    unless File.directory?(dirname)
+      FileUtils.mkdir_p(dirname)
+    end
+
+    File.open(path, 'w+') { |file| file.write(contents) }
+  end
+end
+
+
 #
 # Header
 #
@@ -153,64 +166,30 @@ templates = Templates.new(ROOT_DIR, metadata)
 
 metadata.installation.platforms_list.each do |platform|
   template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}.md.erb"
-
-  if !File.exists?(template_path)
-    contents =
-      <<~EOF
-      <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-      <%= integration_guide(platform: platform) %>
-      EOF
-
-    File.open(template_path, 'w+') { |file| file.write(contents) }
-  end
-end
-
-#
-# Create missing platform integration guides
-#
-
-metadata.installation.platforms_list.each do |platform|
-  template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}.md.erb"
   strategy = platform.strategies.first
   source = metadata.sources.send(strategy.source)
 
-  if !File.exists?(template_path)
-    dirname = File.dirname(template_path)
-
-    unless File.directory?(dirname)
-      FileUtils.mkdir_p(dirname)
-    end
-
-    contents =
-      <<~EOF
-      <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-      <%= integration_guide(platform: platform) %>
-      EOF
-
-    File.open(template_path, 'w+') { |file| file.write(contents) }
-  end
+  write_new_file(
+    template_path,
+    <<~EOF
+    <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
+    <%= integration_guide(platform: platform) %>
+    EOF
+  )
 
   metadata.sinks_list.
     select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
     each do |sink|
       template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}/#{sink.name}.md.erb"
 
-      if !File.exists?(template_path)
-        dirname = File.dirname(template_path)
-
-        unless File.directory?(dirname)
-          FileUtils.mkdir_p(dirname)
-        end
-
-        contents =
-          <<~EOF
-          <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-          <%- sink = metadata.sinks.send("#{sink.name}") -%>
-          <%= integration_guide(platform: platform, sink: sink) %>
-          EOF
-
-        File.open(template_path, 'w+') { |file| file.write(contents) }
-      end
+      write_new_file(
+        template_path,
+        <<~EOF
+        <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
+        <%- sink = metadata.sinks.send("#{sink.name}") -%>
+        <%= integration_guide(platform: platform, sink: sink) %>
+        EOF
+      )
     end
 end
 
@@ -223,45 +202,45 @@ metadata.sources_list.
   each do |source|
     template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}.md.erb"
 
-    if !File.exists?(template_path)
-      dirname = File.dirname(template_path)
-
-      unless File.directory?(dirname)
-        FileUtils.mkdir_p(dirname)
-      end
-
-      contents =
-        <<~EOF
-        <%- source = metadata.sources.send("#{source.name}") -%>
-        <%= integration_guide(source: source) %>
-        EOF
-
-      File.open(template_path, 'w+') { |file| file.write(contents) }
-    end
+    write_new_file(
+      template_path,
+      <<~EOF
+      <%- source = metadata.sources.send("#{source.name}") -%>
+      <%= integration_guide(source: source) %>
+      EOF
+    )
 
     metadata.sinks_list.
       select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
       each do |sink|
         template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}/#{sink.name}.md.erb"
 
-        if !File.exists?(template_path)
-          dirname = File.dirname(template_path)
-
-          unless File.directory?(dirname)
-            FileUtils.mkdir_p(dirname)
-          end
-
-          contents =
-            <<~EOF
-            <%- source = metadata.sources.send("#{source.name}") -%>
-            <%- sink = metadata.sinks.send("#{sink.name}") -%>
-            <%= integration_guide(source: source, sink: sink) %>
-            EOF
-
-          File.open(template_path, 'w+') { |file| file.write(contents) }
-        end
+        write_new_file(
+          template_path,
+          <<~EOF
+          <%- source = metadata.sources.send("#{source.name}") -%>
+          <%- sink = metadata.sinks.send("#{sink.name}") -%>
+          <%= integration_guide(source: source, sink: sink) %>
+          EOF
+        )
       end
   end
+
+#
+# Create missing sink integration guides
+#
+
+metadata.sinks_list.each do |sink|
+  template_path = "#{GUIDES_ROOT}/integrate/sinks/#{sink.name}.md.erb"
+
+  write_new_file(
+    template_path,
+    <<~EOF
+    <%- sink = metadata.sinks.send("#{sink.name}") -%>
+    <%= integration_guide(sink: sink) %>
+    EOF
+  )
+end
 
 #
 # Create missing release pages
@@ -270,49 +249,39 @@ metadata.sources_list.
 metadata.releases_list.each do |release|
   template_path = "#{PAGES_ROOT}/releases/#{release.version}/download.js"
 
-  if !File.exists?(template_path)
-    dirname = File.dirname(template_path)
+  write_new_file(
+    template_path,
+    <<~EOF
+    import React from 'react';
 
-    unless File.directory?(dirname)
-      FileUtils.mkdir_p(dirname)
-    end
+    import ReleaseDownload from '@site/src/components/ReleaseDownload';
 
-    contents =
-      <<~EOF
-      import React from 'react';
+    function Download() {
+      return <ReleaseDownload version="#{release.version}" />
+    }
 
-      import ReleaseDownload from '@site/src/components/ReleaseDownload';
-
-      function Download() {
-        return <ReleaseDownload version="#{release.version}" />
-      }
-
-      export default Download;
-      EOF
-
-    File.open(template_path, 'w+') { |file| file.write(contents) }
-  end
+    export default Download;
+    EOF
+  )
 
   template_path = "#{PAGES_ROOT}/releases/#{release.version}.js"
 
-  if !File.exists?(template_path)
-    contents =
-      <<~EOF
-      import React from 'react';
+  write_new_file(
+    template_path,
+    <<~EOF
+    import React from 'react';
 
-      import ReleaseNotes from '@site/src/components/ReleaseNotes';
+    import ReleaseNotes from '@site/src/components/ReleaseNotes';
 
-      function ReleaseNotesPage() {
-        const version = "#{release.version}";
+    function ReleaseNotesPage() {
+      const version = "#{release.version}";
 
-        return <ReleaseNotes version={version} />;
-      }
+      return <ReleaseNotes version={version} />;
+    }
 
-      export default ReleaseNotesPage;
-      EOF
-
-    File.open(template_path, 'w+') { |file| file.write(contents) }
-  end
+    export default ReleaseNotesPage;
+    EOF
+  )
 end
 
 #

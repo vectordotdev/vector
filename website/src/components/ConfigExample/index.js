@@ -66,7 +66,29 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
       </>
     );
   } else if (sinkName) {
+    const sink = sinksMap[sinkName];
+    const compatibleSources = sources.filter(source => (
+      source.function_category != "test") &&
+        sink.input_types.some(event_type => source.output_types.includes(event_type)
+    ));
 
+    return (
+       <>
+        <Tabs
+          block={true}
+          select={true}
+          label="Where would you like to receive your data?"
+          values={compatibleSources.map(source => ({label: source.title, value: source.name}))}>
+          {compatibleSources.map((source, idx) => {
+            return (
+              <TabItem value={source.name}>
+                <Command format={format} path={path} source={source} source={sourcesMap[source.name]} />
+              </TabItem>
+            );
+          })}
+        </Tabs>
+      </>
+    );
   } else {
 
   }

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 id: ec2-metadata
 title: "EC2 Metadata Enrichments"
 description: "Enrich your events with EC2 metadata"

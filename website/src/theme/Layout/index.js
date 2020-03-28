@@ -33,9 +33,8 @@ function Layout(props) {
   const metaImage = image || defaultImage;
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
-  const myURL = new URL(location);
   // purposefully hardcoded to protect against people copying our site
-  const canonURL = 'https://vector.dev' + myURL.pathname
+  const canonURL = 'https://vector.dev' + location.pathname
 
   return (
     <ThemeProvider>

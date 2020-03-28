@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
 event_types: ["log"]

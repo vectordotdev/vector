@@ -21,21 +21,29 @@ function Guides({filtering, items}) {
   } else if (filtering) {
     return <GuideItems items={items} />
   } else {
-    const groupedCategories = _(items).
-      map(item => item.content.metadata.categories[0]).
-      uniqBy('permalink').
-      sortBy(category => {
-        if (category.name == 'getting-started') {
-          console.log(category.name);
-          return 'AA';
-        } else {
-          return category.name;
-        }
-      }).
-      keyBy('permalink').
-      value();
+    const gettingStartedGuides = items.filter(item => item.content.metadata.categories[0].name == 'getting-started');
+    const advancedGuides = items.filter(item => item.content.metadata.categories[0].name == 'advanced');
+    const advancedCategory = advancedGuides[0].content.metadata.categories[0];
+    const integrationGuides = items.filter(item => item.content.metadata.categories[0].name == 'integrate');
+    const integrationCategory = integrationGuides[0].content.metadata.categories[0];
 
-    const groupedItems = _.groupBy(items, ((item) => item.content.metadata.categories[0].permalink));
+    return (
+      <>
+        <section>
+          <GuideItems items={gettingStartedGuides} staggered={true} />
+        </section>
+        <section>
+          <AnchoredH2 id={advancedCategory.permalink}>{advancedCategory.title}</AnchoredH2>
+          {advancedCategory.description && <div className="sub-title">{advancedCategory.description}</div>}
+          <GuideItems items={advancedGuides} large={true} />
+        </section>
+        <section>
+          <AnchoredH2 id={integrationCategory.permalink}>{integrationCategory.title}</AnchoredH2>
+          {integrationCategory.description && <div className="sub-title">{integrationCategory.description}</div>}
+          <GuideItems items={integrationGuides} groupLevel={2} />
+        </section>
+      </>
+    );
 
     return Object.keys(groupedCategories).map((categoryPermalink, index) => {
       let groupItems = groupedItems[categoryPermalink];
