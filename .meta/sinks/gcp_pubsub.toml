@@ -1,5 +1,6 @@
 [sinks.gcp_pubsub]
 title = "GCP PubSub"
+noun = "GCP PubSub"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

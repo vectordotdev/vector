@@ -1,5 +1,6 @@
 [sinks.http]
 title = "HTTP"
+noun = "an HTTP endpoint"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"

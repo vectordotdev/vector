@@ -1,5 +1,6 @@
 [sinks.datadog_logs]
 title = "Datadog Logs"
+noun = "Datadog Logs"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

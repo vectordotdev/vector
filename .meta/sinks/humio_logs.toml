@@ -1,5 +1,6 @@
 [sinks.humio_logs]
 title = "Humio Logs"
+noun = "Humio"
 common = false
 beta = true
 delivery_guarantee = "at_least_once"

@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Send logs from Docker to Vector"
-description: "A guide to quickly, and correctly, send logs from Docker to Vector."
+title: "Send logs from Docker to another Vector instance"
+description: "A guide to quickly, and correctly, send logs from Docker to another Vector instance."
 author_github: https://github.com/binarylogic
 tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: vector"]
 ---
@@ -11,11 +11,11 @@ import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
 import SVG from 'react-inlinesvg';
 
-> "I just wanna, like, send my logs from Docker to Vector -- why is all of this so complicated?"
+> "I just wanna, like, send my logs from Docker to another Vector instance -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send logs from Docker to Vector? Sounds simple! Sadly, it is not.
+So you want to send logs from Docker to another Vector instance? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.

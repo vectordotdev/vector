@@ -8,6 +8,7 @@ class Sink < Component
     :egress_method,
     :input_types,
     :healthcheck,
+    :noun,
     :output,
     :service_limits_short_link,
     :tls,
@@ -21,6 +22,7 @@ class Sink < Component
     @egress_method = hash.fetch("egress_method")
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
+    @noun = hash.fetch("noun")
     @service_limits_short_link = hash["service_limits_short_link"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -79,7 +81,8 @@ class Sink < Component
 
   def to_h
     super.merge(
-      input_types: input_types
+      input_types: input_types,
+      noun: noun
     )
   end
 

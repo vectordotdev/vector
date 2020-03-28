@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Send logs from STDIN to File"
-description: "A guide to quickly, and correctly, send logs from STDIN to File."
+title: "Send logs from STDIN to a file"
+description: "A guide to quickly, and correctly, send logs from STDIN to a file."
 author_github: https://github.com/binarylogic
 tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: file"]
 ---
@@ -10,11 +10,11 @@ tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink:
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, send my logs from STDIN to File -- why is all of this so complicated?"
+> "I just wanna, like, send my logs from STDIN to a file -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send logs from STDIN to File? Sounds simple! Sadly, it is not.
+So you want to send logs from STDIN to a file? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.

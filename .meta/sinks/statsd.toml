@@ -1,5 +1,6 @@
 [sinks.statsd]
 title = "Statsd"
+noun = "Statsd"
 beta = false
 common = false
 delivery_guarantee = "best_effort"

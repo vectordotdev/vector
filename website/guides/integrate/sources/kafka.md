@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Collect logs from Kafka and send them anywhere"
-description: "A guide to quickly, and correctly, collect logs from Kafka and send them anywhere."
+title: "Collect logs from Kafka cluster and send them anywhere"
+description: "A guide to quickly, and correctly, collect logs from Kafka cluster and send them anywhere."
 author_github: https://github.com/binarylogic
 tags: ["type: tutorial","domain: sources","source: kafka"]
 ---
@@ -10,11 +10,11 @@ tags: ["type: tutorial","domain: sources","source: kafka"]
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, collect my logs from Kafka and send them somewhere -- why is all of this so complicated?"
+> "I just wanna, like, collect my logs from Kafka cluster and send them somewhere -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to collect logs from Kafka and send them anywhere? Sounds simple! Sadly, it is not.
+So you want to collect logs from Kafka cluster and send them anywhere? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.

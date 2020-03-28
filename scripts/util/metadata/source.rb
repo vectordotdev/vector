@@ -8,6 +8,7 @@ require_relative "output"
 
 class Source < Component
   attr_reader :delivery_guarantee,
+    :noun,
     :output,
     :output_types,
     :strategies,
@@ -19,6 +20,7 @@ class Source < Component
     # Init
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
+    @noun = hash.fetch("noun")
     @output = OpenStruct.new
     @log_fields = (hash["log_fields"] || {}).to_struct_with_name(constructor: Field)
     @output_types = hash.fetch("output_types")
@@ -68,6 +70,7 @@ class Source < Component
 
   def to_h
     super.merge(
+      noun: noun,
       output_types: output_types
     )
   end

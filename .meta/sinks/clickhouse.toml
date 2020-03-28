@@ -1,5 +1,6 @@
 [sinks.clickhouse]
 title = "Clickhouse"
+noun = "Clickhouse"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

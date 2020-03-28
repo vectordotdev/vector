@@ -32,11 +32,11 @@ class Templates
         end
 
       if @source && @sink
-        "send #{pronoun}#{@source.event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.title)} to #{normalize_title(@sink.title)}"
+        "send #{pronoun}#{@source.event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} to #{normalize_title(@sink.noun)}"
       elsif @source
-        "collect #{pronoun}#{@source.event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.title)} and send them #{target}"
+        "collect #{pronoun}#{@source.event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} and send them #{target}"
       elsif @sink
-        "send #{pronoun}#{@sink.event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.title)}"
+        "send #{pronoun}#{@sink.event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.noun)}"
       end
     end
 

@@ -1,5 +1,6 @@
 [sinks.aws_cloudwatch_metrics]
 title = "AWS Cloudwatch Metrics"
+noun = "AWS Cloudwatch Metrics"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

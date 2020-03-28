@@ -1,5 +1,6 @@
 [sinks.influxdb_metrics]
 title = "InfluxDB Metrics"
+noun = "InfluxDB"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

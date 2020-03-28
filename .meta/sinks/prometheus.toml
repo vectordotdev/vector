@@ -1,5 +1,6 @@
 [sinks.prometheus]
 title = "Prometheus"
+noun = "Prometheus"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

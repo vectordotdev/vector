@@ -1,5 +1,6 @@
 [sinks.aws_cloudwatch_logs]
 title = "AWS Cloudwatch Logs"
+noun = "AWS Cloudwatch Logs"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"

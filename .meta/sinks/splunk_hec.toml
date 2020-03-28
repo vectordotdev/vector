@@ -1,5 +1,6 @@
 [sinks.splunk_hec]
 title = "Splunk HEC"
+noun = "a Splunk HEC"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"

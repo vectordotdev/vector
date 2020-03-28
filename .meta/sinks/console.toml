@@ -1,5 +1,6 @@
 [sinks.console]
 title = "Console"
+noun = "the console"
 beta = false
 common = false
 delivery_guarantee = "best_effort"

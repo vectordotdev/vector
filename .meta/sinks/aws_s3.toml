@@ -1,5 +1,6 @@
 [sinks.aws_s3]
 title = "AWS S3"
+noun = "AWS S3"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"

@@ -1,5 +1,6 @@
 [sinks.aws_kinesis_firehose]
 title = "AWS Kinesis Firehose"
+noun = "AWS Kinesis Firehose"
 beta = false
 common = false
 delivery_guarantee = "at_least_once"

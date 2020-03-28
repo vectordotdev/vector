@@ -1,5 +1,6 @@
 [sinks.blackhole]
 title = "Blackhole"
+noun = "blackhole"
 beta = false
 common = false
 delivery_guarantee = "best_effort"

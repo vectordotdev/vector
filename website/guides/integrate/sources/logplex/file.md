@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Send logs from Heroku Logplex to File"
-description: "A guide to quickly, and correctly, send logs from Heroku Logplex to File."
+title: "Send logs from Heroku Logplex to a file"
+description: "A guide to quickly, and correctly, send logs from Heroku Logplex to a file."
 author_github: https://github.com/binarylogic
 tags: ["type: tutorial","domain: sources","domain: sinks","source: logplex","sink: file"]
 ---
@@ -10,11 +10,11 @@ tags: ["type: tutorial","domain: sources","domain: sinks","source: logplex","sin
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, send my logs from Heroku Logplex to File -- why is all of this so complicated?"
+> "I just wanna, like, send my logs from Heroku Logplex to a file -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send logs from Heroku Logplex to File? Sounds simple! Sadly, it is not.
+So you want to send logs from Heroku Logplex to a file? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.

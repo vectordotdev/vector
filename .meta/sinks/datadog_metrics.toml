@@ -1,5 +1,6 @@
 [sinks.datadog_metrics]
 title = "Datadog Metrics"
+noun = "Datadog Metrics"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

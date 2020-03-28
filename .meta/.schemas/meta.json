@@ -249,6 +249,7 @@
         "delivery_guarantee",
         "egress_method",
         "function_category",
+        "noun",
         "requirements",
         "title",
         "write_to_description"
@@ -325,6 +326,10 @@
             "enum": ["log", "metric"]
           }
         },
+        "noun": {
+          "type": "string",
+          "description": "The noun that would be used in a sentence."
+        },
         "options": {
           "$ref": "#/definitions/fields",
           "description": "The options provided by this sink, keyed by the option's name."
@@ -385,6 +390,7 @@
         "common",
         "delivery_guarantee",
         "function_category",
+        "noun",
         "requirements",
         "through_description",
         "title"
@@ -426,6 +432,10 @@
             "collect",
             "receive"
           ]
+        },
+        "noun": {
+          "type": "string",
+          "description": "The noun that would be used in a sentence."
         },
         "only_operating_systems": {
           "$ref": "#/definitions/operating_systems",

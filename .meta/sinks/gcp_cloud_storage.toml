@@ -1,5 +1,6 @@
 [sinks.gcp_cloud_storage]
 title = "GCP Cloud Storage (GCS)"
+noun = "GCP Cloud Storage (GCS)"
 beta = true
 common = true
 delivery_guarantee = "at_least_once"

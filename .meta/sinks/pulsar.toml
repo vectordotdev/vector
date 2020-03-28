@@ -1,5 +1,6 @@
 [sinks.pulsar]
 title = "Apache Pulsar"
+noun = "Apache Pulsar"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

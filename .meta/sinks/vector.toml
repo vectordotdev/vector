@@ -1,5 +1,6 @@
 [sinks.vector]
 title = "Vector"
+noun = "another Vector instance"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

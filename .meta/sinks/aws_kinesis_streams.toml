@@ -1,5 +1,6 @@
 [sinks.aws_kinesis_streams]
 title = "AWS Kinesis Data Streams"
+noun = "AWS Kinesis Data Streams"
 beta = false
 common = false
 delivery_guarantee = "at_least_once"

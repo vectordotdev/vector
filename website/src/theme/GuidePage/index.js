@@ -98,14 +98,14 @@ function GuidePage(props) {
   let sinkPathTemplate = null;
 
   if (platform) {
-    sinkPathTemplate = `/guides/setup/platforms/${platform.name}/<name>/`;
+    sinkPathTemplate = `/guides/integrate/platforms/${platform.name}/<name>/`;
   } else if (source) {
-    sinkPathTemplate = `/guides/setup/sources/${source.name}/<name>/`;
+    sinkPathTemplate = `/guides/integrate/sources/${source.name}/<name>/`;
   }
 
   let sourcePathTemplate = sink ?
-    `/guides/setup/sources/<name>/${sink.name}/` :
-    '/guides/setup/sources/<name>/';
+    `/guides/integrate/sources/<name>/${sink.name}/` :
+    '/guides/integrate/sources/<name>/';
 
   //
   // State

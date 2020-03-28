@@ -1,5 +1,6 @@
 [sinks.papertrail]
 title = "Papertrail"
+noun = "Papertrail"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

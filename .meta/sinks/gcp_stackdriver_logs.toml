@@ -1,5 +1,6 @@
 [sinks.gcp_stackdriver_logs]
 title = "GCP Stackdriver Logs"
+noun = "GCP Stackdriver Logs"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

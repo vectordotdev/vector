@@ -1,5 +1,6 @@
 [sinks.loki]
 title = "Loki"
+noun = "Loki"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

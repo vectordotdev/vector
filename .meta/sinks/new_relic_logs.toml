@@ -1,5 +1,6 @@
 [sinks.new_relic_logs]
 title = "New Relic Logs"
+noun = "New Relic"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

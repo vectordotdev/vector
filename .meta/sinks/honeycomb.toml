@@ -1,5 +1,6 @@
 [sinks.honeycomb]
 title = "Honeycomb"
+noun = "Honeycomb"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

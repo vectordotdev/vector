@@ -1,5 +1,6 @@
 [sinks.sematext_logs]
 title = "Sematext Logs"
+noun = "Sematext"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
