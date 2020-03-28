@@ -22,13 +22,22 @@ function Guides({filtering, items}) {
     return <GuideItems items={items} />
   } else {
     const groupedCategories = _(items).
-      flatMap(item => item.content.metadata.categories).
+      map(item => item.content.metadata.categories[0]).
       uniqBy('permalink').
+      sortBy(category => {
+        if (category.name == 'getting-started') {
+          console.log(category.name);
+          return 'AA';
+        } else {
+          return category.name;
+        }
+      }).
       keyBy('permalink').
       value();
+
     const groupedItems = _.groupBy(items, ((item) => item.content.metadata.categories[0].permalink));
 
-    return Object.keys(groupedItems).map((categoryPermalink, index) => {
+    return Object.keys(groupedCategories).map((categoryPermalink, index) => {
       let groupItems = groupedItems[categoryPermalink];
       let category = groupedCategories[categoryPermalink];
 

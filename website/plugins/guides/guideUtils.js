@@ -57,10 +57,10 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             categoryParts.pop();
         }
         let linkName = relativeSource.replace(/\.mdx?$/, '');
-        let coverLabel = frontMatter.cover_label;
         let seriesPosition = frontMatter.series_position;
         let tags = frontMatter.tags || [];
         let title = frontMatter.title || linkName;
+        let coverLabel = frontMatter.cover_label || title;
         guides.push({
             id: frontMatter.id || frontMatter.title,
             metadata: {
@@ -93,8 +93,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             }
         }),
         'metadata.seriesPosition',
-        'metadata.coverLabel',
-        'metadata.title'
+        ((guide) => guide.metadata.coverLabel.toLowerCase())
     ]);
 }
 exports.generateGuides = generateGuides;
