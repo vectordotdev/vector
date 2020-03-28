@@ -34,7 +34,7 @@ function Layout(props) {
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
   // purposefully hardcoded to protect against people copying our site
-  const canonURL = 'https://vector.dev' + location.pathname
+  const canonURL = location && ('https://vector.dev' + location.pathname)
 
   return (
     <ThemeProvider>
@@ -61,7 +61,7 @@ function Layout(props) {
         )}
         {permalink && <meta property="og:url" content={siteUrl + permalink} />}
         <meta name="twitter:card" content="summary" />
-        <link rel="canonical" href={canonURL} />
+        {canonURL && <link rel="canonical" href={canonURL} />}
       </Head>
       <Navbar />
       <div className="main-wrapper">{children}</div>
