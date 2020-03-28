@@ -151,7 +151,7 @@ export default function pluginContentGuide(
 
 
       // Guide categories
-      let guideCategories = guides.flatMap(guide => guide.metadata.categories);
+      let guideCategories = _.flatMap(guides, (guide => guide.metadata.categories));
       guideCategories = _.uniqBy(guideCategories, ((guideCategory) => guideCategory.permalink));
 
       return {
