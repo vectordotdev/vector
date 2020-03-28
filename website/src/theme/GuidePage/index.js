@@ -68,7 +68,7 @@ function GuidePage(props) {
   const {frontMatter, metadata} = GuideContents;
   const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, series_position: seriesPosition, title} = frontMatter;
   const {categories, readingTime, tags} = metadata;
-  console.log(categories)
+
   //
   // Site config
   //

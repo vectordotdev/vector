@@ -112,7 +112,7 @@ function pluginContentGuide(context, opts) {
             });
             const guideTagsListPath = Object.keys(guideTags).length > 0 ? tagsPath : null;
             // Guide categories
-            let guideCategories = guides.flatMap(guide => guide.metadata.categories);
+            let guideCategories = lodash_1.default.flatMap(guides, (guide => guide.metadata.categories));
             guideCategories = lodash_1.default.uniqBy(guideCategories, ((guideCategory) => guideCategory.permalink));
             return {
                 guides,
