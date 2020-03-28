@@ -15,6 +15,7 @@ import SVG from 'react-inlinesvg';
 import Tags from '@site/src/components/Tags';
 import VectorComponents from '@site/src/components/VectorComponents';
 
+import _ from 'lodash';
 import classnames from 'classnames';
 import dateFormat from 'dateformat';
 import {enrichTags} from '@site/src/exports/tags';
@@ -34,6 +35,11 @@ const TOP_OFFSET = 100;
 /* eslint-disable jsx-a11y/control-has-associated-label */
 function Headings({headings, isChild}) {
   if (!headings.length) return null;
+
+  // We need to track shown headings because the markdown parser will
+  // extract duplicate headings if we're using tabs
+  let uniqHeadings = _.uniqBy(headings, (heading => heading.value));
+
   return (
     <ul className={isChild ? '' : 'contents'}>
       {!isChild && (
@@ -45,7 +51,7 @@ function Headings({headings, isChild}) {
           </a>
         </li>
       )}
-      {headings.map(heading => (
+      {uniqHeadings.map(heading => (
         <li key={heading.id}>
           <a
             href={`#${heading.id}`}
