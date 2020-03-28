@@ -46,8 +46,11 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 ```toml
 [sinks.my_sink_id]
   # General
+  type = "pulsar" # required
+  inputs = ["my-source-id"] # required
   address = "127.0.0.1:6650" # required
   topic = "topic-1234" # required
+  healthcheck = true # optional, default
 
   # Encoding
   encoding.codec = "json" # required
@@ -61,8 +64,11 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 ```toml
 [sinks.my_sink_id]
   # General
+  type = "pulsar" # required
+  inputs = ["my-source-id"] # required
   address = "127.0.0.1:6650" # required
   topic = "topic-1234" # required
+  healthcheck = true # optional, default
 
   # Auth
   auth.name = "${PULSAR_NAME}" # optional, no default
@@ -310,6 +316,31 @@ How to format event timestamps.
 
 
 </Fields>
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
 
 </Field>
 

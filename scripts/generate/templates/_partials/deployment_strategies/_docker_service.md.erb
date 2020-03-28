@@ -1,9 +1,8 @@
-<SVG src="/img/deployment-strategies-docker-service.svg" />
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
 
-As shown in the diagram above, the [service deployment strategy][docs.strategies.service]
-treats Vector like any other service. Vector must be configured with [a source
-that receives data over the network][urls.vector_receiving_sources], and the
-upstream service must use that protocol to send data to Vector. This could be
-another Vector instance using the [`vector` sink][docs.sinks.vector] or any
-service that can send log data over the configured protocol.
-[Learn more...][docs.strategies.daemon]
+<SVG src="/img/deployment-strategies-docker-service.svg" />

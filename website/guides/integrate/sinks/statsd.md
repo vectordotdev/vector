@@ -13,10 +13,6 @@ import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-> "I just wanna, like, send my metrics to Statsd -- why is all of this so complicated?"
->
-> — developers
-
 So you want to send metrics to Statsd? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
@@ -47,15 +43,16 @@ you up and running in minutes.
 
 ## How It Works
 
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
 <SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
 ## Tutorial
-
-<div className="steps steps--h3">
 
 <Tabs
   centered={true}
@@ -64,6 +61,7 @@ collecting and forwarding all data on the host.
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -106,8 +104,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <TabItem value="arm64">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -150,8 +150,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <TabItem value="armv7">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -194,10 +196,12 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 </Tabs>
 
-</div>
-
 
 [docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/

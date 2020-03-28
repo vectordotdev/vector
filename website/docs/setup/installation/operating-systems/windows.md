@@ -25,28 +25,30 @@ This document will cover installing Vector on Windows.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="msi"
   values={[{"label":"MSI","value":"msi"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="msi">
-<Tabs
-  block={true}
-  defaultValue="msi-daemon"
-  values={[{"label":"Daemon Strategy","value":"msi-daemon"},{"label":"Service Strategy","value":"msi-service"}]}>
-
-<TabItem value="msi-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <Tabs
   centered={true}
   className="rounded"
@@ -91,85 +93,12 @@ collecting and forwarding all data on the host.
 
 </TabItem>
 </Tabs>
-
 </div>
-</TabItem>
 
-<TabItem value="msi-service">
-
-_service.md.erb
-
----
-
-<div className="steps steps--h3">
-
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"}]}>
-
-<TabItem value="x86_64">
-
-1.  ### Download the Vector `.msi` file
-
-    ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.8.X/vector-x64.msi -OutFile vector-x64.msi
-    ```
-
-    [Looking for a specific version?][docs.package_managers.msi#versions]
-
-2.  ### Install the Vector `.msi` package using `msiexec` command
-
-    ```bat
-    msiexec /i vector-x64.msi /quiet
-    ```
-
-3.  ### Navigate to the Vector directory
-
-    ```bat
-    cd "C:\Program Files\Vector"
-    ```
-
-4.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path="config\vector.toml"
-      sourceName={"http"}
-      sinkName={null} />
-
-5.  ### Start Vector
-
-    ```bat
-    .\bin\vector --config config\vector.toml
-    ```
-
-</TabItem>
-</Tabs>
-
-</div>
-</TabItem>
-</Tabs>
 </TabItem>
 <TabItem value="vector-cli">
-<Tabs
-  block={true}
-  defaultValue="vector-cli-daemon"
-  values={[{"label":"Daemon Strategy","value":"vector-cli-daemon"},{"label":"Service Strategy","value":"vector-cli-service"}]}>
-
-<TabItem value="vector-cli-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -201,72 +130,12 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
 
-<TabItem value="vector-cli-service">
-
-_service.md.erb
-
----
-
-<div className="steps steps--h3">
-
-<ol>
-<li>
-
-### Install Vector
-
-<InstallationCommand />
-
-</li>
-<li>
-
-### Configure Vector
-
-<ConfigExample
-  format="toml"
-  path="vector.toml"
-  sourceName={"http"}
-  sinkName={null} />
-
-</li>
-<li>
-
-### Start Vector
-
-```bash
-vector --config vector.toml
-```
-
-That's it! Simple and to the point. Hit `ctrl+c` to exit.
-
-</li>
-</ol>
-
-</div>
-</TabItem>
-</Tabs>
 </TabItem>
 <TabItem value="docker-cli">
-<Tabs
-  block={true}
-  defaultValue="docker-cli-daemon"
-  values={[{"label":"Daemon Strategy","value":"docker-cli-daemon"},{"label":"Service Strategy","value":"docker-cli-service"}]}>
-
-<TabItem value="docker-cli-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -302,18 +171,124 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
+
 </TabItem>
+<TabItem value="docker-compose">
 
-<TabItem value="docker-cli-service">
+compose!
 
-_service.md.erb
+</TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="service">
+
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-service.svg" />
 
 ---
 
-<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="msi"
+  values={[{"label":"MSI","value":"msi"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+<TabItem value="msi">
 
+<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="x86_64"
+  values={[{"label":"x86_64","value":"x86_64"}]}>
+
+<TabItem value="x86_64">
+
+1.  ### Download the Vector `.msi` file
+
+    ```bat
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.8.X/vector-x64.msi -OutFile vector-x64.msi
+    ```
+
+    [Looking for a specific version?][docs.package_managers.msi#versions]
+
+2.  ### Install the Vector `.msi` package using `msiexec` command
+
+    ```bat
+    msiexec /i vector-x64.msi /quiet
+    ```
+
+3.  ### Navigate to the Vector directory
+
+    ```bat
+    cd "C:\Program Files\Vector"
+    ```
+
+4.  ### Configure Vector
+
+    <ConfigExample
+      format="toml"
+      path="config\vector.toml"
+      sourceName={"vector"}
+      sinkName={null} />
+
+5.  ### Start Vector
+
+    ```bat
+    .\bin\vector --config config\vector.toml
+    ```
+
+</TabItem>
+</Tabs>
+</div>
+
+</TabItem>
+<TabItem value="vector-cli">
+
+<div className="steps steps--h3">
+<ol>
+<li>
+
+### Install Vector
+
+<InstallationCommand />
+
+</li>
+<li>
+
+### Configure Vector
+
+<ConfigExample
+  format="toml"
+  path="vector.toml"
+  sourceName={"vector"}
+  sinkName={null} />
+
+</li>
+<li>
+
+### Start Vector
+
+```bash
+vector --config vector.toml
+```
+
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
+</div>
+
+</TabItem>
+<TabItem value="docker-cli">
+
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -322,7 +297,7 @@ _service.md.erb
 <ConfigExample
   format="toml"
   path="vector.toml"
-  sourceName={"http"}
+  sourceName={"vector"}
   sinkName={null} />
 
 </li>
@@ -333,14 +308,14 @@ _service.md.erb
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-  -p 80:80 \
+  -p 9000:9000 \
   timberio/vector:latest-alpine
 ```
 
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `-p 80:80` flag ensures that port 80 is exposed for network communication.
+   * The `-p 9000:9000` flag ensures that port 9000 is exposed for network communication.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
@@ -349,45 +324,13 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
-</Tabs>
+
 </TabItem>
 <TabItem value="docker-compose">
-<Tabs
-  block={true}
-  defaultValue="docker-compose-daemon"
-  values={[{"label":"Daemon Strategy","value":"docker-compose-daemon"},{"label":"Service Strategy","value":"docker-compose-service"}]}>
-
-<TabItem value="docker-compose-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
-
-<div className="steps steps--h3">
 
 compose!
 
-</div>
-</TabItem>
-
-<TabItem value="docker-compose-service">
-
-_service.md.erb
-
----
-
-<div className="steps steps--h3">
-
-compose!
-
-</div>
 </TabItem>
 </Tabs>
 </TabItem>
@@ -396,3 +339,8 @@ compose!
 
 [docs.package_managers.msi#versions]: /docs/setup/installation/package-managers/msi/#versions
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies.service]: /docs/setup/deployment/strategies/service/

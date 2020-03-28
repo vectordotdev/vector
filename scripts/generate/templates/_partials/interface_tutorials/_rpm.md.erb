@@ -1,5 +1,5 @@
 <%- downloads = metadata.installation.select_downloads(package_manager: :rpm) -%>
-
+<div className="steps steps--h<%= heading_depth %>">
 <Tabs
   centered={true}
   className="rounded"
@@ -40,3 +40,4 @@
 </TabItem>
 <%- end -%>
 </Tabs>
+</div>

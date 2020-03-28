@@ -25,28 +25,30 @@ This document will cover installing Vector on Raspbian.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="vector-cli"
   values={[{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="vector-cli">
-<Tabs
-  block={true}
-  defaultValue="vector-cli-daemon"
-  values={[{"label":"Daemon Strategy","value":"vector-cli-daemon"}]}>
-
-<TabItem value="vector-cli-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -78,29 +80,12 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
-</Tabs>
+
 </TabItem>
 <TabItem value="docker-cli">
-<Tabs
-  block={true}
-  defaultValue="docker-cli-daemon"
-  values={[{"label":"Daemon Strategy","value":"docker-cli-daemon"}]}>
-
-<TabItem value="docker-cli-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -134,32 +119,13 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
-</Tabs>
+
 </TabItem>
 <TabItem value="docker-compose">
-<Tabs
-  block={true}
-  defaultValue="docker-compose-daemon"
-  values={[{"label":"Daemon Strategy","value":"docker-compose-daemon"}]}>
-
-<TabItem value="docker-compose-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
-
-<div className="steps steps--h3">
 
 compose!
 
-</div>
 </TabItem>
 </Tabs>
 </TabItem>
@@ -167,3 +133,6 @@ compose!
 
 
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/

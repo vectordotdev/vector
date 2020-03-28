@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-28"
 title: Install Vector via Nix
 sidebar_label: Nix
 description: Install Vector through the Nix package manager
@@ -34,25 +35,28 @@ delayed. Generally new Vector releases are made available within a few days.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="nix"
   values={[{"label":"Nix","value":"nix"}]}>
 <TabItem value="nix">
-<Tabs
-  block={true}
-  defaultValue="nix-daemon"
-  values={[{"label":"Daemon Strategy","value":"nix-daemon"},{"label":"Service Strategy","value":"nix-service"}]}>
-
-<TabItem value="nix-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
 
@@ -95,13 +99,29 @@ collecting and forwarding all data on the host.
     </CodeExplanation>
 
 </div>
+
 </TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="service">
 
-<TabItem value="nix-service">
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
 
-_service.md.erb
+<SVG src="/img/deployment-strategies-docker-service.svg" />
 
 ---
+
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="nix"
+  values={[{"label":"Nix","value":"nix"}]}>
+<TabItem value="nix">
 
 <div className="steps steps--h3">
 
@@ -126,7 +146,7 @@ _service.md.erb
     <ConfigExample
       format="toml"
       path="/etc/vector/vector.toml"
-      sourceName={"http"}
+      sourceName={"vector"}
       sinkName={null} />
 
 3.  ### Start Vector
@@ -144,6 +164,7 @@ _service.md.erb
     </CodeExplanation>
 
 </div>
+
 </TabItem>
 </Tabs>
 </TabItem>
@@ -242,6 +263,11 @@ Vector's Nix source files are located in the
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.nix#versions]: /docs/setup/installation/package-managers/nix/#versions
 [docs.process-management#starting]: /docs/administration/process-management/#starting
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies.service]: /docs/setup/deployment/strategies/service/
 [urls.nix]: https://nixos.org/nix/
 [urls.nixos]: https://nixos.org/
 [urls.vector_nix_package]: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix

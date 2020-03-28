@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-28"
 title: Install Vector via Window Installer
 sidebar_label: MSI
 description: Install Vector through the Windows Installer
@@ -23,28 +24,30 @@ Vector can be installed from an MSI package through the Windows Installer.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="msi"
   values={[{"label":"MSI","value":"msi"}]}>
 <TabItem value="msi">
-<Tabs
-  block={true}
-  defaultValue="msi-daemon"
-  values={[{"label":"Daemon Strategy","value":"msi-daemon"},{"label":"Service Strategy","value":"msi-service"}]}>
-
-<TabItem value="msi-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <Tabs
   centered={true}
   className="rounded"
@@ -89,18 +92,32 @@ collecting and forwarding all data on the host.
 
 </TabItem>
 </Tabs>
-
 </div>
+
 </TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="service">
 
-<TabItem value="msi-service">
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
 
-_service.md.erb
+<SVG src="/img/deployment-strategies-docker-service.svg" />
 
 ---
 
-<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="msi"
+  values={[{"label":"MSI","value":"msi"}]}>
+<TabItem value="msi">
 
+<div className="steps steps--h3">
 <Tabs
   centered={true}
   className="rounded"
@@ -134,7 +151,7 @@ _service.md.erb
     <ConfigExample
       format="toml"
       path="config\vector.toml"
-      sourceName={"http"}
+      sourceName={"vector"}
       sinkName={null} />
 
 5.  ### Start Vector
@@ -145,8 +162,8 @@ _service.md.erb
 
 </TabItem>
 </Tabs>
-
 </div>
+
 </TabItem>
 </Tabs>
 </TabItem>
@@ -227,6 +244,11 @@ Vector's MSI source files are located in
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.msi#versions]: /docs/setup/installation/package-managers/msi/#versions
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies.service]: /docs/setup/deployment/strategies/service/
 [urls.vector_msi_source_files]: https://github.com/timberio/vector/tree/master/distribution/msi
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.windows_service]: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service

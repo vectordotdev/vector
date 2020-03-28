@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to Datadog"
 description: "A guide to quickly, and correctly, send logs from Journald to Datadog."
@@ -11,10 +11,6 @@ tags: ["type: tutorial","domain: sources","domain: sinks","source: journald","si
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import SVG from 'react-inlinesvg';
-
-> "I just wanna, like, send my logs from Journald to Datadog -- why is all of this so complicated?"
->
-> — developers
 
 So you want to send logs from Journald to Datadog? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
@@ -54,16 +50,18 @@ you up and running in minutes.
 
 ## How It Works
 
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
 
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
 ## Tutorial
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -95,8 +93,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
 
 
-
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/

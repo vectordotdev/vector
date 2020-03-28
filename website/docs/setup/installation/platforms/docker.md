@@ -29,29 +29,30 @@ architectures.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Sidecar","value":"sidecar"},{"label":"As a Service","value":"service"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own
+container, collecting _all_ data for that host. Typically, data is collected
+directly from the Docker API via Vector's [`docker` source][docs.sources.docker],
+but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="docker-cli"
   values={[{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
-<Tabs
-  block={true}
-  defaultValue="docker-cli-daemon"
-  values={[{"label":"Daemon Strategy","value":"docker-cli-daemon"},{"label":"Sidecar Strategy","value":"docker-cli-sidecar"},{"label":"Service Strategy","value":"docker-cli-service"}]}>
-
-<TabItem value="docker-cli-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, we'll be deploying [Vector][urls.vector_website]
-as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
-single host. We'll deploy Vector in it's own container, just like your other
-services, so that your workflow doesn't deviate.
-
----
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -87,22 +88,36 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
 
-<TabItem value="docker-cli-sidecar">
+</TabItem>
+<TabItem value="docker-compose">
+
+compose!
+
+</TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="sidecar">
+
+The [sidecar deployment strategy][docs.strategies.sidecar] is designed to
+collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
+the service. Typically data is collected by tailing local files via Vector's
+[`file` source][docs.sources.file], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
 
 <SVG src="/img/deployment-strategies-docker-sidecar.svg" />
 
-As shown in the diagram above, the [sidecar deployment strategy][docs.strategies.sidecar]
-is designed to collect data from a single service. Vector has a 1 to 1
-relationship with each service on the host. [Learn more...][docs.strategies.sidecar]
-
 ---
 
-<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="docker-cli"
+  values={[{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+<TabItem value="docker-cli">
 
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -138,26 +153,37 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
 
-<TabItem value="docker-cli-service">
+</TabItem>
+<TabItem value="docker-compose">
+
+compose!
+
+</TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="service">
+
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
 
 <SVG src="/img/deployment-strategies-docker-service.svg" />
 
-As shown in the diagram above, the [service deployment strategy][docs.strategies.service]
-treats Vector like any other service. Vector must be configured with [a source
-that receives data over the network][urls.vector_receiving_sources], and the
-upstream service must use that protocol to send data to Vector. This could be
-another Vector instance using the [`vector` sink][docs.sinks.vector] or any
-service that can send log data over the configured protocol.
-[Learn more...][docs.strategies.daemon]
-
 ---
 
-<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="docker-cli"
+  values={[{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+<TabItem value="docker-cli">
 
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -166,7 +192,7 @@ service that can send log data over the configured protocol.
 <ConfigExample
   format="toml"
   path="vector.toml"
-  sourceName={"http"}
+  sourceName={"vector"}
   sinkName={null} />
 
 </li>
@@ -177,14 +203,14 @@ service that can send log data over the configured protocol.
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-  -p 80:80 \
+  -p 9000:9000 \
   timberio/vector:latest-alpine
 ```
 
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `-p 80:80` flag ensures that port 80 is exposed for network communication.
+   * The `-p 9000:9000` flag ensures that port 9000 is exposed for network communication.
    * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
@@ -193,71 +219,13 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
-</TabItem>
-</Tabs>
+
 </TabItem>
 <TabItem value="docker-compose">
-<Tabs
-  block={true}
-  defaultValue="docker-compose-daemon"
-  values={[{"label":"Daemon Strategy","value":"docker-compose-daemon"},{"label":"Sidecar Strategy","value":"docker-compose-sidecar"},{"label":"Service Strategy","value":"docker-compose-service"}]}>
-
-<TabItem value="docker-compose-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, we'll be deploying [Vector][urls.vector_website]
-as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
-single host. We'll deploy Vector in it's own container, just like your other
-services, so that your workflow doesn't deviate.
-
----
-
-<div className="steps steps--h3">
 
 compose!
 
-</div>
-</TabItem>
-
-<TabItem value="docker-compose-sidecar">
-
-<SVG src="/img/deployment-strategies-docker-sidecar.svg" />
-
-As shown in the diagram above, the [sidecar deployment strategy][docs.strategies.sidecar]
-is designed to collect data from a single service. Vector has a 1 to 1
-relationship with each service on the host. [Learn more...][docs.strategies.sidecar]
-
----
-
-<div className="steps steps--h3">
-
-compose!
-
-</div>
-</TabItem>
-
-<TabItem value="docker-compose-service">
-
-<SVG src="/img/deployment-strategies-docker-service.svg" />
-
-As shown in the diagram above, the [service deployment strategy][docs.strategies.service]
-treats Vector like any other service. Vector must be configured with [a source
-that receives data over the network][urls.vector_receiving_sources], and the
-upstream service must use that protocol to send data to Vector. This could be
-another Vector instance using the [`vector` sink][docs.sinks.vector] or any
-service that can send log data over the configured protocol.
-[Learn more...][docs.strategies.daemon]
-
----
-
-<div className="steps steps--h3">
-
-compose!
-
-</div>
 </TabItem>
 </Tabs>
 </TabItem>
@@ -344,6 +312,9 @@ Vector's Docker source files are located
 [docs.deployment]: /docs/setup/deployment/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.docker]: /docs/reference/sources/docker/
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.sources]: /docs/reference/sources/
 [docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
 [docs.strategies.service]: /docs/setup/deployment/strategies/service/
 [docs.strategies.sidecar]: /docs/setup/deployment/strategies/sidecar/
@@ -352,6 +323,4 @@ Vector's Docker source files are located
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
-[urls.vector_receiving_sources]: https://vector.dev/components?functions%5B%5D=receive
 [urls.vector_releases]: https://vector.dev/releases/latest
-[urls.vector_website]: https://vector.dev

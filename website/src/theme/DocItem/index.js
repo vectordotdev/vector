@@ -18,9 +18,15 @@ function Headings({headings, isChild}) {
   useTOCHighlight(LINK_CLASS_NAME, ACTIVE_LINK_CLASS_NAME, TOP_OFFSET);
 
   if (!headings.length) return null;
+
+  // We need to track shown headings because the markdown parser will
+  // extract duplicate headings if we're using tabs
+  let uniqHeadings = _.uniqBy(headings, (heading => heading.value));
+
+
   return (
     <ul className={isChild ? '' : 'contents'}>
-      {headings.map(heading => {
+      {uniqHeadings.map(heading => {
         let cleanValue = heading.value.replace('<code><', '<code>&lt;').replace('></code>', '&gt;</code>');
 
         return <li key={heading.id}>

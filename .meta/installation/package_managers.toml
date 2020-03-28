@@ -4,7 +4,7 @@ archs = ["x86_64", "ARM64", "ARMv7"]
 interfaces = ["dpkg"]
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.package_managers.homebrew]
@@ -13,7 +13,7 @@ archs = ["x86_64"]
 interfaces = ["homebrew"]
 strategies = [
   {name = "daemon", source = "file"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.package_managers.msi]
@@ -22,7 +22,7 @@ interfaces = ["msi"]
 archs = ["x86_64"]
 strategies = [
   {name = "daemon", source = "file"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.package_managers.nix]
@@ -31,7 +31,7 @@ interfaces = ["nix"]
 archs = ["x86_64"]
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.package_managers.rpm]
@@ -40,5 +40,5 @@ interfaces = ["rpm"]
 archs = ["x86_64"]
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]

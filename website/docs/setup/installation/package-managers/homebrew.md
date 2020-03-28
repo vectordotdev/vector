@@ -25,28 +25,30 @@ used on MacOS systems.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="homebrew"
   values={[{"label":"Homebrew","value":"homebrew"}]}>
 <TabItem value="homebrew">
-<Tabs
-  block={true}
-  defaultValue="homebrew-daemon"
-  values={[{"label":"Daemon Strategy","value":"homebrew-daemon"},{"label":"Service Strategy","value":"homebrew-service"}]}>
-
-<TabItem value="homebrew-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -80,18 +82,32 @@ brew services start vector
 
 </li>
 </ol>
-
 </div>
+
 </TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="service">
 
-<TabItem value="homebrew-service">
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
 
-_service.md.erb
+<SVG src="/img/deployment-strategies-docker-service.svg" />
 
 ---
 
-<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="homebrew"
+  values={[{"label":"Homebrew","value":"homebrew"}]}>
+<TabItem value="homebrew">
 
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -111,7 +127,7 @@ brew tap timberio/brew && brew install vector
 <ConfigExample
   format="toml"
   path="/etc/vector/vector.toml"
-  sourceName={"http"}
+  sourceName={"vector"}
   sinkName={null} />
 
 </li>
@@ -125,8 +141,8 @@ brew services start vector
 
 </li>
 </ol>
-
 </div>
+
 </TabItem>
 </Tabs>
 </TabItem>
@@ -198,6 +214,11 @@ Vector's Homebrew source files are located in
 [docs.deployment]: /docs/setup/deployment/
 [docs.manual.from-archives]: /docs/setup/installation/manual/from-archives/
 [docs.package_managers.homebrew]: /docs/setup/installation/package-managers/homebrew/
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies.service]: /docs/setup/deployment/strategies/service/
 [urls.homebrew]: https://brew.sh/
 [urls.homebrew_services]: https://github.com/Homebrew/homebrew-services
 [urls.vector_homebrew_source_files]: https://github.com/timberio/homebrew-brew/blob/master/Formula/vector.rb

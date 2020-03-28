@@ -137,7 +137,7 @@ function GuidePage(props) {
         isOpen={showSourceSwitcher !== null}
         contentLabel="Minimal Modal Example">
           <header>
-            <h1>Where do you receive your data?</h1>
+            <h1>Where do you receive your data from?</h1>
           </header>
           <VectorComponents
             exceptFunctions={['test']}

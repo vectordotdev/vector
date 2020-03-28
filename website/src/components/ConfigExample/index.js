@@ -21,9 +21,9 @@ function Command({format, path, source, sink}) {
       </CodeBlock>
       <CodeExplanation>
         <ul>
-          <li>The <Link to={`/docs/reference/sources/${source.name}`}><code>{source.name}</code> source</Link> ingests data.</li>
-          <li>The <Link to={`/docs/reference/sinks/${sink.name}`}><code>{sink.name}</code> sink</Link> outputs data.</li>
-          <li>The {path} file is the <Link to="/docs/configuration">Vector configuration file</Link> that we'll pass in the next step.</li>
+          <li>The <Link to={`/docs/reference/sources/${source.name}/`}><code>{source.name}</code> source</Link> ingests {source.through_description}.</li>
+          <li>The <Link to={`/docs/reference/sinks/${sink.name}/`}><code>{sink.name}</code> sink</Link> writes to {sink.write_to_description}.</li>
+          <li>The <code>{path}</code> file is the <Link to="/docs/setup/configuration/">Vector configuration file</Link> that Vector uses in the next step.</li>
         </ul>
       </CodeExplanation>
     </>
@@ -34,7 +34,7 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
   const context = useDocusaurusContext();
   const {siteConfig = {}} = context;
   const {metadata: {sources: sourcesMap, sinks: sinksMap}} = siteConfig.customFields;
-  const sources = Object.values(sourcesMap);
+  const sources = _.sortBy(Object.values(sourcesMap), ['title'])
   const sinks = _.sortBy(Object.values(sinksMap), ['title']);
 
   if (sourceName && sinkName) {
@@ -43,17 +43,15 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
     return <Command format={format} path={path} source={source} sink={sinksMap[sink.name]} />
   } else if (sourceName) {
     const source = sourcesMap[sourceName];
-    const compatibleSinks = sinks.filter(sink => (
-      sink.function_category != "test") &&
-        source.output_types.some(event_type => sink.input_types.includes(event_type)
-    ));
+    const compatibleSinks = sinks.filter(sink => source.output_types.some(event_type => sink.input_types.includes(event_type)));
 
     return (
        <>
         <Tabs
           block={true}
           select={true}
-          label="Where would you like to send your data?"
+          label="Where do you want to send your data?"
+          defaultValue="console"
           values={compatibleSinks.map(sink => ({label: sink.title, value: sink.name}))}>
           {compatibleSinks.map((sink, idx) => {
             return (
@@ -77,12 +75,12 @@ function ConfigExample({compatiableSinks, format, path, sourceName, sinkName}) {
         <Tabs
           block={true}
           select={true}
-          label="Where would you like to receive your data?"
+          label="Where do you receive your data from?"
           values={compatibleSources.map(source => ({label: source.title, value: source.name}))}>
           {compatibleSources.map((source, idx) => {
             return (
               <TabItem value={source.name}>
-                <Command format={format} path={path} source={source} source={sourcesMap[source.name]} />
+                <Command format={format} path={path} sink={sink} source={sourcesMap[source.name]} />
               </TabItem>
             );
           })}

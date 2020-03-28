@@ -1688,7 +1688,7 @@ table {
   overflow-y: auto;
   padding-left: var(--ifm-contents-padding-left);
   position: sticky;
-  top: calc(var(--ifm-navbar-height) + 2rem);
+  top: var(--ifm-navbar-height);
 }
 .table-of-contents {
   font-size: 0.8rem;

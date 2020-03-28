@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from Splunk HEC and send them anywhere"
 description: "A guide to quickly, and correctly, collect logs from Splunk HEC and send them anywhere."
@@ -10,10 +10,7 @@ tags: ["type: tutorial","domain: sources","source: splunk_hec"]
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
-
-> "I just wanna, like, collect my logs from Splunk HEC and send them somewhere -- why is all of this so complicated?"
->
-> — developers
+import SVG from 'react-inlinesvg';
 
 So you want to collect logs from Splunk HEC and send them anywhere? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
@@ -46,12 +43,18 @@ you up and running in minutes.
 
 ## How It Works
 
-_service.md.erb
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-service.svg" />
 
 ## Tutorial
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -83,8 +86,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
 
 
-
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.service]: /docs/setup/deployment/strategies/service/

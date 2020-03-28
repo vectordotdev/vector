@@ -71,7 +71,8 @@ class Source < Component
   def to_h
     super.merge(
       noun: noun,
-      output_types: output_types
+      output_types: output_types,
+      through_description: through_description.remove_markdown_links
     )
   end
 end

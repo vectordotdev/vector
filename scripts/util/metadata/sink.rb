@@ -82,7 +82,8 @@ class Sink < Component
   def to_h
     super.merge(
       input_types: input_types,
-      noun: noun
+      noun: noun,
+      write_to_description: write_to_description.remove_markdown_links
     )
   end
 

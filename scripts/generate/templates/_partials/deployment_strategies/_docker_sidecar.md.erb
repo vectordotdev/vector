@@ -1,5 +1,7 @@
-<SVG src="/img/deployment-strategies-docker-sidecar.svg" />
+The [sidecar deployment strategy][docs.strategies.sidecar] is designed to
+collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
+the service. Typically data is collected by tailing local files via Vector's
+[`file` source][docs.sources.file], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
 
-As shown in the diagram above, the [sidecar deployment strategy][docs.strategies.sidecar]
-is designed to collect data from a single service. Vector has a 1 to 1
-relationship with each service on the host. [Learn more...][docs.strategies.sidecar]
+<SVG src="/img/deployment-strategies-docker-sidecar.svg" />

@@ -240,11 +240,11 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
-  def installation_tutorial(interfaces, strategies, platform: nil)
+  def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3)
     render("#{partials_path}/_installation_tutorial.md", binding).strip
   end
 
-  def interface_tutorial(interface, sink: nil, source: nil)
+  def interface_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
     tutorial =
       case (interface && interface.name)
       when "docker-cli"
@@ -254,7 +254,7 @@ class Templates
       end
 
 
-    render("#{partials_path}/_interface_tutorial.md", binding).strip
+    render("#{partials_path}/interface_tutorials/_#{interface.name}.md", binding).strip
   end
 
   def manual_installation_next_steps(type)

@@ -14,5 +14,5 @@ oss = ["Linux", "MacOS"]
 strategies = [
   {name = "daemon", source = "docker"},
   {name = "sidecar", source = "file"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]

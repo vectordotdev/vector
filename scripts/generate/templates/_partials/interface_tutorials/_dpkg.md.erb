@@ -1,5 +1,4 @@
 <%- downloads = metadata.installation.select_downloads(package_manager: :dpkg) -%>
-
 <Tabs
   centered={true}
   className="rounded"
@@ -8,6 +7,7 @@
 
 <%- downloads.each do |download| -%>
 <TabItem value="<%= download.arch.parameterize %>">
+<div className="steps steps--h<%= heading_depth %>">
 <ol>
 <li>
 
@@ -50,6 +50,7 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <%- end -%>
 </Tabs>

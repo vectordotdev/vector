@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to an HTTP endpoint"
 description: "A guide to quickly, and correctly, send logs from STDIN to an HTTP endpoint."
@@ -10,10 +10,7 @@ tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink:
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
-
-> "I just wanna, like, send my logs from STDIN to an HTTP endpoint -- why is all of this so complicated?"
->
-> — developers
+import SVG from 'react-inlinesvg';
 
 So you want to send logs from STDIN to an HTTP endpoint? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
@@ -51,12 +48,17 @@ you up and running in minutes.
 
 ## How It Works
 
-_sidecar.md.erb
+The [sidecar deployment strategy][docs.strategies.sidecar] is designed to
+collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
+the service. Typically data is collected by tailing local files via Vector's
+[`file` source][docs.sources.file], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-sidecar.svg" />
 
 ## Tutorial
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -88,8 +90,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
 
 
-
+[docs.sources.file]: /docs/reference/sources/file/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.sidecar]: /docs/setup/deployment/strategies/sidecar/

@@ -7578,6 +7578,20 @@ end
   # General
   #
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "pulsar"
+  type = "pulsar"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
   # A host and port pair that the pulsar client should connect to.
   #
   # * required
@@ -7589,6 +7603,14 @@ end
   # * required
   # * type: string
   topic = "topic-1234"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
 
   #
   # Auth

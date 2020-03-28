@@ -25,27 +25,28 @@ generally used on Debian and Ubuntu systems.
 ## Install
 
 <Tabs
+  block={true}
+  defaultValue="daemon"
+  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+<TabItem value="daemon">
+
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host. Typically data is collected from a process
+manager, such as Journald via Vector's [`journald`
+source][docs.sources.journald], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+
+---
+
+<Tabs
   centered={true}
   className="rounded"
   defaultValue="dpkg"
   values={[{"label":"DPKG","value":"dpkg"}]}>
 <TabItem value="dpkg">
-<Tabs
-  block={true}
-  defaultValue="dpkg-daemon"
-  values={[{"label":"Daemon Strategy","value":"dpkg-daemon"},{"label":"Service Strategy","value":"dpkg-service"}]}>
-
-<TabItem value="dpkg-daemon">
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
-
-As shown in the diagram above, the daemon deployment strategy is designed for
-data collection on a single host. Vector is deplyed in it's own container,
-collecting and forwarding all data on the host.
-
----
-
-<div className="steps steps--h3">
 
 <Tabs
   centered={true}
@@ -54,6 +55,7 @@ collecting and forwarding all data on the host.
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -96,8 +98,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <TabItem value="arm64">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -140,8 +144,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <TabItem value="armv7">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -184,19 +190,32 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 </Tabs>
 
-</div>
 </TabItem>
+</Tabs>
+</TabItem>
+<TabItem value="service">
 
-<TabItem value="dpkg-service">
+The [service deployment strategy][docs.strategies.service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations. Typically, upstream sources are other
+Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
+can be collected through any of Vector's [sources][docs.sources]. The following
+diagram demonstrates how it works.
 
-_service.md.erb
+<SVG src="/img/deployment-strategies-docker-service.svg" />
 
 ---
 
-<div className="steps steps--h3">
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="dpkg"
+  values={[{"label":"DPKG","value":"dpkg"}]}>
+<TabItem value="dpkg">
 
 <Tabs
   centered={true}
@@ -205,6 +224,7 @@ _service.md.erb
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -233,7 +253,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path="/etc/vector/vector.toml"
-  sourceName={"http"}
+  sourceName={"vector"}
   sinkName={null} />
 
 </li>
@@ -247,8 +267,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <TabItem value="arm64">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -277,7 +299,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path="/etc/vector/vector.toml"
-  sourceName={"http"}
+  sourceName={"vector"}
   sinkName={null} />
 
 </li>
@@ -291,8 +313,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 <TabItem value="armv7">
+<div className="steps steps--h3">
 <ol>
 <li>
 
@@ -321,7 +345,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path="/etc/vector/vector.toml"
-  sourceName={"http"}
+  sourceName={"vector"}
   sinkName={null} />
 
 </li>
@@ -335,10 +359,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
+</div>
 </TabItem>
 </Tabs>
 
-</div>
 </TabItem>
 </Tabs>
 </TabItem>
@@ -445,6 +469,11 @@ Vector's DPKG source files are located in
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions
+[docs.sinks.vector]: /docs/reference/sinks/vector/
+[docs.sources.journald]: /docs/reference/sources/journald/
+[docs.sources]: /docs/reference/sources/
+[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies.service]: /docs/setup/deployment/strategies/service/
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_debian_source_files]: https://github.com/timberio/vector/tree/master/distribution/debian

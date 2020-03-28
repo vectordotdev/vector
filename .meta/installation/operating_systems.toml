@@ -9,7 +9,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.centos]
@@ -23,7 +23,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.debian]
@@ -37,7 +37,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.macos]
@@ -51,7 +51,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "file"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.nixos]
@@ -65,7 +65,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.raspbian]
@@ -91,7 +91,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.ubuntu]
@@ -105,7 +105,7 @@ interfaces = [
 os = "Linux"
 strategies = [
   {name = "daemon", source = "journald"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]
 
 [installation.operating_systems.windows]
@@ -119,5 +119,5 @@ interfaces = [
 os = "Windows"
 strategies = [
   {name = "daemon", source = "file"},
-  {name = "service", source = "http"},
+  {name = "service", source = "vector"},
 ]

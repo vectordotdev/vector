@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-28"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Loki"
 description: "A guide to quickly, and correctly, send logs from Docker to Loki."
@@ -11,10 +11,6 @@ tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
 import SVG from 'react-inlinesvg';
-
-> "I just wanna, like, send my logs from Docker to Loki -- why is all of this so complicated?"
->
-> — developers
 
 So you want to send logs from Docker to Loki? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
@@ -54,17 +50,18 @@ you up and running in minutes.
 
 ## How It Works
 
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own
+container, collecting _all_ data for that host. Typically, data is collected
+directly from the Docker API via Vector's [`docker` source][docs.sources.docker],
+but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
 
-As shown in the diagram above, we'll be deploying [Vector][urls.vector_website]
-as a [daemon][docs.strategies.daemon] to collect all of your Docker logs on a
-single host. We'll deploy Vector in it's own container, just like your other
-services, so that your workflow doesn't deviate.
+<SVG src="/img/deployment-strategies-docker-daemon.svg" />
 
 ## Tutorial
 
 <div className="steps steps--h3">
-
 <ol>
 <li>
 
@@ -100,10 +97,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-
 </div>
 
 
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
+[docs.sources.docker]: /docs/reference/sources/docker/
+[docs.sources]: /docs/reference/sources/
 [docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
-[urls.vector_website]: https://vector.dev

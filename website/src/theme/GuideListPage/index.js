@@ -83,9 +83,9 @@ function GuideListPage(props) {
       let normalizedTerm = searchTerm.toLowerCase();
       let frontMatter = item.content.frontMatter;
       let metadata = item.content.metadata;
-      let normalizedTitle = frontMatter.title.toLowerCase();
+      let normalizedLabel = metadata.coverLabel.toLowerCase();
 
-      if (normalizedTitle.includes(normalizedTerm)) {
+      if (normalizedLabel.includes(normalizedTerm)) {
         return true;
       } else if (metadata.tags.some(tag => tag.label.toLowerCase().includes(normalizedTerm))) {
         return true;

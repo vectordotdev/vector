@@ -221,6 +221,24 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/blackhole",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/blackhole.md",
+          "series_position": null,
+          "title": "Send logs and metrics to blackhole"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/console",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/console.md",
+          "series_position": null,
+          "title": "Send logs and metrics to the console"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/aws_cloudwatch_logs.md",
@@ -2597,6 +2615,222 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/pulsar.md",
+          "series_position": null,
+          "title": "Send logs to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/kafka.md",
+          "series_position": null,
+          "title": "Send logs to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/logdna.md",
+          "series_position": null,
+          "title": "Send logs to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/loki.md",
+          "series_position": null,
+          "title": "Send logs to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/papertrail.md",
+          "series_position": null,
+          "title": "Send logs to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/socket.md",
+          "series_position": null,
+          "title": "Send logs to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/file.md",
+          "series_position": null,
+          "title": "Send logs to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/http.md",
+          "series_position": null,
+          "title": "Send logs to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/vector.md",
+          "series_position": null,
+          "title": "Send logs to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics.md",
@@ -2728,6 +2962,51 @@ module.exports = {
           "path": "website/guides/integrate/sources/vector/statsd.md",
           "series_position": null,
           "title": "Send metrics from Vector to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/statsd.md",
+          "series_position": null,
+          "title": "Send metrics to Statsd"
         }
       ],
       "name": "integrate",
@@ -2899,7 +3178,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "amazon-linux"
@@ -2920,7 +3199,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "centos"
@@ -2941,7 +3220,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "debian"
@@ -2962,7 +3241,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "macos"
@@ -2983,7 +3262,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "nixos"
@@ -3020,7 +3299,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "rhel"
@@ -3041,7 +3320,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "ubuntu"
@@ -3062,7 +3341,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "windows"
@@ -3086,7 +3365,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "dpkg"
@@ -3106,7 +3385,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "homebrew"
@@ -3126,7 +3405,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "msi"
@@ -3146,7 +3425,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "nix"
@@ -3166,7 +3445,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "name": "rpm"
@@ -3200,7 +3479,7 @@ module.exports = {
           },
           {
             "name": "service",
-            "source": "http"
+            "source": "vector"
           }
         ],
         "title": "Docker"
@@ -24333,7 +24612,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint"
     },
     "aws_cloudwatch_metrics": {
       "beta": true,
@@ -24366,7 +24646,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint"
     },
     "aws_kinesis_firehose": {
       "beta": false,
@@ -24399,7 +24680,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint"
     },
     "aws_kinesis_streams": {
       "beta": false,
@@ -24432,7 +24714,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint"
     },
     "aws_s3": {
       "beta": false,
@@ -24465,7 +24748,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Amazon Web Service's S3 service via the `PutObject` API endpoint"
     },
     "blackhole": {
       "beta": false,
@@ -24500,7 +24784,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a blackhole that simply discards data, designed for testing and benchmarking purposes"
     },
     "clickhouse": {
       "beta": true,
@@ -24533,7 +24818,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Clickhouse via the `HTTP` Interface"
     },
     "console": {
       "beta": false,
@@ -24568,7 +24854,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "standard output streams, such as `STDOUT` and `STDERR`"
     },
     "datadog_logs": {
       "beta": true,
@@ -24601,7 +24888,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Datadog's logs via the TCP endpoint"
     },
     "datadog_metrics": {
       "beta": true,
@@ -24634,7 +24922,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Datadog's metrics service using HTTP API"
     },
     "elasticsearch": {
       "beta": false,
@@ -24668,7 +24957,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Elasticsearch via the `_bulk` API endpoint"
     },
     "file": {
       "beta": false,
@@ -24701,7 +24991,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a file"
     },
     "gcp_cloud_storage": {
       "beta": true,
@@ -24734,7 +25025,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Google Cloud Platform's Cloud Storage service via the XML Interface"
     },
     "gcp_pubsub": {
       "beta": true,
@@ -24767,7 +25059,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Google Cloud Platform's Pubsub service via the REST Interface"
     },
     "gcp_stackdriver_logs": {
       "beta": true,
@@ -24800,7 +25093,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Google Cloud Platform's Stackdriver Logging service via the REST Interface"
     },
     "honeycomb": {
       "beta": true,
@@ -24833,7 +25127,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Honeycomb via the batch events API"
     },
     "http": {
       "beta": false,
@@ -24866,7 +25161,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a generic HTTP endpoint"
     },
     "humio_logs": {
       "beta": true,
@@ -24899,7 +25195,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Humio via the HEC API"
     },
     "influxdb_metrics": {
       "beta": true,
@@ -24932,7 +25229,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "InfluxDB using v1 or v2 HTTP API"
     },
     "kafka": {
       "beta": false,
@@ -24966,7 +25264,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Apache Kafka via the Kafka protocol"
     },
     "logdna": {
       "beta": true,
@@ -24999,7 +25298,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "LogDna's HTTP Ingestion API"
     },
     "loki": {
       "beta": true,
@@ -25032,7 +25332,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Loki"
     },
     "new_relic_logs": {
       "beta": true,
@@ -25065,7 +25366,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "New Relic's log service via their log API"
     },
     "papertrail": {
       "beta": true,
@@ -25098,7 +25400,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Papertrail via Syslog"
     },
     "prometheus": {
       "beta": true,
@@ -25131,12 +25434,13 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Prometheus metrics service"
     },
     "pulsar": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  address = \"127.0.0.1:6650\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # General\n  type = \"pulsar\" # required\n  inputs = [\"in\"] # required\n  address = \"127.0.0.1:6650\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].",
@@ -25164,7 +25468,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Apache Pulsar via the Pulsar protocol"
     },
     "sematext_logs": {
       "beta": true,
@@ -25197,7 +25502,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "Sematext via the Elasticsearch API"
     },
     "socket": {
       "beta": false,
@@ -25230,7 +25536,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a socket, such as a TCP, UDP, or Unix domain socket"
     },
     "splunk_hec": {
       "beta": false,
@@ -25263,7 +25570,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "a Splunk's HTTP Event Collector"
     },
     "statsd": {
       "beta": false,
@@ -25296,7 +25604,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "StatsD metrics service"
     },
     "vector": {
       "beta": true,
@@ -25329,7 +25638,8 @@ module.exports = {
       "type": "sink",
       "unsupported_operating_systems": [
 
-      ]
+      ],
+      "write_to_description": "another downstream `vector` source"
     }
   },
   "sources": {
@@ -25360,6 +25670,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "the Docker engine daemon",
       "title": "Docker",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25393,6 +25704,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "through_description": "one or more local files",
       "title": "File",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25426,6 +25738,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "the HTTP protocol",
       "title": "HTTP",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25457,6 +25770,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "log records from journald",
       "title": "Journald",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25491,6 +25805,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "Kafka",
       "title": "Kafka",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25524,6 +25839,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "the Heroku Logplex HTTP Drain protocol",
       "title": "Heroku Logplex",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25557,6 +25873,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "the Prometheus text exposition format",
       "title": "Prometheus",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25590,6 +25907,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "through_description": "a socket, such as a TCP, UDP, or Unix socket",
       "title": "Socket",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25623,6 +25941,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "the Splunk HTTP Event Collector protocol",
       "title": "Splunk HEC",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25656,6 +25975,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "through_description": "the StatsD UDP protocol",
       "title": "Statsd",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25689,6 +26009,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "through_description": "standard input (STDIN)",
       "title": "STDIN",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25722,6 +26043,7 @@ module.exports = {
 
       ],
       "status": "prod-ready",
+      "through_description": "the Syslog protocol",
       "title": "Syslog",
       "type": "source",
       "unsupported_operating_systems": [
@@ -25757,6 +26079,7 @@ module.exports = {
 
       ],
       "status": "beta",
+      "through_description": "another upstream `vector` sink",
       "title": "Vector",
       "type": "source",
       "unsupported_operating_systems": [
