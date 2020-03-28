@@ -221,18 +221,18 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_metrics",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_logs",
           "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
           "series_position": null,
           "title": "Send logs and metrics from Vector to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_metrics",
           "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
           "series_position": null,
           "title": "Send logs and metrics from Vector to AWS Cloudwatch"
         },
@@ -284,18 +284,18 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_metrics",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_logs",
           "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
+          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
           "series_position": null,
           "title": "Send logs and metrics from Vector to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_metrics",
           "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
+          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
           "series_position": null,
           "title": "Send logs and metrics from Vector to Datadog"
         },
@@ -307,15 +307,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/vector/elasticsearch.md",
           "series_position": null,
           "title": "Send logs and metrics from Vector to Elasticsearch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/file.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to File"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -343,15 +334,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/vector/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs and metrics from Vector to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/http.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -446,24 +428,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/socket.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/splunk_hec",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Splunk HEC"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/statsd",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/vector/statsd.md",
@@ -473,11 +437,47 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs and metrics from Vector to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/socket.md",
+          "series_position": null,
+          "title": "Send logs and metrics from Vector to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/file.md",
+          "series_position": null,
+          "title": "Send logs and metrics from Vector to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/http.md",
+          "series_position": null,
+          "title": "Send logs and metrics from Vector to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/vector/vector.md",
           "series_position": null,
-          "title": "Send logs and metrics from Vector to Vector"
+          "title": "Send logs and metrics from Vector to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -554,15 +554,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/platforms/docker/file.md",
-          "series_position": null,
-          "title": "Send logs from Docker to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/gcp_cloud_storage.md",
@@ -586,15 +577,6 @@ module.exports = {
           "path": "website/guides/integrate/platforms/docker/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from Docker to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/platforms/docker/http.md",
-          "series_position": null,
-          "title": "Send logs from Docker to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -671,20 +653,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/platforms/docker/socket.md",
-          "series_position": null,
-          "title": "Send logs from Docker to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Docker to Splunk HEC"
+          "title": "Send logs from Docker to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/socket.md",
+          "series_position": null,
+          "title": "Send logs from Docker to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/file.md",
+          "series_position": null,
+          "title": "Send logs from Docker to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/http.md",
+          "series_position": null,
+          "title": "Send logs from Docker to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -693,7 +693,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/vector.md",
           "series_position": null,
-          "title": "Send logs from Docker to Vector"
+          "title": "Send logs from Docker to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -770,15 +770,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/http/file.md",
-          "series_position": null,
-          "title": "Send logs from HTTP to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/gcp_cloud_storage.md",
@@ -802,15 +793,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/http/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from HTTP to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/http/http.md",
-          "series_position": null,
-          "title": "Send logs from HTTP to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -887,20 +869,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/http/socket.md",
-          "series_position": null,
-          "title": "Send logs from HTTP to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from HTTP to Splunk HEC"
+          "title": "Send logs from HTTP to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/socket.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/file.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/http.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -909,7 +909,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/vector.md",
           "series_position": null,
-          "title": "Send logs from HTTP to Vector"
+          "title": "Send logs from HTTP to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -986,15 +986,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/file.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/logplex/gcp_cloud_storage.md",
@@ -1018,15 +1009,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/logplex/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from Heroku Logplex to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/http.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1103,20 +1085,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/socket.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/logplex/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Heroku Logplex to Splunk HEC"
+          "title": "Send logs from Heroku Logplex to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/socket.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/file.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/http.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1125,7 +1125,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/logplex/vector.md",
           "series_position": null,
-          "title": "Send logs from Heroku Logplex to Vector"
+          "title": "Send logs from Heroku Logplex to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1202,15 +1202,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/journald/file.md",
-          "series_position": null,
-          "title": "Send logs from Journald to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/gcp_cloud_storage.md",
@@ -1234,15 +1225,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/journald/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from Journald to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/journald/http.md",
-          "series_position": null,
-          "title": "Send logs from Journald to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1319,20 +1301,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/journald/socket.md",
-          "series_position": null,
-          "title": "Send logs from Journald to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Journald to Splunk HEC"
+          "title": "Send logs from Journald to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/socket.md",
+          "series_position": null,
+          "title": "Send logs from Journald to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/file.md",
+          "series_position": null,
+          "title": "Send logs from Journald to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/http.md",
+          "series_position": null,
+          "title": "Send logs from Journald to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1341,7 +1341,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/vector.md",
           "series_position": null,
-          "title": "Send logs from Journald to Vector"
+          "title": "Send logs from Journald to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1418,15 +1418,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/kafka/file.md",
-          "series_position": null,
-          "title": "Send logs from Kafka cluster to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_cloud_storage.md",
@@ -1450,15 +1441,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/kafka/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from Kafka cluster to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/kafka/http.md",
-          "series_position": null,
-          "title": "Send logs from Kafka cluster to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1535,20 +1517,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/kafka/socket.md",
-          "series_position": null,
-          "title": "Send logs from Kafka cluster to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Splunk HEC"
+          "title": "Send logs from Kafka cluster to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/socket.md",
+          "series_position": null,
+          "title": "Send logs from Kafka cluster to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/file.md",
+          "series_position": null,
+          "title": "Send logs from Kafka cluster to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/http.md",
+          "series_position": null,
+          "title": "Send logs from Kafka cluster to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1557,7 +1557,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/vector.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Vector"
+          "title": "Send logs from Kafka cluster to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1634,15 +1634,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/stdin/file.md",
-          "series_position": null,
-          "title": "Send logs from STDIN to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/gcp_cloud_storage.md",
@@ -1666,15 +1657,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/stdin/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from STDIN to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/stdin/http.md",
-          "series_position": null,
-          "title": "Send logs from STDIN to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1751,20 +1733,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/stdin/socket.md",
-          "series_position": null,
-          "title": "Send logs from STDIN to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from STDIN to Splunk HEC"
+          "title": "Send logs from STDIN to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/socket.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/file.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/http.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1773,7 +1773,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/vector.md",
           "series_position": null,
-          "title": "Send logs from STDIN to Vector"
+          "title": "Send logs from STDIN to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1850,15 +1850,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/splunk_hec/file.md",
-          "series_position": null,
-          "title": "Send logs from Splunk HEC to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/gcp_cloud_storage.md",
@@ -1882,15 +1873,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from Splunk HEC to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/splunk_hec/http.md",
-          "series_position": null,
-          "title": "Send logs from Splunk HEC to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1967,20 +1949,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/splunk_hec/socket.md",
-          "series_position": null,
-          "title": "Send logs from Splunk HEC to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Splunk HEC to Splunk HEC"
+          "title": "Send logs from Splunk HEC to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/socket.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/file.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/http.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1989,7 +1989,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/vector.md",
           "series_position": null,
-          "title": "Send logs from Splunk HEC to Vector"
+          "title": "Send logs from Splunk HEC to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2066,15 +2066,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/syslog/file.md",
-          "series_position": null,
-          "title": "Send logs from Syslog to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/gcp_cloud_storage.md",
@@ -2098,15 +2089,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/syslog/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from Syslog to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/syslog/http.md",
-          "series_position": null,
-          "title": "Send logs from Syslog to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2183,20 +2165,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/syslog/socket.md",
-          "series_position": null,
-          "title": "Send logs from Syslog to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Syslog to Splunk HEC"
+          "title": "Send logs from Syslog to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/socket.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/file.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/http.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2205,7 +2205,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/vector.md",
           "series_position": null,
-          "title": "Send logs from Syslog to Vector"
+          "title": "Send logs from Syslog to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2282,15 +2282,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/socket/file.md",
-          "series_position": null,
-          "title": "Send logs from a TCP, UDP, or UDS socket to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/gcp_cloud_storage.md",
@@ -2314,15 +2305,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/socket/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from a TCP, UDP, or UDS socket to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/socket/http.md",
-          "series_position": null,
-          "title": "Send logs from a TCP, UDP, or UDS socket to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2399,20 +2381,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/socket/socket.md",
-          "series_position": null,
-          "title": "Send logs from a TCP, UDP, or UDS socket to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from a TCP, UDP, or UDS socket to Splunk HEC"
+          "title": "Send logs from a TCP, UDP, or UDS socket to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/socket.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/file.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/http.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2421,7 +2421,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/vector.md",
           "series_position": null,
-          "title": "Send logs from a TCP, UDP, or UDS socket to Vector"
+          "title": "Send logs from a TCP, UDP, or UDS socket to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2498,15 +2498,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/file/file.md",
-          "series_position": null,
-          "title": "Send logs from a file to File"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/gcp_cloud_storage.md",
@@ -2530,15 +2521,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/file/gcp_stackdriver_logs.md",
           "series_position": null,
           "title": "Send logs from a file to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/file/http.md",
-          "series_position": null,
-          "title": "Send logs from a file to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2615,20 +2597,38 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/file/socket.md",
-          "series_position": null,
-          "title": "Send logs from a file to Socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from a file to Splunk HEC"
+          "title": "Send logs from a file to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/socket.md",
+          "series_position": null,
+          "title": "Send logs from a file to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/file.md",
+          "series_position": null,
+          "title": "Send logs from a file to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/http.md",
+          "series_position": null,
+          "title": "Send logs from a file to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2637,7 +2637,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/vector.md",
           "series_position": null,
-          "title": "Send logs from a file to Vector"
+          "title": "Send logs from a file to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -25478,7 +25478,7 @@ module.exports = {
       "id": "kafka_source",
       "logo_path": "/img/logos/kafka.svg",
       "name": "kafka",
-      "noun": "Kafka cluster",
+      "noun": "Kafka",
       "operating_systems": [
         "Linux",
         "MacOS",

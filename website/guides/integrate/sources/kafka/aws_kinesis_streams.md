@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Send logs from Kafka cluster to AWS Kinesis Data Streams"
-description: "A guide to quickly, and correctly, send logs from Kafka cluster to AWS Kinesis Data Streams."
+title: "Send logs from Kafka to AWS Kinesis Data Streams"
+description: "A guide to quickly, and correctly, send logs from Kafka to AWS Kinesis Data Streams."
 author_github: https://github.com/binarylogic
 tags: ["type: tutorial","domain: sources","domain: sinks","source: kafka","sink: aws_kinesis_streams"]
 ---
@@ -10,11 +10,11 @@ tags: ["type: tutorial","domain: sources","domain: sinks","source: kafka","sink:
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, send my logs from Kafka cluster to AWS Kinesis Data Streams -- why is all of this so complicated?"
+> "I just wanna, like, send my logs from Kafka to AWS Kinesis Data Streams -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send logs from Kafka cluster to AWS Kinesis Data Streams? Sounds simple! Sadly, it is not.
+So you want to send logs from Kafka to AWS Kinesis Data Streams? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.
