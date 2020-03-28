@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to a file"
 description: "A guide to quickly, and correctly, send logs from STDIN to a file."
 author_github: https://github.com/binarylogic
+cover_label: "STDIN to File Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: file"]
 ---
 

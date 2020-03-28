@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to Papertrail"
 description: "A guide to quickly, and correctly, send logs from Syslog to Papertrail."
 author_github: https://github.com/binarylogic
+cover_label: "Syslog to Papertrail Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: syslog","sink: papertrail"]
 ---
 

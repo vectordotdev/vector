@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Kafka to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send logs from Kafka to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
+cover_label: "Kafka to AWS Cloudwatch Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: kafka","sink: aws_cloudwatch_logs"]
 ---
 

@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to Loki"
 description: "A guide to quickly, and correctly, send logs from STDIN to Loki."
 author_github: https://github.com/binarylogic
+cover_label: "STDIN to Loki Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: loki"]
 ---
 

@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send logs from Splunk HEC to GCP Stackdriver."
 author_github: https://github.com/binarylogic
+cover_label: "Splunk HEC to GCP Stackdriver Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: splunk_hec","sink: gcp_stackdriver_logs"]
 ---
 

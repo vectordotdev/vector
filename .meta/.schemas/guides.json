@@ -22,6 +22,10 @@
       "type": "string",
       "description": "Github URL of the author."
     },
+    "cover_label": {
+      "type": "string",
+      "description": "Optional label for the cover of the guide"
+    },
     "description": {
       "type": "string",
       "description": "Short description of the guide."

@@ -149,7 +149,7 @@ function VectorComponents(props) {
   }
 
   if (onlyEventTypes.size > 0) {
-    components = components.filter(component => Array.from(onlyEventTypes).every(x => component.event_types.includes(x)));
+    components = components.filter(component => Array.from(onlyEventTypes).some(x => component.event_types.includes(x)));
   }
 
   if (onlyFunctions.size > 0) {

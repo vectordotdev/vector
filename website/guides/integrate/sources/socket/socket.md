@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to a TCP, UDP, or UDS socket"
 description: "A guide to quickly, and correctly, send logs from a TCP, UDP, or UDS socket to a TCP, UDP, or UDS socket."
 author_github: https://github.com/binarylogic
+cover_label: "Socket to Socket Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: socket","sink: socket"]
 ---
 

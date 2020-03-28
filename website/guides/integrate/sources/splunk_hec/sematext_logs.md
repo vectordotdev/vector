@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to Sematext"
 description: "A guide to quickly, and correctly, send logs from Splunk HEC to Sematext."
 author_github: https://github.com/binarylogic
+cover_label: "Splunk HEC to Sematext Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: splunk_hec","sink: sematext_logs"]
 ---
 

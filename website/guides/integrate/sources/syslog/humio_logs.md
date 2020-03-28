@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to Humio"
 description: "A guide to quickly, and correctly, send logs from Syslog to Humio."
 author_github: https://github.com/binarylogic
+cover_label: "Syslog to Humio Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: syslog","sink: humio_logs"]
 ---
 

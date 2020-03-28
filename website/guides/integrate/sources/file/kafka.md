@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a file to Kafka"
 description: "A guide to quickly, and correctly, send logs from a file to Kafka."
 author_github: https://github.com/binarylogic
+cover_label: "File to Kafka Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: file","sink: kafka"]
 ---
 

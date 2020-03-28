@@ -1,20 +1,21 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Send logs and metrics from Vector to Sematext"
-description: "A guide to quickly, and correctly, send logs and metrics from Vector to Sematext."
+title: "Send logs from Vector to Sematext"
+description: "A guide to quickly, and correctly, send logs from Vector to Sematext."
 author_github: https://github.com/binarylogic
+cover_label: "Vector to Sematext Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: vector","sink: sematext_logs"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, send my logs and metrics from Vector to Sematext -- why is all of this so complicated?"
+> "I just wanna, like, send my logs from Vector to Sematext -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send logs and metrics from Vector to Sematext? Sounds simple! Sadly, it is not.
+So you want to send logs from Vector to Sematext? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.

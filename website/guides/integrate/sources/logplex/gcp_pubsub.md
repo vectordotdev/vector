@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Heroku Logplex to GCP PubSub"
 description: "A guide to quickly, and correctly, send logs from Heroku Logplex to GCP PubSub."
 author_github: https://github.com/binarylogic
+cover_label: "Heroku Logplex to GCP PubSub Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: logplex","sink: gcp_pubsub"]
 ---
 

@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to another Vector instance"
 description: "A guide to quickly, and correctly, send logs from Splunk HEC to another Vector instance."
 author_github: https://github.com/binarylogic
+cover_label: "Splunk HEC to Vector Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: splunk_hec","sink: vector"]
 ---
 

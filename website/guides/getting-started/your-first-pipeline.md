@@ -116,7 +116,7 @@ in the sink config.
 
 If you expected something more interesting to happen then that's on you. The
 text came out unchanged because we didn't ask Vector to change it, we can remedy
-that by following the next guide in the series: [Structuring Your Log Data][guides.getting-started.structuring].
+that by following the next guide in the series.
 
 
 [docs.configuration]: /docs/setup/configuration/
@@ -125,4 +125,3 @@ that by following the next guide in the series: [Structuring Your Log Data][guid
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.console]: /docs/reference/sinks/console/
 [docs.sources.stdin]: /docs/reference/sources/stdin/
-[guides.getting-started.structuring]: /guides/Users/benjohnson/Code/timber/vector/website/guides/getting-started/structuring/

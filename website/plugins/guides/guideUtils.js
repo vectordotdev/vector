@@ -48,7 +48,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
                     description = 'Take Vector from zero to production in under 10 minutes.';
                     break;
             }
-            categories.push({
+            categories.unshift({
                 name: name,
                 title: title,
                 description: description,
@@ -57,6 +57,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             categoryParts.pop();
         }
         let linkName = relativeSource.replace(/\.mdx?$/, '');
+        let coverLabel = frontMatter.cover_label;
         let seriesPosition = frontMatter.series_position;
         let tags = frontMatter.tags || [];
         let title = frontMatter.title || linkName;
@@ -64,6 +65,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             id: frontMatter.id || frontMatter.title,
             metadata: {
                 categories: categories,
+                coverLabel: coverLabel,
                 description: frontMatter.description || excerpt,
                 permalink: utils_1.normalizeUrl([
                     baseUrl,
@@ -91,6 +93,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             }
         }),
         'metadata.seriesPosition',
+        'metadata.coverLabel',
         'metadata.title'
     ]);
 }

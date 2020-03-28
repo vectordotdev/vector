@@ -19,7 +19,7 @@ function Guides({filtering, items}) {
       <Empty text="no guides found" />
     );
   } else if (filtering) {
-    return <GuideItems items={items.slice(0,25)} />
+    return <GuideItems items={items} />
   } else {
     const groupedCategories = _(items).
       flatMap(item => item.content.metadata.categories).
@@ -33,12 +33,12 @@ function Guides({filtering, items}) {
       let category = groupedCategories[categoryPermalink];
 
       return (
-        <section>
+        <section key={index}>
           {index > 0 && <>
             <AnchoredH2 id={categoryPermalink}>{category.title}</AnchoredH2>
             {category.description && <div className="sub-title">{category.description}</div>}
           </>}
-          <GuideItems items={groupItems.slice(0,25)} large={index == 1} staggered={index == 0} />
+          <GuideItems items={groupItems} large={index == 1} staggered={index == 0} />
         </section>
       );
     });

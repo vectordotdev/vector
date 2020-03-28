@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to another Vector instance"
 description: "A guide to quickly, and correctly, send logs from STDIN to another Vector instance."
 author_github: https://github.com/binarylogic
+cover_label: "STDIN to Vector Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: vector"]
 ---
 

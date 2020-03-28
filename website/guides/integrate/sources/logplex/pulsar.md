@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Heroku Logplex to Apache Pulsar"
 description: "A guide to quickly, and correctly, send logs from Heroku Logplex to Apache Pulsar."
 author_github: https://github.com/binarylogic
+cover_label: "Heroku Logplex to Apache Pulsar Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: logplex","sink: pulsar"]
 ---
 

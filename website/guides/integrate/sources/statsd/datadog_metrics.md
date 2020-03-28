@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Statsd to Datadog"
 description: "A guide to quickly, and correctly, send metrics from Statsd to Datadog."
 author_github: https://github.com/binarylogic
+cover_label: "Statsd to Datadog Metrics Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: statsd","sink: datadog_metrics"]
 ---
 

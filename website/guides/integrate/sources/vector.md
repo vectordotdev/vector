@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs and metrics from Vector and send them anywhere"
 description: "A guide to quickly, and correctly, collect logs and metrics from Vector and send them anywhere."
 author_github: https://github.com/binarylogic
+cover_label: "Vector Integration"
 tags: ["type: tutorial","domain: sources","source: vector"]
 ---
 

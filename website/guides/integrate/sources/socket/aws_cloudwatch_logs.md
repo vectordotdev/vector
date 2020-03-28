@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send logs from a TCP, UDP, or UDS socket to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
+cover_label: "Socket to AWS Cloudwatch Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: socket","sink: aws_cloudwatch_logs"]
 ---
 

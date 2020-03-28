@@ -59,6 +59,7 @@ export interface GuidePaginated {
 
 export interface MetaData {
   categories: GuideCategory[];
+  coverLabel: string;
   description: string;
   nextItem?: Paginator;
   permalink: string;

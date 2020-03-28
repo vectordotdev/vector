@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to AWS Kinesis Firehose"
 description: "A guide to quickly, and correctly, send logs from Syslog to AWS Kinesis Firehose."
 author_github: https://github.com/binarylogic
+cover_label: "Syslog to AWS Kinesis Firehose Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: syslog","sink: aws_kinesis_firehose"]
 ---
 

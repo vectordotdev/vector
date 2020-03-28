@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Kafka to Datadog"
 description: "A guide to quickly, and correctly, send logs from Kafka to Datadog."
 author_github: https://github.com/binarylogic
+cover_label: "Kafka to Datadog Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: kafka","sink: datadog_logs"]
 ---
 

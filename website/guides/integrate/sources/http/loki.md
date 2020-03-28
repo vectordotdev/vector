@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from HTTP to Loki"
 description: "A guide to quickly, and correctly, send logs from HTTP to Loki."
 author_github: https://github.com/binarylogic
+cover_label: "HTTP to Loki Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: http","sink: loki"]
 ---
 

@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from HTTP to GCP Stackdriver"
 description: "A guide to quickly, and correctly, send logs from HTTP to GCP Stackdriver."
 author_github: https://github.com/binarylogic
+cover_label: "HTTP to GCP Stackdriver Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: http","sink: gcp_stackdriver_logs"]
 ---
 

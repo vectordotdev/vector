@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Splunk HEC to Elasticsearch"
 description: "A guide to quickly, and correctly, send logs from Splunk HEC to Elasticsearch."
 author_github: https://github.com/binarylogic
+cover_label: "Splunk HEC to Elasticsearch Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: splunk_hec","sink: elasticsearch"]
 ---
 

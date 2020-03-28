@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to Sematext"
 description: "A guide to quickly, and correctly, send logs from STDIN to Sematext."
 author_github: https://github.com/binarylogic
+cover_label: "STDIN to Sematext Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: sematext_logs"]
 ---
 

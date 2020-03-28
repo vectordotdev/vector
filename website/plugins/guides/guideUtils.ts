@@ -64,7 +64,7 @@ export async function generateGuides(
 
         }
 
-        categories.push({
+        categories.unshift({
           name: name,
           title: title,
           description: description,
@@ -74,6 +74,7 @@ export async function generateGuides(
       }
 
       let linkName = relativeSource.replace(/\.mdx?$/, '');
+      let coverLabel  = frontMatter.cover_label;
       let seriesPosition = frontMatter.series_position;
       let tags = frontMatter.tags || [];
       let title = frontMatter.title || linkName;
@@ -82,6 +83,7 @@ export async function generateGuides(
         id: frontMatter.id || frontMatter.title,
         metadata: {
           categories: categories,
+          coverLabel: coverLabel,
           description: frontMatter.description || excerpt,
           permalink: normalizeUrl([
             baseUrl,
@@ -111,6 +113,7 @@ export async function generateGuides(
       }
     }),
     'metadata.seriesPosition',
+    'metadata.coverLabel',
     'metadata.title'
   ]);
 }

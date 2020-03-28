@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to Datadog"
 description: "A guide to quickly, and correctly, send logs from Journald to Datadog."
 author_github: https://github.com/binarylogic
+cover_label: "Journald to Datadog Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: journald","sink: datadog_logs"]
 ---
 

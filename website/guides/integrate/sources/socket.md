@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from a TCP, UDP, or UDS socket and send them anywhere"
 description: "A guide to quickly, and correctly, collect logs from a TCP, UDP, or UDS socket and send them anywhere."
 author_github: https://github.com/binarylogic
+cover_label: "Socket Integration"
 tags: ["type: tutorial","domain: sources","source: socket"]
 ---
 

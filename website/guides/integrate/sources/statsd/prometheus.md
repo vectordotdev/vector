@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Statsd to Prometheus"
 description: "A guide to quickly, and correctly, send metrics from Statsd to Prometheus."
 author_github: https://github.com/binarylogic
+cover_label: "Statsd to Prometheus Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: statsd","sink: prometheus"]
 ---
 

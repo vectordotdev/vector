@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a file to Apache Pulsar"
 description: "A guide to quickly, and correctly, send logs from a file to Apache Pulsar."
 author_github: https://github.com/binarylogic
+cover_label: "File to Apache Pulsar Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: file","sink: pulsar"]
 ---
 

@@ -1,20 +1,21 @@
 ---
 last_modified_on: "2020-03-27"
 $schema: "/.meta/.schemas/guides.json"
-title: "Send logs and metrics from Vector to Statsd"
-description: "A guide to quickly, and correctly, send logs and metrics from Vector to Statsd."
+title: "Send metrics from Vector to Statsd"
+description: "A guide to quickly, and correctly, send metrics from Vector to Statsd."
 author_github: https://github.com/binarylogic
+cover_label: "Vector to Statsd Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: vector","sink: statsd"]
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
-> "I just wanna, like, send my logs and metrics from Vector to Statsd -- why is all of this so complicated?"
+> "I just wanna, like, send my metrics from Vector to Statsd -- why is all of this so complicated?"
 >
 > — developers
 
-So you want to send logs and metrics from Vector to Statsd? Sounds simple! Sadly, it is not.
+So you want to send metrics from Vector to Statsd? Sounds simple! Sadly, it is not.
 When you account for x, y, and z, you quickly realize this is no easy endaevor.
 Especially for high volume product environments! Fear not! This guide will get
 you up and running in minutes.

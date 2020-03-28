@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to GCP Cloud Storage (GCS)"
 description: "A guide to quickly, and correctly, send logs from Journald to GCP Cloud Storage (GCS)."
 author_github: https://github.com/binarylogic
+cover_label: "Journald to GCP Cloud Storage (GCS) Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: journald","sink: gcp_cloud_storage"]
 ---
 

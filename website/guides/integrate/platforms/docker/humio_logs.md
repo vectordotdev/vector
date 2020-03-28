@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Humio"
 description: "A guide to quickly, and correctly, send logs from Docker to Humio."
 author_github: https://github.com/binarylogic
+cover_label: "Docker to Humio Logs Integration"
 tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: humio_logs"]
 ---
 

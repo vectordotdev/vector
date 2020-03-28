@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send logs from Docker to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
+cover_label: "Docker to AWS Cloudwatch Logs Integration"
 tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: aws_cloudwatch_logs"]
 ---
 

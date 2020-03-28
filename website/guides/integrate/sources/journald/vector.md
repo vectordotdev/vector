@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to another Vector instance"
 description: "A guide to quickly, and correctly, send logs from Journald to another Vector instance."
 author_github: https://github.com/binarylogic
+cover_label: "Journald to Vector Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: journald","sink: vector"]
 ---
 

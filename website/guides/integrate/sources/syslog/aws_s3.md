@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to AWS S3"
 description: "A guide to quickly, and correctly, send logs from Syslog to AWS S3."
 author_github: https://github.com/binarylogic
+cover_label: "Syslog to AWS S3 Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: syslog","sink: aws_s3"]
 ---
 

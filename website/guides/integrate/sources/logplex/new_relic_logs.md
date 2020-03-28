@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Heroku Logplex to New Relic"
 description: "A guide to quickly, and correctly, send logs from Heroku Logplex to New Relic."
 author_github: https://github.com/binarylogic
+cover_label: "Heroku Logplex to New Relic Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: logplex","sink: new_relic_logs"]
 ---
 

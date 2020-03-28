@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to New Relic"
 description: "A guide to quickly, and correctly, send logs from a TCP, UDP, or UDS socket to New Relic."
 author_github: https://github.com/binarylogic
+cover_label: "Socket to New Relic Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: socket","sink: new_relic_logs"]
 ---
 

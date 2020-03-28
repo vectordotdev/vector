@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to AWS Kinesis Data Streams"
 description: "A guide to quickly, and correctly, send logs from a TCP, UDP, or UDS socket to AWS Kinesis Data Streams."
 author_github: https://github.com/binarylogic
+cover_label: "Socket to AWS Kinesis Data Streams Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: socket","sink: aws_kinesis_streams"]
 ---
 

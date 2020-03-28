@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to Apache Pulsar"
 description: "A guide to quickly, and correctly, send logs from a TCP, UDP, or UDS socket to Apache Pulsar."
 author_github: https://github.com/binarylogic
+cover_label: "Socket to Apache Pulsar Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: socket","sink: pulsar"]
 ---
 

@@ -10,6 +10,17 @@ class Templates
       @source = source
       @sink = sink
       @strategy = strategy
+
+      @event_types =
+        if source && sink
+          source.event_types & sink.event_types
+        elsif source
+          source.event_types
+        elsif sink
+          sink.event_types
+        else
+          []
+        end
     end
 
     def action_phrase(narrative = nil)
@@ -32,12 +43,27 @@ class Templates
         end
 
       if @source && @sink
-        "send #{pronoun}#{@source.event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} to #{normalize_title(@sink.noun)}"
+        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} to #{normalize_title(@sink.noun)}"
       elsif @source
-        "collect #{pronoun}#{@source.event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} and send them #{target}"
+        "collect #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} and send them #{target}"
       elsif @sink
-        "send #{pronoun}#{@sink.event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.noun)}"
+        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.noun)}"
       end
+    end
+
+    def cover_label
+      @cover_label ||=
+        if @platform && @sink
+          "#{@platform.title} to #{@sink.title} Integration"
+        elsif @platform
+          "#{@platform.title} Integration"
+        elsif @source && @sink
+          "#{@source.title} to #{@sink.title} Integration"
+        elsif @source
+          "#{@source.title} Integration"
+        elsif @sink.title
+          "#{@sink.title} Integration"
+        end
     end
 
     def features
@@ -52,7 +78,7 @@ class Templates
             }.to_struct
           else
             features << {
-              text: "Collect your #{@sinks.event_types.collect(&:pluralize)} from one or more sources",
+              text: "Collect your #{@event_types.collect(&:pluralize)} from one or more sources",
               features: []
             }.to_struct
           end
@@ -64,7 +90,7 @@ class Templates
             }.to_struct
           else
             features << {
-              text: "Send your #{@source.event_types.collect(&:pluralize).to_sentence} to one or more destinations",
+              text: "Send your #{@event_types.collect(&:pluralize).to_sentence} to one or more destinations",
               features: []
             }.to_struct
           end

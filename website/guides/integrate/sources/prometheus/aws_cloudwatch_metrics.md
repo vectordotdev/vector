@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Prometheus to AWS Cloudwatch"
 description: "A guide to quickly, and correctly, send metrics from Prometheus to AWS Cloudwatch."
 author_github: https://github.com/binarylogic
+cover_label: "Prometheus to AWS Cloudwatch Metrics Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: prometheus","sink: aws_cloudwatch_metrics"]
 ---
 

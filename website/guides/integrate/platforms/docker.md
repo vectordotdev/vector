@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from Docker and send them anywhere"
 description: "A guide to quickly, and correctly, collect logs from Docker and send them anywhere."
 author_github: https://github.com/binarylogic
+cover_label: "Docker Integration"
 tags: ["type: tutorial","domain: platforms","platform: docker"]
 ---
 

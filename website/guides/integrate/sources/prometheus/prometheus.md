@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Prometheus to Prometheus"
 description: "A guide to quickly, and correctly, send metrics from Prometheus to Prometheus."
 author_github: https://github.com/binarylogic
+cover_label: "Prometheus to Prometheus Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: prometheus","sink: prometheus"]
 ---
 

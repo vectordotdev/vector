@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Kafka"
 description: "A guide to quickly, and correctly, send logs from Docker to Kafka."
 author_github: https://github.com/binarylogic
+cover_label: "Docker to Kafka Integration"
 tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: kafka"]
 ---
 

@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from a file and send them anywhere"
 description: "A guide to quickly, and correctly, collect logs from a file and send them anywhere."
 author_github: https://github.com/binarylogic
+cover_label: "File Integration"
 tags: ["type: tutorial","domain: sources","source: file"]
 ---
 

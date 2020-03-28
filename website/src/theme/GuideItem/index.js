@@ -23,7 +23,7 @@ function GuideItem(props) {
     isGuidePage = false,
   } = props;
   const {categories, description, permalink, readingTime, seriesPosition, tags} = metadata;
-  const {author_github, last_modified_on: lastModifiedOn, title} = frontMatter;
+  const {author_github, cover_label: coverLabel, last_modified_on: lastModifiedOn, title} = frontMatter;
   const enrichedTags = enrichTags(tags, 'guides');
   const domainTag = enrichedTags.find(tag => tag.category == 'domain');
   const domainBG = domainTag ? domainTag.value : 'default';
@@ -57,7 +57,7 @@ function GuideItem(props) {
       <article className={`domain-bg domain-bg--${domainBG} domain-bg--hover`}>
         <header>
           <div className="category">{categories[0].name}</div>
-          <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{title}</h2>
+          <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{coverLabel || title}</h2>
         </header>
         <footer>
           {logoPath && <SVG src={logoPath} className="logo" />}

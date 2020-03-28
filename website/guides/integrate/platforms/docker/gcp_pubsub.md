@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to GCP PubSub"
 description: "A guide to quickly, and correctly, send logs from Docker to GCP PubSub."
 author_github: https://github.com/binarylogic
+cover_label: "Docker to GCP PubSub Integration"
 tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: gcp_pubsub"]
 ---
 

@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Collect metrics from Statsd and send them anywhere"
 description: "A guide to quickly, and correctly, collect metrics from Statsd and send them anywhere."
 author_github: https://github.com/binarylogic
+cover_label: "Statsd Integration"
 tags: ["type: tutorial","domain: sources","source: statsd"]
 ---
 

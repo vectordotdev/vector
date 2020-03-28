@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Loki"
 description: "A guide to quickly, and correctly, send logs from Docker to Loki."
 author_github: https://github.com/binarylogic
+cover_label: "Docker to Loki Integration"
 tags: ["type: tutorial","domain: platforms","domain: sinks","platform: docker","sink: loki"]
 ---
 

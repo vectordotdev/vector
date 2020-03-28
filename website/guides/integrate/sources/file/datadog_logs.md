@@ -4,6 +4,7 @@ $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a file to Datadog"
 description: "A guide to quickly, and correctly, send logs from a file to Datadog."
 author_github: https://github.com/binarylogic
+cover_label: "File to Datadog Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: file","sink: datadog_logs"]
 ---
 

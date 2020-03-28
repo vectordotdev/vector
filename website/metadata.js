@@ -153,7 +153,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka.md",
           "series_position": null,
-          "title": "Collect logs from Kafka cluster and send them anywhere"
+          "title": "Collect logs from Kafka and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -217,267 +217,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/statsd.md",
           "series_position": null,
           "title": "Collect metrics from Statsd and send them anywhere"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to AWS Cloudwatch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_metrics",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to AWS Cloudwatch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_kinesis_streams",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_kinesis_streams.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to AWS Kinesis Data Streams"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_kinesis_firehose",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_kinesis_firehose.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to AWS Kinesis Firehose"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_s3",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_s3.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to AWS S3"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/pulsar",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/pulsar.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Apache Pulsar"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/clickhouse",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/clickhouse.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Clickhouse"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Datadog"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_metrics",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Datadog"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/elasticsearch",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/elasticsearch.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Elasticsearch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_cloud_storage",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/gcp_cloud_storage.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to GCP Cloud Storage (GCS)"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_pubsub",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/gcp_pubsub.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to GCP PubSub"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_stackdriver_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/gcp_stackdriver_logs.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/honeycomb",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/honeycomb.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Honeycomb"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/humio_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/humio_logs.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Humio"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/influxdb_metrics",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/influxdb_metrics.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to InfluxDB"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/kafka",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/kafka.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Kafka"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/logdna",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/logdna.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to LogDNA"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/loki",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/loki.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Loki"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/new_relic_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/new_relic_logs.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to New Relic"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/papertrail",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/papertrail.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Papertrail"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/prometheus",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/prometheus.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Prometheus"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/sematext_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/sematext_logs.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Sematext"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/statsd",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/statsd.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to Statsd"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/splunk_hec",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to a Splunk HEC"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/socket.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to a TCP, UDP, or UDS socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/file.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to a file"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/http.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to an HTTP endpoint"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/vector",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/vector.md",
-          "series_position": null,
-          "title": "Send logs and metrics from Vector to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1350,7 +1089,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_cloudwatch_logs.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to AWS Cloudwatch"
+          "title": "Send logs from Kafka to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1359,7 +1098,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_kinesis_streams.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to AWS Kinesis Data Streams"
+          "title": "Send logs from Kafka to AWS Kinesis Data Streams"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1368,7 +1107,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_kinesis_firehose.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to AWS Kinesis Firehose"
+          "title": "Send logs from Kafka to AWS Kinesis Firehose"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1377,7 +1116,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_s3.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to AWS S3"
+          "title": "Send logs from Kafka to AWS S3"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1386,7 +1125,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/pulsar.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Apache Pulsar"
+          "title": "Send logs from Kafka to Apache Pulsar"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1395,7 +1134,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/clickhouse.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Clickhouse"
+          "title": "Send logs from Kafka to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1404,7 +1143,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/datadog_logs.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Datadog"
+          "title": "Send logs from Kafka to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1413,7 +1152,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/elasticsearch.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Elasticsearch"
+          "title": "Send logs from Kafka to Elasticsearch"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1422,7 +1161,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_cloud_storage.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to GCP Cloud Storage (GCS)"
+          "title": "Send logs from Kafka to GCP Cloud Storage (GCS)"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1431,7 +1170,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_pubsub.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to GCP PubSub"
+          "title": "Send logs from Kafka to GCP PubSub"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1440,7 +1179,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_stackdriver_logs.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to GCP Stackdriver"
+          "title": "Send logs from Kafka to GCP Stackdriver"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1449,7 +1188,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/honeycomb.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Honeycomb"
+          "title": "Send logs from Kafka to Honeycomb"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1458,7 +1197,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/humio_logs.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Humio"
+          "title": "Send logs from Kafka to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1467,7 +1206,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/kafka.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Kafka"
+          "title": "Send logs from Kafka to Kafka"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1476,7 +1215,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/logdna.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to LogDNA"
+          "title": "Send logs from Kafka to LogDNA"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1485,7 +1224,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/loki.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Loki"
+          "title": "Send logs from Kafka to Loki"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1494,7 +1233,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/new_relic_logs.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to New Relic"
+          "title": "Send logs from Kafka to New Relic"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1503,7 +1242,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/papertrail.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Papertrail"
+          "title": "Send logs from Kafka to Papertrail"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1512,7 +1251,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/sematext_logs.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to Sematext"
+          "title": "Send logs from Kafka to Sematext"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1521,7 +1260,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/splunk_hec.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to a Splunk HEC"
+          "title": "Send logs from Kafka to a Splunk HEC"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1530,7 +1269,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/socket.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to a TCP, UDP, or UDS socket"
+          "title": "Send logs from Kafka to a TCP, UDP, or UDS socket"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1539,7 +1278,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/file.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to a file"
+          "title": "Send logs from Kafka to a file"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1548,7 +1287,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/http.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to an HTTP endpoint"
+          "title": "Send logs from Kafka to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1557,7 +1296,7 @@ module.exports = {
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/vector.md",
           "series_position": null,
-          "title": "Send logs from Kafka cluster to another Vector instance"
+          "title": "Send logs from Kafka to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2210,6 +1949,222 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Vector to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/loki.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Vector to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/socket.md",
+          "series_position": null,
+          "title": "Send logs from Vector to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/file.md",
+          "series_position": null,
+          "title": "Send logs from Vector to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/http.md",
+          "series_position": null,
+          "title": "Send logs from Vector to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/vector.md",
+          "series_position": null,
+          "title": "Send logs from Vector to another Vector instance"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/aws_cloudwatch_logs.md",
@@ -2728,6 +2683,51 @@ module.exports = {
           "path": "website/guides/integrate/sources/statsd/statsd.md",
           "series_position": null,
           "title": "Send metrics from Statsd to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/statsd.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to Statsd"
         }
       ],
       "name": "integrate",
