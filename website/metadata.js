@@ -96,969 +96,2643 @@ module.exports = {
       "series": true,
       "title": "Getting Started"
     },
-    "setup": {
+    "integrate": {
       "children": {
       },
-      "description": "Targeted guides for setting up specific platforms, sources and sinks.",
+      "description": "Targeted guides for integrating platforms, data sources, and data destinations.",
       "guides": [
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker.md",
+          "path": "website/guides/integrate/sources/vector.md",
           "series_position": null,
-          "title": "Collect Docker logs and send them anywhere"
+          "title": "Collect logs and metrics from Vector and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file.md",
+          "path": "website/guides/integrate/platforms/docker.md",
           "series_position": null,
-          "title": "Collect File logs and send them anywhere"
+          "title": "Collect logs from Docker and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald.md",
+          "path": "website/guides/integrate/sources/file.md",
           "series_position": null,
-          "title": "Collect Journald logs and send them anywhere"
+          "title": "Collect logs from File and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/prometheus.md",
+          "path": "website/guides/integrate/sources/http.md",
           "series_position": null,
-          "title": "Collect Prometheus metrics and send them anywhere"
+          "title": "Collect logs from HTTP and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin.md",
+          "path": "website/guides/integrate/sources/logplex.md",
           "series_position": null,
-          "title": "Collect STDIN logs and send them anywhere"
+          "title": "Collect logs from Heroku Logplex and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_cloudwatch_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/aws_cloudwatch_logs.md",
+          "path": "website/guides/integrate/sources/journald.md",
           "series_position": null,
-          "title": "Send Docker logs to AWS Cloudwatch"
+          "title": "Collect logs from Journald and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_kinesis_streams",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/aws_kinesis_streams.md",
+          "path": "website/guides/integrate/sources/kafka.md",
           "series_position": null,
-          "title": "Send Docker logs to AWS Kinesis Data Streams"
+          "title": "Collect logs from Kafka and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_kinesis_firehose",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/aws_kinesis_firehose.md",
+          "path": "website/guides/integrate/sources/stdin.md",
           "series_position": null,
-          "title": "Send Docker logs to AWS Kinesis Firehose"
+          "title": "Collect logs from STDIN and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/aws_s3",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/aws_s3.md",
+          "path": "website/guides/integrate/sources/socket.md",
           "series_position": null,
-          "title": "Send Docker logs to AWS S3"
+          "title": "Collect logs from Socket and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/pulsar",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/pulsar.md",
+          "path": "website/guides/integrate/sources/splunk_hec.md",
           "series_position": null,
-          "title": "Send Docker logs to Apache Pulsar"
+          "title": "Collect logs from Splunk HEC and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/clickhouse",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/clickhouse.md",
+          "path": "website/guides/integrate/sources/syslog.md",
           "series_position": null,
-          "title": "Send Docker logs to Clickhouse"
+          "title": "Collect logs from Syslog and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/datadog_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/datadog_logs.md",
+          "path": "website/guides/integrate/sources/prometheus.md",
           "series_position": null,
-          "title": "Send Docker logs to Datadog"
+          "title": "Collect metrics from Prometheus and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/elasticsearch",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/elasticsearch.md",
+          "path": "website/guides/integrate/sources/statsd.md",
           "series_position": null,
-          "title": "Send Docker logs to Elasticsearch"
+          "title": "Collect metrics from Statsd and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/file",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_metrics",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/file.md",
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
           "series_position": null,
-          "title": "Send Docker logs to File"
+          "title": "Send logs and metrics from Vector to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/gcp_cloud_storage",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_cloudwatch_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/gcp_cloud_storage.md",
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
           "series_position": null,
-          "title": "Send Docker logs to GCP Cloud Storage (GCS)"
+          "title": "Send logs and metrics from Vector to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/gcp_pubsub",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_kinesis_streams",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/gcp_pubsub.md",
+          "path": "website/guides/integrate/sources/vector/aws_kinesis_streams.md",
           "series_position": null,
-          "title": "Send Docker logs to GCP PubSub"
+          "title": "Send logs and metrics from Vector to AWS Kinesis Data Streams"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/gcp_stackdriver_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_kinesis_firehose",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/gcp_stackdriver_logs.md",
+          "path": "website/guides/integrate/sources/vector/aws_kinesis_firehose.md",
           "series_position": null,
-          "title": "Send Docker logs to GCP Stackdriver"
+          "title": "Send logs and metrics from Vector to AWS Kinesis Firehose"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/http",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/aws_s3",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/http.md",
+          "path": "website/guides/integrate/sources/vector/aws_s3.md",
           "series_position": null,
-          "title": "Send Docker logs to HTTP"
+          "title": "Send logs and metrics from Vector to AWS S3"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/honeycomb",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/pulsar",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/honeycomb.md",
+          "path": "website/guides/integrate/sources/vector/pulsar.md",
           "series_position": null,
-          "title": "Send Docker logs to Honeycomb"
+          "title": "Send logs and metrics from Vector to Apache Pulsar"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/humio_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/clickhouse",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/humio_logs.md",
+          "path": "website/guides/integrate/sources/vector/clickhouse.md",
           "series_position": null,
-          "title": "Send Docker logs to Humio"
+          "title": "Send logs and metrics from Vector to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/kafka",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_metrics",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/kafka.md",
+          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
           "series_position": null,
-          "title": "Send Docker logs to Kafka"
+          "title": "Send logs and metrics from Vector to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/logdna",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/datadog_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/logdna.md",
+          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
           "series_position": null,
-          "title": "Send Docker logs to LogDNA"
+          "title": "Send logs and metrics from Vector to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/loki",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/elasticsearch",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/loki.md",
+          "path": "website/guides/integrate/sources/vector/elasticsearch.md",
           "series_position": null,
-          "title": "Send Docker logs to Loki"
+          "title": "Send logs and metrics from Vector to Elasticsearch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/new_relic_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/file",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/new_relic_logs.md",
+          "path": "website/guides/integrate/sources/vector/file.md",
           "series_position": null,
-          "title": "Send Docker logs to New Relic"
+          "title": "Send logs and metrics from Vector to File"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/papertrail",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_cloud_storage",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/papertrail.md",
+          "path": "website/guides/integrate/sources/vector/gcp_cloud_storage.md",
           "series_position": null,
-          "title": "Send Docker logs to Papertrail"
+          "title": "Send logs and metrics from Vector to GCP Cloud Storage (GCS)"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/sematext_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_pubsub",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/sematext_logs.md",
+          "path": "website/guides/integrate/sources/vector/gcp_pubsub.md",
           "series_position": null,
-          "title": "Send Docker logs to Sematext"
+          "title": "Send logs and metrics from Vector to GCP PubSub"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/socket",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/gcp_stackdriver_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/socket.md",
+          "path": "website/guides/integrate/sources/vector/gcp_stackdriver_logs.md",
           "series_position": null,
-          "title": "Send Docker logs to Socket"
+          "title": "Send logs and metrics from Vector to GCP Stackdriver"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/splunk_hec",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/http",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/splunk_hec.md",
+          "path": "website/guides/integrate/sources/vector/http.md",
           "series_position": null,
-          "title": "Send Docker logs to Splunk HEC"
+          "title": "Send logs and metrics from Vector to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/platforms/docker/vector",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/honeycomb",
           "last_modified_on": null,
-          "path": "website/guides/setup/platforms/docker/vector.md",
+          "path": "website/guides/integrate/sources/vector/honeycomb.md",
           "series_position": null,
-          "title": "Send Docker logs to Vector"
+          "title": "Send logs and metrics from Vector to Honeycomb"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_cloudwatch_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/humio_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/aws_cloudwatch_logs.md",
+          "path": "website/guides/integrate/sources/vector/humio_logs.md",
           "series_position": null,
-          "title": "Send File logs to AWS Cloudwatch"
+          "title": "Send logs and metrics from Vector to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_kinesis_streams",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/influxdb_metrics",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/aws_kinesis_streams.md",
+          "path": "website/guides/integrate/sources/vector/influxdb_metrics.md",
           "series_position": null,
-          "title": "Send File logs to AWS Kinesis Data Streams"
+          "title": "Send logs and metrics from Vector to InfluxDB"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_kinesis_firehose",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/kafka",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/aws_kinesis_firehose.md",
+          "path": "website/guides/integrate/sources/vector/kafka.md",
           "series_position": null,
-          "title": "Send File logs to AWS Kinesis Firehose"
+          "title": "Send logs and metrics from Vector to Kafka"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/aws_s3",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/logdna",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/aws_s3.md",
+          "path": "website/guides/integrate/sources/vector/logdna.md",
           "series_position": null,
-          "title": "Send File logs to AWS S3"
+          "title": "Send logs and metrics from Vector to LogDNA"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/pulsar",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/loki",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/pulsar.md",
+          "path": "website/guides/integrate/sources/vector/loki.md",
           "series_position": null,
-          "title": "Send File logs to Apache Pulsar"
+          "title": "Send logs and metrics from Vector to Loki"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/clickhouse",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/new_relic_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/clickhouse.md",
+          "path": "website/guides/integrate/sources/vector/new_relic_logs.md",
           "series_position": null,
-          "title": "Send File logs to Clickhouse"
+          "title": "Send logs and metrics from Vector to New Relic"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/datadog_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/papertrail",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/datadog_logs.md",
+          "path": "website/guides/integrate/sources/vector/papertrail.md",
           "series_position": null,
-          "title": "Send File logs to Datadog"
+          "title": "Send logs and metrics from Vector to Papertrail"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/elasticsearch",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/prometheus",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/elasticsearch.md",
+          "path": "website/guides/integrate/sources/vector/prometheus.md",
           "series_position": null,
-          "title": "Send File logs to Elasticsearch"
+          "title": "Send logs and metrics from Vector to Prometheus"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/file",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/sematext_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/file.md",
+          "path": "website/guides/integrate/sources/vector/sematext_logs.md",
           "series_position": null,
-          "title": "Send File logs to File"
+          "title": "Send logs and metrics from Vector to Sematext"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/gcp_cloud_storage",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/socket",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/gcp_cloud_storage.md",
+          "path": "website/guides/integrate/sources/vector/socket.md",
           "series_position": null,
-          "title": "Send File logs to GCP Cloud Storage (GCS)"
+          "title": "Send logs and metrics from Vector to Socket"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/gcp_pubsub",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/splunk_hec",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/gcp_pubsub.md",
+          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
           "series_position": null,
-          "title": "Send File logs to GCP PubSub"
+          "title": "Send logs and metrics from Vector to Splunk HEC"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/gcp_stackdriver_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/statsd",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/gcp_stackdriver_logs.md",
+          "path": "website/guides/integrate/sources/vector/statsd.md",
           "series_position": null,
-          "title": "Send File logs to GCP Stackdriver"
+          "title": "Send logs and metrics from Vector to Statsd"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/http",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/vector/vector",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/http.md",
+          "path": "website/guides/integrate/sources/vector/vector.md",
           "series_position": null,
-          "title": "Send File logs to HTTP"
+          "title": "Send logs and metrics from Vector to Vector"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/honeycomb",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_cloudwatch_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/honeycomb.md",
+          "path": "website/guides/integrate/platforms/docker/aws_cloudwatch_logs.md",
           "series_position": null,
-          "title": "Send File logs to Honeycomb"
+          "title": "Send logs from Docker to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/humio_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_kinesis_streams",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/humio_logs.md",
+          "path": "website/guides/integrate/platforms/docker/aws_kinesis_streams.md",
           "series_position": null,
-          "title": "Send File logs to Humio"
+          "title": "Send logs from Docker to AWS Kinesis Data Streams"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/kafka",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_kinesis_firehose",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/kafka.md",
+          "path": "website/guides/integrate/platforms/docker/aws_kinesis_firehose.md",
           "series_position": null,
-          "title": "Send File logs to Kafka"
+          "title": "Send logs from Docker to AWS Kinesis Firehose"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/logdna",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_s3",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/logdna.md",
+          "path": "website/guides/integrate/platforms/docker/aws_s3.md",
           "series_position": null,
-          "title": "Send File logs to LogDNA"
+          "title": "Send logs from Docker to AWS S3"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/loki",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/pulsar",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/loki.md",
+          "path": "website/guides/integrate/platforms/docker/pulsar.md",
           "series_position": null,
-          "title": "Send File logs to Loki"
+          "title": "Send logs from Docker to Apache Pulsar"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/new_relic_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/clickhouse",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/new_relic_logs.md",
+          "path": "website/guides/integrate/platforms/docker/clickhouse.md",
           "series_position": null,
-          "title": "Send File logs to New Relic"
+          "title": "Send logs from Docker to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/papertrail",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/datadog_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/papertrail.md",
+          "path": "website/guides/integrate/platforms/docker/datadog_logs.md",
           "series_position": null,
-          "title": "Send File logs to Papertrail"
+          "title": "Send logs from Docker to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/sematext_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/elasticsearch",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/sematext_logs.md",
+          "path": "website/guides/integrate/platforms/docker/elasticsearch.md",
           "series_position": null,
-          "title": "Send File logs to Sematext"
+          "title": "Send logs from Docker to Elasticsearch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/socket",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/file",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/socket.md",
+          "path": "website/guides/integrate/platforms/docker/file.md",
           "series_position": null,
-          "title": "Send File logs to Socket"
+          "title": "Send logs from Docker to File"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/splunk_hec",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_cloud_storage",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/splunk_hec.md",
+          "path": "website/guides/integrate/platforms/docker/gcp_cloud_storage.md",
           "series_position": null,
-          "title": "Send File logs to Splunk HEC"
+          "title": "Send logs from Docker to GCP Cloud Storage (GCS)"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/file/vector",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_pubsub",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/file/vector.md",
+          "path": "website/guides/integrate/platforms/docker/gcp_pubsub.md",
           "series_position": null,
-          "title": "Send File logs to Vector"
+          "title": "Send logs from Docker to GCP PubSub"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_cloudwatch_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_stackdriver_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/aws_cloudwatch_logs.md",
+          "path": "website/guides/integrate/platforms/docker/gcp_stackdriver_logs.md",
           "series_position": null,
-          "title": "Send Journald logs to AWS Cloudwatch"
+          "title": "Send logs from Docker to GCP Stackdriver"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_kinesis_streams",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/http",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/aws_kinesis_streams.md",
+          "path": "website/guides/integrate/platforms/docker/http.md",
           "series_position": null,
-          "title": "Send Journald logs to AWS Kinesis Data Streams"
+          "title": "Send logs from Docker to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_kinesis_firehose",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/honeycomb",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/aws_kinesis_firehose.md",
+          "path": "website/guides/integrate/platforms/docker/honeycomb.md",
           "series_position": null,
-          "title": "Send Journald logs to AWS Kinesis Firehose"
+          "title": "Send logs from Docker to Honeycomb"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/aws_s3",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/humio_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/aws_s3.md",
+          "path": "website/guides/integrate/platforms/docker/humio_logs.md",
           "series_position": null,
-          "title": "Send Journald logs to AWS S3"
+          "title": "Send logs from Docker to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/pulsar",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/kafka",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/pulsar.md",
+          "path": "website/guides/integrate/platforms/docker/kafka.md",
           "series_position": null,
-          "title": "Send Journald logs to Apache Pulsar"
+          "title": "Send logs from Docker to Kafka"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/clickhouse",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/logdna",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/clickhouse.md",
+          "path": "website/guides/integrate/platforms/docker/logdna.md",
           "series_position": null,
-          "title": "Send Journald logs to Clickhouse"
+          "title": "Send logs from Docker to LogDNA"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/datadog_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/loki",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/datadog_logs.md",
+          "path": "website/guides/integrate/platforms/docker/loki.md",
           "series_position": null,
-          "title": "Send Journald logs to Datadog"
+          "title": "Send logs from Docker to Loki"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/elasticsearch",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/new_relic_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/elasticsearch.md",
+          "path": "website/guides/integrate/platforms/docker/new_relic_logs.md",
           "series_position": null,
-          "title": "Send Journald logs to Elasticsearch"
+          "title": "Send logs from Docker to New Relic"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/file",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/papertrail",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/file.md",
+          "path": "website/guides/integrate/platforms/docker/papertrail.md",
           "series_position": null,
-          "title": "Send Journald logs to File"
+          "title": "Send logs from Docker to Papertrail"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/gcp_cloud_storage",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/sematext_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/gcp_cloud_storage.md",
+          "path": "website/guides/integrate/platforms/docker/sematext_logs.md",
           "series_position": null,
-          "title": "Send Journald logs to GCP Cloud Storage (GCS)"
+          "title": "Send logs from Docker to Sematext"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/gcp_pubsub",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/socket",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/gcp_pubsub.md",
+          "path": "website/guides/integrate/platforms/docker/socket.md",
           "series_position": null,
-          "title": "Send Journald logs to GCP PubSub"
+          "title": "Send logs from Docker to Socket"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/gcp_stackdriver_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/splunk_hec",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/gcp_stackdriver_logs.md",
+          "path": "website/guides/integrate/platforms/docker/splunk_hec.md",
           "series_position": null,
-          "title": "Send Journald logs to GCP Stackdriver"
+          "title": "Send logs from Docker to Splunk HEC"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/http",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/vector",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/http.md",
+          "path": "website/guides/integrate/platforms/docker/vector.md",
           "series_position": null,
-          "title": "Send Journald logs to HTTP"
+          "title": "Send logs from Docker to Vector"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/honeycomb",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_cloudwatch_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/honeycomb.md",
+          "path": "website/guides/integrate/sources/file/aws_cloudwatch_logs.md",
           "series_position": null,
-          "title": "Send Journald logs to Honeycomb"
+          "title": "Send logs from File to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/humio_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_kinesis_streams",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/humio_logs.md",
+          "path": "website/guides/integrate/sources/file/aws_kinesis_streams.md",
           "series_position": null,
-          "title": "Send Journald logs to Humio"
+          "title": "Send logs from File to AWS Kinesis Data Streams"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/kafka",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_kinesis_firehose",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/kafka.md",
+          "path": "website/guides/integrate/sources/file/aws_kinesis_firehose.md",
           "series_position": null,
-          "title": "Send Journald logs to Kafka"
+          "title": "Send logs from File to AWS Kinesis Firehose"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/logdna",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_s3",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/logdna.md",
+          "path": "website/guides/integrate/sources/file/aws_s3.md",
           "series_position": null,
-          "title": "Send Journald logs to LogDNA"
+          "title": "Send logs from File to AWS S3"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/loki",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/pulsar",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/loki.md",
+          "path": "website/guides/integrate/sources/file/pulsar.md",
           "series_position": null,
-          "title": "Send Journald logs to Loki"
+          "title": "Send logs from File to Apache Pulsar"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/new_relic_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/clickhouse",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/new_relic_logs.md",
+          "path": "website/guides/integrate/sources/file/clickhouse.md",
           "series_position": null,
-          "title": "Send Journald logs to New Relic"
+          "title": "Send logs from File to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/papertrail",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/datadog_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/papertrail.md",
+          "path": "website/guides/integrate/sources/file/datadog_logs.md",
           "series_position": null,
-          "title": "Send Journald logs to Papertrail"
+          "title": "Send logs from File to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/sematext_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/elasticsearch",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/sematext_logs.md",
+          "path": "website/guides/integrate/sources/file/elasticsearch.md",
           "series_position": null,
-          "title": "Send Journald logs to Sematext"
+          "title": "Send logs from File to Elasticsearch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/socket",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/file",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/socket.md",
+          "path": "website/guides/integrate/sources/file/file.md",
           "series_position": null,
-          "title": "Send Journald logs to Socket"
+          "title": "Send logs from File to File"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/splunk_hec",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_cloud_storage",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/splunk_hec.md",
+          "path": "website/guides/integrate/sources/file/gcp_cloud_storage.md",
           "series_position": null,
-          "title": "Send Journald logs to Splunk HEC"
+          "title": "Send logs from File to GCP Cloud Storage (GCS)"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/journald/vector",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_pubsub",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/journald/vector.md",
+          "path": "website/guides/integrate/sources/file/gcp_pubsub.md",
           "series_position": null,
-          "title": "Send Journald logs to Vector"
+          "title": "Send logs from File to GCP PubSub"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/aws_cloudwatch_metrics",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_stackdriver_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/prometheus/aws_cloudwatch_metrics.md",
+          "path": "website/guides/integrate/sources/file/gcp_stackdriver_logs.md",
           "series_position": null,
-          "title": "Send Prometheus metrics to AWS Cloudwatch"
+          "title": "Send logs from File to GCP Stackdriver"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/datadog_metrics",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/http",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/prometheus/datadog_metrics.md",
+          "path": "website/guides/integrate/sources/file/http.md",
           "series_position": null,
-          "title": "Send Prometheus metrics to Datadog"
+          "title": "Send logs from File to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/influxdb_metrics",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/honeycomb",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/prometheus/influxdb_metrics.md",
+          "path": "website/guides/integrate/sources/file/honeycomb.md",
           "series_position": null,
-          "title": "Send Prometheus metrics to InfluxDB"
+          "title": "Send logs from File to Honeycomb"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/prometheus",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/humio_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/prometheus/prometheus.md",
+          "path": "website/guides/integrate/sources/file/humio_logs.md",
           "series_position": null,
-          "title": "Send Prometheus metrics to Prometheus"
+          "title": "Send logs from File to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/prometheus/statsd",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/kafka",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/prometheus/statsd.md",
+          "path": "website/guides/integrate/sources/file/kafka.md",
           "series_position": null,
-          "title": "Send Prometheus metrics to Statsd"
+          "title": "Send logs from File to Kafka"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_cloudwatch_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/logdna",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/aws_cloudwatch_logs.md",
+          "path": "website/guides/integrate/sources/file/logdna.md",
           "series_position": null,
-          "title": "Send STDIN logs to AWS Cloudwatch"
+          "title": "Send logs from File to LogDNA"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_kinesis_streams",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/loki",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/aws_kinesis_streams.md",
+          "path": "website/guides/integrate/sources/file/loki.md",
           "series_position": null,
-          "title": "Send STDIN logs to AWS Kinesis Data Streams"
+          "title": "Send logs from File to Loki"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_kinesis_firehose",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/new_relic_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/aws_kinesis_firehose.md",
+          "path": "website/guides/integrate/sources/file/new_relic_logs.md",
           "series_position": null,
-          "title": "Send STDIN logs to AWS Kinesis Firehose"
+          "title": "Send logs from File to New Relic"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/aws_s3",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/papertrail",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/aws_s3.md",
+          "path": "website/guides/integrate/sources/file/papertrail.md",
           "series_position": null,
-          "title": "Send STDIN logs to AWS S3"
+          "title": "Send logs from File to Papertrail"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/pulsar",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/sematext_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/pulsar.md",
+          "path": "website/guides/integrate/sources/file/sematext_logs.md",
           "series_position": null,
-          "title": "Send STDIN logs to Apache Pulsar"
+          "title": "Send logs from File to Sematext"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/clickhouse",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/socket",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/clickhouse.md",
+          "path": "website/guides/integrate/sources/file/socket.md",
           "series_position": null,
-          "title": "Send STDIN logs to Clickhouse"
+          "title": "Send logs from File to Socket"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/datadog_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/splunk_hec",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/datadog_logs.md",
+          "path": "website/guides/integrate/sources/file/splunk_hec.md",
           "series_position": null,
-          "title": "Send STDIN logs to Datadog"
+          "title": "Send logs from File to Splunk HEC"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/elasticsearch",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/vector",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/elasticsearch.md",
+          "path": "website/guides/integrate/sources/file/vector.md",
           "series_position": null,
-          "title": "Send STDIN logs to Elasticsearch"
+          "title": "Send logs from File to Vector"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/file",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_cloudwatch_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/file.md",
+          "path": "website/guides/integrate/sources/http/aws_cloudwatch_logs.md",
           "series_position": null,
-          "title": "Send STDIN logs to File"
+          "title": "Send logs from HTTP to AWS Cloudwatch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/gcp_cloud_storage",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_kinesis_streams",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/gcp_cloud_storage.md",
+          "path": "website/guides/integrate/sources/http/aws_kinesis_streams.md",
           "series_position": null,
-          "title": "Send STDIN logs to GCP Cloud Storage (GCS)"
+          "title": "Send logs from HTTP to AWS Kinesis Data Streams"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/gcp_pubsub",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_kinesis_firehose",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/gcp_pubsub.md",
+          "path": "website/guides/integrate/sources/http/aws_kinesis_firehose.md",
           "series_position": null,
-          "title": "Send STDIN logs to GCP PubSub"
+          "title": "Send logs from HTTP to AWS Kinesis Firehose"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/gcp_stackdriver_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_s3",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/gcp_stackdriver_logs.md",
+          "path": "website/guides/integrate/sources/http/aws_s3.md",
           "series_position": null,
-          "title": "Send STDIN logs to GCP Stackdriver"
+          "title": "Send logs from HTTP to AWS S3"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/http",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/pulsar",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/http.md",
+          "path": "website/guides/integrate/sources/http/pulsar.md",
           "series_position": null,
-          "title": "Send STDIN logs to HTTP"
+          "title": "Send logs from HTTP to Apache Pulsar"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/honeycomb",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/clickhouse",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/honeycomb.md",
+          "path": "website/guides/integrate/sources/http/clickhouse.md",
           "series_position": null,
-          "title": "Send STDIN logs to Honeycomb"
+          "title": "Send logs from HTTP to Clickhouse"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/humio_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/datadog_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/humio_logs.md",
+          "path": "website/guides/integrate/sources/http/datadog_logs.md",
           "series_position": null,
-          "title": "Send STDIN logs to Humio"
+          "title": "Send logs from HTTP to Datadog"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/kafka",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/elasticsearch",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/kafka.md",
+          "path": "website/guides/integrate/sources/http/elasticsearch.md",
           "series_position": null,
-          "title": "Send STDIN logs to Kafka"
+          "title": "Send logs from HTTP to Elasticsearch"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/logdna",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/file",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/logdna.md",
+          "path": "website/guides/integrate/sources/http/file.md",
           "series_position": null,
-          "title": "Send STDIN logs to LogDNA"
+          "title": "Send logs from HTTP to File"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/loki",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_cloud_storage",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/loki.md",
+          "path": "website/guides/integrate/sources/http/gcp_cloud_storage.md",
           "series_position": null,
-          "title": "Send STDIN logs to Loki"
+          "title": "Send logs from HTTP to GCP Cloud Storage (GCS)"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/new_relic_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_pubsub",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/new_relic_logs.md",
+          "path": "website/guides/integrate/sources/http/gcp_pubsub.md",
           "series_position": null,
-          "title": "Send STDIN logs to New Relic"
+          "title": "Send logs from HTTP to GCP PubSub"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/papertrail",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_stackdriver_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/papertrail.md",
+          "path": "website/guides/integrate/sources/http/gcp_stackdriver_logs.md",
           "series_position": null,
-          "title": "Send STDIN logs to Papertrail"
+          "title": "Send logs from HTTP to GCP Stackdriver"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/sematext_logs",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/http",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/sematext_logs.md",
+          "path": "website/guides/integrate/sources/http/http.md",
           "series_position": null,
-          "title": "Send STDIN logs to Sematext"
+          "title": "Send logs from HTTP to HTTP"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/socket",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/honeycomb",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/socket.md",
+          "path": "website/guides/integrate/sources/http/honeycomb.md",
           "series_position": null,
-          "title": "Send STDIN logs to Socket"
+          "title": "Send logs from HTTP to Honeycomb"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/splunk_hec",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/humio_logs",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/splunk_hec.md",
+          "path": "website/guides/integrate/sources/http/humio_logs.md",
           "series_position": null,
-          "title": "Send STDIN logs to Splunk HEC"
+          "title": "Send logs from HTTP to Humio"
         },
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/setup/sources/stdin/vector",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/kafka",
           "last_modified_on": null,
-          "path": "website/guides/setup/sources/stdin/vector.md",
+          "path": "website/guides/integrate/sources/http/kafka.md",
           "series_position": null,
-          "title": "Send STDIN logs to Vector"
+          "title": "Send logs from HTTP to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/logdna.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/loki.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/socket.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/vector.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/file.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/http.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/loki.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/socket.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/logplex/vector.md",
+          "series_position": null,
+          "title": "Send logs from Heroku Logplex to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Journald to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/file.md",
+          "series_position": null,
+          "title": "Send logs from Journald to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/http.md",
+          "series_position": null,
+          "title": "Send logs from Journald to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Journald to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/loki.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/socket.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/vector.md",
+          "series_position": null,
+          "title": "Send logs from Journald to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/file.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/http.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/loki.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/socket.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/vector.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/file.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/http.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/kafka.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/logdna.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/loki.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/socket.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/vector.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Socket to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Socket to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Socket to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Socket to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/file.md",
+          "series_position": null,
+          "title": "Send logs from Socket to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Socket to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Socket to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Socket to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/http.md",
+          "series_position": null,
+          "title": "Send logs from Socket to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Socket to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/loki.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Socket to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/socket.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/vector.md",
+          "series_position": null,
+          "title": "Send logs from Socket to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/file.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/http.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/loki.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/socket.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/vector.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/file.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to File"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/http.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to HTTP"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/loki.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/socket.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/vector.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to Vector"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/prometheus/statsd.md",
+          "series_position": null,
+          "title": "Send metrics from Prometheus to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/statsd/statsd.md",
+          "series_position": null,
+          "title": "Send metrics from Statsd to Statsd"
         }
       ],
-      "name": "setup",
+      "name": "integrate",
       "series": false,
-      "title": "Setup"
+      "title": "Integrate"
     }
   },
   "installation": {
@@ -23577,7 +25251,7 @@ module.exports = {
       "input_types": [
         "metric"
       ],
-      "logo_path": null,
+      "logo_path": "/img/logos/statsd.svg",
       "name": "statsd",
       "operating_systems": [
         "Linux",
@@ -23927,7 +25601,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "statsd_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/statsd.svg",
       "name": "statsd",
       "operating_systems": [
         "Linux",
@@ -23991,7 +25665,7 @@ module.exports = {
       ],
       "function_category": "receive",
       "id": "syslog_source",
-      "logo_path": null,
+      "logo_path": "/img/logos/syslog.svg",
       "name": "syslog",
       "operating_systems": [
         "Linux",

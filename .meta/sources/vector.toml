@@ -1,5 +1,6 @@
 [sources.vector]
 title = "Vector"
+noun = "Vector"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

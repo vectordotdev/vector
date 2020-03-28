@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "Heroku Logplex"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+logplex%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Heroku Logplex"
 sidebar_label: "logplex|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/logplex.rs
 status: "beta"

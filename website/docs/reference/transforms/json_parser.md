@@ -1,10 +1,10 @@
 ---
+last_modified_on: "2020-03-27"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
-service_name: "JSON Parser"
 sidebar_label: "json_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
 status: "prod-ready"

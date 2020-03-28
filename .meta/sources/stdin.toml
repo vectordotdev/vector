@@ -1,5 +1,6 @@
 [sources.stdin]
 title = "STDIN"
+noun = "STDIN"
 beta = false
 common = false
 delivery_guarantee = "at_least_once"

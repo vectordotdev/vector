@@ -1,5 +1,6 @@
 [sources.docker]
 title = "Docker"
+noun = "Docker"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
@@ -12,7 +13,6 @@ features = [
 function_category = "collect"
 output_types = ["log"]
 requirements.docker_api = ">= 1.24"
-service_name = "Docker API"
 strategies = ["daemon"]
 through_description = "the [Docker engine daemon][urls.docker_daemon]"
 

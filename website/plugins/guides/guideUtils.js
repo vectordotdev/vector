@@ -6,9 +6,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const lodash_1 = __importDefault(require("lodash"));
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const globby_1 = __importDefault(require("globby"));
+const humanize_string_1 = __importDefault(require("humanize-string"));
 const path_1 = __importDefault(require("path"));
 const utils_1 = require("@docusaurus/utils");
 const reading_time_1 = __importDefault(require("reading-time"));
+const titleize_1 = __importDefault(require("titleize"));
 function truncate(fileString, truncateMarker) {
     return fileString.split(truncateMarker, 1).shift();
 }
@@ -32,8 +34,28 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
         if (frontMatter.draft && process.env.NODE_ENV === 'production') {
             return;
         }
-        let categories = relativeSource.split('/').slice(0, -1);
-        let categorySlug = categories.join('/');
+        let categoryParts = relativeSource.split('/').slice(0, -1);
+        let categories = [];
+        while (categoryParts.length > 0) {
+            let name = categoryParts[categoryParts.length - 1];
+            let title = titleize_1.default(humanize_string_1.default(name));
+            let description = null;
+            switch (name) {
+                case 'advanced':
+                    description = 'Go beyond the basics, become a Vector pro, and extract the full potential of Vector.';
+                    break;
+                case 'getting-started':
+                    description = 'Take Vector from zero to production in under 10 minutes.';
+                    break;
+            }
+            categories.push({
+                name: name,
+                title: title,
+                description: description,
+                permalink: utils_1.normalizeUrl([baseUrl, routeBasePath, categoryParts.join('/')])
+            });
+            categoryParts.pop();
+        }
         let linkName = relativeSource.replace(/\.mdx?$/, '');
         let seriesPosition = frontMatter.series_position;
         let tags = frontMatter.tags || [];
@@ -42,7 +64,6 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
             id: frontMatter.id || frontMatter.title,
             metadata: {
                 categories: categories,
-                categorySlug: categorySlug,
                 description: frontMatter.description || excerpt,
                 permalink: utils_1.normalizeUrl([
                     baseUrl,
@@ -62,8 +83,8 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
     return lodash_1.default.sortBy(guides, [
         ((guide) => {
             let categories = guide.metadata.categories;
-            if (categories[0] == 'getting-started') {
-                return ['AA'].concat(categories.slice(1));
+            if (categories[0].name == 'getting-started') {
+                return ['AA'].concat(categories.map(category => category.name).slice(1));
             }
             else {
                 return categories;

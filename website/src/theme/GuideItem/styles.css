@@ -60,7 +60,11 @@
   width: 100%;
 }
 
-.guide-item > article > footer > .logo {
+.guide-item > article > footer > div.logo {
+  font-size: 2.5em;
+}
+
+.guide-item > article > footer > svg.logo {
   height: 3em;
   width: 3em;
 }

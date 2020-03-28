@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Kafka"
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
 status: "beta"

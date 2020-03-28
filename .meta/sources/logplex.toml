@@ -1,5 +1,6 @@
 [sources.logplex]
 title = "Heroku Logplex"
+noun = "Heroku Logplex"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"

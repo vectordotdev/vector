@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "best_effort"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+loki%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Loki"
 sidebar_label: "loki|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/loki.rs
 status: "beta"

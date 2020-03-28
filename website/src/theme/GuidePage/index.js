@@ -68,15 +68,14 @@ function GuidePage(props) {
   const {frontMatter, metadata} = GuideContents;
   const {author_github: authorGithub, id, last_modified_on: lastModifiedOn, series_position: seriesPosition, title} = frontMatter;
   const {categories, readingTime, tags} = metadata;
-
+  console.log(categories)
   //
   // Site config
   //
 
   const {siteConfig} = useDocusaurusContext();
-  const {metadata: {guides: guidesMetadata, installation, sources, sinks}} = siteConfig.customFields;
+  const {metadata: {installation, sources, sinks}} = siteConfig.customFields;
   const {platforms} = installation;
-  const category = guidesMetadata[categories[0]];
 
   //
   // Variables
@@ -95,21 +94,25 @@ function GuidePage(props) {
   const sourceTag = enrichedTags.find(tag => tag.category == 'source');
   const sourceName = sourceTag ? sourceTag.value : null;
   const source = sourceName && sources[sourceName];
-  const eventTypes = (source || sink || {}).event_types || [];
 
-  let pathPrefix = '/guides/setup';
+  let sinkPathTemplate = null;
 
   if (platform) {
-    pathPrefix = `/guides/setup/platforms/${platform.name}`;
+    sinkPathTemplate = `/guides/setup/platforms/${platform.name}/<name>/`;
   } else if (source) {
-    pathPrefix = `/guides/setup/sources/${source.name}`;
+    sinkPathTemplate = `/guides/setup/sources/${source.name}/<name>/`;
   }
+
+  let sourcePathTemplate = sink ?
+    `/guides/setup/sources/<name>/${sink.name}/` :
+    '/guides/setup/sources/<name>/';
 
   //
   // State
   //
 
-  const [showComponentSwitcher, setShowComponentSwitcher] = useState(null);
+  const [showSourceSwitcher, setShowSourceSwitcher] = useState(false);
+  const [showSinkSwitcher, setShowSinkSwitcher] = useState(false);
 
   //
   // Render
@@ -119,23 +122,43 @@ function GuidePage(props) {
 
   return (
     <Layout title={title} description={`${title}, in minutes, for free`}>
-      {showComponentSwitcher && <Modal
+      {showSourceSwitcher && <Modal
         className="modal"
-        onRequestClose={() => setShowComponentSwitcher(false)}
+        onRequestClose={() => setShowSourceSwitcher(false)}
         overlayClassName="modal-overlay"
-        isOpen={showComponentSwitcher !== null}
+        isOpen={showSourceSwitcher !== null}
+        contentLabel="Minimal Modal Example">
+          <header>
+            <h1>Where do you receive your data?</h1>
+          </header>
+          <VectorComponents
+            exceptFunctions={['test']}
+            exceptNames={[source && source.name]}
+            eventTypes={sink && sink.event_types}
+            pathTemplate={sourcePathTemplate}
+            titles={false}
+            sources={true}
+            transforms={false}
+            sinks={false} />
+      </Modal>}
+      {showSinkSwitcher && <Modal
+        className="modal"
+        onRequestClose={() => setShowSinkSwitcher(false)}
+        overlayClassName="modal-overlay"
+        isOpen={showSinkSwitcher !== null}
         contentLabel="Minimal Modal Example">
           <header>
             <h1>Where do you want to send your data?</h1>
           </header>
           <VectorComponents
             exceptFunctions={['test']}
-            exceptNames={[source && source.name]}
-            eventTypes={eventTypes}
-            pathPrefix={pathPrefix}
+            exceptNames={[sink && sink.name]}
+            eventTypes={source && source.event_types}
+            pathTemplate={sinkPathTemplate}
             titles={false}
             sources={false}
-            transforms={false} />
+            transforms={false}
+            sinks={true} />
       </Modal>}
       <header className={`hero domain-bg domain-bg--${domainBG}`}>
         <div className="container">
@@ -146,29 +169,29 @@ function GuidePage(props) {
                   <SVG src={platform.logo_path} alt={`${platform.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
-              {source && !platform && <div className="icon panel link" title="Change your source" onClick={(event) => setShowComponentSwitcher('source')}>
+              {source && !platform && <div className="icon panel link" title="Change your source" onClick={(event) => setShowSourceSwitcher(true)}>
                 {source.logo_path ?
                   <SVG src={source.logo_path} alt={`${source.title} Logo`} /> :
                   <i className="feather icon-server"></i>}
               </div>}
-              {!source && !platform && <div className="icon panel link" title="Select a source" onClick={(event) => setShowComponentSwitcher('source')}>
+              {!source && !platform && <div className="icon panel link" title="Select a source" onClick={(event) => setShowSinkSwitcher(true)}>
                  <i className="feather icon-plus"></i>
                </div>}
               {!source && !platform && <div className="icon panel link" title="Select a source">
                 <i className="feather icon-plus"></i>
               </div>}
-              {sink && <div className="icon panel link" title="Change your destination" onClick={(event) => setShowComponentSwitcher('sink')}>
+              {sink && <div className="icon panel link" title="Change your destination" onClick={(event) => setShowSinkSwitcher(true)}>
                 {sink.logo_path ?
                   <SVG src={sink.logo_path} alt={`${sink.title} Logo`} /> :
                   <i className="feather icon-database"></i>}
                </div>}
-               {!sink && <div className="icon panel link" title="Select a destination" onClick={(event) => setShowComponentSwitcher('sink')}>
+               {!sink && <div className="icon panel link" title="Select a destination" onClick={(event) => setShowSinkSwitcher(true)}>
                  <i className="feather icon-plus"></i>
                </div>}
             </div>
           )}
           {(!platform && !source && !sink) && (
-            <div className="hero--category"><Link to={`/guides/${category.name}/`}>{category.title}{category.series && <> Series - {seriesPosition} of {category.guides.length}</>}</Link></div>)}
+            <div className="hero--category"><Link to={categories[0].permalink + '/'}>{categories[0].name}</Link></div>)}
           <h1 className={styles.header}>{title}</h1>
           <div className="hero--subtitle">{frontMatter.description}</div>
           <Tags colorProfile="guides" tags={tags} />
@@ -204,11 +227,11 @@ function GuidePage(props) {
           <div className={classnames('col', styles.rightCol)}>
             <article>
               <div className="markdown">
-                <a aria-hidden="true" tabindex="-1" class="anchor" id="overview"></a>
+                <a aria-hidden="true" tabIndex="-1" className="anchor" id="overview"></a>
                 <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
               </div>
             </article>
-            <PagePaginator previous={metadata.previousItem} next={metadata.nextItem} className={styles.paginator} />
+            <PagePaginator previous={metadata.prevItem} next={metadata.nextItem} className={styles.paginator} />
           </div>
         </div>
       </main>

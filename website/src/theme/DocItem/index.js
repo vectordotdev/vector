@@ -75,7 +75,7 @@ function OperatingSystemsStatus({operatingSystems, unsupportedOperatingSystems})
   return operatingSystemsEls;
 }
 
-function Statuses({deliveryGuarantee, eventTypes, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, eventTypes, operatingSystems, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
@@ -150,7 +150,6 @@ function DocItem(props) {
       issues_url: issuesUrl,
       operating_systems: operatingSystems,
       posts_path: postsPath,
-      service_name: serviceName,
       source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
@@ -218,7 +217,6 @@ function DocItem(props) {
                     deliveryGuarantee={deliveryGuarantee}
                     eventTypes={eventTypes}
                     operatingSystems={operatingSystems}
-                    serviceName={serviceName}
                     status={status}
                     unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&

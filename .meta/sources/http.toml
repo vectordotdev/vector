@@ -1,5 +1,6 @@
 [sources.http]
 title = "HTTP"
+noun = "HTTP"
 beta = true
 common = true
 delivery_guarantee = "best_effort"

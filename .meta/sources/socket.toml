@@ -1,5 +1,6 @@
 [sources.socket]
 title = "Socket"
+noun = "a TCP, UDP, or UDS socket"
 beta = false
 common = true
 delivery_guarantee = "best_effort"

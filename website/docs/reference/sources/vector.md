@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "best_effort"
 component_title: "Vector"
 description: "The Vector `vector` source ingests data through another upstream `vector` sink and outputs `log` and `metric` events."
@@ -6,7 +7,6 @@ event_types: ["log","metric"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Vector"
 sidebar_label: "vector|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/vector.rs
 status: "beta"

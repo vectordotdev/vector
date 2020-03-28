@@ -8,13 +8,12 @@ import Link from '@docusaurus/Link';
 
 import humanizeString from 'humanize-string';
 import qs from 'qs';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
 const AnchoredH2 = Heading('h2');
 
-function Guides({filtering, guidesMetadata, items}) {
+function Guides({filtering, items}) {
   if (items.length == 0) {
     return (
       <Empty text="no guides found" />
@@ -22,17 +21,22 @@ function Guides({filtering, guidesMetadata, items}) {
   } else if (filtering) {
     return <GuideItems items={items.slice(0,25)} />
   } else {
-    const groupedItems = _.groupBy(items, ((item) => item.content.metadata.categorySlug.split('/')[0]));
+    const groupedCategories = _(items).
+      flatMap(item => item.content.metadata.categories).
+      uniqBy('permalink').
+      keyBy('permalink').
+      value();
+    const groupedItems = _.groupBy(items, ((item) => item.content.metadata.categories[0].permalink));
 
-    return Object.keys(groupedItems).map((categorySlug, index) => {
-      let category = guidesMetadata[categorySlug];
-      let groupItems = groupedItems[categorySlug];
+    return Object.keys(groupedItems).map((categoryPermalink, index) => {
+      let groupItems = groupedItems[categoryPermalink];
+      let category = groupedCategories[categoryPermalink];
 
       return (
         <section>
           {index > 0 && <>
-            <AnchoredH2 id={category.name}>{category.title}</AnchoredH2>
-            <div className="sub-title">{category.description}</div>
+            <AnchoredH2 id={categoryPermalink}>{category.title}</AnchoredH2>
+            {category.description && <div className="sub-title">{category.description}</div>}
           </>}
           <GuideItems items={groupItems.slice(0,25)} large={index == 1} staggered={index == 0} />
         </section>
@@ -43,12 +47,6 @@ function Guides({filtering, guidesMetadata, items}) {
 
 function GuideListPage(props) {
   const {metadata, items} = props;
-  const context = useDocusaurusContext();
-  const {siteConfig: {customFields, title: siteTitle}} = context;
-  const {metadata: {guides: guidesMetadata}} = customFields;
-  const isGuideOnlyMode = metadata.permalink === '/';
-  const title = isGuideOnlyMode ? siteTitle : 'Guides';
-
   const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
   const [searchTerm, setSearchTerm] = useState(queryObj['search']);
 
@@ -81,7 +79,7 @@ function GuideListPage(props) {
   }
 
   return (
-    <Layout title={title} description="Guides, tutorials, and education.">
+    <Layout title="Guides" description="Guides, tutorials, and education.">
       <header className="hero hero--clean">
         <div className="container">
           <h1>Vector Guides</h1>
@@ -100,7 +98,6 @@ function GuideListPage(props) {
       <main className="container container--s">
         <Guides
           filtering={filtering}
-          guidesMetadata={guidesMetadata}
           items={filteredItems} />
       </main>
     </Layout>

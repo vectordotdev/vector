@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+splunk_hec%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/splunk_hec.rs
 status: "beta"

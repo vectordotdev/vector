@@ -4,9 +4,11 @@ import {LoadContext} from '@docusaurus/types';
 import _ from 'lodash';
 import fs from 'fs-extra';
 import globby from 'globby';
+import humanizeString from 'humanize-string';
 import path from 'path';
 import {parse, normalizeUrl, aliasedSitePath} from '@docusaurus/utils';
 import readingTime from 'reading-time';
+import titleize from 'titleize';
 
 export function truncate(fileString: string, truncateMarker: RegExp) {
   return fileString.split(truncateMarker, 1).shift()!;
@@ -42,8 +44,35 @@ export async function generateGuides(
         return;
       }
 
-      let categories = relativeSource.split('/').slice(0, -1);
-      let categorySlug = categories.join('/');
+      let categoryParts = relativeSource.split('/').slice(0, -1);
+      let categories = [];
+
+      while (categoryParts.length > 0) {
+        let name = categoryParts[categoryParts.length - 1];
+        let title = titleize(humanizeString(name));
+
+        let description = null;
+
+        switch(name) {
+          case 'advanced':
+            description = 'Go beyond the basics, become a Vector pro, and extract the full potential of Vector.';
+            break;
+
+          case 'getting-started':
+            description = 'Take Vector from zero to production in under 10 minutes.';
+            break;
+
+        }
+
+        categories.push({
+          name: name,
+          title: title,
+          description: description,
+          permalink: normalizeUrl([baseUrl, routeBasePath, categoryParts.join('/')])
+        });
+        categoryParts.pop();
+      }
+
       let linkName = relativeSource.replace(/\.mdx?$/, '');
       let seriesPosition = frontMatter.series_position;
       let tags = frontMatter.tags || [];
@@ -53,7 +82,6 @@ export async function generateGuides(
         id: frontMatter.id || frontMatter.title,
         metadata: {
           categories: categories,
-          categorySlug: categorySlug,
           description: frontMatter.description || excerpt,
           permalink: normalizeUrl([
             baseUrl,
@@ -76,8 +104,8 @@ export async function generateGuides(
     ((guide) => {
       let categories = guide.metadata.categories;
 
-      if (categories[0] == 'getting-started') {
-        return ['AA'].concat(categories.slice(1));
+      if (categories[0].name == 'getting-started') {
+        return ['AA'].concat(categories.map(category => category.name).slice(1));
       } else {
         return categories;
       }

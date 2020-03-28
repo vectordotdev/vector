@@ -148,17 +148,17 @@ metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 templates = Templates.new(ROOT_DIR, metadata)
 
 #
-# Create missing platform setup guides
+# Create missing platform integration guides
 #
 
 metadata.installation.platforms_list.each do |platform|
-  template_path = "#{GUIDES_ROOT}/setup/platforms/#{platform.name}.md.erb"
+  template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}.md.erb"
 
   if !File.exists?(template_path)
     contents =
       <<~EOF
       <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-      <%= setup_guide(platform: platform) %>
+      <%= integration_guide(platform: platform) %>
       EOF
 
     File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -166,11 +166,11 @@ metadata.installation.platforms_list.each do |platform|
 end
 
 #
-# Create missing platform setup guides
+# Create missing platform integration guides
 #
 
 metadata.installation.platforms_list.each do |platform|
-  template_path = "#{GUIDES_ROOT}/setup/platforms/#{platform.name}.md.erb"
+  template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}.md.erb"
   strategy = platform.strategies.first
   source = metadata.sources.send(strategy.source)
 
@@ -184,7 +184,7 @@ metadata.installation.platforms_list.each do |platform|
     contents =
       <<~EOF
       <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
-      <%= setup_guide(platform: platform) %>
+      <%= integration_guide(platform: platform) %>
       EOF
 
     File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -193,7 +193,7 @@ metadata.installation.platforms_list.each do |platform|
   metadata.sinks_list.
     select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
     each do |sink|
-      template_path = "#{GUIDES_ROOT}/setup/platforms/#{platform.name}/#{sink.name}.md.erb"
+      template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}/#{sink.name}.md.erb"
 
       if !File.exists?(template_path)
         dirname = File.dirname(template_path)
@@ -206,7 +206,7 @@ metadata.installation.platforms_list.each do |platform|
           <<~EOF
           <%- platform = metadata.installation.platforms.send("#{platform.name}") -%>
           <%- sink = metadata.sinks.send("#{sink.name}") -%>
-          <%= setup_guide(platform: platform, sink: sink) %>
+          <%= integration_guide(platform: platform, sink: sink) %>
           EOF
 
         File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -215,13 +215,13 @@ metadata.installation.platforms_list.each do |platform|
 end
 
 #
-# Create missing source setup guides
+# Create missing source integration guides
 #
 
 metadata.sources_list.
-  select { |s| s.collects? && !s.for_platform? }.
+  select { |s| !s.for_platform? }.
   each do |source|
-    template_path = "#{GUIDES_ROOT}/setup/sources/#{source.name}.md.erb"
+    template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}.md.erb"
 
     if !File.exists?(template_path)
       dirname = File.dirname(template_path)
@@ -233,7 +233,7 @@ metadata.sources_list.
       contents =
         <<~EOF
         <%- source = metadata.sources.send("#{source.name}") -%>
-        <%= setup_guide(source: source) %>
+        <%= integration_guide(source: source) %>
         EOF
 
       File.open(template_path, 'w+') { |file| file.write(contents) }
@@ -242,7 +242,7 @@ metadata.sources_list.
     metadata.sinks_list.
       select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
       each do |sink|
-        template_path = "#{GUIDES_ROOT}/setup/sources/#{source.name}/#{sink.name}.md.erb"
+        template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}/#{sink.name}.md.erb"
 
         if !File.exists?(template_path)
           dirname = File.dirname(template_path)
@@ -255,7 +255,7 @@ metadata.sources_list.
             <<~EOF
             <%- source = metadata.sources.send("#{source.name}") -%>
             <%- sink = metadata.sinks.send("#{sink.name}") -%>
-            <%= setup_guide(source: source, sink: sink) %>
+            <%= integration_guide(source: source, sink: sink) %>
             EOF
 
           File.open(template_path, 'w+') { |file| file.write(contents) }

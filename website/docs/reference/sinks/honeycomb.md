@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+honeycomb%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Honeycomb"
 sidebar_label: "honeycomb|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/honeycomb.rs
 status: "beta"

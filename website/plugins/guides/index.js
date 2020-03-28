@@ -58,7 +58,7 @@ function pluginContentGuide(context, opts) {
                 }
             });
             // Guide pagination routes.
-            // Example: `/guide`, `/guide/page/1`, `/guide/page/2`
+            // Example: `/guides`
             const totalCount = guides.length;
             const { siteConfig: { baseUrl = '' }, } = context;
             const basePageUrl = utils_1.normalizeUrl([baseUrl, routeBasePath]);
@@ -73,7 +73,7 @@ function pluginContentGuide(context, opts) {
                     previousPage: basePageUrl,
                     nextPage: basePageUrl,
                 },
-                items: guides.map(item => item.id),
+                items: guides.filter(guide => guide.metadata.categories.length <= 2).map(item => item.id),
             });
             // Guide tags
             const guideTags = {};
@@ -112,22 +112,14 @@ function pluginContentGuide(context, opts) {
             });
             const guideTagsListPath = Object.keys(guideTags).length > 0 ? tagsPath : null;
             // Guide categories
-            let guideCategorySlugs = guides.flatMap(guide => {
-                let categories = [...guide.metadata.categories];
-                let categorySlugs = [];
-                while (categories.length > 0) {
-                    categorySlugs.push(categories.join('/'));
-                    categories.pop();
-                }
-                return categorySlugs;
-            });
-            guideCategorySlugs = lodash_1.default.uniq(guideCategorySlugs);
+            let guideCategories = guides.flatMap(guide => guide.metadata.categories);
+            guideCategories = lodash_1.default.uniqBy(guideCategories, ((guideCategory) => guideCategory.permalink));
             return {
                 guides,
                 guideListPaginated,
                 guideTags,
                 guideTagsListPath,
-                guideCategorySlugs,
+                guideCategories,
             };
         },
         async contentLoaded({ content: guideContents, actions, }) {
@@ -137,7 +129,7 @@ function pluginContentGuide(context, opts) {
             const { guideListComponent, guideComponent, guideTagListComponent, guideTagComponent, guideCategoryComponent, } = options;
             const aliasedSource = (source) => `~guide/${path_1.default.relative(dataDir, source)}`;
             const { addRoute, createData } = actions;
-            const { guides, guideListPaginated, guideTags, guideTagsListPath, guideCategorySlugs, } = guideContents;
+            const { guides, guideListPaginated, guideTags, guideTagsListPath, guideCategories, } = guideContents;
             const guideItemsToMetadata = {};
             guides.map(guide => {
                 guideItemsToMetadata[guide.id] = guide.metadata;
@@ -218,10 +210,10 @@ function pluginContentGuide(context, opts) {
                 });
             }
             // Guide categories
-            if (guideCategorySlugs.length > 0) {
-                await Promise.all(guideCategorySlugs.map(async (categorySlug) => {
-                    const permalink = `/guides/${categorySlug}`;
-                    const metadata = { categorySlug: categorySlug };
+            if (guideCategories.length > 0) {
+                await Promise.all(guideCategories.map(async (category) => {
+                    const permalink = category.permalink;
+                    const metadata = { category: category };
                     const categoryMetadataPath = await createData(`${utils_1.docuHash(permalink)}.json`, JSON.stringify(metadata, null, 2));
                     addRoute({
                         path: permalink,
@@ -229,7 +221,7 @@ function pluginContentGuide(context, opts) {
                         exact: true,
                         modules: {
                             items: guides.
-                                filter(guide => guide.metadata.categorySlug.startsWith(categorySlug)).
+                                filter(guide => guide.metadata.categories.map(category => category.permalink).includes(category.permalink)).
                                 map(guide => {
                                 const metadata = guideItemsToMetadata[guide.id];
                                 // To tell routes.js this is an import and not a nested object to recurse.

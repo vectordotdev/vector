@@ -1,10 +1,10 @@
 ---
+last_modified_on: "2020-03-27"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
 function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
-service_name: "Swimlanes"
 sidebar_label: "swimlanes|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/swimlanes.rs
 status: "beta"

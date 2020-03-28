@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "best_effort"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_stackdriver_logs%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "GCP Stackdriver Logs"
 sidebar_label: "gcp_stackdriver_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/stackdriver_logs.rs
 status: "beta"

@@ -1,5 +1,6 @@
 [sources.kubernetes]
 title = "Kubernetes"
+noun = "Kubernetes cluster"
 beta = true
 delivery_guarantee = "best_effort"
 features = [

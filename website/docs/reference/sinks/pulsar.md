@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+pulsar%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Apache Pulsar"
 sidebar_label: "pulsar|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/pulsar.rs
 status: "beta"

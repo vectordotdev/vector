@@ -86,7 +86,7 @@ export default function pluginContentGuide(
       });
 
       // Guide pagination routes.
-      // Example: `/guide`, `/guide/page/1`, `/guide/page/2`
+      // Example: `/guides`
       const totalCount = guides.length;
       const {
         siteConfig: {baseUrl = ''},
@@ -105,7 +105,7 @@ export default function pluginContentGuide(
           previousPage: basePageUrl,
           nextPage: basePageUrl,
         },
-        items: guides.map(item => item.id),
+        items: guides.filter(guide => guide.metadata.categories.length <= 2).map(item => item.id),
       });
 
       // Guide tags
@@ -151,25 +151,15 @@ export default function pluginContentGuide(
 
 
       // Guide categories
-      let guideCategorySlugs = guides.flatMap(guide => {
-        let categories = [...guide.metadata.categories];
-        let categorySlugs = [];
-
-        while (categories.length > 0) {
-          categorySlugs.push(categories.join('/'));
-          categories.pop();
-        }
-
-        return categorySlugs;
-      });
-      guideCategorySlugs = _.uniq(guideCategorySlugs);
+      let guideCategories = guides.flatMap(guide => guide.metadata.categories);
+      guideCategories = _.uniqBy(guideCategories, ((guideCategory) => guideCategory.permalink));
 
       return {
         guides,
         guideListPaginated,
         guideTags,
         guideTagsListPath,
-        guideCategorySlugs,
+        guideCategories,
       };
     },
 
@@ -200,7 +190,7 @@ export default function pluginContentGuide(
         guideListPaginated,
         guideTags,
         guideTagsListPath,
-        guideCategorySlugs,
+        guideCategories,
       } = guideContents;
 
       const guideItemsToMetadata: GuideItemsToMetadata = {};
@@ -307,11 +297,11 @@ export default function pluginContentGuide(
       }
 
       // Guide categories
-      if (guideCategorySlugs.length > 0) {
+      if (guideCategories.length > 0) {
         await Promise.all(
-          guideCategorySlugs.map(async categorySlug => {
-            const permalink = `/guides/${categorySlug}`;
-            const metadata = {categorySlug: categorySlug};
+          guideCategories.map(async category => {
+            const permalink = category.permalink;
+            const metadata = {category: category};
             const categoryMetadataPath = await createData(
               `${docuHash(permalink)}.json`,
               JSON.stringify(metadata, null, 2),
@@ -323,7 +313,7 @@ export default function pluginContentGuide(
               exact: true,
               modules: {
                 items: guides.
-                  filter(guide => guide.metadata.categorySlug.startsWith(categorySlug)).
+                  filter(guide => guide.metadata.categories.map(category => category.permalink).includes(category.permalink)).
                   map(guide => {
                     const metadata = guideItemsToMetadata[guide.id];
                     // To tell routes.js this is an import and not a nested object to recurse.

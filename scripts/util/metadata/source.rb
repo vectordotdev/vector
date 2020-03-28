@@ -54,7 +54,7 @@ class Source < Component
   end
 
   def collects?
-    strategies.include?("daemon") || strategies.include?("sidecar")
+    function_category == "collects"
   end
 
   def description

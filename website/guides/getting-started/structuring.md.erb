@@ -37,7 +37,7 @@ And have them coming out the other end in a structured format like this:
 <ol>
 <li>
 
-### Setup A Basic pipeline
+### Setup a basic pipeline
 
 In the last guide we simply piped stdin to stdout, I'm not trying to diminish
 your sense of achievement but that was pretty basic.
@@ -191,12 +191,12 @@ config just like you would for regular code:
 <CodeHeader text="vector.toml" />
 
 ```diff
- # Write the data
- [sinks.bar]
-   inputs = ["apache_parser"]
-   type = "elasticsearch"
-   index = "example-index"
-   host = "http://10.24.32.122:9000"
+# Write the data
+[sinks.bar]
+  inputs = ["apache_parser"]
+  type = "elasticsearch"
+  index = "example-index"
+  host = "http://10.24.32.122:9000"
 +
 +[[tests]]
 +  name = "test apache regex"
@@ -270,7 +270,13 @@ at a specific transform (in this case our _only_ transform), and defines where
 we'd like to capture resulting events coming out along with a condition to check
 the events against.
 
-When we run `vector test ./vector.toml` it will parse and execute our test:
+When we run:
+
+```bash
+vector test ./vector.toml
+```
+
+It will parse and execute our test:
 
 ```text
 Running vector.toml tests

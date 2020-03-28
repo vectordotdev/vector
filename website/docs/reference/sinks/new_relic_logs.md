@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+new_relic_logs%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "New Relic Logs"
 sidebar_label: "new_relic_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/new_relic_logs.rs
 status: "beta"

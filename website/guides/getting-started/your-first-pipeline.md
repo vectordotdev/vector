@@ -9,7 +9,9 @@ tags: ["type: tutorial", "domain: config"]
 ---
 
 import Alert from '@site/src/components/Alert';
+import CodeExplanation from '@site/src/components/CodeExplanation';
 import CodeHeader from '@site/src/components/CodeHeader';
+import InstallationCommand from '@site/src/components/InstallationCommand';
 
 Vector is a simple beast to tame, in this guide we'll send an
 [event][docs.data-model] through it and touch on some basic concepts.
@@ -32,9 +34,7 @@ Vector is a simple beast to tame, in this guide we'll send an
 
 If you haven't already, install Vector. Here's a script for the lazy:
 
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
-```
+<InstallationCommand />
 
 Or [choose your preferred installation method][docs.installation].
 
@@ -48,7 +48,7 @@ components to run and how they should interact. Let's create one that simply
 pipes a [`stdin` source][docs.sources.stdin] to a
 [`console` sink][docs.sinks.console]:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sources.foo]
@@ -60,6 +60,14 @@ pipes a [`stdin` source][docs.sources.stdin] to a
   encoding.codec = "text"
 ```
 
+<CodeExplanation>
+
+* The [`stdin` source][docs.sources.stdin] tells Vector to receive data over `STDIN`.
+* The [`console` source]docs.sinks.stdout] tells Vector to simply print the data to `STDOUT`.
+* The  `encoding.codec` tells Vector to print the data as plain text (unencoded).
+
+</CodeExplanation>
+
 Every component within a Vector config has an identifier chosen by you. This
 allows you to specify where a sink should gather its data from (using the
 `inputs` field).
@@ -67,19 +75,26 @@ allows you to specify where a sink should gather its data from (using the
 </li>
 <li>
 
-### Test It
+### Hello World!
 
 That's it for our first config, now pipe an event through it:
 
 ```bash
-echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ./vector.toml
+echo 'Hello World!' | vector --config ./vector.toml
 ```
+
+<CodeExplanation>
+
+* The `echo` statement sends a single log to Vector over `STDIN`
+* The `vector...` command starts Vector with our previously created config file.
+
+</CodeExplanation>
 
 Your input event will get echoed back (along with some service logs) unchanged:
 
 ```text
 ... some logs ...
-172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272
+Hello World!
 ```
 
 That's because the raw input text of our source was captured internally within

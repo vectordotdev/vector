@@ -4,8 +4,8 @@ require "active_support/core_ext/string/output_safety"
 
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
+require_relative "templates/integration_guide"
 require_relative "templates/interface_tutorials"
-require_relative "templates/setup_guide"
 
 # Renders templates in the templates sub-dir
 #
@@ -380,6 +380,31 @@ class Templates
     end
   end
 
+  def integration_guide(platform: nil, source: nil, sink: nil)
+    if platform && source
+      raise ArgumentError.new("You cannot pass both a platform and a source")
+    end
+
+    interfaces = []
+    strategy = nil
+
+    if platform
+      interfaces = fetch_interfaces(platform.interfaces)
+      strategy = fetch_strategy(platform.strategies.first)
+      source = metadata.sources.send(strategy.source)
+    elsif source
+      interfaces = [metadata.installation.interfaces.send("vector-cli")]
+      strategy = fetch_strategy(source.strategies.first)
+    elsif sink
+      interfaces = metadata.installation.interfaces_list
+      strategy = metadata.installation.strategies.first
+    end
+
+    guide = IntegrationGuide.new(interfaces, strategy, platform: platform, source: source, sink: sink)
+
+    render("#{partials_path}/_integration_guide.md", binding).strip
+  end
+
   def pluralize(count, word)
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
   end
@@ -446,31 +471,6 @@ class Templates
     end
 
     content
-  end
-
-  def setup_guide(platform: nil, source: nil, sink: nil)
-    if platform && source
-      raise ArgumentError.new("You cannot pass both a platform and a source")
-    end
-
-    interfaces = []
-    strategy = nil
-
-    if platform
-      interfaces = fetch_interfaces(platform.interfaces)
-      strategy = fetch_strategy(platform.strategies.first)
-      source = metadata.sources.send(strategy.source)
-    elsif source
-      interfaces = [metadata.installation.interfaces.send("vector-cli")]
-      strategy = fetch_strategy(source.strategies.first)
-    elsif sink
-      interfaces = metadata.installation.interfaces_list
-      strategy = metadata.installation.strategies.first
-    end
-
-    guide = SetupGuide.new(interfaces, strategy, platform: platform, source: source, sink: sink)
-
-    render("#{partials_path}/_setup_guide.md", binding).strip
   end
 
   def sink_description(sink)

@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through log records from journald and outputs `log` events."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
 operating_systems: ["Linux"]
-service_name: "Journald"
 sidebar_label: "journald|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
 status: "beta"

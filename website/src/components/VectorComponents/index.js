@@ -14,16 +14,16 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Component({delivery_guarantee, description, event_types, function_category, logo_path, name, pathPrefix, status, title, type}) {
-  let prefix = pathPrefix;
+function Component({delivery_guarantee, description, event_types, function_category, logo_path, name, pathTemplate, status, title, type}) {
+  let template = pathTemplate;
 
-  if (!prefix) {
-    if(type == "source") prefix = '/docs/reference/sources';
-    if(type == "transform") prefix = '/docs/reference/transforms';
-    if(type == "sink") prefix = '/docs/reference/sinks';
+  if (!template) {
+    if(type == "source") template = '/docs/reference/sources/<name>/';
+    if(type == "transform") template = '/docs/reference/transforms/<name>/';
+    if(type == "sink") template = '/docs/reference/sinks/<name>/';
   }
 
-  let path = `${prefix}/${name}/`;
+  let path = template.replace('<name>', name);
 
   return (
     <Link to={path} className="vector-component" title={description}>
@@ -51,7 +51,7 @@ function Component({delivery_guarantee, description, event_types, function_categ
   );
 }
 
-function Components({components, headingLevel, pathPrefix, titles}) {
+function Components({components, headingLevel, pathTemplate, titles}) {
   const sourceComponents = components.filter(component => component.type == "source");
   const transformComponents = components.filter(component => component.type == "transform");
   const sinkComponents = components.filter(component => component.type == "sink");
@@ -65,7 +65,7 @@ function Components({components, headingLevel, pathPrefix, titles}) {
             {titles && <HeadingTag>{sourceComponents.length} Sources</HeadingTag>}
             <div className="vector-components--grid">
               {sourceComponents.map((props, idx) => (
-                <Component key={idx} pathPrefix={pathPrefix} {...props} />
+                <Component key={idx} pathTemplate={pathTemplate} {...props} />
               ))}
             </div>
           </>:
@@ -75,7 +75,7 @@ function Components({components, headingLevel, pathPrefix, titles}) {
             {titles && <HeadingTag>{transformComponents.length} Transforms</HeadingTag>}
             <div className="vector-components--grid">
               {transformComponents.map((props, idx) => (
-                <Component key={idx} pathPrefix={pathPrefix} {...props} />
+                <Component key={idx} pathTemplate={pathTemplate} {...props} />
               ))}
             </div>
           </>:
@@ -85,7 +85,7 @@ function Components({components, headingLevel, pathPrefix, titles}) {
             {titles && <HeadingTag>{sinkComponents.length} Sinks</HeadingTag>}
             <div className="vector-components--grid">
               {sinkComponents.map((props, idx) => (
-                <Component key={idx} pathPrefix={pathPrefix} {...props} />
+                <Component key={idx} pathTemplate={pathTemplate} {...props} />
               ))}
             </div>
           </>:
@@ -112,7 +112,7 @@ function VectorComponents(props) {
   const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
-  const pathPrefix = props.pathPrefix;
+  const pathTemplate = props.pathTemplate;
   const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
 
   let components = [];
@@ -369,7 +369,7 @@ function VectorComponents(props) {
         <Components
           components={components}
           headingLevel={props.headingLevel}
-          pathPrefix={pathPrefix}
+          pathTemplate={pathTemplate}
           titles={titles} />
       </div>
     </div>

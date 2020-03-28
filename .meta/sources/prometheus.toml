@@ -1,5 +1,6 @@
 [sources.prometheus]
 title = "Prometheus"
+noun = "Prometheus"
 beta = true
 common = false
 delivery_guarantee = "best_effort"

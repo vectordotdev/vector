@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "best_effort"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
@@ -6,7 +7,6 @@ event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+papertrail%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Papertrail"
 sidebar_label: "papertrail|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/papertrail.rs
 status: "beta"

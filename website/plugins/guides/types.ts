@@ -3,7 +3,7 @@ export interface GuideContent {
   guideListPaginated: GuidePaginated[];
   guideTags: GuideTags;
   guideTagsListPath: string | null;
-  guideCategorySlugs: string[];
+  guideCategories: GuideCategory[];
 }
 
 export interface PluginOptions {
@@ -18,6 +18,13 @@ export interface PluginOptions {
   remarkPlugins: string[];
   rehypePlugins: string[];
   truncateMarker: RegExp;
+}
+
+export interface GuideCategory {
+  name: string;
+  title: string;
+  description: string | null;
+  permalink: string;
 }
 
 export interface GuideTags {
@@ -51,8 +58,7 @@ export interface GuidePaginated {
 }
 
 export interface MetaData {
-  categories: string[];
-  categorySlug: string;
+  categories: GuideCategory[];
   description: string;
   nextItem?: Paginator;
   permalink: string;

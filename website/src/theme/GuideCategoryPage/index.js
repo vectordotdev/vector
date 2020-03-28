@@ -4,28 +4,22 @@ import Layout from '@theme/Layout';
 import GuideItems from '@theme/GuideItems';
 import Link from '@docusaurus/Link';
 
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-
 function GuideCategoryPage(props) {
-  const {metadata: {categorySlug}, items} = props;
-  const context = useDocusaurusContext();
-  const {siteConfig: {customFields, title: siteTitle}} = context;
-  const {metadata: {guides: guidesMetadata}} = customFields;
-  const mainCategory = guidesMetadata[categorySlug.split('/')[0]];
+  const {metadata: {category}, items} = props;
 
   return (
     <Layout
-      title={`${categorySlug} Guides`}
-      description={mainCategory.description}>
+      title={`${category.title} Guides`}
+      description={`All ${category.title} guides`}>
       <header className="hero hero--clean">
         <div className="container">
-          <h1>{categorySlug} Guides</h1>
-          <div className="hero--subtitle">{mainCategory.description}</div>
+          <h1>{category.title} Guides</h1>
+          {category.description && <div className="hero--subtitle">{category.description}</div>}
           <div><Link to="/guides">View All Guides</Link></div>
         </div>
       </header>
       <main className="container container--s">
-        <GuideItems items={items} staggered={mainCategory.series} />
+        <GuideItems items={items} staggered={items[0].content.metadata.seriesPosition != null} />
       </main>
     </Layout>
   );

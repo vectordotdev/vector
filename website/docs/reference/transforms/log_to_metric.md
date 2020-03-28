@@ -1,10 +1,10 @@
 ---
+last_modified_on: "2020-03-27"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
 function_category: "convert"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-service_name: "Log to Metric"
 sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
 status: "prod-ready"

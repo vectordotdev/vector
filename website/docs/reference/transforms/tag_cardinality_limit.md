@@ -1,10 +1,10 @@
 ---
+last_modified_on: "2020-03-27"
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tag_cardinality_limit%22
-service_name: "Tag Cardinality Limit"
 sidebar_label: "tag_cardinality_limit|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tag_cardinality_limit.rs
 status: "beta"

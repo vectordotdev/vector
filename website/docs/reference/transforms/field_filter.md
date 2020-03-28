@@ -1,10 +1,10 @@
 ---
+last_modified_on: "2020-03-27"
 component_title: "Field Filter"
 description: "The Vector `field_filter` transform accepts and outputs `log` events allowing you to filter events by a log field's value."
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
-service_name: "Field Filter"
 sidebar_label: "field_filter|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 status: "beta"

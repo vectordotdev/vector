@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-27"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
@@ -6,7 +7,6 @@ event_types: ["metric"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Statsd"
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/blob/master/src/sources/statsd/
 status: "prod-ready"
