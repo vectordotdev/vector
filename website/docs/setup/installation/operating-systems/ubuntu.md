@@ -266,7 +266,7 @@ docker run \
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
@@ -521,8 +521,8 @@ docker run \
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `-p 9000:9000` flag ensures that port 9000 is exposed for network communication.
-   * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+* The `-p 9000:9000` flag ensures that port 9000 is exposed for network communication.
+* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 

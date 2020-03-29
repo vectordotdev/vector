@@ -116,7 +116,7 @@ docker run \
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 

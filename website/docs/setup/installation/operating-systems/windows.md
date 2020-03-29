@@ -168,8 +168,8 @@ docker run \
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
-   * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+* The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
+* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
@@ -325,8 +325,8 @@ docker run \
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-   * The `-p 9000:9000` flag ensures that port 9000 is exposed for network communication.
-   * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+* The `-p 9000:9000` flag ensures that port 9000 is exposed for network communication.
+* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
