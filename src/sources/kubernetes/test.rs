@@ -318,7 +318,8 @@ impl Drop for Kube {
 /// Panics if all trys fail.
 fn retry<F: FnMut() -> Result<R, E>, R, E: std::fmt::Debug>(mut f: F) -> R {
     let mut last_error = None;
-    for _ in 0..WAIT_LIMIT {
+    let started = std::time::Instant::now();
+    while started.elapsed() < std::time::Duration::from_secs(WAIT_LIMIT as u64) {
         match f() {
             Ok(data) => return data,
             Err(error) => {
@@ -526,7 +527,7 @@ fn kube_multi_log() {
 
 #[test]
 fn kube_object_uid() {
-    let namespace = format!("object-uid-{}", Uuid::new_v4());
+    let namespace = "kube-object-uid".to_owned(); //format!("object-uid-{}", Uuid::new_v4());
     let message = random_string(300);
     let user_namespace = user_namespace(&namespace);
 

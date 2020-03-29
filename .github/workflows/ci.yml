@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [1.13.12, 1.14.10, 1.17.2]
+        kube: [1.14.10, 1.17.2]
     steps:
     - name: Load vector
       uses: actions/download-artifact@v1
@@ -84,7 +84,7 @@ jobs:
         ENTRYPOINT ["/usr/local/bin/vector"]
         EOF
         docker push localhost:5000/vector_test:latest
-    - name: Make test executable, executable
+    - name: Make test binary executable
       run: chmod +x ./builds/vector-test
     - name: Run kubernetes integration tests
       run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest ./builds/vector-test --test-threads=1 kubernetes
