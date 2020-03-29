@@ -61,8 +61,11 @@ EOF
 # Test Kubernetes v1.17.0
 run_test kindest/node:v1.17.0@sha256:9512edae126da271b66b990b6fff768fbb7cd786c7d39e86bdf55906352fdf62
 
-# Test Kubernetes v1.14.10
-run_test kindest/node:v1.14.10@sha256:81ae5a3237c779efc4dda43cc81c696f88a194abcc4f8fa34f86cf674aa14977
 
-# Test Kubernetes v1.13.12
-run_test kindest/node:v1.13.12@sha256:5e8ae1a4e39f3d151d420ef912e18368745a2ede6d20ea87506920cd947a7e3a
+# Disabled for Kind because it can be slow at randome times which trigger test timeouts.
+
+# # Test Kubernetes v1.14.10
+# run_test kindest/node:v1.14.10@sha256:81ae5a3237c779efc4dda43cc81c696f88a194abcc4f8fa34f86cf674aa14977
+
+# # Test Kubernetes v1.13.12
+# run_test kindest/node:v1.13.12@sha256:5e8ae1a4e39f3d151d420ef912e18368745a2ede6d20ea87506920cd947a7e3a

@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [v1.13.12, v1.14.10, v1.17.2]
+        kube: [1.13.12, 1.14.10, 1.17.2]
     steps:
     - name: Load vector
       uses: actions/download-artifact@v1
@@ -69,11 +69,12 @@ jobs:
         name: builds
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
-        minikube-version: 1.7.3
+        minikube-version: 1.9.0
+        k8s-version: ${{ matrix.kube }}
     - name: Start local repository
       run: docker run -d -p 5000:5000 --restart=always --name registry registry:2
     - name: Start minikube
-      run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=${{ matrix.kube }}
+      run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=v${{ matrix.kube }}
     - name: Build & push image
       run: |
         docker build -t "localhost:5000/vector_test:latest" -f - . << EOF

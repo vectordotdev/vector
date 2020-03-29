@@ -23,7 +23,7 @@ static USER_CONTAINERS_MARKER: &'static str = "$(USER_CONTAINERS)";
 static USER_POD_UID_MARKER: &'static str = "$(USER_POD_UIDS)";
 static ARGS_MARKER: &'static str = "$(ARGS_MARKER)";
 static ECHO_NAME: &'static str = "$(ECHO_NAME)";
-static WAIT_LIMIT: usize = 60; //s
+static WAIT_LIMIT: usize = 120; //s
 /// Environment variable which contains name of the image to be tested.
 /// Image tag defines imagePullPolicy:
 /// - tag is 'latest' => imagePullPolicy: Always
