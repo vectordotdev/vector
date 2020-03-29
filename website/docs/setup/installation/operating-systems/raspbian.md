@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-28"
+last_modified_on: "2020-03-29"
 title: Install Vector On Raspbian
 sidebar_label: Raspbian
 description: Install Vector On Raspbian
@@ -7,8 +7,8 @@ description: Install Vector On Raspbian
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
+import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import InstallationCommand from '@site/src/components/InstallationCommand';
-import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -32,12 +32,17 @@ This document will cover installing Vector on Raspbian.
 
 The [daemon deployment strategy][docs.strategies.daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host. Typically data is collected from a process
-manager, such as Journald via Vector's [`journald`
-source][docs.sources.journald], but can be collected through any of Vector's
-[sources][docs.sources]. The following diagram demonstrates how it works.
+collecting _all_ data for that host.
 
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+Typically data is collected from a process manager, such as Journald via
+Vector's [`journald` source][docs.sources.journald], but can be collected
+through any of Vector's [sources][docs.sources].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={null}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 

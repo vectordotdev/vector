@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-28"
+last_modified_on: "2020-03-29"
 title: Install Vector On Ubuntu
 sidebar_label: Ubuntu
 description: Install Vector on the Ubuntu operating system
@@ -7,8 +7,9 @@ description: Install Vector on the Ubuntu operating system
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
+import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import InstallationCommand from '@site/src/components/InstallationCommand';
-import SVG from 'react-inlinesvg';
+import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -32,12 +33,17 @@ This document will cover installing Vector on Ubuntu.
 
 The [daemon deployment strategy][docs.strategies.daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host. Typically data is collected from a process
-manager, such as Journald via Vector's [`journald`
-source][docs.sources.journald], but can be collected through any of Vector's
-[sources][docs.sources]. The following diagram demonstrates how it works.
+collecting _all_ data for that host.
 
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+Typically data is collected from a process manager, such as Journald via
+Vector's [`journald` source][docs.sources.journald], but can be collected
+through any of Vector's [sources][docs.sources].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={null}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 
@@ -282,12 +288,16 @@ compose!
 
 The [service deployment strategy][docs.strategies.service] treats Vector like a
 separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations. Typically, upstream sources are other
-Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
-can be collected through any of Vector's [sources][docs.sources]. The following
-diagram demonstrates how it works.
+fan-out to one or more destinations.
+Typically, upstream sources are other Vector instances sending data via the
+[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
+[sources][docs.sources].
+The following diagram demonstrates how it works.
 
-<SVG src="/img/deployment-strategies-docker-service.svg" />
+<ServiceDiagram
+  platformName={null}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 

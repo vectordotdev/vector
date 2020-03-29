@@ -1,8 +1,0 @@
-The [daemon deployment strategy][docs.strategies.daemon] is designed for data
-collection on a single host. Vector runs in the background, in its own
-container, collecting _all_ data for that host. Typically, data is collected
-directly from the Docker API via Vector's [`docker` source][docs.sources.docker],
-but can be collected through any of Vector's
-[sources][docs.sources]. The following diagram demonstrates how it works.
-
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />

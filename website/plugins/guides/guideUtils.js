@@ -48,7 +48,7 @@ async function generateGuides(guideDir, { siteConfig, siteDir }, options) {
                     description = 'Take Vector from zero to production in under 10 minutes.';
                     break;
                 case 'integrate':
-                    description = 'Simple, step-by-step integration guides.';
+                    description = 'Simple step-by-step integration guides.';
                     break;
             }
             categories.unshift({

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-28"
+last_modified_on: "2020-03-29"
 delivery_guarantee: "best_effort"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."

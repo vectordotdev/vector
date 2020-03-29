@@ -4,4 +4,7 @@ the service. Typically data is collected by tailing local files via Vector's
 [`file` source][docs.sources.file], but can be collected through any of Vector's
 [sources][docs.sources]. The following diagram demonstrates how it works.
 
-<SVG src="/img/deployment-strategies-docker-sidecar.svg" />
+<ServiceDiagram
+  platformName={<%= (platform && platform.name).to_json %>}
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />

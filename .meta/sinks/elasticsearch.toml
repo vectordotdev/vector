@@ -6,7 +6,7 @@ common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
 features = [
-  "Send logs to Elasticsearch, self-hosted and AWS.",
+  "Send logs to Elasticsearch (AWS, Elastic Cloud, self-hosted, etc).",
   "Batch data to maximize throughput.",
   "Dynamically partition logs across indexes.",
   "Automatically retry failed requests, with backoff.",

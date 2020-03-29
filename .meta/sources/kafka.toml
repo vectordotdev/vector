@@ -6,7 +6,6 @@ common = true
 delivery_guarantee = "at_least_once"
 features = [
   "Consume one or more Kafka topics.",
-  "Automatically discover new files with glob patterns.",
   "Checkpoint your position to ensure data is not lost between restarts.",
   "Enrich your logs with useful Kafka context."
 ]

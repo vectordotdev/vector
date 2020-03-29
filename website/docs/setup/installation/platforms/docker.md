@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-28"
+last_modified_on: "2020-03-29"
 title: Install Vector On Docker
 sidebar_label: Docker
 description: Install Vector on the Docker platform
@@ -8,7 +8,8 @@ source_url: https://github.com/timberio/vector/tree/master/distribution/docker
 
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
-import SVG from 'react-inlinesvg';
+import DaemonDiagram from '@site/src/components/DaemonDiagram';
+import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -35,13 +36,18 @@ architectures.
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies.daemon] is designed for data
-collection on a single host. Vector runs in the background, in its own
-container, collecting _all_ data for that host. Typically, data is collected
-directly from the Docker API via Vector's [`docker` source][docs.sources.docker],
-but can be collected through any of Vector's
-[sources][docs.sources]. The following diagram demonstrates how it works.
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host.
 
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+Typically data is collected from a process manager, such as Journald via
+Vector's [`journald` source][docs.sources.journald], but can be collected
+through any of Vector's [sources][docs.sources].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={"docker"}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 
@@ -106,7 +112,10 @@ the service. Typically data is collected by tailing local files via Vector's
 [`file` source][docs.sources.file], but can be collected through any of Vector's
 [sources][docs.sources]. The following diagram demonstrates how it works.
 
-<SVG src="/img/deployment-strategies-docker-sidecar.svg" />
+<ServiceDiagram
+  platformName={"docker"}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 
@@ -167,12 +176,16 @@ compose!
 
 The [service deployment strategy][docs.strategies.service] treats Vector like a
 separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations. Typically, upstream sources are other
-Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
-can be collected through any of Vector's [sources][docs.sources]. The following
-diagram demonstrates how it works.
+fan-out to one or more destinations.
+Typically, upstream sources are other Vector instances sending data via the
+[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
+[sources][docs.sources].
+The following diagram demonstrates how it works.
 
-<SVG src="/img/deployment-strategies-docker-service.svg" />
+<ServiceDiagram
+  platformName={"docker"}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 
@@ -312,8 +325,8 @@ Vector's Docker source files are located
 [docs.deployment]: /docs/setup/deployment/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sinks.vector]: /docs/reference/sinks/vector/
-[docs.sources.docker]: /docs/reference/sources/docker/
 [docs.sources.file]: /docs/reference/sources/file/
+[docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
 [docs.strategies.service]: /docs/setup/deployment/strategies/service/

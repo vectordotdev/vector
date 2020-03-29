@@ -242,6 +242,7 @@ class Component
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
       description: description,
       event_types: event_types,
+      features: features,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
       logo_path: logo_path,

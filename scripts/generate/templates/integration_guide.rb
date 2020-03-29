@@ -1,15 +1,11 @@
 class Templates
   class IntegrationGuide
+    attr_reader :event_types, :platform, :sink, :source
+
     def initialize(interfaces, strategy, platform: nil, source: nil, sink: nil)
       if platform.nil? && source.nil? && sink.nil?
         raise ArgumentError.new("You must supply at least a platform, source, or sink")
       end
-
-      @interfaces = interfaces
-      @platform = platform
-      @source = source
-      @sink = sink
-      @strategy = strategy
 
       @event_types =
         if source && sink
@@ -21,6 +17,12 @@ class Templates
         else
           []
         end
+
+      @interfaces = interfaces
+      @platform = platform
+      @source = source
+      @sink = sink
+      @strategy = strategy
     end
 
     def action_phrase(narrative = nil)
@@ -43,11 +45,11 @@ class Templates
         end
 
       if @source && @sink
-        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} to #{normalize_title(@sink.noun)}"
+        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_noun(@source.noun)} to #{normalize_noun(@sink.noun)}"
       elsif @source
-        "collect #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_title(@source.noun)} and send them #{target}"
+        "collect #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_noun(@source.noun)} and send them #{target}"
       elsif @sink
-        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} to #{normalize_title(@sink.noun)}"
+        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} to #{normalize_noun(@sink.noun)}"
       end
     end
 
@@ -64,6 +66,10 @@ class Templates
         elsif @sink.title
           "#{@sink.title} Integration"
         end
+    end
+
+    def events_phrase
+      @events_phrase ||= event_types.collect(&:pluralize).to_sentence
     end
 
     def features
@@ -123,7 +129,7 @@ class Templates
             strings << "platform: #{@platform.name}"
           end
 
-          if @source && !@platform
+          if @source
             strings << "source: #{@source.name}"
           end
 
@@ -136,7 +142,7 @@ class Templates
     end
 
     private
-      def normalize_title(title)
+      def normalize_noun(title)
         title.gsub(/ (logs|metrics)$/i, '')
       end
   end

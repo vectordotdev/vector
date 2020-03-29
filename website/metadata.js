@@ -24591,6 +24591,13 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to AWS Cloudwatch.",
+        "Dynamically partition logs across CloudWatch groups and streams.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "aws_cloudwatch_logs_sink",
       "input_types": [
@@ -24624,6 +24631,12 @@ module.exports = {
       "description": "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
       "event_types": [
         "metric"
+      ],
+      "features": [
+        "Send metrics to AWS Cloudwatch.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
       ],
       "function_category": "transmit",
       "id": "aws_cloudwatch_metrics_sink",
@@ -24659,6 +24672,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to AWS Kinesis Firehose.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "aws_kinesis_firehose_sink",
       "input_types": [
@@ -24693,6 +24712,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to AWS Kinesis Data Streams.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "aws_kinesis_streams_sink",
       "input_types": [
@@ -24726,6 +24751,14 @@ module.exports = {
       "description": "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to AWS S3.",
+        "Dynamically partition logs across different key prefixes.",
+        "Compress and batch data to reduce storage cost and imrpove throughput.",
+        "Optionally adjust ACL and encryption settings.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "aws_s3_sink",
@@ -24762,6 +24795,10 @@ module.exports = {
         "log",
         "metric"
       ],
+      "features": [
+        "Test log throughput.",
+        "Print log totals on an interval."
+      ],
       "function_category": "test",
       "id": "blackhole_sink",
       "input_types": [
@@ -24796,6 +24833,13 @@ module.exports = {
       "description": "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to ClickHouse.",
+        "Compress and batch data to maximize throughput.",
+        "Encode timestamps to ClickHouse supported formats.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "clickhouse_sink",
@@ -24832,6 +24876,10 @@ module.exports = {
         "log",
         "metric"
       ],
+      "features": [
+        "Print logs to STDOUT or STDERR.",
+        "Encode logs to JSON or text."
+      ],
       "function_category": "test",
       "id": "console_sink",
       "input_types": [
@@ -24867,6 +24915,13 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to DataDog.",
+        "Automatically map common fields to Datadog's reserved fields.",
+        "Compress and batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "datadog_logs_sink",
       "input_types": [
@@ -24901,6 +24956,12 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Send metrics to Datadog.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "datadog_metrics_sink",
       "input_types": [
@@ -24934,6 +24995,13 @@ module.exports = {
       "description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to Elasticsearch (AWS, Elastic Cloud, self-hosted, etc).",
+        "Batch data to maximize throughput.",
+        "Dynamically partition logs across indexes.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "elasticsearch_sink",
@@ -24970,6 +25038,10 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Write logs to files.",
+        "Dynamically partition logs across multiple files."
+      ],
       "function_category": "transmit",
       "id": "file_sink",
       "input_types": [
@@ -25003,6 +25075,17 @@ module.exports = {
       "description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to GCP Cloud Storage.",
+        "Leverage any of GCP's IAM strategies.",
+        "Confifgure object sizes to reduce request cost.",
+        "Dynamically partition logs across different key prefixes.",
+        "Optionally compress data to reduce storage cost.",
+        "Control object-level ACL.",
+        "Choose different storage classes for cost control.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "gcp_cloud_storage_sink",
@@ -25038,6 +25121,13 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to GCP PubSub.",
+        "Leverage any of GCP's IAM strategies.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "gcp_pubsub_sink",
       "input_types": [
@@ -25071,6 +25161,13 @@ module.exports = {
       "description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to GCP Stackdriver.",
+        "Leverage any of GCP's IAM strategies.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "gcp_stackdriver_logs_sink",
@@ -25106,6 +25203,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send structured logs to the Honeycomb observability service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "honeycomb_sink",
       "input_types": [
@@ -25139,6 +25242,13 @@ module.exports = {
       "description": "Batches log events to a generic HTTP endpoint.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs over the HTTP protocol.",
+        "Batch and compress data to maximize throughput.",
+        "Optionally set custom headers.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "http_sink",
@@ -25174,6 +25284,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to the Humio logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "humio_logs_sink",
       "input_types": [
@@ -25208,6 +25324,12 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Send metrics to InfluxDB v1 or v2.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "influxdb_metrics_sink",
       "input_types": [
@@ -25241,6 +25363,13 @@ module.exports = {
       "description": "Streams log events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to Kafka.",
+        "Leverage any of AWS' IAM strategies.",
+        "Optionally compress data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "kafka_sink",
@@ -25277,6 +25406,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to the LogDNA logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "logdna_sink",
       "input_types": [
@@ -25310,6 +25445,13 @@ module.exports = {
       "description": "Batches log events to [Loki][urls.loki].",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send structured logs to the Loki logging service.",
+        "Batch data to maximize throughput.",
+        "Set custom labels to be added to all log data.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "loki_sink",
@@ -25345,6 +25487,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to the New Relic logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "new_relic_logs_sink",
       "input_types": [
@@ -25378,6 +25526,12 @@ module.exports = {
       "description": "Streams log events to [Papertrail](https://www.papertrail.com/) via [Syslog](https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages).",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to the Papertrail logging service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "papertrail_sink",
@@ -25413,6 +25567,10 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Expose an endpoint that Prometheus can scrape for metrics data.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "prometheus_sink",
       "input_types": [
@@ -25446,6 +25604,11 @@ module.exports = {
       "description": "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send logs to Apache Pulsar.",
+        "Stream data in a real-time fashion.",
+        "Automatically retry failed requests, with backoff."
       ],
       "function_category": "transmit",
       "id": "pulsar_sink",
@@ -25481,6 +25644,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to the Sematext monitoring service.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "sematext_logs_sink",
       "input_types": [
@@ -25514,6 +25683,10 @@ module.exports = {
       "description": "Streams log events to a socket, such as a TCP, UDP, or Unix domain socket.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Stream logs over a TCP, UDP, or Unix socket.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "socket_sink",
@@ -25549,6 +25722,13 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Send logs to a Splunk HTTP event collector.",
+        "Customize which fields should be added to the Splunk index.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
+      ],
       "function_category": "transmit",
       "id": "splunk_hec_sink",
       "input_types": [
@@ -25583,6 +25763,10 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Stream metrics over a StatsD UDP protocol.",
+        "Automatically aggregate metrics at the edge for improved performance."
+      ],
       "function_category": "transmit",
       "id": "statsd_sink",
       "input_types": [
@@ -25616,6 +25800,9 @@ module.exports = {
       "description": "Streams log events to another downstream [`vector` source][docs.sources.vector].",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Send data to another downstream Vector instance."
       ],
       "function_category": "transmit",
       "id": "vector_sink",
@@ -25653,6 +25840,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Collect Docker container logs.",
+        "Filter which containers you collect them from.",
+        "Automatically merge logs that Docker splits.",
+        "Enrich your logs with useful Docker context."
+      ],
       "function_category": "collect",
       "id": "docker_source",
       "logo_path": "/img/logos/docker.svg",
@@ -25686,6 +25879,13 @@ module.exports = {
       "description": "Ingests data through one or more local files and outputs log events.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Tail one or more files.",
+        "Automatically discover new files with glob patterns.",
+        "Merge multi-line logs into one event.",
+        "Checkpoint your position to ensure data is not lost between restarts.",
+        "Enrich your logs with useful file and host-level context."
       ],
       "function_category": "collect",
       "id": "file_source",
@@ -25721,6 +25921,11 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data over HTTP.",
+        "Decode JSON, NDJSON, and text.",
+        "Enrich your logs with select HTTP headers."
+      ],
       "function_category": "receive",
       "id": "http_source",
       "logo_path": "/img/logos/http.svg",
@@ -25755,6 +25960,12 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Collect Journald/Systemd logs.",
+        "Filter which Systemd units you collect them from.",
+        "Checkpoint your position to ensure data is not lost between restarts.",
+        "Enrich your logs with useful Systemd context."
+      ],
       "function_category": "collect",
       "id": "journald_source",
       "logo_path": "/img/logos/journald.svg",
@@ -25787,6 +25998,11 @@ module.exports = {
       "description": "Ingests data through Kafka and outputs log events.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Consume one or more Kafka topics.",
+        "Checkpoint your position to ensure data is not lost between restarts.",
+        "Enrich your logs with useful Kafka context."
       ],
       "function_category": "collect",
       "id": "kafka_source",
@@ -25822,6 +26038,10 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept Heroku Logplex data over HTTP.",
+        "Automatically parse incoming data into structured events."
+      ],
       "function_category": "receive",
       "id": "logplex_source",
       "logo_path": "/img/logos/logplex.svg",
@@ -25855,6 +26075,11 @@ module.exports = {
       "description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
       "event_types": [
         "metric"
+      ],
+      "features": [
+        "Scrape one or more Prometheus endpoints.",
+        "Ingest all Prometheus metric types.",
+        "Automatically parse metrics into a lossless interoperable data model."
       ],
       "function_category": "receive",
       "id": "prometheus_source",
@@ -25890,6 +26115,10 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data over a TCP, UDP, or UDS socket.",
+        "Automatically enrich logs with host-level context."
+      ],
       "function_category": "receive",
       "id": "socket_source",
       "logo_path": "/img/logos/socket.svg",
@@ -25923,6 +26152,11 @@ module.exports = {
       "description": "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Accept log data just like the Splunk HTTP event collector.",
+        "Automatically parse incoming data into structured events.",
+        "Optionally require authentication on all requests."
       ],
       "function_category": "receive",
       "id": "splunk_hec_source",
@@ -25958,6 +26192,10 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+        "Accept metrics data over the Statsd UDP protocol.",
+        "Automatically parse metrics into a lossless interoperable data model."
+      ],
       "function_category": "receive",
       "id": "statsd_source",
       "logo_path": "/img/logos/statsd.svg",
@@ -25991,6 +26229,10 @@ module.exports = {
       "description": "Ingests data through standard input (STDIN) and outputs log events.",
       "event_types": [
         "log"
+      ],
+      "features": [
+        "Accept new line delimited log data through STDIN.",
+        "Automatically enrich logs with host-level context."
       ],
       "function_category": "receive",
       "id": "stdin_source",
@@ -26026,6 +26268,10 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+        "Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.",
+        "Automatically parse Syslog 3164 and 5424 formats."
+      ],
       "function_category": "receive",
       "id": "syslog_source",
       "logo_path": "/img/logos/syslog.svg",
@@ -26060,6 +26306,9 @@ module.exports = {
       "event_types": [
         "log",
         "metric"
+      ],
+      "features": [
+        "Accept data from another upstream Vector instance."
       ],
       "function_category": "receive",
       "id": "vector_source",
@@ -26182,6 +26431,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "add_fields_transform",
       "inpuut_types": [
@@ -26214,6 +26466,9 @@ module.exports = {
       "description": "Accepts metric events and allows you to add one or more metric tags.",
       "event_types": [
         "metric"
+      ],
+      "features": [
+
       ],
       "function_category": "shape",
       "id": "add_tags_transform",
@@ -26248,6 +26503,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "sanitize",
       "id": "ansi_stripper_transform",
       "inpuut_types": [
@@ -26280,6 +26538,9 @@ module.exports = {
       "description": "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "enrich",
       "id": "aws_ec2_metadata_transform",
@@ -26314,6 +26575,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "coercer_transform",
       "inpuut_types": [
@@ -26346,6 +26610,9 @@ module.exports = {
       "description": "Accepts log events and allows you to concat (substrings) of other fields to a new one.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "shape",
       "id": "concat_transform",
@@ -26380,6 +26647,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "filter",
       "id": "dedupe_transform",
       "inpuut_types": [
@@ -26412,6 +26682,9 @@ module.exports = {
       "description": "Accepts log events and allows you to filter events by a log field's value.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "filter",
       "id": "field_filter_transform",
@@ -26446,6 +26719,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "enrich",
       "id": "geoip_transform",
       "inpuut_types": [
@@ -26479,6 +26755,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "grok_parser_transform",
       "inpuut_types": [
@@ -26511,6 +26790,9 @@ module.exports = {
       "description": "Accepts log events and allows you to parse a log field value as JSON.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "parse",
       "id": "json_parser_transform",
@@ -26546,6 +26828,9 @@ module.exports = {
         "log",
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "convert",
       "id": "log_to_metric_transform",
       "inpuut_types": [
@@ -26578,6 +26863,9 @@ module.exports = {
       "description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "parse",
       "id": "logfmt_parser_transform",
@@ -26612,6 +26900,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "program",
       "id": "lua_transform",
       "inpuut_types": [
@@ -26644,6 +26935,9 @@ module.exports = {
       "description": "Accepts log events and allows you to merge partial log events into a single event.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "aggregate",
       "id": "merge_transform",
@@ -26678,6 +26972,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "parse",
       "id": "regex_parser_transform",
       "inpuut_types": [
@@ -26710,6 +27007,9 @@ module.exports = {
       "description": "Accepts log events and allows you to remove one or more log fields.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "shape",
       "id": "remove_fields_transform",
@@ -26744,6 +27044,9 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "shape",
       "id": "remove_tags_transform",
       "inpuut_types": [
@@ -26776,6 +27079,9 @@ module.exports = {
       "description": "Accepts log events and allows you to rename one or more log fields.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "shape",
       "id": "rename_fields_transform",
@@ -26810,6 +27116,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "filter",
       "id": "sampler_transform",
       "inpuut_types": [
@@ -26842,6 +27151,9 @@ module.exports = {
       "description": "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "parse",
       "id": "split_transform",
@@ -26876,6 +27188,9 @@ module.exports = {
       "event_types": [
         "log"
       ],
+      "features": [
+
+      ],
       "function_category": "route",
       "id": "swimlanes_transform",
       "inpuut_types": [
@@ -26909,6 +27224,9 @@ module.exports = {
       "event_types": [
         "metric"
       ],
+      "features": [
+
+      ],
       "function_category": "filter",
       "id": "tag_cardinality_limit_transform",
       "inpuut_types": [
@@ -26941,6 +27259,9 @@ module.exports = {
       "description": "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.",
       "event_types": [
         "log"
+      ],
+      "features": [
+
       ],
       "function_category": "parse",
       "id": "tokenizer_transform",

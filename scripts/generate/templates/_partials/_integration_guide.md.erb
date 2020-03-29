@@ -1,20 +1,29 @@
 ---
 $schema: "/.meta/.schemas/guides.json"
 title: <%= guide.action_phrase.capitalize_first.to_json %>
-description: "A guide to quickly, and correctly, <%= guide.action_phrase %>."
+description: "A simple guide to <%= guide.action_phrase %> in just a few minutes."
 author_github: https://github.com/binarylogic
 cover_label: <%= guide.cover_label.to_json %>
 tags: <%= guide.tags.to_json %>
 ---
 
-So you want to <%= guide.action_phrase %>? Sounds simple! Sadly, it is not.
-When you account for x, y, and z, you quickly realize this is no easy endaevor.
-Especially for high volume product environments! Fear not! This guide will get
-you up and running in minutes.
+<%= guide.events_phrase.capitalize %> are an _essential_ part of observing any
+service; without them you are flying blind. But collecting and analying them can
+be a real challenge -- especially at scale. Not only do you need to solve the
+basic task of collecting your <%= guide.events_phrase %>, but you must do it in
+a reliable, performant, and robust manner. Nothing is more frustrating than
+having your <%= guide.events_phrase %> pipeline fall on it's face during an
+outage, or even worse, disrupt more important services!
+
+Fear not! In this guide we'll show you how to send <%= guide.action_phrase %>
+and build a <%= guide.events_phrase %> pipeline that will be the backbone of
+your observability strategy.
 
 ## What We'll Accomplish
 
-<ol className="list--checks list--lg list--semi-bold list--primary list--flush">
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--semi-bold list--flush">
   <%- guide.features.each do |feature| -%>
   <li>
     <%= feature.text %>
@@ -27,12 +36,19 @@ you up and running in minutes.
     <%- end -%>
   </li>
   <%- end -%>
-  <li className="list--li--arrow list--li--pink">All in just a few minutes. Let's get started!</li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
 
 ## How It Works
 
-<%= deployment_strategy(strategy, describe_vector: true, platform: platform) %>
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[<%= strategy.name %>][docs.strategies.<%= strategy.name %>].
+
+<%= deployment_strategy(strategy, platform: platform, sink: sink, source: source) %>
 
 ## Tutorial
 

@@ -63,7 +63,7 @@ export async function generateGuides(
             break;
 
           case 'integrate':
-            description = 'Simple, step-by-step integration guides.'
+            description = 'Simple step-by-step integration guides.'
             break;
         }
 

@@ -133,15 +133,8 @@ class Templates
     end
   end
 
-  def deployment_strategy(strategy, describe_vector: false, platform: nil)
-    template_name =
-      if platform
-        "deployment_strategies/_#{platform.name}_#{strategy.name}"
-      else
-        "deployment_strategies/_#{strategy.name}"
-      end
-
-    render("#{partials_path}/#{template_name}.md", binding).strip
+  def deployment_strategy(strategy, platform: nil, sink: nil, source: nil)
+    render("#{partials_path}/deployment_strategies/_#{strategy.name}.md", binding).strip
   end
 
   def docker_docs

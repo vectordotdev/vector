@@ -952,7 +952,7 @@ ol.list--checks ol {
   list-style: none;
 }
 ol.list--checks ol {
-  font-size: 0.85em;
+  font-size: 0.9em;
   margin: var(--ifm-spacing-vertical) 0;
 }
 ol.list--checks li:before {

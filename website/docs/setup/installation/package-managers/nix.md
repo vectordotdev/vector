@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-28"
+last_modified_on: "2020-03-29"
 title: Install Vector via Nix
 sidebar_label: Nix
 description: Install Vector through the Nix package manager
@@ -8,8 +8,9 @@ description: Install Vector through the Nix package manager
 import Alert from '@site/src/components/Alert';
 import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
+import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
-import SVG from 'react-inlinesvg';
+import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -42,12 +43,17 @@ delayed. Generally new Vector releases are made available within a few days.
 
 The [daemon deployment strategy][docs.strategies.daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host. Typically data is collected from a process
-manager, such as Journald via Vector's [`journald`
-source][docs.sources.journald], but can be collected through any of Vector's
-[sources][docs.sources]. The following diagram demonstrates how it works.
+collecting _all_ data for that host.
 
-<SVG src="/img/deployment-strategies-docker-daemon.svg" />
+Typically data is collected from a process manager, such as Journald via
+Vector's [`journald` source][docs.sources.journald], but can be collected
+through any of Vector's [sources][docs.sources].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={null}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 
@@ -107,12 +113,16 @@ source][docs.sources.journald], but can be collected through any of Vector's
 
 The [service deployment strategy][docs.strategies.service] treats Vector like a
 separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations. Typically, upstream sources are other
-Vector instances sending data via the [`vector` sink][docs.sinks.vector], but
-can be collected through any of Vector's [sources][docs.sources]. The following
-diagram demonstrates how it works.
+fan-out to one or more destinations.
+Typically, upstream sources are other Vector instances sending data via the
+[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
+[sources][docs.sources].
+The following diagram demonstrates how it works.
 
-<SVG src="/img/deployment-strategies-docker-service.svg" />
+<ServiceDiagram
+  platformName={null}
+  sourceName={null}
+  sinkName={null} />
 
 ---
 

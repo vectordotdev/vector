@@ -21,7 +21,7 @@ const DEFAULT_OPTIONS = {
     truncateMarker: /<!--\s*(truncate)\s*-->/,
 };
 function pluginContentGuide(context, opts) {
-    const options = { ...DEFAULT_OPTIONS, ...opts };
+    const options = Object.assign(Object.assign({}, DEFAULT_OPTIONS), opts);
     const { siteDir, generatedFilesDir } = context;
     const contentPath = path_1.default.resolve(siteDir, options.path);
     const dataDir = path_1.default.join(generatedFilesDir, 'guides');

@@ -22,6 +22,7 @@ function GroupedGuideItems({groupLevel, items, large, staggered}) {
   const groupedCategories = _(items).
     map(item => item.content.metadata.categories[groupLevel - 1]).
     uniqBy('permalink').
+    sortBy('title').
     keyBy('permalink').
     value();
 
