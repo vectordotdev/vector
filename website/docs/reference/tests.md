@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-30"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -825,4 +826,4 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
-[guides.advanced.unit-testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
+[guides.advanced.unit-testing]: /guides/advanced/unit-testing/

@@ -48,10 +48,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="homebrew"
-  values={[{"label":"Homebrew","value":"homebrew"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="homebrew">
 
 <div className="steps steps--h3">
@@ -194,10 +196,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="homebrew"
-  values={[{"label":"Homebrew","value":"homebrew"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="homebrew">
 
 <div className="steps steps--h3">

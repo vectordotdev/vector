@@ -58,10 +58,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="nix"
-  values={[{"label":"Nix","value":"nix"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"Nix","value":"nix"}]}>
 <TabItem value="nix">
 
 <div className="steps steps--h3">
@@ -127,10 +129,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="nix"
-  values={[{"label":"Nix","value":"nix"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"Nix","value":"nix"}]}>
 <TabItem value="nix">
 
 <div className="steps steps--h3">

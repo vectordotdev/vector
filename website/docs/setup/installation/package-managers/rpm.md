@@ -48,10 +48,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="rpm"
-  values={[{"label":"RPM","value":"rpm"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 
 <div className="steps steps--h3">
@@ -178,10 +180,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="rpm"
-  values={[{"label":"RPM","value":"rpm"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 
 <div className="steps steps--h3">

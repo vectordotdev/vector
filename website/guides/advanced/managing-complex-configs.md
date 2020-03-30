@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
@@ -17,7 +17,7 @@ free Vector configs that are easy to maintain.
 
      To make changes please edit the template located at:
 
-     website/guides/advanced/managing-complex-configurations.md.erb
+     website/guides/advanced/managing-complex-configs.md.erb
 -->
 
 ## Test Driven Configuration
@@ -187,5 +187,5 @@ If you're running Vector in environments where it's not possible to issue
 automatically gobble up changes whenever the file is written to.
 
 
-[guides.advanced.unit-testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
-[guides.unit-testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
+[guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[guides.unit-testing]: /guides/advanced/unit-testing/

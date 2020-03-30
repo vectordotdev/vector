@@ -29,6 +29,7 @@ class Links
   VECTOR_ROOT = "https://github.com/timberio/vector".freeze
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit".freeze
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues".freeze
+  VECTOR_MILESTONES_ROOT = "#{VECTOR_ROOT}/milestone".freeze
   VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull".freeze
   TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness".freeze
 
@@ -48,7 +49,7 @@ class Links
       Dir.glob("#{guides_root}/**/*.md").
       to_a.
       reject { |p| File.directory?(p) }.
-      collect { |f| f.gsub(docs_root, "").split(".").first }
+      collect { |f| f.gsub(guides_root, "").split(".").first }
 
     @pages =
       Dir.glob("#{pages_root}/**/*.js").
@@ -187,7 +188,12 @@ class Links
     end
 
     def fetch_guide_path(name)
-      if name == "index"
+      case name
+      when "advanced"
+        return "#{GUIDES_BASE_PATH}/advanced/"
+      when "getting-started"
+        return "#{GUIDES_BASE_PATH}/getting-started/"
+      when "index"
         return GUIDES_BASE_PATH
       end
 
@@ -240,6 +246,9 @@ class Links
 
       when /^issue_([0-9]+)$/
         "#{VECTOR_ISSUES_ROOT}/#{$1}"
+
+      when /^milestone_([0-9]+)$/
+        "#{VECTOR_MILESTONES_ROOT}/#{$1}"
 
       when /^new_(.*)_(sink|source|transform)_issue$/
         name = $1

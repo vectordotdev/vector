@@ -100,4 +100,4 @@ works well for everyone. Please let us know what you think either in our
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms]: /docs/reference/transforms/
-[guides.advanced.unit_testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
+[guides.advanced.unit_testing]: /guides/advanced/unit-testing/

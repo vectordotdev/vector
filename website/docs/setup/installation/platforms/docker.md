@@ -53,10 +53,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="docker-cli"
-  values={[{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
 <div className="steps steps--h3">
@@ -121,10 +123,12 @@ each service. Typically data is collected by tailing local files via Vector's
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="docker-cli"
-  values={[{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
 <div className="steps steps--h3">
@@ -191,10 +195,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="docker-cli"
-  values={[{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
 <div className="steps steps--h3">

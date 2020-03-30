@@ -81,6 +81,12 @@ github = "https://github.com/lukesteensen"
 keybase = "https://keybase.io/lukesteensen"
 twitter = "https://twitter.com/lukesteensen"
 name = "Luke"
+bio = """\
+Luke is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
+and member of the <a href="/community#team">core Vector team</a>. Before \
+Timber Luke was an engineer at Braintree, working on parts of their \
+observability pipeline.\
+"""
 
 [[team]]
 id = "mike"

@@ -12,9 +12,9 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/managing-complex-configurations",
+          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/managing-complex-configs",
           "last_modified_on": null,
-          "path": "website/guides/advanced/managing-complex-configurations.md",
+          "path": "website/guides/advanced/managing-complex-configs.md",
           "series_position": null,
           "title": "Managing Complex Configs"
         },
@@ -26399,6 +26399,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/lukesteensen.png",
+      "bio": "Luke is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and member of the <a href=\"/community#team\">core Vector team</a>. Before Timber Luke was an engineer at Braintree, working on parts of their observability pipeline.",
       "github": "https://github.com/lukesteensen",
       "id": "luke",
       "keybase": "https://keybase.io/lukesteensen",

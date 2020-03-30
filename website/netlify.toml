@@ -104,7 +104,7 @@
 
 [[redirects]]
   from = "/docs/setup/guides/advanced-configs/"
-  to = "/guides/advanced/managing-complex-configurations/"
+  to = "/guides/advanced/managing-complex-configs/"
   status = 301
   force = true
 

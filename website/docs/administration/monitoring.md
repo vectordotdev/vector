@@ -20,45 +20,94 @@ This document will cover monitoring Vector.
 
 ## Logs
 
-Vector writes all output to `STDOUT`, therefore, you have complete control of
-the output destination. Accessing the logs depends on your service manager:
+### Accessing
 
 <Tabs
-  block={true}
-  defaultValue="manual"
-  values={[
-    { label: 'Manual', value: 'manual', },
-    { label: 'Systemd', value: 'systemd', },
-    { label: 'Initd', value: 'initd', },
-    { label: 'Homebrew', value: 'homebrew', },
-  ]
-}>
-<TabItem value="manual">
+  block={false}
+  centered={true}
+  placeholder="How did you install Vector?"
+  select={true}
+  size={null}
+  values={[{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"}]}>
+<TabItem value="dpkg">
 
-```bash
-tail /var/log/vector.log
-```
-
-</TabItem>
-<TabItem value="systemd">
+The Vector DEB package installs Vector as a Systemd service. Logs can be
+accessed through the `journalctl` utility:
 
 ```bash
 sudo journalctl -fu vector
 ```
 
 </TabItem>
-<TabItem value="initd">
+<TabItem value="docker-cli">
+
+If you've started Vector through the `docker` CLI you can access Vector's logs
+via the `docker logs` command. First, find the Vector container ID:
 
 ```bash
-tail -f /var/log/vector.log
+docker ps | grep vector
 ```
+
+Copy Vector's container ID and use it to tail the logs:
+
+```bash
+docker logs -f <container-id>
+```
+
+</TabItem>
+<TabItem value="docker-compose">
+
+If you started Vector through Docker compose you can use the following command
+to access Vector's logs:
+
+```bash
+docker-compose logs -f vector
+```
+
+Replace `vector` with the name of Vector's service if it is not called `vector`.
 
 </TabItem>
 <TabItem value="homebrew">
 
+When Vector is started through Homebrew the logs are automatically routed to
+`/usr/local/var/log/vector.log`. You can tail them with the `tail` utility:
+
 ```bash
 tail -f /usr/local/var/log/vector.log
 ```
+
+</TabItem>
+<TabItem value="msi">
+
+The Vector MSI package does not install Vector into a proces manager. Therefore,
+Vector must be started by executing the Vector binary directly. Vector's logs
+are written to `STDOUT`. You are in charge of routing `STDOUT`, and this
+determines how you access Vector's logs.
+
+</TabItem>
+<TabItem value="nix">
+
+The Vector Nix package does not install Vector into a proces manager. Therefore,
+Vector must be started by executing the Vector binary directly. Vector's logs
+are written to `STDOUT`. You are in charge of routing `STDOUT`, and this
+determines how you access Vector's logs.
+
+</TabItem>
+<TabItem value="rpm">
+
+The Vector RPM package installs Vector as a Systemd service. Logs can be
+accessed through the `journalctl` utility:
+
+```bash
+sudo journalctl -fu vector
+```
+
+</TabItem>
+<TabItem value="vector-cli">
+
+If you are starting Vector directly from the Vector CLI then all logs will be
+written to `STDOUT`. You are in charge of routing `STDOUT`, and this determines
+how you access Vector's logs.
 
 </TabItem>
 </Tabs>
@@ -85,7 +134,8 @@ var. More on this in the [Troubleshooting guide][guides.advanced.troubleshooting
 
 Vector rate limits log events in the hot path. This is to your benefit as
 it allows you to get granular insight without the risk of saturating IO
-and disrupting service. The tradeoff is that repetitive logs will not be logged.
+and disrupting the service. The tradeoff is that repetitive logs will not be
+logged.
 
 ## Metrics
 
@@ -105,5 +155,5 @@ Please refer to our troubleshooting guide:
 [docs.process-management#flags]: /docs/administration/process-management/#flags
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
-[guides.advanced.troubleshooting]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/troubleshooting/
+[guides.advanced.troubleshooting]: /guides/advanced/troubleshooting/
 [urls.issue_230]: https://github.com/timberio/vector/issues/230

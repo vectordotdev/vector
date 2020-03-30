@@ -1,3 +1,4 @@
+<%- if describe -%>
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
@@ -12,6 +13,7 @@ through any of Vector's [sources][docs.sources].
 <%- end -%>
 The following diagram demonstrates how it works.
 
+<%- end -%>
 <DaemonDiagram
   platformName={<%= (platform && platform.name).to_json %>}
   sourceName={<%= (source && source.name).to_json %>}

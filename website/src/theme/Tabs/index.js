@@ -28,13 +28,28 @@ function ListSwitcher({block, centered, className, style, values, selectedValue,
     </div>
   );
 }
-function SelectSwitcher({placeholder, selectedValue, setSelectedValue, values}) {
+function SelectSwitcher({placeholder, selectedValue, setSelectedValue, size, values}) {
+  let options = values;
+
+  if (options[0].group) {
+    let groupedOptions = _.groupBy(options, 'group');
+
+    options = Object.keys(groupedOptions).map(group => {
+      return {
+        label: group,
+        options: groupedOptions[group]
+      }
+    });
+  }
+
+  console.log(values)
+
   return (
     <Select
-      className='react-select-container'
+      className={`react-select-container react-select--${size}`}
       classNamePrefix='react-select'
-      options={values}
-      isClearable={false}
+      options={options}
+      isClearable={selectedValue}
       placeholder={placeholder}
       value={values.find(option => option.value == selectedValue)}
       onChange={(selectedOption) => setSelectedValue(selectedOption ? selectedOption.value : null)} />
@@ -42,7 +57,7 @@ function SelectSwitcher({placeholder, selectedValue, setSelectedValue, values}) 
 }
 
 function Tabs(props) {
-  const {block, centered, children, defaultValue, label, placeholder, select, style, values, urlKey} = props;
+  const {block, centered, children, defaultValue, label, placeholder, select, size, style, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -56,10 +71,15 @@ function Tabs(props) {
 
   return (
     <>
-      <div className="margin-vert--md">
+      <div className={`margin-vert--${size || 'md'}`}>
         {label && <div className="margin-vert--sm">{label}</div>}
         {values.length > 1 && (select ?
-          <SelectSwitcher placeholder={placeholder} selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
+          <SelectSwitcher
+            placeholder={placeholder}
+            selectedValue={selectedValue}
+            setSelectedValue={setSelectedValue}
+            size={size}
+            {...props} /> :
           <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
       </div>
 

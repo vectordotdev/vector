@@ -1309,7 +1309,6 @@ a.panel:hover {
 
 .react-select-container .react-select__single-value {
   color: var(--ifm-font-base-color);
-
 }
 
 .react-select-container:hover .react-select__control {
@@ -1330,12 +1329,22 @@ a.panel:hover {
 }
 
 .react-select-container .react-select__option--is-selected {
-  background: var(--ifm-panel-background-active);
+  background: var(--ifm-panel-background-active) !important;
+  color: var(--ifm-color-primary) !important;
+  font-weight: bold;
 }
 
 .react-select-container .react-select__option--is-focused {
   background: var(--ifm-panel-background-active);
   color: var(--ifm-color-content);
+}
+
+.react-select-container .react-select__placeholder {
+  color: var(--ifm-color-content-secondary);
+}
+
+.react-select--lg {
+  font-size: 1.2em;
 }
 
 /**

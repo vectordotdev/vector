@@ -48,10 +48,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="rpm"
-  values={[{"label":"RPM","value":"rpm"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="rpm">
 
 <div className="steps steps--h3">
@@ -259,10 +261,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="rpm"
-  values={[{"label":"RPM","value":"rpm"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="rpm">
 
 <div className="steps steps--h3">

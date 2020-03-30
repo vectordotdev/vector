@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: Structuring Your Log Data
 description: How to parse log data in Vector
@@ -352,4 +352,4 @@ deploy Vector. Onto the next guide!
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms]: /docs/reference/transforms/
-[guides.advanced.unit_testing]: /guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
+[guides.advanced.unit_testing]: /guides/advanced/unit-testing/

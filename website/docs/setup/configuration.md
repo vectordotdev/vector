@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-30"
 title: Configuration
 description: Configuring Vector
 ---
@@ -76,7 +77,7 @@ The key thing to notice above is the use of the `inputs` option. This connects
 Vector's component to create a pipeline. For a simple introduction, please
 refer to the:
 
-<Jump to="/guides/Users/benjohnson/Code/timber/vector/website/guides/getting-started/your-first-pipeline/">Getting Started Guide</Jump>
+<Jump to="/guides/getting-started/your-first-pipeline/">Getting Started Guide</Jump>
 
 ## Reference
 

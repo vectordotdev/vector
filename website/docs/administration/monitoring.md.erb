@@ -7,48 +7,9 @@ This document will cover monitoring Vector.
 
 ## Logs
 
-Vector writes all output to `STDOUT`, therefore, you have complete control of
-the output destination. Accessing the logs depends on your service manager:
+### Accessing
 
-<Tabs
-  block={true}
-  defaultValue="manual"
-  values={[
-    { label: 'Manual', value: 'manual', },
-    { label: 'Systemd', value: 'systemd', },
-    { label: 'Initd', value: 'initd', },
-    { label: 'Homebrew', value: 'homebrew', },
-  ]
-}>
-<TabItem value="manual">
-
-```bash
-tail /var/log/vector.log
-```
-
-</TabItem>
-<TabItem value="systemd">
-
-```bash
-sudo journalctl -fu vector
-```
-
-</TabItem>
-<TabItem value="initd">
-
-```bash
-tail -f /var/log/vector.log
-```
-
-</TabItem>
-<TabItem value="homebrew">
-
-```bash
-tail -f /usr/local/var/log/vector.log
-```
-
-</TabItem>
-</Tabs>
+<%= interfaces_logs(metadata.installation.interfaces_list) %>
 
 ### Levels
 
@@ -72,7 +33,8 @@ var. More on this in the [Troubleshooting guide][guides.advanced.troubleshooting
 
 Vector rate limits log events in the hot path. This is to your benefit as
 it allows you to get granular insight without the risk of saturating IO
-and disrupting service. The tradeoff is that repetitive logs will not be logged.
+and disrupting the service. The tradeoff is that repetitive logs will not be
+logged.
 
 ## Metrics
 

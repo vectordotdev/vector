@@ -48,10 +48,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="msi"
-  values={[{"label":"MSI","value":"msi"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="msi">
 
 <div className="steps steps--h3">
@@ -205,10 +207,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="msi"
-  values={[{"label":"MSI","value":"msi"},{"label":"Vector CLI","value":"vector-cli"},{"label":"Docker CLI","value":"docker-cli"},{"label":"Docker Compose","value":"docker-compose"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="msi">
 
 <div className="steps steps--h3">

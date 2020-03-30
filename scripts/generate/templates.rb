@@ -133,7 +133,7 @@ class Templates
     end
   end
 
-  def deployment_strategy(strategy, platform: nil, sink: nil, source: nil)
+  def deployment_strategy(strategy, describe: true, platform: nil, sink: nil, source: nil)
     render("#{partials_path}/deployment_strategies/_#{strategy.name}.md", binding).strip
   end
 
@@ -233,11 +233,11 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
-  def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3)
+  def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3, show_deployment_strategy: true)
     render("#{partials_path}/_installation_tutorial.md", binding).strip
   end
 
-  def interface_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
+  def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
     tutorial =
       case (interface && interface.name)
       when "docker-cli"
@@ -246,8 +246,15 @@ class Templates
         InterfaceTutorials::DockerCLI.new(source)
       end
 
+    render("#{partials_path}/interface_installation_tutorials/_#{interface.name}.md", binding).strip
+  end
 
-    render("#{partials_path}/interface_tutorials/_#{interface.name}.md", binding).strip
+  def interface_logs(interface)
+    render("#{partials_path}/interface_logs/_#{interface.name}.md", binding).strip
+  end
+
+  def interfaces_logs(interfaces, size: nil)
+    render("#{partials_path}/_interfaces_logs.md", binding).strip
   end
 
   def manual_installation_next_steps(type)
@@ -478,6 +485,10 @@ class Templates
     EOF
   end
 
+  def strategies(strategies)
+    render("#{partials_path}/_strategies.md", binding).strip
+  end
+
   def subpages(link_name = nil)
     dir =
       if link_name
@@ -510,6 +521,10 @@ class Templates
 
   def tags(tags)
     tags.collect { |tag| "`#{tag}`" }.join(" ")
+  end
+
+  def topologies
+    render("#{partials_path}/_topologies.md", binding).strip
   end
 
   def tutorial_steps(steps, heading_depth: 3)

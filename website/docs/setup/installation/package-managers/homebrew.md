@@ -48,10 +48,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="homebrew"
-  values={[{"label":"Homebrew","value":"homebrew"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"}]}>
 <TabItem value="homebrew">
 
 <div className="steps steps--h3">
@@ -111,10 +113,12 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
+  block={false}
   centered={true}
-  className="rounded"
-  defaultValue="homebrew"
-  values={[{"label":"Homebrew","value":"homebrew"}]}>
+  placeholder="Please choose an installation method..."
+  select={false}
+  size="lg"
+  values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"}]}>
 <TabItem value="homebrew">
 
 <div className="steps steps--h3">

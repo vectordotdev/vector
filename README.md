@@ -257,7 +257,7 @@ Or use your own [preferred method][docs.installation].
 [docs.updating]: https://vector.dev/docs/administration/updating/
 [docs.validating]: https://vector.dev/docs/administration/validating/
 [docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
-[guides.advanced.unit-testing]: https://vector.dev/guides/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing/
+[guides.advanced.unit-testing]: https://vector.dev/guides/advanced/unit-testing/
 [pages.releases]: https://vector.dev/releases/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.mailing_list]: https://vector.dev/community/
