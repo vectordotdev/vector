@@ -50,10 +50,6 @@ class Sink < Component
     false
   end
 
-  def description
-    @description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
-  end
-
   def exposing?
     egress_method == "exposing"
   end
@@ -73,6 +69,10 @@ class Sink < Component
     else
       raise("Unhandled egress_method: #{egress_method.inspect}")
     end
+  end
+
+  def short_description
+    @short_description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
   end
 
   def streaming?

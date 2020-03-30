@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Vector to Prometheus"
 description: "A simple guide to send metrics from Vector to Prometheus in just a few minutes."

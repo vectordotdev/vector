@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to Datadog"
 description: "A simple guide to send logs from a TCP, UDP, or UDS socket to Datadog in just a few minutes."

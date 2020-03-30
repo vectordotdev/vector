@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Vector to InfluxDB"
 description: "A simple guide to send metrics from Vector to InfluxDB in just a few minutes."

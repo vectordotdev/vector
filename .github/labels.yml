@@ -191,6 +191,15 @@
 - name: "provider: aws"
   description: Anything AWS related
   color: ff9f43
+- name: "provider: confluent"
+  description: Anything Confluent related
+  color: ff9f43
+- name: "provider: heroku"
+  description: Anything Heroku related
+  color: ff9f43
+- name: "provider: splunk"
+  description: Anything Splunk related
+  color: ff9f43
 - name: "provider: datadog"
   description: Anything Datadog related
   color: ff9f43
@@ -203,14 +212,8 @@
 - name: "provider: influxdata"
   description: Anything InfluxData related
   color: ff9f43
-- name: "provider: confluent"
-  description: Anything Confluent related
-  color: ff9f43
 - name: "provider: new relic"
   description: Anything New Relic related
-  color: ff9f43
-- name: "provider: splunk"
-  description: Anything Splunk related
   color: ff9f43
 
 #

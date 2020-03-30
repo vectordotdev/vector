@@ -1,5 +1,6 @@
 class Platform
   attr_reader :archs,
+    :description,
     :interfaces,
     :name,
     :oss,
@@ -8,6 +9,7 @@ class Platform
 
   def initialize(hash)
     @archs = hash.fetch("archs")
+    @description = hash.fetch("description")
     @interfaces = hash.fetch("interfaces")
     @name = hash.fetch("name")
     @oss = hash.fetch("oss")
@@ -24,6 +26,7 @@ class Platform
   def to_h
     {
       archs: archs,
+      description: description,
       interfaces: interfaces,
       logo_path: logo_path,
       name: name,

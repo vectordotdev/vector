@@ -12,6 +12,7 @@ features = [
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "80"
+service_providers = ["Splunk"]
 strategies = ["service"]
 through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol]"
 

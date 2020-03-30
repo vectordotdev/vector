@@ -13,7 +13,7 @@ function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "80"
 strategies = ["service"]
-through_description = "the HTTP protocol"
+through_description = "the [HTTP protocol][urls.http]"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "http") %>
 

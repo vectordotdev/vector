@@ -432,7 +432,7 @@ dns_servers = ["0.0.0.0:53"]
     verify_certificate = false
     verify_certificate = true
 
-# Ingests data through log records from journald and outputs `log` events.
+# Ingests data through Systemd's Journald utility and outputs `log` events.
 [sources.journald]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -732,7 +732,7 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: seconds
   scrape_interval_secs = 15
 
-# Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events.
+# Ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events.
 [sources.socket]
   #
   # General
@@ -3862,7 +3862,7 @@ end
     verify_hostname = true
     verify_hostname = false
 
-# Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
+# Streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR.
 [sinks.console]
   #
   # General
@@ -7926,7 +7926,7 @@ end
     # * unit: seconds
     timeout_secs = 60
 
-# Streams `log` events to a socket, such as a TCP, UDP, or Unix domain socket.
+# Streams `log` events to a socket, such as a TCP, UDP, or UDS socket.
 [sinks.socket]
   #
   # General

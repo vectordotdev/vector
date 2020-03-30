@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from HTTP to Apache Pulsar"
 description: "A simple guide to send logs from HTTP to Apache Pulsar in just a few minutes."

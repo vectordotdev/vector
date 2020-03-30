@@ -12,7 +12,7 @@ function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "514"
 strategies = ["service"]
-through_description = "the Syslog protocol"
+through_description = "the [Syslog protocol][urls.syslog_5424]"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "syslog") %>
 

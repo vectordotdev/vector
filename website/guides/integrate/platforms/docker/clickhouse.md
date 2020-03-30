@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Clickhouse"
 description: "A simple guide to send logs from Docker to Clickhouse in just a few minutes."
@@ -32,6 +32,11 @@ your observability strategy.
 
      website/guides/integrate/platforms/docker/clickhouse.md.erb
 -->
+
+## What is Docker?
+
+[Docker][urls.docker] is an open platform for developing, shipping, and running
+applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
 
 ## What We'll Accomplish
 
@@ -124,6 +129,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.docker]: https://www.docker.com/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

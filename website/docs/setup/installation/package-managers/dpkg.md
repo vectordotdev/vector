@@ -489,6 +489,6 @@ Vector's DPKG source files are located in
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.dpkg]: https://wiki.debian.org/dpkg
-[urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.systemd]: https://systemd.io/
 [urls.vector_debian_source_files]: https://github.com/timberio/vector/tree/master/distribution/debian
 [urls.vector_releases]: https://vector.dev/releases/latest

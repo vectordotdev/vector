@@ -12,8 +12,9 @@ features = [
 function_category = "collect"
 output_types = ["log"]
 requirements.kafka = ">= 0.8"
+service_providers = ["AWS", "Confluent"]
 strategies = ["service"]
-through_description = "Kafka"
+through_description = "[Kafka][urls.kafka]"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "kafka") %>
 

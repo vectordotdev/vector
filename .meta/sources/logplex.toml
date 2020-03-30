@@ -11,6 +11,7 @@ features = [
 function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "80"
+service_providers = ["Heroku"]
 strategies = ["service"]
 through_description = "the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol]"
 

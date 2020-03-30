@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to Clickhouse"
 description: "A simple guide to send logs from Syslog to Clickhouse in just a few minutes."

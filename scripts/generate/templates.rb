@@ -64,10 +64,6 @@ class Templates
     render("#{partials_path}/_component_default.md.erb", binding).strip
   end
 
-  def component_description(component)
-    send("#{component.type}_description", component)
-  end
-
   def component_header(component)
     render("#{partials_path}/_component_header.md", binding).strip
   end
@@ -84,6 +80,10 @@ class Templates
 
   def component_sections(component)
     render("#{partials_path}/_component_sections.md", binding).strip
+  end
+
+  def component_short_description(component)
+    send("#{component.type}_short_description", component)
   end
 
   def components_table(components)
@@ -400,7 +400,14 @@ class Templates
       strategy = metadata.installation.strategies_list.first
     end
 
-    guide = IntegrationGuide.new(interfaces, strategy, platform: platform, source: source, sink: sink)
+    guide =
+      IntegrationGuide.new(
+        interfaces,
+        strategy,
+        platform: platform,
+        source: source,
+        sink: sink
+      )
 
     render("#{partials_path}/_integration_guide.md", binding).strip
   end
@@ -473,13 +480,13 @@ class Templates
     content
   end
 
-  def sink_description(sink)
+  def sink_short_description(sink)
     strip <<~EOF
     #{write_verb_link(sink)} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
     EOF
   end
 
-  def source_description(source)
+  def source_short_description(source)
     strip <<~EOF
     Ingests data through #{source.through_description} and #{outputs_link(source)}.
     EOF
@@ -531,7 +538,7 @@ class Templates
     render("#{partials_path}/_tutorial_steps.md", binding).strip
   end
 
-  def transform_description(transform)
+  def transform_short_description(transform)
     if transform.input_types == transform.output_types
       strip <<~EOF
       Accepts and #{outputs_link(transform)} allowing you to #{transform.allow_you_to_description}.

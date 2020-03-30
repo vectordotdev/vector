@@ -8,6 +8,7 @@ class Component
 
   attr_reader :beta,
     :common,
+    :description,
     :env_vars,
     :features,
     :function_category,
@@ -26,6 +27,7 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
+    @description = hash["description"]
     @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
     @features = hash["features"] || []
     @function_category = hash.fetch("function_category").downcase
@@ -249,6 +251,7 @@ class Component
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
       service_providers: service_providers,
+      short_description: short_description,
       status: status,
       title: title,
       type: type,

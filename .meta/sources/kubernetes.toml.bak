@@ -14,7 +14,7 @@ function_category = "collect"
 output_types = ["log"]
 requirements = {}
 strategies = ["daemon"]
-through_description = "kubernetes node's"
+through_description = "[Kubernetes][urls.kubernetes]"
 
 [sources.kubernetes.options.include_container_names]
 type = "[string]"

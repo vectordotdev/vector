@@ -20,6 +20,23 @@ Fear not! In this guide we'll show you how to send <%= guide.action_phrase %>
 and build a <%= guide.events_phrase %> pipeline that will be the backbone of
 your observability strategy.
 
+<%- if platform && platform.description -%>
+## What is <%= platform.title %>?
+
+<%= platform.description %>
+
+<%- elsif source && source.description -%>
+## What is <%= source.title %>?
+
+<%= source.description %>
+
+<%- end -%>
+<%- if sink && sink.description -%>
+## What is <%= sink.title %>?
+
+<%= sink.description %>
+
+<%- end -%>
 ## What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:

@@ -13,7 +13,7 @@ function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]
 requirements = {}
-write_to_description = "[standard output streams][urls.standard_streams], such as `STDOUT` and `STDERR`"
+write_to_description = "[standard output streams][urls.standard_streams], such as [STDOUT][urls.stdout] and [STDERR][urls.stderr]"
 
 <%= render(
   "_partials/fields/_component_options.toml",

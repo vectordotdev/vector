@@ -289,6 +289,10 @@
           "description": "The sink's delivery guarantee.",
           "enum": ["at_least_once", "best_effort"]
         },
+        "description": {
+          "type": "string",
+          "description": "A long form description of the sink. This should contain links and keywords for SEO purposes."
+        },
         "egress_method": {
           "type": "string",
           "description": "The sink's egress method.",
@@ -408,6 +412,10 @@
           "type": "string",
           "description": "The source's delivery guarantee",
           "enum": ["at_least_once", "best_effort"]
+        },
+        "description": {
+          "type": "string",
+          "description": "A long form description of the source. This should contain links and keywords for SEO purposes."
         },
         "env_vars": {
           "$ref": "#/definitions/fields",
@@ -534,6 +542,10 @@
         "common": {
           "type": "boolean",
           "description": "Is this a common transform that should be highlighted in a full list of transforms?"
+        },
+        "description": {
+          "type": "string",
+          "description": "A long form description of the transform. This should contain links and keywords for SEO purposes."
         },
         "env_vars": {
           "$ref": "#/definitions/fields",

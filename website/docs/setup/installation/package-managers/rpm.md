@@ -403,6 +403,6 @@ Vector's RPM source files are located in
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.rpm]: https://rpm.org/
-[urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.systemd]: https://systemd.io/
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.vector_rpm_source_files]: https://github.com/timberio/vector/tree/master/distribution/rpm

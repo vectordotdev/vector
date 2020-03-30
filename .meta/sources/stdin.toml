@@ -12,7 +12,7 @@ function_category = "receive"
 output_types = ["log"]
 requirements = {}
 strategies = ["sidecar"]
-through_description = "standard input (STDIN)"
+through_description = "[standard input (STDIN)][urls.stdin]"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "stdin") %>
 

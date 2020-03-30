@@ -1,6 +1,5 @@
 [sinks.aws_cloudwatch_logs]
 title = "AWS Cloudwatch Logs"
-noun = "AWS Cloudwatch Logs"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"
@@ -15,10 +14,12 @@ features = [
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+noun = "AWS Cloudwatch Logs"
 requirements = {}
 service_limits_short_link = "aws_cw_logs_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
+
 
 <%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_logs.env_vars") %>
 

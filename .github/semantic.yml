@@ -53,13 +53,14 @@ scopes:
 
   # providers
   - aws provider
+  - confluent provider
+  - heroku provider
+  - splunk provider
   - datadog provider
   - elastic provider
   - google provider
   - influxdata provider
-  - confluent provider
   - new relic provider
-  - splunk provider
 
   # sources
   - docker source

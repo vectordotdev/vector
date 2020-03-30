@@ -12,7 +12,7 @@ function_category = "receive"
 output_types = ["log"]
 requirements.network_port = "9000"
 strategies = ["service"]
-through_description = "a socket, such as a TCP, UDP, or Unix socket"
+through_description = "a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket"
 
 <%= render(
   "_partials/fields/_component_options.toml",

@@ -276,5 +276,5 @@ transition from the old to new pipeline is graceful.
 [docs.sources]: /docs/reference/sources/
 [docs.validating]: /docs/administration/validating/
 [urls.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants
-[urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.systemd]: https://systemd.io/
 [urls.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service

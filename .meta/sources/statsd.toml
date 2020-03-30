@@ -12,7 +12,7 @@ function_category = "receive"
 output_types = ["metric"]
 requirements.network_port = "8126"
 strategies = ["service"]
-through_description = "the StatsD UDP protocol"
+through_description = "the [StatsD UDP protocol][urls.statsd_udp_protocol]"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "statsd") %>
 
