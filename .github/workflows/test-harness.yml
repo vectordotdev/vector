@@ -29,7 +29,7 @@ jobs:
           })
 
     - name: Check user permissions
-      uses: MOZGIII/repo-permission-check-action@input-fix
+      uses: lannonbr/repo-permission-check-action@2.0.1
       with:
         permission: write
       env:
@@ -37,7 +37,7 @@ jobs:
 
     - name: Get Pull Request info
       id: pr-info
-      uses: MOZGIII/github-script@core-access
+      uses: actions/github-script@0.9.0
       with:
         script: |
           const pr_info_response = await github.pulls.get({
@@ -106,7 +106,7 @@ jobs:
         AWS_DEFAULT_REGION: '${{ secrets.AWS_DEFAULT_REGION }}'
 
     - name: Post a comment with the results
-      uses: actions/github-script@0.4.0
+      uses: actions/github-script@0.9.0
       with:
         github-token: '${{secrets.GITHUB_TOKEN}}'
         script: |

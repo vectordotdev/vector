@@ -127,9 +127,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tags.Tag1 = "Value1" # example
 
   # Request
-  request.in_flight_limit = 5 # optional, default, requests
+  request.in_flight_limit = 50 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
-  request.rate_limit_num = 5 # optional, default
+  request.rate_limit_num = 250 # optional, default
   request.retry_attempts = -1 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
@@ -895,9 +895,9 @@ Configures the sink request behavior.
 
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={50}
   enumValues={null}
-  examples={[5]}
+  examples={[50]}
   groups={[]}
   name={"in_flight_limit"}
   path={"request"}
@@ -945,9 +945,9 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={250}
   enumValues={null}
-  examples={[5]}
+  examples={[250]}
   groups={[]}
   name={"rate_limit_num"}
   path={"request"}

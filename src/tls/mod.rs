@@ -1,6 +1,6 @@
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, HandshakeError, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
 use std::fmt::Debug;
@@ -16,11 +16,15 @@ mod maybe_tls;
 mod outgoing;
 mod settings;
 
+#[cfg(feature = "sources-tls")]
+pub(crate) use incoming::MaybeTlsListener;
 pub(crate) use maybe_tls::MaybeTls;
 pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
+
+pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
 #[derive(Debug, Snafu)]
 pub enum TlsError {
@@ -69,7 +73,11 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: HandshakeError<TcpStream> },
+    Handshake { source: openssl::ssl::Error },
+    #[snafu(display("Not ready for I/O during TLS handshake"))]
+    HandshakeNotReady,
+    #[snafu(display("TLS handshake setup failed: {}", source))]
+    HandshakeSetup { source: ErrorStack },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: crate::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
@@ -92,9 +100,9 @@ pub enum TlsError {
     TcpBind { source: IoError },
     #[snafu(display("{}", source))]
     Connect { source: std::io::Error },
+    #[snafu(display("Could not get peer address: {}", source))]
+    PeerAddress { source: std::io::Error },
 }
-
-pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
 impl MaybeTlsStream<TcpStream> {
     pub fn peer_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {

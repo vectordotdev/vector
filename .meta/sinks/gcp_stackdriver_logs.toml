@@ -125,7 +125,7 @@ For example, Compute Engine VM instances use the labels `projectId`, \
 `instanceId`, and `zone`.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logs.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logs.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>
 
 <%= render("_partials/_encoding.toml",
   namespace: "sinks.gcp_stackdriver_logs.options",

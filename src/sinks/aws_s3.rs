@@ -109,8 +109,8 @@ enum S3StorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(25),
-        rate_limit_num: Some(25),
+        in_flight_limit: Some(50),
+        rate_limit_num: Some(250),
         ..Default::default()
     };
 }

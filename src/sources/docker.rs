@@ -1,6 +1,6 @@
 use crate::{
     event::merge_state::LogEventMergeState,
-    event::{self, Event, Value},
+    event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
@@ -799,7 +799,7 @@ impl ContainerLogInfo {
 
         // Prepare the log event.
         let mut log_event = {
-            let mut log_event = Event::new_empty_log().into_log();
+            let mut log_event = LogEvent::new();
 
             // The log message.
             log_event.insert(
