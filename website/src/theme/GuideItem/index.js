@@ -40,16 +40,21 @@ function GuideItem(props) {
   const platform = platformName && platforms[platformName];
   const source = sourceName && sources[sourceName];
   const sink = sinkName && sinks[sinkName];
-  const icon = (platform || source || sink) !== null;
+  const sourceIcon = (platform || source) !== null;
+  const sinkIcon = sink != null;
 
-  let logoPath = null;
+  let sourceLogoPath = null;
 
   if (platform) {
-    logoPath = platform.logo_path;
+    sourceLogoPath = platform.logo_path;
   } else if (source) {
-    logoPath = source.logo_path;
-  } else if (sink) {
-    logoPath = sink.logo_path;
+    sourceLogoPath = source.logo_path;
+  }
+
+  let sinkLogoPath = null;
+
+  if (sink) {
+    sinkLogoPath = sink.logo_path;
   }
 
   return (
@@ -60,9 +65,11 @@ function GuideItem(props) {
           <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{coverLabel || title}</h2>
         </header>
         <footer>
-          {logoPath && <SVG src={logoPath} className="logo" />}
-          {!logoPath && icon && <div className="logo"><i className="feather icon-server" /></div>}
-          {!logoPath && !icon && <Tags colorProfile="guides" tags={tags} />}
+          {sourceLogoPath && <SVG src={sourceLogoPath} className="logo" />}
+          {!sourceLogoPath && sourceIcon && <div className="logo"><i className="feather icon-server" /></div>}
+          {sinkLogoPath && <SVG src={sinkLogoPath} className="logo" />}
+          {!sinkLogoPath && sinkIcon && <div className="logo"><i className="feather icon-server" /></div>}
+          {!sourceLogoPath && !sinkLogoPath && !sourceIcon && !sinkIcon && <Tags colorProfile="guides" tags={tags} />}
           <div className="action">read now</div>
         </footer>
       </article>
