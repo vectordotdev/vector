@@ -2263,13 +2263,13 @@ end
       # * relevant when type = "check_fields"
       "message.contains" = "foo"
 
-      # Checks whether a string field has a string argument prefix.
+      # Checks whether a string field starts with a string argument.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
-      "environment.prefix" = "staging-"
+      "environment.starts_with" = "staging-"
 
 # Accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]

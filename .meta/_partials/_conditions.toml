@@ -57,13 +57,13 @@ description = """\
 Checks whether a string field contains a string argument.\
 """
 
-[<%= namespace %>."`[field_name]`.prefix"]
+[<%= namespace %>."`[field_name]`.starts_with"]
 type = "string"
 examples = [
-  { "environment.prefix" = "staging-" }
+  { "environment.starts_with" = "staging-" }
 ]
 common = true
 relevant_when = {type = "check_fields"}
 description = """\
-Checks whether a string field has a string argument prefix.\
+Checks whether a string field starts with a string argument.\
 """
