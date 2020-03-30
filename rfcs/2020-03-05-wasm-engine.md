@@ -23,7 +23,7 @@ also noted it lacked serialization support.
 
 While evaluating the possibility of adding serialization we noted that any implementation that operated dynamically
 would be quite slow. Notably, it would **it would seriously impact overall event processing infrastructure** if Vector
-was responsible for a slowdown. These organizations are vhoosing to use protobufs usually for speed and/or compatibility
+was responsible for a slowdown. These organizations are choosing to use protobufs usually for speed and/or compatibility
 guarantees.
 
 We should enable and encourage these goals, our users should be empowered to capture their events, and not worried about
@@ -34,7 +34,7 @@ great pain?*
 ### Increasing build complexity and our slow build times
 
 Recently, we've been discussing the trade offs associated with different code modularization techniques. We currently
-make fairly heavy use of the Rust Feature Flag system.
+make fairly heavy use of the Rust feature flag system.
 
 This is great because it enables us to build in multi-platform support as well as specialized (eg only 1 source) builds.
 We also noted builds with only 1 or two feature flags are **significantly** faster than builds with all features
@@ -42,6 +42,10 @@ supported.
 
 One downside is our current strategy can require tests (See the `make check-features` task) to ensure their correctness.
 The other is that we sometimes need to spend a lot of time weaving through `cfg(feature = "..")` flags.
+
+Having some solution to cleanly package independent modules of functionality would allow us to have a core Vector which
+builds fast while keeping modularity features.
+
 
 ### Language runtime support
 
@@ -70,7 +74,7 @@ Vector is in a slightly different position than Terraform though! Vector runs pr
 machines. We can't expect users to have build tooling installed to their servers (it's a security risk!) and we
 definitely can't expect it on an end-user machines. Most people just aren't that interested in computers. Vector has
 different performance needs, too. While folk's aren't generally wanting to execute terraform providers hundreds of
-thousands (or millions) of times per second they are absolutely doing that with Vector.
+thousands (or millions) of times per second, they are absolutely doing that with Vector.
 
 When we're processing the firehose of events originating from a modern infrastructure every millisecond counts. Vector
 needs a way to ship portable, *optimizable* modules if we ever hope of making this a reality.
@@ -86,7 +90,7 @@ Having to, for example, use two transforms just to add 1 field and remove anothe
 We noted that the existing lua runtime was able to accomplish these tasks quite elegantly, however it was an order of
 magnitude slower than a native transform.
 
-(TODO: Proof)
+> TODO: Proof
 
 Users shouldn't pay a high price just for a few lines saved in a configuration file. They shouldn't feel frustration
 when building these kinds of pipelines either.
@@ -113,14 +117,14 @@ router, Tremor focuses on servicing demanding workloads from it's position as an
 What if we could provide users of Tremor and Vector with some sort of familiar shared experience? What if we could share
 functionality? What kind of framework could satisfy both our needs? There are so many questions!
 
-We need to talk to them. TODO.
+> TODO: We need to talk to them.
 
 
 ## Prior Art
 
-We have an existing `lua` runtime existing as transform, and there is currently an issue (TODO: Link) regarding an
-eventual `javascript` transform. Neither of these features reach the scope of this proposal, still, it is valuable to
-learn.
+We have an existing `lua` runtime existing as transform, and there is currently an
+[issue](https://github.com/timberio/vector/issues/667) regarding an eventual `javascript` transform. Neither of these
+features reach the scope of this proposal, still, it is valuable to learn.
 
 While evaluating the `lua` transform to solve the Protobuf problem described in Motivations, we benchmarked an
 implementation of `add_fields` that was already performing at approximately the same performance as the `serde-protobuf`
@@ -129,6 +133,9 @@ solution.
 We also noted that the existing `lua` transform is quite simple. While this makes for nice usability, it means things
 like on-start initializations aren't possible. While these kinds of features may be added, this shouldn't stop us from
 investigating WASM.
+
+We also noted the capabilities and speed of WASM (particularly WASI) mean we could eventually support things like
+sockets and files.
 
 Indeed, it is possible we will be able to let Vector build and run Lua code as a wasm module in the future.
 
@@ -278,20 +285,25 @@ What happens next depends on which type of module you register.
 
 ### Module types
 
-> This is still a big TODO. How can we handle batching and partitioning etc? How do we handle all the knobs?
+An avid Rust hacker will note the below APIs are not very idiomatic!
+
+> TODO: Reflect some of the practice from
+https://michael-f-bryan.github.io/rust-ffi-guide/errors/return_types.html
 
 * `Transform`: Modules of this time can be used as a transform `type`.
 
   ```rust
   #[no_mangle]
-  pub extern "C" fn process() {
+  pub extern "C" fn process() -> usize {
       if let Some(value) = hostcall::get("field").unwrap() {
           hostcall::insert("field", value).unwrap();
       }
+      0
   }
   ```
 
 * `Source`: Modules of this time can be used as a source `type`.
+> The rest are still a big TODO. How can we handle batching and partitioning etc? How do we handle all the knobs?
 
   ```rust
   #[no_mangle]
@@ -301,6 +313,7 @@ What happens next depends on which type of module you register.
   ```
 
 * `Sink`: Modules of this time can be used as a sink `type`.
+> The rest are still a big TODO. How can we handle batching and partitioning etc? How do we handle all the knobs?
 
   ```rust
   #[no_mangle]
@@ -312,6 +325,7 @@ What happens next depends on which type of module you register.
   ```
 
 * `Codec`:
+> The rest are still a big TODO. How can we handle batching and partitioning etc? How do we handle all the knobs?
 
   ```rust
   #[no_mangle]
@@ -328,24 +342,122 @@ What happens next depends on which type of module you register.
 To create your first module, start with a working Rust toolchain (see https://rustup.rs/) add the `wasm32-wasi`
 toolchain's `nightly` version:
 
-```rust
+```bash
 rustup target add wasm32-wasi --toolchain nightly
 ```
 
 Then, create a module:
 
+```bash
+cargo +nightly init --lib echo
+```
+
+In your `Cargo.toml` fill in:
+
+```toml
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+vector = "0.8.2"
+```
+
+Next, in your `lib.rs` file:
+
 ```rust
-cargo +nightly init --lib demo_module
+use vector::api::guest::{Registration, roles::Transform, get, insert};
+
+#[no_mangle]
+pub extern "C" fn register() {
+    Registration::<Transform>::default()
+        // TODO: Options here
+        .register();
+}
+
+#[no_mangle]
+pub extern "C" fn initialize() {
+    // Relax! Nothing needed.
+}
+
+
+#[no_mangle]
+pub extern "C" fn process() -> usize {
+    let result = vector::get("message");
+
+    println!("From inside the wasm machine: {:?}", result);
+    // TODO: Do your stuff
+
+    match result.unwrap() {
+        Some(value) => {
+            vector::insert("echo", value);
+            0
+        }
+        None => {
+            0
+        }
+    }
+}
 ```
 
 Now to build it:
 
-```rust
+```bash
 cargo +nightly build --target wasm32-wasi --release
+```
+
+In your `target/wasm-wasi/release/` verify that the `echo.wasm` file exists. Next edit your Vector `config.toml`:
+
+> TODO: Talk more about this!
+
+```toml
+data_dir = "/var/lib/vector/"
+dns_servers = []
+
+[sources.source0]
+max_length = 102400
+type = "stdin"
+
+[transforms.demo]
+inputs = ["source0"]
+type = "wasm"
+source = "$TARGET_DIRECTORY/echo.wasm"
+
+[sinks.sink0]
+healthcheck = true
+inputs = ["demo"]
+type = "console"
+encoding = "json"
+buffer.type = "memory"
+buffer.max_events = 500
+buffer.when_full = "block"
+
+[[tests]]
+  name = "demo-tester"
+  [tests.input]
+    insert_at = "demo"
+    type = "log"
+    [tests.input.log_fields]
+      "message" = "foo"
+  [[tests.outputs]]
+    extract_from = "demo"
+    [[tests.outputs.conditions]]
+      "echo.equals" = "foo"
+```
+
+Now try `vector test config.toml` and Vector will go ahead and build an optimized `cache/echo.so` artifact then run it
+for a unit test.
+
+```bash
+Running test.toml tests
+test test.toml: demo-tester ... passed
 ```
 
 
 ### Resources & templates
+
+* [Rustinomicon](https://doc.rust-lang.org/nomicon/)
+* [Lucet Docs](https://bytecodealliance.github.io/lucet/)
+* [WASI](https://wasi.dev/)
 
 
 ## Sales Pitch
@@ -357,7 +469,7 @@ Integrating a flexible, practical, simple WASM engine means we can:
 * Support and advertise a plugin system.
 * Empower us to modularize Vector's components and increase maintainability.
 * Share a common plugin format with Tremor.
-* In the future, support something like Assemblyscript as a first class language.
+* In the future, support something like AssemblyScript as a first class language.
 
 
 ## Drawbacks
@@ -375,16 +487,47 @@ and compatibility.
 
 This feature is **advanced and may invoke user confusion**. Novice or casual users may not fully grasp the subtleties
 and limitations of WASM. We must practice caution around the user experience of this feature to ensure novices and
-advanced users can both understand what is happening in a Vector pipeline utilizing WASM modules.
+advanced users can understand what is happening in a Vector pipeline utilizing WASM modules.
+
 
 ## Outstanding Questions
 
+Since this is a broad reaching feature with a number of green sky ideas, we should discuss these questions:
+
+
 ### Agree on breadth and depth of implementation
+
+We should support modules so broadly?
+
+* As sinks? For this we should consider how we handle batching, partitioning, etc, more.
+* As sources? This requires thinking about how we can do event sourcing.
+* What about the idea of codecs being separate?
+* This RFC makes some provisions for a future Event refactor, is it possible that this might happen?
+
 
 ### Consider supporting a blessed compiler
 
+Our original discussions included the idea of a blessed compiler and a UX similar to our existing `lua` or `javascript`
+transform. Indeed, our initial implementation should include just a transform, as it's by far the easiest place to
+introduce this feature.
+
+During investigation of the initial POC we determined that our most desirable "blessed" language would be
+AssemblyScript, unfortunately, it's currently not able to run inside Lucet. Work is ongoing and we expect it to be
+possible soon.
+
+
 ### Consider API tradeoffs
 
+We should consider if we are satisfied with the idea of hostcalls being used for `get` and other API. We could also let
+the host call the Guest allocate function and then pass it a C String pointer to let it work on. This, however, requires
+serializing and deserializing the entire Event each time, which is a huge performance bottleneck.
+
+We could also consider adopting a new strategy for our `event` type. However, that work is outside the scope of this
+RFC. The current structure of the `Event` type is already discussed in
+[#1891](https://github.com/timberio/vector/issues/1891).
+
+We should also consider if we want to change how we handle codecs, since it is likely that WASM module use cases will
+include wanting to add codec support to already existing sources.
 
 
 ### Consider Packaging Approach
@@ -400,13 +543,18 @@ A couple good questions to consider:
 * Should a user import `vector::...` to use the Vector guest API in their Rust module?
 * Vector's internal API is largely undocumented and kind of a mess. Should we hide/clean the irrelevant stuff?
 
+### Consider observability
+
+How can we let users see what's happening in WASM modules? Can we use tracing somehow? Lucet supports tracing, perhaps
+we could hook in somehow?
+
 ## Plan of attack
 
-Incremental steps that execute this change. Generally this is in the form of:
+Incremental steps that execute this change.
 
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
+- v0.1: This RFC is accepted forming the basis for the RFC, and demoing a POC of how a theoretical user could use this
+  for a protobuf decoding transform, and permitting the first `engine` unit test to pass.
+- This RFC is amended to include Sinks and Sources information.
+- This RFC is amended to include information about possible codec changes.
 
 Note: This can be filled out during the review process.
