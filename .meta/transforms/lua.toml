@@ -4,12 +4,19 @@ allow_you_to_description = "transform events with a full embedded [Lua][urls.lua
 beta = true
 common = true
 function_category = "program"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
-resources = [
-  {name = "Lua Reference Manual", short_link = "lua_manual"}
-]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "lua") %>
+
+[transforms.lua.options.version]
+type = "string"
+common = true
+required = false
+description = "transform API version"
+default = "1"
+enum = { 1 = "transform API version 1" }
 
 [transforms.lua.options.source]
 type = "string"

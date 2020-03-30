@@ -1,14 +1,14 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::assert_relative_eq;
-use futures::future;
+use futures01::future;
 use rand::distributions::{Alphanumeric, Uniform};
 use rand::prelude::*;
 use vector::event::Event;
 use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use vector::topology::config::TransformConfig;
+use vector::topology::config::{TransformConfig, TransformContext};
 use vector::topology::{self, config};
 use vector::{runtime, sinks, sources, transforms};
 
@@ -235,7 +235,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     let sends = (0..num_writers)
                         .map(|_| {
                             let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                            futures::sync::oneshot::spawn(send, &rt.executor())
+                            futures01::sync::oneshot::spawn(send, &rt.executor())
                         })
                         .collect::<Vec<_>>();
 
@@ -416,7 +416,7 @@ fn benchmark_regex(c: &mut Criterion) {
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build(rt.executor()).unwrap();
+                    }.build(TransformContext::new_test(rt.executor())).unwrap();
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)
@@ -501,6 +501,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         &["parser"],
                         transforms::sampler::SamplerConfig {
                             rate: 10,
+                            key_field: None,
                             pass_list: vec![],
                         },
                     );
@@ -569,7 +570,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 )| {
                     // One sender generates pure random lines
                     let send1 = send_lines(in_addr1, random_lines(100).take(num_lines));
-                    let send1 = futures::sync::oneshot::spawn(send1, &rt.executor());
+                    let send1 = futures01::sync::oneshot::spawn(send1, &rt.executor());
 
                     // The other includes either status=200 or status=404
                     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
@@ -584,7 +585,7 @@ fn benchmark_complex(c: &mut Criterion) {
                             })
                             .take(num_lines),
                     );
-                    let send2 = futures::sync::oneshot::spawn(send2, &rt.executor());
+                    let send2 = futures01::sync::oneshot::spawn(send2, &rt.executor());
                     let sends = vec![send1, send2];
                     rt.block_on(future::join_all(sends)).unwrap();
 
@@ -625,7 +626,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now());
+                        .insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
                     (Template::from("index-%Y.%m.%d"), event)
                 },
@@ -642,7 +643,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now());
+                        .insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
                     (Template::from("index"), event)
                 },

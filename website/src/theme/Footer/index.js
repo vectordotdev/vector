@@ -70,7 +70,7 @@ function Footer() {
                 <MailingListForm description={false} width="150px" />
               </div>
               <div>
-                <a href="https://twitter.com/timberdotio" target="_blank"><i className="feather icon-twitter" alt="Vector's Twitter"></i></a>
+                <a href="https://twitter.com/vectordotdev" target="_blank"><i className="feather icon-twitter" alt="Vector's Twitter"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
                 <a href="https://chat.vector.dev" target="_blank"><i className="feather icon-message-circle" alt="Vector's Chat"></i></a>
                 &nbsp;&nbsp;&nbsp;&nbsp;
@@ -90,8 +90,9 @@ function Footer() {
                   <ul className="footer__items">
                     {linkItem.items.map((item, key) =>
                       item.html ? (
-                        <div
+                        <li
                           key={key}
+                          className="footer__item"
                           dangerouslySetInnerHTML={{
                             __html: item.html,
                           }}
@@ -125,7 +126,11 @@ function Footer() {
                 )}
               </div>
             )}
-            {copyright}
+            {copyright}<br />
+            <small>
+              <a href="https://github.com/timberio/vector/security/policy">Security Policy</a>&nbsp;&bull;&nbsp;
+              <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
+            </small>
           </div>
         )}
       </div>

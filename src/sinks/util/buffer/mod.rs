@@ -4,6 +4,7 @@ use partition::Partition;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
+pub mod json;
 pub mod metrics;
 pub mod partition;
 
@@ -192,7 +193,7 @@ where
 mod test {
     use super::Buffer;
     use crate::sinks::util::batch::{Batch, BatchSink};
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use std::io::Read;
 
     #[test]
@@ -207,7 +208,7 @@ mod test {
         .take(100_000);
 
         let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
+            .send_all(futures01::stream::iter_ok(input))
             .wait()
             .unwrap();
 

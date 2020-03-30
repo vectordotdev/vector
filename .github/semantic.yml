@@ -2,53 +2,71 @@
 titleOnly: true
 
 types:
-  - chore               # An internal change that should not be communicated to Vector users.
-  - docs                # A change relating to Vector's documentation.
-  - enhancement         # Anything that enhances it's subject.
-  - feat                # An entirely new feature, such as a new platform, source, transform, or sink.
-  - fix                 # A bug fix.
-  - perf                # A change that enhancements performance.
+  - chore               # An internal change this is not observable by users.
+  - docs                # Any user observable documentation change.
+  - enhancement         # Any user observable enhancement to an existing feature.
+  - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
+  - fix                 # Any user observable bug fix.
+  - perf                # Any user observable performance improvment.
+  - status              # A status change to a Vector component.
 
 scopes:
-  - buffers             # Anything related to Vector's buffers, serialization, etc.
-  - cli                 # Anything related to Vector's CLI.
-  - config              # Anything related to Vector's configuration as a whole.
-  - docs                # Anything related to documentation.
-  - log data model      # Anything related to the log event data model.
-  - metric data model   # Anything related to the metric event data model.
-  - networking          # Anything related to Vector's networking (DNS, HTTP, TCP, etc).
-  - new platform        # A new platform, operating system, architecture, etc.
-  - new source          # A new Vector source.
-  - new transform       # A new Vector transform.
-  - new sink            # A new Vector sink.
-  - observability       # Anything related to observing Vector (internal logs, metrics, etc).
-  - operations          # Anything related to /scripts, CI, etc.
-  - platforms           # Anything related to Vector's supported platforms.
-  - security            # Anything related to security.
-  - testing             # Anything related to testing.
-  - topology            # Anything related to Vector's topology code.
-  - website             # Anything related to the website (not docs).
+
+  - new source
+  - new transform
+  - new sink
+
+  # domains
+  - buffers
+  - cli
+  - config
+  - dependencies
+  - networking
+  - observability
+  - operations
+  - security
+  - sinks
+  - sources
+  - tests
+  - topology
+  - transforms
+  - ux
+  - website
 
   # platforms
-  - Docker platform
-  - Amazon Linux platform
-  - CentOS platform
-  - Debian platform
-  - MacOS platform
-  - Raspbian platform
-  - RHEL platform
-  - Ubuntu platform
-  - Windows platform
-  - DPKG platform
-  - Homebrew platform
-  - RPM platform
-  - MSI platform
+  - docker platform
+  - amazon linux platform
+  - centos platform
+  - debian platform
+  - macos platform
+  - nixos platform
+  - raspbian platform
+  - rhel platform
+  - ubuntu platform
+  - windows platform
+  - dpkg platform
+  - homebrew platform
+  - nix platform
+  - rpm platform
+  - msi platform
+
+  # providers
+  - aws provider
+  - datadog provider
+  - elastic provider
+  - google provider
+  - influxdata provider
+  - confluent provider
+  - new relic provider
+  - splunk provider
 
   # sources
   - docker source
   - file source
+  - http source
   - journald source
   - kafka source
+  - logplex source
   - prometheus source
   - socket source
   - splunk_hec source
@@ -64,18 +82,24 @@ scopes:
   - aws_ec2_metadata transform
   - coercer transform
   - concat transform
+  - dedupe transform
   - field_filter transform
   - geoip transform
   - grok_parser transform
   - javascript transform
   - json_parser transform
   - log_to_metric transform
+  - logfmt_parser transform
   - lua transform
+  - merge transform
   - regex_parser transform
   - remove_fields transform
   - remove_tags transform
+  - rename_fields transform
   - sampler transform
   - split transform
+  - swimlanes transform
+  - tag_cardinality_limit transform
   - tokenizer transform
 
   # sinks
@@ -87,14 +111,25 @@ scopes:
   - blackhole sink
   - clickhouse sink
   - console sink
+  - datadog_logs sink
   - datadog_metrics sink
   - elasticsearch sink
   - file sink
+  - gcp_cloud_storage sink
   - gcp_pubsub sink
+  - gcp_stackdriver_logs sink
+  - honeycomb sink
   - http sink
+  - humio_logs sink
+  - influxdb_metrics sink
   - kafka sink
+  - logdna sink
+  - loki sink
   - new_relic_logs sink
+  - papertrail sink
   - prometheus sink
+  - pulsar sink
+  - sematext_logs sink
   - socket sink
   - splunk_hec sink
   - statsd sink

@@ -35,21 +35,21 @@ import TabItem from '@theme/TabItem';
       className="mini"
       defaultValue="latest"
       values={[
-        { label: 'Latest (0.6.0)', value: 'latest'},
+        { label: 'Latest (0.8.2)', value: 'latest'},
         { label: 'Nightly', value: 'nightly'},
       ]}>
 
     <TabItem value="latest">
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.6.X/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/0.8.X/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     </TabItem>
     <TabItem value="nightly">
 
     ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/nightly/vector-x64.msi -OutFile vector-x64.msi
+    powershell Invoke-WebRequest https://packages.timber.io/vector/nightly/latest/vector-x64.msi -OutFile vector-x64.msi
     ```
 
     </TabItem>
@@ -60,6 +60,7 @@ import TabItem from '@theme/TabItem';
     ```bat
     msiexec /i vector-x64.msi /quiet
     ```
+
 3.  Navigate to the Vector directory:
 
     ```bat
@@ -89,7 +90,7 @@ Once you've found the version you'd like to install you can re-follow the
 
 The Vector configuration file is placed in:
 
-```
+```text
 %ProgramFiles%\Vector\config\vector.toml
 ```
 

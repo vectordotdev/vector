@@ -15,7 +15,7 @@ function Contact() {
       <header className="hero">
         <div className="container container--fluid">
           <h1>Contact</h1>
-          <div className="hero__subtitle">
+          <div className="hero--subtitle">
             Vector is a <a href="https://timber.io">Timber.io</a> open-source product. You can contact the Vector &amp; Timber team using any of the options below.
           </div>
         </div>
@@ -34,13 +34,13 @@ function Contact() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/timberdotio" target="_blank" className="panel panel--link text--center">
+                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel panel--link text--center">
                   <div className="panel--icon">
                     <i className="feather icon-twitter"></i>
                   </div>
-                  <div className="panel--title">Twitter @timberdotio</div>
+                  <div className="panel--title">@vectordotdev</div>
                   <div className="panel--description">
-                    Tweet at us. Use the <code>#vector</code> hashtag.
+                    Tweet at us
                   </div>
                 </a>
               </div>

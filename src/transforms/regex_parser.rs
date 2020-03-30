@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, ValueKind},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    event::{self, Event, Value},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex};
@@ -41,7 +40,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         RegexParser::build(&self)
     }
 
@@ -69,7 +68,10 @@ pub struct RegexParser {
 
 impl RegexParser {
     pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
-        let field = config.field.as_ref().unwrap_or(&event::MESSAGE);
+        let field = config
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
 
         let regex = Regex::new(&config.regex).context(super::InvalidRegex)?;
 
@@ -139,9 +141,11 @@ impl Transform for RegexParser {
             {
                 for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
-                        let capture: ValueKind = value[start..end].into();
+                        let capture: Value = value[start..end].into();
                         match conversion.convert(capture) {
-                            Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
+                            Ok(value) => {
+                                event.as_mut_log().insert(name.clone(), value);
+                            }
                             Err(error) => {
                                 debug!(
                                     message = "Could not convert types.",
@@ -196,8 +200,11 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
-    use crate::event::{LogEvent, ValueKind};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::event::{LogEvent, Value};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
 
     fn do_transform(
         event: &str,
@@ -216,7 +223,7 @@ mod tests {
             drop_failed,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).map(|event| event.into_log())
@@ -338,9 +345,9 @@ mod tests {
             &[("status", "int"), ("time", "float"), ("check", "boolean")],
         )
         .expect("Failed to parse log");
-        assert_eq!(log[&"check".into()], ValueKind::Boolean(false));
-        assert_eq!(log[&"status".into()], ValueKind::Integer(1234));
-        assert_eq!(log[&"time".into()], ValueKind::Float(6789.01));
+        assert_eq!(log[&"check".into()], Value::Boolean(false));
+        assert_eq!(log[&"status".into()], Value::Integer(1234));
+        assert_eq!(log[&"time".into()], Value::Float(6789.01));
     }
 
     #[test]

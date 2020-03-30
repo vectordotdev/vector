@@ -35,7 +35,12 @@ def create_release_meta_file!(current_commits, new_version)
 
   existing_release =
     if File.exists?(release_meta_path)
-      TomlRB.parse(File.read(release_meta_path)).fetch("releases").fetch(new_version.to_s)
+      existing_contents = File.read(release_meta_path)
+      if existing_contents.length > 0
+        TomlRB.parse(existing_contents).fetch("releases").fetch(new_version.to_s)
+      else
+        {"commits" => []}
+      end
     else
       {"commits" => []}
     end
@@ -85,7 +90,7 @@ def create_release_meta_file!(current_commits, new_version)
           <<~EOF
           [releases."#{new_version}"]
           date = #{Time.now.utc.to_date.to_toml}
-          commits = #{commits.to_toml}
+          commits = #{new_commits.to_toml}
           EOF
         )
       end
@@ -111,7 +116,7 @@ def create_release_meta_file!(current_commits, new_version)
 end
 
 def get_commit_log(last_version)
-  range = "v#{last_version}...master"
+  range = "v#{last_version}..."
   `git log #{range} --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
 end
 
@@ -154,6 +159,18 @@ def get_new_version(last_version, commits)
       else
         nil
       end
+    elsif commits.any? { |c| fix?(c) }
+      next_version = "#{last_version.major}.#{last_version.minor}.#{last_version.patch + 1}"
+
+      words = "It looks like this release contains commits with bug fixes. " +
+        "Would you like to use the recommended version #{next_version} for " +
+        "this release?"
+
+      if get(words, ["y", "n"]) == "y"
+        next_version
+      else
+        nil
+      end
     end
 
   version_string = next_version || get("What is the next version you are releasing? (current version is #{last_version})")
@@ -178,6 +195,10 @@ def new_feature?(commit)
   !commit.fetch("message").match(/^feat/).nil?
 end
 
+def fix?(commit)
+  !commit.fetch("message").match(/^fix/).nil?
+end
+
 def parse_commit_line!(commit_line)
   # Parse the full commit line
   line_parts = commit_line.split("\t")
@@ -192,8 +213,10 @@ def parse_commit_line!(commit_line)
 
   # Parse the stats
   stats = get_commit_stats(attributes.fetch("sha"))
-  stats_attributes = parse_commit_stats!(stats)
-  attributes.merge!(stats_attributes)
+  if /^\W*\p{Digit}+ files? changed,/.match(stats)
+    stats_attributes = parse_commit_stats!(stats)
+    attributes.merge!(stats_attributes)
+  end
 
   attributes
 end
@@ -229,7 +252,7 @@ end
 
 title("Creating release meta file...")
 
-last_tag = `git describe --abbrev=0`.chomp
+last_tag = `git describe --tags --abbrev=0`.chomp
 last_version = Version.new(last_tag.gsub(/^v/, ''))
 commits = get_commits(last_version)
 new_version = get_new_version(last_version, commits)

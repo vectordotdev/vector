@@ -66,6 +66,11 @@ class Links
 
   def fetch(id)
     id_parts = id.split(".", 2)
+
+    if id_parts.length != 2
+      raise ArgumentError.new("Link id is invalid! #{id}")
+    end
+
     category = id_parts[0]
     suffix = id_parts[1]
     hash_parts = suffix.split("#", 2)
@@ -199,14 +204,7 @@ class Links
       when /^(.*)_(sink|source|transform)_source$/
         name = $1
         type = $2
-
-        source_file_url =
-          case "#{name}_#{type}"
-          when "statsd_source"
-            "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}/mod.rs"
-          else
-            "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}.rs"
-          end
+        source_file_url = "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}.rs"
 
       when /^(.*)_test$/
         "#{TEST_HARNESS_ROOT}/tree/master/cases/#{$1}"

@@ -2,7 +2,7 @@
 id: arm-support-on-linux
 title: "ARMv7 & ARM64 Support on Linux"
 description: "These architectures are widely used in embeded devices & servers"
-author_id: ben
+author_github: https://github.com/binarylogic
 tags: ["type: announcement", "domain: platforms", "platform: arm"]
 ---
 

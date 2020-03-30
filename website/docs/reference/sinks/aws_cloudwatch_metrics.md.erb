@@ -2,18 +2,22 @@
 
 <%= component_header(component) %>
 
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
 
-## Options
-
-<%= options(component.specific_options_list, heading_depth: 3) %>
+<%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= options(component.env_vars_list, heading_depth: 3) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 <%- if component.output -%>
@@ -27,8 +31,9 @@
 ### Metric Types
 
 CloudWatch Metrics types are organized not by their semantics, but by storage properties:
-- Statistic Sets
-- Data Points
+
+* Statistic Sets
+* Data Points
 
 In Vector only the latter is used to allow lossless statistics calculations on CloudWatch side.
 
@@ -45,7 +50,7 @@ The following matrix outlines how Vector metric types are mapped into CloudWatch
 1. Gauge values are persisted between flushes. On Vector start up each gauge is assumed to have
 zero (0.0) value, that can be updated explicitly by the consequent absolute (not delta) gauge
 observation, or by delta increments/decrements. Delta gauges are considered an advanced feature
-useful in distributed setting, however it should be used with care.
+useful itn distributed setting, however it should be used with care.
 
 <%= component_sections(component) %>
 

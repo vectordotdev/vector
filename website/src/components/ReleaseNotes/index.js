@@ -49,6 +49,15 @@ function Sidebar({releases, release}) {
 }
 
 function Highlight({post}) {
+  return (
+    <div className="section">
+      <AnchoredH3 id={post.id}>{post.title}</AnchoredH3>
+      <div dangerouslySetInnerHTML={{__html: post.body}} />
+    </div>
+  );
+}
+
+function BlogHighlight({post}) {
   const date = Date.parse(post.date);
   const MAX_LENGTH = 175;
 
@@ -58,7 +67,7 @@ function Highlight({post}) {
         <BlogPostTags tags={post.tags} valuesOnly={true} />
       </div>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
-      <Avatar id={post.author_id} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
+      <Avatar github={post.author_github} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />
       <p>
         {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full post</Link>
       </p>
@@ -89,8 +98,11 @@ function ChangelogSentence({release}) {
 }
 
 function Notes({release, latest}) {
+  const subtitle = release.subtitle || (<>Released by <Link to="/community#team">Ben</Link></>);
+  const description = release.description || "";
   const date = Date.parse(release.date);
   const posts = release.posts;
+  const highlights = release.highlights;
   posts.reverse();
 
   let releaseTypeClass = 'primary';
@@ -110,9 +122,9 @@ function Notes({release, latest}) {
         <div className="container container--fluid">
           <div className={styles.componentsHeroOverlay}>
             <h1>Vector v{release.version} Release Notes</h1>
-            <div className="hero__subtitle">
+            <div className="hero--subtitle">
               <div className={styles.heroSubTitle}>
-                Released by <Link to="/community#team">Ben</Link> on <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
+                {subtitle}, <time>{dateFormat(date, "mmmm dS, yyyy")}</time>
               </div>
               <div>
                 <small>
@@ -135,16 +147,20 @@ function Notes({release, latest}) {
         <MailingListForm center={true} />
       </section>
       <section className="markdown">
+        {description.length > 0 && <p>{description}</p>}
         <p>
           We're excited to release Vector v{release.version}! Vector follows <a href="https://semver.org" target="_blank">semantic versioning</a>, and this is an <a href={release.type_url} target="_blank">{release.type}</a> release. This release brings <ChangelogSentence release={release} />. Checkout the <a href="#highlights">highlights</a> for notable features and, as always, <Link to="/community/">let us know what you think</Link>!
         </p>
 
-        {posts.length > 0 && (
+        {posts.length > 0 || highlights.length > 0 && (
           <>
             <AnchoredH2 id="highlights">Highlights</AnchoredH2>
 
             <div className="section-list">
               {posts.map((post, idx) => (
+                <BlogHighlight post={post} key={idx} />
+              ))}
+              {highlights.map((post, idx) => (
                 <Highlight post={post} key={idx} />
               ))}
             </div>
@@ -179,6 +195,7 @@ function TableOfContents({release}) {
   const groupedCommits = _.groupBy(release.commits, 'type');
   const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
   const posts = release.posts;
+  const highlights = release.highlights;
 
   return (
     <div className={styles.toc}>
@@ -187,13 +204,18 @@ function TableOfContents({release}) {
           <div className="title">Contents</div>
 
           <ul className="contents">
-            {posts.length > 0 && (
+            {posts.length > 0 || highlights.length > 0 && (
               <li>
                 <a href="#highlights" className="contents__link">Highlights</a>
                 <ul>
                   {posts.map((post, idx) =>
                     <li key={idx}>
-                      <a href={`#${post.id}`} className="contents__link">{post.title}</a>
+                      <a href={`#${post.id}`} className="contents__link" title={post.title}>{post.title}</a>
+                    </li>
+                  )}
+                  {highlights.map((post, idx) =>
+                    <li key={idx}>
+                      <a href={`#${post.id}`} className="contents__link" title={post.title}>{post.title}</a>
                     </li>
                   )}
                 </ul>
@@ -205,7 +227,7 @@ function TableOfContents({release}) {
                 <ul>
                   {release.upgrade_guides.map((upgradeGuide, idx) =>
                     <li key={idx}>
-                      <a href={`#${upgradeGuide.id}`} className="contents__link">{upgradeGuide.title}</a>
+                      <a href={`#${upgradeGuide.id}`} className="contents__link" title={upgradeGuide.title}>{upgradeGuide.title}</a>
                     </li>
                   )}
                 </ul>

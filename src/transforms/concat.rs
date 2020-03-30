@@ -1,8 +1,7 @@
 use super::{BuildError, Transform};
-use crate::runtime::TaskExecutor;
 use crate::{
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -24,7 +23,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var.into(),
@@ -177,9 +176,7 @@ impl Transform for Concat {
         }
 
         let content = content_vec.join(self.joiner.as_bytes());
-        event
-            .as_mut_log()
-            .insert_explicit(self.target.clone(), content);
+        event.as_mut_log().insert(self.target.clone(), content);
 
         Some(event)
     }
@@ -194,10 +191,8 @@ mod tests {
     #[test]
     fn concat_to_from() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("first", "Hello vector users");
-        event.as_mut_log().insert_explicit("second", "World");
+        event.as_mut_log().insert("first", "Hello vector users");
+        event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -215,10 +210,8 @@ mod tests {
     #[test]
     fn concat_full() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("first", "Hello vector users");
-        event.as_mut_log().insert_explicit("second", "World");
+        event.as_mut_log().insert("first", "Hello vector users");
+        event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -235,10 +228,8 @@ mod tests {
     #[test]
     fn concat_mixed() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("first", "Hello vector users");
-        event.as_mut_log().insert_explicit("second", "World");
+        event.as_mut_log().insert("first", "Hello vector users");
+        event.as_mut_log().insert("second", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -259,9 +250,7 @@ mod tests {
     #[test]
     fn concat_start_gt_end() {
         let mut event = Event::from("message");
-        event
-            .as_mut_log()
-            .insert_explicit("only", "Hello vector users");
+        event.as_mut_log().insert("only", "Hello vector users");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -275,7 +264,7 @@ mod tests {
     #[test]
     fn concat_start_gt_len() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert_explicit("only", "World");
+        event.as_mut_log().insert("only", "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -289,7 +278,7 @@ mod tests {
     #[test]
     fn concat_end_gt_len() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert_explicit("only", "World");
+        event.as_mut_log().insert("only", "World");
 
         let mut transform = Concat::new(
             "out".into(),

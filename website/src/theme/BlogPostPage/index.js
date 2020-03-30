@@ -19,7 +19,7 @@ import styles from './styles.module.css';
 function BlogPostPage(props) {
   const {content: BlogPostContents} = props;
   const {frontMatter, metadata} = BlogPostContents;
-  const {author_id, id, title} = frontMatter;
+  const {author_github, id, title} = frontMatter;
   const {date: dateString, tags} = metadata;
   const readingStats = readingTime(BlogPostContents.toString());
   const date = new Date(Date.parse(dateString));
@@ -36,7 +36,7 @@ function BlogPostPage(props) {
       <article className={styles.blogPost}>
         <header className={classnames('hero', 'domain-bg', `domain-bg--${domain}`, styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
-            <Avatar id={author_id} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
+            <Avatar github={author_github} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
             <h1>{title}</h1>
             <div className={styles.headerTags}>
               <BlogPostTags tags={tags} />

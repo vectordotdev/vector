@@ -1,17 +1,17 @@
 use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition};
 use bytes::Bytes;
-use futures::{stream, Future, Sink, Stream};
+use futures::{executor::block_on, stream, stream::StreamExt, Sink};
 use glob::{glob, Pattern};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::fs::{self, File};
 use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
 use tracing::field;
 
-use crate::metadata_ext::PortableMetadataExt;
+use crate::metadata_ext::PortableFileExt;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -51,7 +51,7 @@ pub struct FileServer {
 impl FileServer {
     pub fn run(
         self,
-        mut chans: impl Sink<SinkItem = (Bytes, String), SinkError = ()>,
+        mut chans: impl Sink<(Bytes, String), Error = ()> + Unpin,
         shutdown: std::sync::mpsc::Receiver<()>,
     ) {
         let mut line_buffer = Vec::new();
@@ -259,16 +259,13 @@ impl FileServer {
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|_file_id, watcher| !watcher.dead());
 
-            match stream::iter_ok::<_, ()>(lines.drain(..))
-                .forward(chans)
-                .wait()
-            {
-                Ok((_, sink)) => chans = sink,
-                Err(_) => {
-                    debug!("Output channel closed.");
-                    return;
-                }
+            let stream = stream::iter(lines.drain(..).map(Result::<_, ()>::Ok));
+            let result = block_on(stream.forward(&mut chans));
+            if result.is_err() {
+                debug!("Output channel closed.");
+                return;
             }
+
             // When no lines have been read we kick the backup_cap up by twice,
             // limited by the hard-coded cap. Else, we set the backup_cap to its
             // minimum on the assumption that next time through there will be
@@ -396,9 +393,9 @@ impl Fingerprinter {
     ) -> Result<FileFingerprint, io::Error> {
         match *self {
             Fingerprinter::DevInode => {
-                let metadata = fs::metadata(path)?;
-                let dev = metadata.portable_dev();
-                let ino = metadata.portable_ino();
+                let file_handle = File::open(path)?;
+                let dev = file_handle.portable_dev()?;
+                let ino = file_handle.portable_ino()?;
                 buffer.clear();
                 buffer.write_all(&dev.to_be_bytes())?;
                 buffer.write_all(&ino.to_be_bytes())?;

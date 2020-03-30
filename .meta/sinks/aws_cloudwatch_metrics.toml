@@ -1,18 +1,24 @@
 [sinks.aws_cloudwatch_metrics]
 title = "AWS Cloudwatch Metrics"
-batch_max_events = 20
-batch_timeout_secs = 1
 beta = true
-buffer = false
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
 function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
+requirements = {}
 service_limits_short_link = "aws_cw_metrics_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
+
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_metrics.env_vars") %>
+
+<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_cloudwatch_metrics.options", common: false, max_events: 20, max_size: nil, timeout_secs: 1) %>
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "aws_cloudwatch_metrics") %>
 
 [sinks.aws_cloudwatch_metrics.options.namespace]
 type = "string"
@@ -20,10 +26,3 @@ common = true
 examples = ["service"]
 required = true
 description = "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
-
-[sinks.aws_cloudwatch_metrics.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-required = true
-description = "The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides."

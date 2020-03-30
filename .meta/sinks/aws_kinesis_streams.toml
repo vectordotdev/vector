@@ -1,38 +1,54 @@
 [sinks.aws_kinesis_streams]
 title = "AWS Kinesis Data Streams"
-batch_max_events = 500
-batch_timeout_secs = 1
 beta = true
-buffer = true
 common = false
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
-encodings = ["json", "text"]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num =5
-request_retry_attempts = 5
-request_retry_backoff_secs = 1
-request_in_flight_limit = 5
-request_timeout_secs = 30
+requirements = {}
 service_limits_short_link = "aws_kinesis_streams_service_limits"
 service_providers = ["AWS"]
 write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
+
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_streams.env_vars") %>
+
+<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_kinesis_streams.options") %>
+
+<%= render("_partials/_component_options.toml", type: "sinks", name: "aws_kinesis_streams") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_kinesis_streams.options", common: false, max_events: 500, max_size: nil, timeout_secs: 1) %>
+
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.aws_kinesis_streams.options",
+  common: false
+) %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.aws_kinesis_streams.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 30
+) %>
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.aws_kinesis_streams.options",
+  encodings: ["json", "text"]
+) %>
 
 [sinks.aws_kinesis_streams.options.partition_key_field]
 type = "string"
 common = true
 examples = ["user_id"]
 description = "The log field used as the Kinesis record's partition key value."
-
-[sinks.aws_kinesis_streams.options.region]
-type = "string"
-common = true
-examples = ["us-east-1"]
-required = true
-description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
@@ -43,8 +59,8 @@ description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kin
 
 [[sinks.aws_kinesis_streams.output.examples]]
 label = "Generic"
-output.type = "http"
-output.body = """\
+body = """\
+```http
 POST / HTTP/1.1
 Host: kinesis.<region>.<domain>
 Content-Length: <byte_size>
@@ -67,5 +83,6 @@ X-Amz-Target: Kinesis_20131202.PutRecords
         },
     ],
     "StreamName": "<stream_name>"
-}\
+}
+```\
 """

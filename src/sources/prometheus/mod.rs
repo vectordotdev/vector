@@ -1,12 +1,12 @@
-use crate::{topology::config::GlobalOptions, Event};
-use futures::{sync::mpsc, Future, Sink, Stream};
+use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
+use futures01::{sync::mpsc, Future, Sink, Stream};
 use http::Uri;
 use hyper;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
-use tokio::timer::Interval;
+use tokio01::timer::Interval;
 
 pub mod parser;
 
@@ -27,6 +27,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
@@ -51,7 +52,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
 
     let task = Interval::new(Instant::now(), Duration::from_secs(interval))
         .map_err(|e| error!("timer error: {:?}", e))
-        .map(move |_| futures::stream::iter_ok(urls.clone()))
+        .map(move |_| futures01::stream::iter_ok(urls.clone()))
         .flatten()
         .map(move |url| {
             let https = HttpsConnector::new(4).expect("TLS initialization failed");
@@ -71,7 +72,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
                         .unwrap_or_default()
                         .into_iter()
                         .map(Event::Metric);
-                    futures::stream::iter_ok(metrics)
+                    futures01::stream::iter_ok(metrics)
                 })
                 .flatten_stream()
                 .map_err(|e| error!("http request processing error: {:?}", e))
@@ -83,6 +84,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
     Box::new(task)
 }
 
+#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use super::*;

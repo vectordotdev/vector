@@ -1,14 +1,14 @@
 use crate::FilePosition;
 use flate2::bufread::MultiGzDecoder;
 use std::{
-    fs,
+    fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
     thread,
     time::{Duration, Instant, SystemTime},
 };
 
-use crate::metadata_ext::PortableMetadataExt;
+use crate::metadata_ext::PortableFileExt;
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
 /// from a file path, transparently updating the underlying file descriptor when
@@ -41,6 +41,7 @@ impl FileWatcher {
         ignore_before: Option<SystemTime>,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
+        let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
         let metadata = f.metadata()?;
         let mut reader = io::BufReader::new(f);
 
@@ -87,8 +88,8 @@ impl FileWatcher {
             findable: true,
             reader,
             file_position,
-            devno: metadata.portable_dev(),
-            inode: metadata.portable_ino(),
+            devno: devno,
+            inode: ino,
             is_dead: false,
             last_read_attempt: ts.clone(),
             last_read_success: ts,
@@ -96,8 +97,8 @@ impl FileWatcher {
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
-        let metadata = fs::metadata(&path)?;
-        if (metadata.portable_dev(), metadata.portable_ino()) != (self.devno, self.inode) {
+        let file_handle = File::open(&path)?;
+        if (file_handle.portable_dev()?, file_handle.portable_ino()?) != (self.devno, self.inode) {
             let mut reader = io::BufReader::new(fs::File::open(&path)?);
             let gzipped = is_gzipped(&mut reader)?;
             let new_reader: Box<dyn BufRead> = if gzipped {
@@ -111,8 +112,8 @@ impl FileWatcher {
                 Box::new(reader)
             };
             self.reader = new_reader;
-            self.devno = metadata.portable_dev();
-            self.inode = metadata.portable_ino();
+            self.devno = file_handle.portable_dev()?;
+            self.inode = file_handle.portable_ino()?;
         }
         self.path = path;
         Ok(())

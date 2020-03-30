@@ -1,0 +1,68 @@
+[transforms.merge]
+  inputs = []
+  type = "merge"
+[[tests]]
+  name = "merge"
+  [[tests.inputs]]
+    insert_at = "merge"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "hello "
+      _partial = true
+  [[tests.inputs]]
+    insert_at = "merge"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "world"
+  [[tests.outputs]]
+    extract_from = "merge"
+    [[tests.outputs.conditions]]
+      "message.equals" = "hello world"
+      "_partial.exists" = false
+
+[transforms.merge_nested]
+  inputs = []
+  type = "merge"
+  merge_fields = ["nested.message"]
+[[tests]]
+  name = "merge_nested"
+  [[tests.inputs]]
+    insert_at = "merge_nested"
+    type = "log"
+    [tests.inputs.log_fields]
+      "nested.message" = "hello "
+      _partial = true
+  [[tests.inputs]]
+    insert_at = "merge_nested"
+    type = "log"
+    [tests.inputs.log_fields]
+      "nested.message" = "world"
+  [[tests.outputs]]
+    extract_from = "merge_nested"
+    [[tests.outputs.conditions]]
+      "nested.message.equals" = "hello world"
+      "_partial.exists" = false
+
+[transforms.merge_nested_marker]
+  inputs = []
+  type = "merge"
+  merge_fields = ["nested.message"]
+  partial_event_marker_field = "nested.is_partial"
+[[tests]]
+  name = "merge_nested_marker"
+  [[tests.inputs]]
+    insert_at = "merge_nested_marker"
+    type = "log"
+    [tests.inputs.log_fields]
+      "nested.message" = "hello "
+      "nested.is_partial" = true
+  [[tests.inputs]]
+    insert_at = "merge_nested_marker"
+    type = "log"
+    [tests.inputs.log_fields]
+      "nested.message" = "world"
+  [[tests.outputs]]
+    extract_from = "merge_nested_marker"
+    [[tests.outputs.conditions]]
+      "nested.message.equals" = "hello world"
+      "nested.is_partial.exists" = false

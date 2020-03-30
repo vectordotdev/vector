@@ -1,16 +1,19 @@
 [transforms.ansi_stripper]
 title = "ANSI Stripper"
-allow_you_to_description = "strips ANSI characters from the specified field"
+allow_you_to_description = "strips ANSI escape sequences from the specified field"
+beta = false
 common = false
 function_category = "sanitize"
-guides = []
 input_types = ["log"]
 output_types = ["log"]
-resources = []
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "ansi_stripper") %>
 
 [transforms.ansi_stripper.options.field]
 type = "string"
 common = true
 default = "message"
-required = true
-description = "The target field to strip ANSI characters from."
+examples = ["message", "parent.child", "array[0]"]
+field_path_notation = true
+description = "The target field to strip ANSI escape sequences from."

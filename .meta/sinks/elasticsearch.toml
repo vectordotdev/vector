@@ -1,64 +1,86 @@
 [sinks.elasticsearch]
 title = "Elasticsearch"
-batch_max_size = 10490000
-batch_timeout_secs = 1
 beta = true
-buffer = true
 common = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-request_rate_limit_duration_secs = 1
-request_rate_limit_num =5
-request_retry_attempts = 5
-request_retry_backoff_secs = 1
-request_in_flight_limit = 5
-request_timeout_secs = 60
+min_version = "0"
+requirements = {}
 service_providers = ["AWS", "Elastic"]
 write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
-tls_options = []
+
+<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.elasticsearch.env_vars") %>
+
+<%= render("_partials/_component_options.toml", type: "sink", name: "elasticsearch") %>
+
+<%= render("_partials/_batch_options.toml", namespace: "sinks.elasticsearch.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
+
+<%= render(
+  "_partials/_buffer_options.toml",
+  namespace: "sinks.elasticsearch.options",
+  common: false
+) %>
+
+<%= render(
+  "_partials/_request_options.toml",
+  namespace: "sinks.elasticsearch.options",
+  common: false,
+  in_flight_limit: 5,
+  rate_limit_duration_secs: 1,
+  rate_limit_num: 5,
+  retry_attempts: -1,
+  retry_initial_backoff_secs: 1,
+  retry_max_duration_secs: 10,
+  timeout_secs: 60
+) %>
+
+<%= render("_partials/_encoding.toml",
+  namespace: "sinks.elasticsearch.options",
+  encodings: []
+) %>
 
 [sinks.elasticsearch.options.auth]
 type = "table"
 common = false
 description = "Options for the authentication strategy."
 
-[sinks.elasticsearch.options.auth.options.strategy]
+[sinks.elasticsearch.options.auth.children.strategy]
 type = "string"
 required = true
+sort = 1
 description = "The authentication strategy to use."
 
-[sinks.elasticsearch.options.auth.options.strategy.enum]
+[sinks.elasticsearch.options.auth.children.strategy.enum]
 aws = "Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch]."
 basic = "The [basic authentication strategy][urls.basic_auth]."
 
-[sinks.elasticsearch.options.auth.options.password]
+[sinks.elasticsearch.options.auth.children.password]
 type = "string"
 examples = ["${PASSWORD_ENV_VAR}", "password"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = "The basic authentication password."
 
-[sinks.elasticsearch.options.auth.options.user]
+[sinks.elasticsearch.options.auth.children.user]
 type = "string"
 examples = ["${USERNAME_ENV_VAR}", "username"]
-required = true
 relevant_when = {strategy = "basic"}
+required = true
 description = "The basic authentication user name."
 
 [sinks.elasticsearch.options.doc_type]
 type = "string"
 default = "_doc"
-required = true
 description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
 
 [sinks.elasticsearch.options.headers]
 type = "table"
 description = "Options for custom headers."
 
-[sinks.elasticsearch.options.headers.options."`[header-name]`"]
+[sinks.elasticsearch.options.headers.children."`[header-name]`"]
 type = "string"
 examples = [
   {Authorization = "${TOKEN_ENV_VAR}"},
@@ -71,7 +93,7 @@ description = "A custom header to be added to each outgoing Elasticsearch reques
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
-description = """The host of your Elasticsearch cluster. This should be the full URL as shown in the example. This is required if the `provider` is not `"aws"`"""
+description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
 
 [sinks.elasticsearch.options.index]
 type = "string"
@@ -81,38 +103,20 @@ examples = [
   "application-{{ application_id }}-%Y-%m-%d",
   "vector-%Y-%m-%d",
 ]
-required = true
 templateable = true
 description = "Index name to write events to."
-
-[sinks.elasticsearch.options.provider]
-type = "string"
-default = "default"
-description = """\
-The provider of the Elasticsearch service. This is used to properly \
-authenticate with the Elasticsearch cluster. For example, authentication \
-for [AWS Elasticsearch Service][urls.aws_elasticsearch] requires that we \
-obtain AWS credentials to properly sign the request.\
-"""
-
-[sinks.elasticsearch.options.provider.enum]
-default = "A generic Elasticsearch provider."
-aws = "The [AWS Elasticsearch Service][urls.aws_elasticsearch]."
 
 [sinks.elasticsearch.options.query]
 type = "table"
 description = "Custom parameters to Elasticsearch query string."
 
-[sinks.elasticsearch.options.query.options."`[parameter-name]`"]
+[sinks.elasticsearch.options.query.children."`[parameter-name]`"]
 type = "string"
 examples = [{"X-Powered-By" = "Vector"}]
 required = true
 description = "A custom parameter to be added to each Elasticsearch request."
 
-[sinks.elasticsearch.options.region]
-type = "string"
-examples = ["us-east-1"]
-description = "When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance."
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.elasticsearch.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>
 
 [[sinks.elasticsearch.output.examples]]
 label = "Generic"

@@ -1,0 +1,60 @@
+[transforms.remove_fields_simple]
+  inputs = []
+  type = "remove_fields"
+  fields = ["a"]
+[[tests]]
+  name = "remove_fields_simple"
+  [tests.input]
+    insert_at = "remove_fields_simple"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 4
+  [[tests.outputs]]
+    extract_from = "remove_fields_simple"
+    [[tests.outputs.conditions]]
+      "a.exists" = false
+      "b.equals" = 4
+
+[transforms.remove_fields_nested]
+  inputs = []
+  type = "remove_fields"
+  fields = ["a.c"]
+[[tests]]
+  name = "remove_fields_nested"
+  [tests.input]
+    insert_at = "remove_fields_nested"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b" = 3
+      "a.c" = 4
+  [[tests.outputs]]
+    extract_from = "remove_fields_nested"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = 3
+      "a.c.exists" = false
+
+[transforms.remove_fields_empty_objects]
+  inputs = []
+  type = "remove_fields"
+  fields = ["a.c", "a.b", "b.a"]
+  drop_empty = true
+[[tests]]
+  name = "remove_fields_empty_objects"
+  [tests.input]
+    insert_at = "remove_fields_empty_objects"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b" = 3
+      "a.c" = 4
+      "b.a" = 3
+      "b.b" = 4
+  [[tests.outputs]]
+    extract_from = "remove_fields_empty_objects"
+    [[tests.outputs.conditions]]
+      "a.b.exists" = false
+      "a.c.exists" = false
+      "a.exists" = false
+      "b.a.exists" = false
+      "b.exists" = true
+      "b.b.equals" = 4

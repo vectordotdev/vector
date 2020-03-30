@@ -1,0 +1,151 @@
+[transforms.add_fields_nested]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_nested.fields]
+    "a.b" = 123
+    x.y = 456
+    "x.z" = 789
+[[tests]]
+  name = "add_fields_nested"
+  [tests.input]
+    insert_at = "add_fields_nested"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_nested"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = 123
+      "x.y.equals" = 456
+      "x.z.equals" = 789
+
+[transforms.add_fields_array]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_array.fields]
+    "a[0]" = 0
+    "a[1]" = "1"
+    "a[2]" = 2.0
+
+    "b[2]" = "two"
+    "b[0]" = 0
+[[tests]]
+  name = "add_fields_array"
+  [tests.input]
+    insert_at = "add_fields_array"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_array"
+    [[tests.outputs.conditions]]
+      "a[0].equals" = 0
+      "a[1].equals" = "1"
+      "a[2].equals" = 2.0
+
+      "b[0].equals" = 0
+      "b[1].equals" = "<null>"
+      "b[2].equals" = "two"
+
+[transforms.add_fields_scalar_then_nested_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_nested_1.fields]
+    a = "initial value"
+[transforms.add_fields_scalar_then_nested_2]
+  inputs = ["add_fields_scalar_then_nested_1"]
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_nested_2.fields]
+    "a.b" = "new value"
+[[tests]]
+  name = "add_fields_scalar_then_nested"
+  [tests.input]
+    insert_at = "add_fields_scalar_then_nested_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_scalar_then_nested_2"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = "new value"
+
+[transforms.add_fields_nested_then_scalar_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_nested_then_scalar_1.fields]
+    a.b = "initial value"
+[transforms.add_fields_nested_then_scalar_2]
+  inputs = ["add_fields_nested_then_scalar_1"]
+  type = "add_fields"
+  [transforms.add_fields_nested_then_scalar_2.fields]
+    a = "new value"
+[[tests]]
+  name = "add_fields_nested_then_scalar"
+  [tests.input]
+    insert_at = "add_fields_nested_then_scalar_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_nested_then_scalar_2"
+    [[tests.outputs.conditions]]
+      "a.equals" = "new value"
+
+[transforms.add_fields_scalar_then_scalar_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_scalar_1.fields]
+    a = "initial value"
+[transforms.add_fields_scalar_then_scalar_2]
+  inputs = ["add_fields_scalar_then_scalar_1"]
+  type = "add_fields"
+  [transforms.add_fields_scalar_then_scalar_2.fields]
+    a = "new value"
+[[tests]]
+  name = "add_fields_scalar_then_scalar"
+  [tests.input]
+    insert_at = "add_fields_scalar_then_scalar_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_scalar_then_scalar_2"
+    [[tests.outputs.conditions]]
+      "a.equals" = "new value"
+
+[transforms.add_fields_templated_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_templated_1.fields]
+    a = "initial value"
+[transforms.add_fields_templated_2]
+  inputs = ["add_fields_templated_1"]
+  type = "add_fields"
+  [transforms.add_fields_templated_2.fields]
+    b = "a was: {{a}}"
+[[tests]]
+  name = "add_fields_templated_1"
+  [tests.input]
+    insert_at = "add_fields_templated_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_templated_2"
+    [[tests.outputs.conditions]]
+      "b.equals" = "a was: initial value"
+
+[transforms.add_fields_templated_nested_1]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_templated_nested_1.fields]
+    a.b = "initial value"
+[transforms.add_fields_templated_nested_2]
+  inputs = ["add_fields_templated_nested_1"]
+  type = "add_fields"
+  [transforms.add_fields_templated_nested_2.fields]
+    b.c = "a.b was: {{a.b}}"
+[[tests]]
+  name = "add_fields_templated_nested_1"
+  [tests.input]
+    insert_at = "add_fields_templated_nested_1"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_templated_nested_2"
+    [[tests.outputs.conditions]]
+      "b.c.equals" = "a.b was: initial value"

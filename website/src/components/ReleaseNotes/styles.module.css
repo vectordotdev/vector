@@ -5,7 +5,7 @@
 
 .sidebar {
   padding-top: calc( var(--ifm-spacing-vertical) * 2 );
-  width: 175px;
+  width: 125px;
 }
 
 .content {
@@ -21,7 +21,7 @@
 }
 
 .toc {
-  width: 175px;
+  width: 200px;
 }
 
 @media (max-width: 996px) {

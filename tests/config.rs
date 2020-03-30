@@ -7,6 +7,11 @@ fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
         .map(|(_topology, warnings)| warnings)
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sampler",
+    feature = "sinks-socket"
+))]
 #[test]
 fn happy_path() {
     load(
@@ -64,6 +69,7 @@ fn bad_syntax() {
     );
 }
 
+#[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 #[test]
 fn missing_key() {
     let err = load(
@@ -72,8 +78,9 @@ fn missing_key() {
         type = "socket"
 
         [sinks.out]
-        type = "tcp"
+        type = "socket"
         inputs = ["in"]
+        mode = "tcp"
         address = "127.0.0.1:9999"
       "#,
     )
@@ -82,6 +89,7 @@ fn missing_key() {
     assert_eq!(err, vec!["missing field `mode` for key `sources.in`"]);
 }
 
+#[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 #[test]
 fn missing_key2() {
     let err = load(
@@ -102,6 +110,7 @@ fn missing_key2() {
     assert_eq!(err, vec!["missing field `address` for key `sources.in`"]);
 }
 
+#[cfg(feature = "sources-socket")]
 #[test]
 fn bad_type() {
     let err = load(
@@ -123,6 +132,11 @@ fn bad_type() {
     assert!(err[0].starts_with("unknown variant `jabberwocky`, expected one of "));
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sampler",
+    feature = "sinks-socket"
+))]
 #[test]
 fn nonexistant_input() {
     let err = load(
@@ -157,6 +171,11 @@ fn nonexistant_input() {
     );
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sampler",
+    feature = "sinks-socket"
+))]
 #[test]
 fn bad_regex() {
     let err = load(
@@ -211,6 +230,11 @@ fn bad_regex() {
     assert!(err[0].contains("error: unclosed character class"));
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-regex_parser",
+    feature = "sinks-socket"
+))]
 #[test]
 fn good_regex_parser() {
     let result = load(
@@ -240,6 +264,11 @@ fn good_regex_parser() {
     assert!(result.is_ok());
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-tokenizer",
+    feature = "sinks-socket"
+))]
 #[test]
 fn good_tokenizer() {
     let result = load(
@@ -269,7 +298,7 @@ fn good_tokenizer() {
 
     assert!(result.is_ok());
 }
-
+#[cfg(all(feature = "sources-socket", feature = "sinks-aws_s3"))]
 #[test]
 fn bad_s3_region() {
     let err = load(
@@ -332,6 +361,11 @@ fn bad_s3_region() {
     )
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sampler",
+    feature = "sinks-socket"
+))]
 #[test]
 fn warnings() {
     let warnings = load(
@@ -371,12 +405,17 @@ fn warnings() {
     assert_eq!(
         warnings,
         vec![
-            "Transform \"sampler2\" has no outputs",
-            "Source \"in2\" has no outputs",
+            "Transform \"sampler2\" has no consumers",
+            "Source \"in2\" has no consumers",
         ]
     )
 }
 
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sampler",
+    feature = "sinks-socket"
+))]
 #[test]
 fn cycle() {
     let errors = load(
@@ -420,9 +459,13 @@ fn cycle() {
     )
     .unwrap_err();
 
-    assert_eq!(errors, vec!["Configured topology contains a cycle"])
+    assert_eq!(
+        errors,
+        vec!["Cyclic dependency detected in the chain [ four -> two -> three -> four ]"]
+    )
 }
 
+#[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 #[test]
 fn disabled_healthcheck() {
     load(
@@ -444,6 +487,7 @@ fn disabled_healthcheck() {
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
 #[test]
 fn parses_sink_no_request() {
     load(
@@ -461,6 +505,7 @@ fn parses_sink_no_request() {
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
 #[test]
 fn parses_sink_partial_request() {
     load(
@@ -481,6 +526,7 @@ fn parses_sink_partial_request() {
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
 #[test]
 fn parses_sink_full_request() {
     load(
@@ -500,12 +546,14 @@ fn parses_sink_full_request() {
         rate_limit_duration_secs = 3
         rate_limit_num = 4
         retry_attempts = 5
-        retry_backoff_secs = 6
+        retry_max_duration_secs = 10
+        retry_initial_backoff_secs = 6
         "#,
     )
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
 #[test]
 fn parses_sink_full_batch_bytes() {
     load(
@@ -527,6 +575,7 @@ fn parses_sink_full_batch_bytes() {
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-aws_cloudwatch_logs"))]
 #[test]
 fn parses_sink_full_batch_event() {
     load(
@@ -550,6 +599,7 @@ fn parses_sink_full_batch_event() {
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
 #[test]
 fn parses_sink_full_auth() {
     load(
@@ -572,6 +622,7 @@ fn parses_sink_full_auth() {
     .unwrap();
 }
 
+#[cfg(all(feature = "sources-stdin", feature = "sinks-elasticsearch"))]
 #[test]
 fn parses_sink_full_es_basic_auth() {
     load(
@@ -593,6 +644,11 @@ fn parses_sink_full_es_basic_auth() {
     .unwrap();
 }
 
+#[cfg(all(
+    feature = "docker",
+    feature = "sources-stdin",
+    feature = "sinks-elasticsearch"
+))]
 #[test]
 fn parses_sink_full_es_aws() {
     load(
@@ -603,7 +659,7 @@ fn parses_sink_full_es_aws() {
         [sinks.out]
         type = "elasticsearch"
         inputs = ["in"]
-        region = "us-east-1"
+        host = "https://es.us-east-1.amazonaws.com"
 
         [sinks.out.auth]
         strategy = "aws"

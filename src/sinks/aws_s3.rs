@@ -2,16 +2,19 @@ use crate::{
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
+    serde::to_string,
     sinks::util::{
-        retries::RetryLogic, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer,
-        ServiceBuilderExt, SinkExt, TowerRequestConfig,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        retries::RetryLogic,
+        rusoto, BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
+        SinkExt, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream::iter_ok, Future, Poll, Sink};
+use futures01::{stream::iter_ok, Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError, RusotoFuture};
 use rusoto_s3::{
@@ -19,6 +22,7 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
@@ -39,19 +43,74 @@ pub struct S3SinkConfig {
     pub filename_append_uuid: Option<bool>,
     pub filename_extension: Option<String>,
     #[serde(flatten)]
+    options: S3Options,
+    #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: Encoding,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub assume_role: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct S3Options {
+    acl: Option<S3CannedAcl>,
+    grant_full_control: Option<String>,
+    grant_read: Option<String>,
+    grant_read_acp: Option<String>,
+    grant_write_acp: Option<String>,
+    server_side_encryption: Option<S3ServerSideEncryption>,
+    ssekms_key_id: Option<String>,
+    storage_class: Option<S3StorageClass>,
+    tags: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "kebab-case")]
+enum S3CannedAcl {
+    #[derivative(Default)]
+    Private,
+    PublicRead,
+    PublicReadWrite,
+    AwsExecRead,
+    AuthenticatedRead,
+    LogDeliveryWrite,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+enum S3ServerSideEncryption {
+    #[serde(rename = "AES256")]
+    AES256,
+    #[serde(rename = "aws:kms")]
+    AwsKms,
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum S3StorageClass {
+    #[derivative(Default)]
+    Standard,
+    ReducedRedundancy,
+    IntelligentTiering,
+    StandardIA,
+    OnezoneIA,
+    Glacier,
+    DeepArchive,
 }
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(25),
-        rate_limit_num: Some(25),
+        in_flight_limit: Some(50),
+        rate_limit_num: Some(250),
         ..Default::default()
     };
 }
@@ -128,11 +187,12 @@ impl S3Sink {
         let region = config.region.clone().try_into()?;
 
         let s3 = S3Sink {
-            client: Self::create_client(cx.resolver(), region)?,
+            client: Self::create_client(region, config.assume_role.clone(), cx.resolver())?,
         };
 
         let filename_extension = config.filename_extension.clone();
         let bucket = config.bucket.clone();
+        let options = config.options.clone();
 
         let svc = ServiceBuilder::new()
             .map(move |req| {
@@ -143,6 +203,7 @@ impl S3Sink {
                     filename_append_uuid,
                     compression,
                     bucket.clone(),
+                    options.clone(),
                 )
             })
             .settings(request, S3RetryLogic)
@@ -159,7 +220,11 @@ impl S3Sink {
         config: &S3SinkConfig,
         resolver: Resolver,
     ) -> crate::Result<super::Healthcheck> {
-        let client = Self::create_client(resolver, config.region.clone().try_into()?)?;
+        let client = Self::create_client(
+            config.region.clone().try_into()?,
+            config.assume_role.clone(),
+            resolver,
+        )?;
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
@@ -182,29 +247,24 @@ impl S3Sink {
         Ok(Box::new(healthcheck))
     }
 
-    pub fn create_client(resolver: Resolver, region: Region) -> crate::Result<S3Client> {
+    pub fn create_client(
+        region: Region,
+        _assume_role: Option<String>,
+        resolver: Resolver,
+    ) -> crate::Result<S3Client> {
+        let client = rusoto::client(resolver)?;
+
+        #[cfg(not(test))]
+        let creds = rusoto::AwsCredentialsProvider::new(&region, _assume_role)?;
+
         // Hack around the fact that rusoto will not pick up runtime
         // env vars. This is designed to only for test purposes use
         // static credentials.
-        #[cfg(not(test))]
-        {
-            use rusoto_credential::DefaultCredentialsProvider;
-
-            let p = DefaultCredentialsProvider::new()?;
-            let d = crate::sinks::util::rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
-
         #[cfg(test)]
-        {
-            use rusoto_credential::StaticProvider;
+        let creds =
+            rusoto::AwsCredentialsProvider::new_minimal("test-access-key", "test-secret-key");
 
-            let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-            let d = crate::sinks::util::rusoto::client(resolver)?;
-
-            Ok(S3Client::new_with(d, p, region))
-        }
+        Ok(S3Client::new_with(client, creds, region))
     }
 }
 
@@ -218,12 +278,29 @@ impl Service<Request> for S3Sink {
     }
 
     fn call(&mut self, request: Request) -> Self::Future {
+        let options = request.options;
+        let mut tagging = url::form_urlencoded::Serializer::new(String::new());
+        if let Some(tags) = options.tags {
+            for (p, v) in tags {
+                tagging.append_pair(&p, &v);
+            }
+        }
+        let tagging = tagging.finish();
         self.client
             .put_object(PutObjectRequest {
                 body: Some(request.body.into()),
                 bucket: request.bucket,
                 key: request.key,
                 content_encoding: request.content_encoding,
+                acl: options.acl.map(to_string),
+                grant_full_control: options.grant_full_control,
+                grant_read: options.grant_read,
+                grant_read_acp: options.grant_read_acp,
+                grant_write_acp: options.grant_write_acp,
+                server_side_encryption: options.server_side_encryption.map(to_string),
+                ssekms_key_id: options.ssekms_key_id,
+                storage_class: options.storage_class.map(to_string),
+                tagging: Some(tagging),
                 ..Default::default()
             })
             .instrument(info_span!("request"))
@@ -237,6 +314,7 @@ fn build_request(
     uuid: bool,
     gzip: bool,
     bucket: String,
+    options: S3Options,
 ) -> Request {
     let (inner, key) = req.into_parts();
 
@@ -270,6 +348,7 @@ fn build_request(
         bucket,
         key,
         content_encoding: if gzip { Some("gzip".to_string()) } else { None },
+        options,
     }
 }
 
@@ -279,6 +358,7 @@ struct Request {
     bucket: String,
     key: String,
     content_encoding: Option<String>,
+    options: S3Options,
 }
 
 #[derive(Debug, Clone)]
@@ -298,10 +378,11 @@ impl RetryLogic for S3RetryLogic {
 }
 
 fn encode_event(
-    event: Event,
+    mut event: Event,
     key_prefix: &Template,
-    encoding: &Encoding,
+    encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -314,16 +395,16 @@ fn encode_event(
         .ok()?;
 
     let log = event.into_log();
-    let bytes = match encoding {
-        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
+    let bytes = match encoding.codec {
+        Encoding::Ndjson => serde_json::to_vec(&log)
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        &Encoding::Text => {
+        Encoding::Text => {
             let mut bytes = log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -339,14 +420,18 @@ mod tests {
     use super::*;
     use crate::event::{self, Event};
 
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes =
-            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
+        let bytes = encode_event(
+            message.clone().into(),
+            &batch_time_format,
+            &Encoding::Text.into(),
+        )
+        .unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -357,15 +442,15 @@ mod tests {
     fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert_explicit("key", "value");
+        event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
-        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 
@@ -380,6 +465,7 @@ mod tests {
             false,
             false,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
@@ -390,6 +476,7 @@ mod tests {
             false,
             false,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_eq!(req.key, "key/date.log".to_string());
 
@@ -400,6 +487,7 @@ mod tests {
             false,
             true,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
@@ -410,6 +498,7 @@ mod tests {
             true,
             true,
             "bucket".into(),
+            S3Options::default(),
         );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
@@ -430,7 +519,7 @@ mod integration_tests {
         topology::config::SinkContext,
     };
     use flate2::read::GzDecoder;
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
@@ -492,11 +581,11 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log().insert_implicit("i", format!("{}", i));
+            e.as_mut_log().insert("i", format!("{}", i));
             e
         });
 
-        let pump = sink.send_all(futures::stream::iter_ok(events));
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
@@ -531,7 +620,7 @@ mod integration_tests {
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
-        let (tx, rx) = futures::sync::mpsc::channel(1);
+        let (tx, rx) = futures01::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
 
         let mut rt = Runtime::new().unwrap();
@@ -544,7 +633,7 @@ mod integration_tests {
 
             let i = if i < 10 { 1 } else { 2 };
 
-            event.as_mut_log().insert_implicit("i", format!("{}", i));
+            event.as_mut_log().insert("i", format!("{}", i));
             tx.send(event).unwrap();
         }
 
@@ -555,7 +644,7 @@ mod integration_tests {
 
             let i = if i < 5 { 2 } else { 3 };
 
-            event.as_mut_log().insert_implicit("i", format!("{}", i));
+            event.as_mut_log().insert("i", format!("{}", i));
             tx.send(event).unwrap();
         }
 

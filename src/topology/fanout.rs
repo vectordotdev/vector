@@ -1,7 +1,7 @@
 use crate::sinks::RouterSink;
 use crate::Event;
-use futures::sync::mpsc;
-use futures::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures01::sync::mpsc;
+use futures01::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 pub struct Fanout {
     sinks: Vec<(String, RouterSink)>,
@@ -45,7 +45,7 @@ impl Fanout {
 
         let (_name, mut removed) = self.sinks.remove(i);
 
-        tokio::spawn(future::poll_fn(move || removed.close()));
+        tokio01::spawn(future::poll_fn(move || removed.close()));
 
         if self.i > i {
             self.i -= 1;
@@ -146,8 +146,8 @@ mod tests {
     use crate::runtime;
     use crate::test_util::{self, CollectCurrent};
     use crate::Event;
-    use futures::sync::mpsc;
-    use futures::{stream, Future, Sink, Stream};
+    use futures01::sync::mpsc;
+    use futures01::{stream, Future, Sink, Stream};
 
     #[test]
     fn fanout_writes_to_all() {
@@ -205,9 +205,9 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(50));
         // The send_all task will be blocked on sending rec2 to b right now.
 
-        let collect_a = futures::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
+        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
+        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
         assert_eq!(collect_a.wait().unwrap(), recs.clone());
         assert_eq!(collect_b.wait().unwrap(), recs.clone());
@@ -319,9 +319,9 @@ mod tests {
             .unbounded_send(ControlMessage::Remove("c".to_string()))
             .unwrap();
 
-        let collect_a = futures::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
+        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
+        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
         assert_eq!(collect_a.wait().unwrap(), recs.clone());
         assert_eq!(collect_b.wait().unwrap(), recs.clone());
@@ -359,9 +359,9 @@ mod tests {
             .unbounded_send(ControlMessage::Remove("b".to_string()))
             .unwrap();
 
-        let collect_a = futures::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
+        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
+        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
         assert_eq!(collect_a.wait().unwrap(), recs.clone());
         assert_eq!(collect_b.wait().unwrap(), vec![rec1.clone()]);
@@ -400,9 +400,9 @@ mod tests {
             .unbounded_send(ControlMessage::Remove("a".to_string()))
             .unwrap();
 
-        let collect_a = futures::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
+        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
+        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
 
         assert_eq!(collect_a.wait().unwrap(), [rec1.clone(), rec2.clone()]);
         assert_eq!(collect_b.wait().unwrap(), recs.clone());

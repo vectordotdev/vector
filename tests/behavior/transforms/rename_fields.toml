@@ -1,0 +1,65 @@
+[transforms.rename_fields_simple]
+  inputs = []
+  type = "rename_fields"
+  [transforms.rename_fields_simple.fields]
+      a = "renamed_a"
+      "b.c" = "b.renamed_c"
+      b.e = "b.renamed_e"
+      replaces = "existing"
+[[tests]]
+  name = "rename_fields_simple"
+  [tests.input]
+    insert_at = "rename_fields_simple"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      "b.c" = "c"
+      "b.d" = "d"
+      "b.e" = "e"
+      replaces = "replaces"
+      existing = "existing"
+  [[tests.outputs]]
+    extract_from = "rename_fields_simple"
+    [[tests.outputs.conditions]]
+      # Plain
+      "a.exists" = false
+      "renamed_a.equals" = "a"
+      # Moved via a nested string
+      "b.renamed_c.equals" = "c"
+      "b.c.exists" = false
+      # Didn't change
+      "b.d.equals" = "d"
+      # Moved via a map
+      "b.renamed_e.equals" = "e"
+      # Replaced if conflict
+      "existing.equals" = "replaces"
+
+[transforms.rename_fields_empty_objects]
+  inputs = []
+  type = "rename_fields"
+  drop_empty = true
+  [transforms.rename_fields_empty_objects.fields]
+      "a.c" = "renamed_c"
+      "b.d" = "renamed_d"
+      b.e = "renamed_e"
+[[tests]]
+  name = "rename_fields_empty_objects"
+  [tests.input]
+    insert_at = "rename_fields_empty_objects"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b" = 1
+      "a.c" = 2
+      "b.d" = "d"
+      "b.e" = "e"
+  [[tests.outputs]]
+    extract_from = "rename_fields_empty_objects"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = 1
+      "a.exists" = true
+      "renamed_c.equals" = 2
+      "renamed_d.equals" = "d"
+      "b.d.exists" = false
+      "renamed_e.equals" = "e"
+      "b.e.exists" = false
+      "b.exists" = false

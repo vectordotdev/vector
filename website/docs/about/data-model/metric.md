@@ -171,18 +171,25 @@ import Field from '@site/src/components/Field';
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
-  examples={{"absolute":"The value is an absolute, stand-alone value. It can be used individually.","incremental":"The value is incremental and is used to form a holistic value by merging with other incremental values. Individually it does not tell the whole story."}}
+  examples={["absolute","incremental"]}
+  groups={[]}
   name={"kind"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### kind
 
-The metric value kind. This determines how the value is merged downstream if metrics are aggregated.
+The metric value kind. This determines how the value is merged downstream if
+metrics are aggregated.
+
 
 
 
@@ -190,13 +197,18 @@ The metric value kind. This determines how the value is merged downstream if met
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["login.count","response_time"]}
+  groups={[]}
   name={"name"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"string"}
+  unit={null}
   >
 
 ### name
@@ -204,87 +216,127 @@ The metric value kind. This determines how the value is merged downstream if met
 The metric name.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[{"host":"my.host.com"}]}
+  groups={[]}
   name={"tags"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"map"}
+  unit={null}
   >
 
 ### tags
 
-Tags that add additional metadata or context to the metric. These are simple key/value pairs in `string` format and cannot be nested.
+Tags that add additional metadata or context to the metric. These are simple
+key/value pairs in `string` format and cannot be nested.
+
+
 
 
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
+  groups={[]}
   name={"timestamp"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"timestamp"}
+  unit={null}
   >
 
 ### timestamp
 
-The metric timestamp, representing when the metric was created/ingested within Vector.
+The metric timestamp, representing when the metric was created/ingested within
+Vector.
+
+
 
 
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"type"}
   path={null}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 ### type
 
-A metric must be one of 6 types.
+The metric value. The value is an enumeration and will be comprised of
+different attributes depending on the value type.
+
+
 
 <Fields filters={false}>
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"aggregated_histogram"}
   path={"type"}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 #### aggregated_histogram
 
-Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually
+things like request durations or response sizes) and counts them in
+configurable buckets. It also provides a sum of all observed values.
+
+
 
 <Fields filters={false}>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[[1,2,5,10,25]]}
+  groups={[]}
   name={"buckets"}
   path={"type.aggregated_histogram"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[double]"}
+  unit={null}
   >
 
 ##### buckets
@@ -292,17 +344,24 @@ Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples
 The buckets contained within this histogram.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[54]}
+  groups={[]}
   name={"count"}
   path={"type.aggregated_histogram"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"int"}
+  unit={null}
   >
 
 ##### count
@@ -310,17 +369,24 @@ The buckets contained within this histogram.
 The total number of values contained within the histogram.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[[1,5,25,2,5]]}
+  groups={[]}
   name={"counts"}
   path={"type.aggregated_histogram"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[int]"}
+  unit={null}
   >
 
 ##### counts
@@ -328,17 +394,24 @@ The total number of values contained within the histogram.
 The number of values contained within each bucket.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[524.0]}
+  groups={[]}
   name={"sum"}
   path={"type.aggregated_histogram"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"double"}
+  unit={null}
   >
 
 ##### sum
@@ -346,6 +419,8 @@ The number of values contained within each bucket.
 The sum of all values contained within the histogram.
 
 
+
+
 </Field>
 
 
@@ -355,31 +430,45 @@ The sum of all values contained within the histogram.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"aggregated_summary"}
   path={"type"}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 #### aggregated_summary
 
-Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+Similar to a histogram, a summary samples observations (usually things like
+request durations and response sizes). While it also provides a total count of
+observations and a sum of all observed values, it calculates configurable
+quantiles over a sliding time window.
+
 
 
 <Fields filters={false}>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[54]}
+  groups={[]}
   name={"count"}
   path={"type.aggregated_summary"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"int"}
+  unit={null}
   >
 
 ##### count
@@ -387,35 +476,49 @@ Similar to a histogram, a summary samples observations (usually things like requ
 The total number of values contained within the summary.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[[0.1,0.5,0.75,1.0]]}
+  groups={[]}
   name={"quantiles"}
   path={"type.aggregated_summary"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[double]"}
+  unit={null}
   >
 
 ##### quantiles
 
-The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
+The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
+
+
 
 
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[524.0]}
+  groups={[]}
   name={"sum"}
   path={"type.aggregated_summary"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"double"}
+  unit={null}
   >
 
 ##### sum
@@ -423,17 +526,24 @@ The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
 The sum of all values contained within the summary.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[[2.1,4.68,23.02,120.1]]}
+  groups={[]}
   name={"values"}
   path={"type.aggregated_summary"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[double]"}
+  unit={null}
   >
 
 ##### values
@@ -441,6 +551,8 @@ The sum of all values contained within the summary.
 The values contained within the summary that align with the [`quantiles`](#quantiles).
 
 
+
+
 </Field>
 
 
@@ -450,30 +562,43 @@ The values contained within the summary that align with the [`quantiles`](#quant
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"counter"}
   path={"type"}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 #### counter
 
-A single value that can _only_ be incremented or reset to zero value, it cannot be decremented.
+A single value that can _only_ be incremented or reset to zero value, it cannot
+be decremented.
+
+
 
 <Fields filters={false}>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[2.6,5.0]}
+  groups={[]}
   name={"value"}
   path={"type.counter"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"double"}
+  unit={null}
   >
 
 ##### value
@@ -481,6 +606,8 @@ A single value that can _only_ be incremented or reset to zero value, it cannot 
 The value to increment the counter by. Can only be positive.
 
 
+
+
 </Field>
 
 
@@ -490,30 +617,42 @@ The value to increment the counter by. Can only be positive.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"distribution"}
   path={"type"}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 #### distribution
 
-A dsitribution represents a distribution of sampled values.
+A distribution represents a distribution of sampled values.
+
+
 
 <Fields filters={false}>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[[12,43,25]]}
+  groups={[]}
   name={"sample_rates"}
   path={"type.distribution"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[int]"}
+  unit={null}
   >
 
 ##### sample_rates
@@ -521,17 +660,24 @@ A dsitribution represents a distribution of sampled values.
 The rate at which each individual value was sampled.
 
 
+
+
 </Field>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[[12.0,43.3,25.2]]}
+  groups={[]}
   name={"values"}
   path={"type.distribution"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[double]"}
+  unit={null}
   >
 
 ##### values
@@ -539,6 +685,8 @@ The rate at which each individual value was sampled.
 The list of values contained within the distribution.
 
 
+
+
 </Field>
 
 
@@ -548,30 +696,44 @@ The list of values contained within the distribution.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"gauge"}
   path={"type"}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 #### gauge
 
-A gauge represents a point-in-time value that can increase and decrease. Vector's internal gauge type represents changes to that value. Gauges should be used to track fluctuations in values, like current memory or CPU usage.
+A gauge represents a point-in-time value that can increase and decrease.
+Vector's internal gauge type represents changes to that value. Gauges should be
+used to track fluctuations in values, like current memory or CPU usage.
+
+
 
 <Fields filters={false}>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[554222.0]}
+  groups={[]}
   name={"value"}
   path={"type.gauge"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"double"}
+  unit={null}
   >
 
 ##### value
@@ -579,6 +741,8 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
 A specific point-in-time value for the gauge.
 
 
+
+
 </Field>
 
 
@@ -588,35 +752,49 @@ A specific point-in-time value for the gauge.
 
 
 <Field
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={null}
+  examples={[]}
+  groups={[]}
   name={"set"}
   path={"type"}
+  relevantWhen={null}
   required={false}
+  templateable={false}
   type={"struct"}
+  unit={null}
   >
 
 #### set
 
 A set represents a count of unique values, AKA the cardinality.
 
+
+
 <Fields filters={false}>
 
 
 <Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[["unique item 1","unique item 2"]]}
+  groups={[]}
   name={"values"}
   path={"type.set"}
+  relevantWhen={null}
   required={true}
+  templateable={false}
   type={"[string]"}
+  unit={null}
   >
 
 ##### values
 
 The list of unique values.
+
+
 
 
 </Field>
@@ -638,7 +816,7 @@ The list of unique values.
 
 import Jump from '@site/src/components/Jump';
 
-<Jump to="/components/?metric=true">View all metric compatible components</Jump>
+<Jump to="/components/?event-types[]=metric">View all metric compatible components</Jump>
 
 
 

@@ -8,12 +8,12 @@
 
 ## Options
 
-<%%= options(component.specific_options_list, heading_depth: 3) %>
+<%%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%%= fields(component.env_vars_list) %>
+<%%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%%- end -%>
 <%- if component.source? || component.transform? -%>
@@ -21,7 +21,7 @@
 
 <%- if component.output.log -%>
 <%%= component_output(component, component.output.log, heading_depth: 3) %>
-<%- else -%>
+<%- elsif component.output.metric -%>
 <%%= component_output(component, component.output.metric, heading_depth: 3) %>
 <%- end -%>
 

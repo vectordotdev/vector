@@ -27,7 +27,7 @@ function Components(props) {
           <canvas width="2000" height="300"></canvas>
           <div className={styles.componentsHeroOverlay}>
             <h1>Vector Components</h1>
-            <div className="hero__subtitle">
+            <div className="hero--subtitle">
               Components allow you to collect, transform, and route data with ease. <Link to="/docs/about/concepts/">Learn more</Link>.
             </div>
           </div>

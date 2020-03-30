@@ -3,7 +3,7 @@ use super::{
     Batch, BatchServiceSink,
 };
 use crate::buffers::Acker;
-use futures::Poll;
+use futures01::Poll;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,6 +15,9 @@ use tower::{
     util::BoxService,
     Service, ServiceBuilder,
 };
+
+pub type TowerBatchedSink<T, L, B, S> =
+    BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -57,7 +60,8 @@ pub struct TowerRequestConfig {
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
     pub retry_attempts: Option<usize>,         // max_value()
-    pub retry_backoff_secs: Option<u64>,       // 1
+    pub retry_max_duration_secs: Option<u64>,
+    pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
 impl TowerRequestConfig {
@@ -78,9 +82,14 @@ impl TowerRequestConfig {
                 .retry_attempts
                 .or(defaults.retry_attempts)
                 .unwrap_or(usize::max_value()),
-            retry_backoff: Duration::from_secs(
-                self.retry_backoff_secs
-                    .or(defaults.retry_backoff_secs)
+            retry_max_duration_secs: Duration::from_secs(
+                self.retry_max_duration_secs
+                    .or(defaults.retry_max_duration_secs)
+                    .unwrap_or(3600),
+            ),
+            retry_initial_backoff_secs: Duration::from_secs(
+                self.retry_initial_backoff_secs
+                    .or(defaults.retry_initial_backoff_secs)
                     .unwrap_or(1),
             ),
         }
@@ -94,12 +103,18 @@ pub struct TowerRequestSettings {
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
     pub retry_attempts: usize,
-    pub retry_backoff: Duration,
+    pub retry_max_duration_secs: Duration,
+    pub retry_initial_backoff_secs: Duration,
 }
 
 impl TowerRequestSettings {
     pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
-        FixedRetryPolicy::new(self.retry_attempts, self.retry_backoff, logic)
+        FixedRetryPolicy::new(
+            self.retry_attempts,
+            self.retry_initial_backoff_secs,
+            self.retry_max_duration_secs,
+            logic,
+        )
     }
 
     pub fn batch_sink<B, L, S, T>(
@@ -107,7 +122,7 @@ impl TowerRequestSettings {
         retry_logic: L,
         service: S,
         acker: Acker,
-    ) -> BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>
+    ) -> TowerBatchedSink<T, L, B, S>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
     // `trait SinkExt` above), as it is missing a bound on the
@@ -197,15 +212,15 @@ where
 {
     type Response = S::Response;
     type Error = crate::Error;
-    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
+    type Future = futures01::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+        self.inner.poll_ready().map_err(Into::into)
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        use futures::Future;
+        use futures01::Future;
         self.inner.call(req).map_err(|e| e.into())
     }
 }
@@ -216,5 +231,35 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
             f: self.f.clone(),
             inner: self.inner.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures01::Future;
+    use std::sync::Arc;
+    use tokio01_test::{assert_ready, task::MockTask};
+    use tower::layer::Layer;
+    use tower_test::{assert_request_eq, mock};
+
+    #[test]
+    fn map() {
+        let mut task = MockTask::new();
+        let (mock, mut handle) = mock::pair();
+
+        let f = |r| r;
+
+        let map_layer = MapLayer { f: Arc::new(f) };
+
+        let mut svc = map_layer.layer(mock);
+
+        task.enter(|| assert_ready!(svc.poll_ready()));
+
+        let res = svc.call("hello world");
+
+        assert_request_eq!(handle, "hello world").send_response("world bye");
+
+        res.wait().unwrap();
     }
 }

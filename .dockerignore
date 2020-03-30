@@ -1,0 +1,6 @@
+*
+!scripts/Gemfile
+!scripts/Gemfile.lock
+!scripts/ci-docker-images/verifier-nixos/Gemfile
+!rust-toolchain
+!target/x86_64-unknown-linux-musl/debug/vector

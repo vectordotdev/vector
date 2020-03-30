@@ -1,14 +1,17 @@
+use super::util::encoding::{EncodingConfig, EncodingConfiguration};
 use super::util::SinkExt;
 use crate::{
     event::{self, Event},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, Sink};
+use async_trait::async_trait;
+use futures::pin_mut;
+use futures::stream::{Stream, StreamExt};
+use futures01::future;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    codec::{FramedWrite, LinesCodec},
-    io,
-};
+use tokio::io::{self, AsyncWriteExt};
+
+use super::streaming_sink::{self, StreamingSink};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -28,7 +31,7 @@ impl Default for Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -44,18 +47,17 @@ inventory::submit! {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
-        let output: Box<dyn io::AsyncWrite + Send> = match self.target {
+        let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
             Target::Stdout => Box::new(io::stdout()),
             Target::Stderr => Box::new(io::stderr()),
         };
 
-        let sink = FramedWrite::new(output, LinesCodec::new())
-            .stream_ack(cx.acker())
-            .sink_map_err(|_| ())
-            .with(move |event| encode_event(event, &encoding));
+        let sink = WriterSink { output, encoding };
+        let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
+        let sink = sink.stream_ack(cx.acker());
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }
@@ -69,35 +71,86 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
-fn encode_event(event: Event, encoding: &Encoding) -> Result<String, ()> {
+fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Result<String, serde_json::Error> {
+    encoding.apply_rules(&mut event);
     match event {
-        Event::Log(log) => match encoding {
-            Encoding::Json => {
-                serde_json::to_string(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
-            }
+        Event::Log(log) => match encoding.codec {
+            Encoding::Json => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log
-                    .get(&event::MESSAGE)
+                    .get(&event::log_schema().message_key())
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)
             }
         },
-        Event::Metric(metric) => serde_json::to_string(&metric).map_err(|_| ()),
+        Event::Metric(metric) => serde_json::to_string(&metric),
+    }
+}
+
+async fn write_event_to_output(
+    mut output: impl io::AsyncWrite + Send + Unpin,
+    event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Result<(), std::io::Error> {
+    let mut buf =
+        encode_event(event, encoding).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+    buf.push('\n');
+    output.write_all(buf.as_bytes()).await?;
+    Ok(())
+}
+
+struct WriterSink {
+    output: Box<dyn io::AsyncWrite + Send + Sync + Unpin>,
+    encoding: EncodingConfig<Encoding>,
+}
+
+#[async_trait]
+impl StreamingSink for WriterSink {
+    async fn run(
+        &mut self,
+        input: impl Stream<Item = Event> + Send + Sync + 'static,
+    ) -> crate::Result<()> {
+        let output = &mut self.output;
+        pin_mut!(output);
+        pin_mut!(input);
+        while let Some(event) = input.next().await {
+            write_event_to_output(&mut output, event, &self.encoding).await?
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{encode_event, Encoding};
+    use super::{encode_event, Encoding, EncodingConfig};
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::event::Event;
+    use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
     fn encodes_raw_logs() {
         let event = Event::from("foo");
-        assert_eq!(Ok("foo".to_string()), encode_event(event, &Encoding::Text));
+        assert_eq!(
+            "foo",
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+        );
+    }
+
+    #[test]
+    fn encodes_log_events() {
+        let mut event = Event::new_empty_log();
+        let log = event.as_mut_log();
+        log.insert("x", Value::from("23"));
+        log.insert("z", Value::from(25));
+        log.insert("a", Value::from("0"));
+
+        let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
+        let expected = r#"{"a":"0","x":"23","z":25}"#;
+        assert_eq!(encoded.unwrap(), expected);
     }
 
     #[test]
@@ -106,16 +159,20 @@ mod test {
             name: "foos".into(),
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
-                vec![("key".to_owned(), "value".to_owned())]
-                    .into_iter()
-                    .collect(),
+                vec![
+                    ("key2".to_owned(), "value2".to_owned()),
+                    ("key1".to_owned(), "value1".to_owned()),
+                    ("Key3".to_owned(), "Value3".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
             ),
             kind: MetricKind::Incremental,
             value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            Ok(r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#.to_string()),
-            encode_event(event, &Encoding::Text)
+            r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","value":{"type":"counter","value":100.0}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 
@@ -131,8 +188,8 @@ mod test {
             },
         });
         assert_eq!(
-            Ok(r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#.to_string()),
-            encode_event(event, &Encoding::Text)
+            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"set","values":["bob"]}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 
@@ -149,8 +206,8 @@ mod test {
             },
         });
         assert_eq!(
-            Ok(r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#.to_string()),
-            encode_event(event, &Encoding::Text)
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","value":{"type":"distribution","values":[10.0],"sample_rates":[1]}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }
 }

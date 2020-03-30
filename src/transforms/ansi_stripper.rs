@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, ValueKind},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    event::{self, Value},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -20,8 +19,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let field = self
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
 
         Ok(Box::new(AnsiStripper {
             field: field.clone(),
@@ -54,7 +56,7 @@ impl Transform for AnsiStripper {
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
             ),
-            Some(ValueKind::Bytes(ref mut bytes)) => {
+            Some(Value::Bytes(ref mut bytes)) => {
                 *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
                     Ok(b) => b.into(),
                     Err(error) => {
@@ -82,7 +84,7 @@ impl Transform for AnsiStripper {
 mod tests {
     use super::AnsiStripper;
     use crate::{
-        event::{Event, ValueKind, MESSAGE},
+        event::{self, Event, Value},
         transforms::Transform,
     };
 
@@ -97,8 +99,8 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().into_value(&MESSAGE).unwrap(),
-                    ValueKind::from("foo bar")
+                    event.into_log().remove(&event::log_schema().message_key()).unwrap(),
+                    Value::from("foo bar")
                 );
             )+
         };

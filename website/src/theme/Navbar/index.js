@@ -7,6 +7,7 @@
 
 import React, {useCallback, useState} from 'react';
 
+import GitHubButton from 'react-github-btn'
 import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
 import SearchBar from '@theme/SearchBar';
@@ -19,57 +20,62 @@ import {fetchNewRelease} from '@site/src/exports/newRelease';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useHideableNavbar from '@theme/hooks/useHideableNavbar';
-import useTheme from '@theme/hooks/useTheme';
+import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
+import useThemeContext from '@theme/hooks/useThemeContext';
 
 import styles from './styles.module.css';
 
-function navLinkAttributes(label) {
+function navLinkAttributes(label, right) {
+  let attrs = {'label': label};
+
   switch(label.toLowerCase()) {
     case 'blog':
       const newPost = fetchNewPost();
 
       if (newPost) {
-        return {
-          badge: 'new',
-          badgeStyle: 'primary',
-        };
-      } else {
-        return {};
+        attrs.badge = 'new';
+        attrs.badgeStyle = 'primary';
       }
+
+      return attrs;
+
+    case 'chat':
+      attrs.hideText = right == true;
+      attrs.icon = 'message-circle';
+      return attrs;
 
     case 'download':
       const newRelease = fetchNewRelease();
 
-      let downloadAttrs = {
-        icon: 'download'
-      }
+      attrs.hideText = right == true;
+      attrs.icon = 'download';
 
       if (newRelease) {
-        downloadAttrs.badge = 'new';
-        downloadAttrs.badgeStyle = 'primary';
+        attrs.badge = 'new';
+        attrs.badgeStyle = 'primary';
       }
 
-      return downloadAttrs;
+      return attrs;
 
     case 'github':
-      return {
-        badge: '3k',
-        icon: 'github'
-      };
+      attrs.badge = '3.5k';
+      attrs.hideText = right == true;
+      attrs.icon = 'github';
+      return attrs;
 
     default:
-      return {};
+      return attrs;
   };
 }
 
-function NavLink({href, hideIcon, hideText, label, onClick, to}) {
-  let attributes = navLinkAttributes(label) || {};
+function NavLink({href, hideIcon, label, onClick, position, right, to}) {
+  let attributes = navLinkAttributes(label, right) || {};
   const toUrl = useBaseUrl(to);
 
   return (
     <Link
-      className="navbar__item navbar__link"
-      title={hideText ? label : null}
+      className={classnames("navbar__item navbar__link", attributes.className)}
+      title={attributes.hideText ? label : null}
       onClick={onClick}
       {...(href
         ? {
@@ -81,8 +87,8 @@ function NavLink({href, hideIcon, hideText, label, onClick, to}) {
             activeClassName: 'navbar__link--active',
             to: toUrl,
           })}>
-      {!hideIcon && attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> </>}
-      {!hideText && label}
+      {!hideIcon && attributes.icon && <><i className={`feather icon-${attributes.icon}`}></i> {attributes.iconLabel}</>}
+      {!attributes.hideText && attributes.label}
       {attributes.badge && <span className={classnames('badge', `badge--${attributes.badgeStyle || 'secondary'}`)}>{attributes.badge}</span>}
     </Link>
   );
@@ -96,24 +102,34 @@ function Navbar() {
   const {title, logo = {}, links = [], hideOnScroll = false} = navbar;
   const [sidebarShown, setSidebarShown] = useState(false);
   const [isSearchBarExpanded, setIsSearchBarExpanded] = useState(false);
-  const [theme, setTheme] = useTheme();
+  const {isDarkTheme, setLightTheme, setDarkTheme} = useThemeContext();
   const {navbarRef, isNavbarVisible} = useHideableNavbar(hideOnScroll);
 
+  useLockBodyScroll(sidebarShown);
+
   const showSidebar = useCallback(() => {
-    document.body.style.overflow = 'hidden';
     setSidebarShown(true);
   }, [setSidebarShown]);
   const hideSidebar = useCallback(() => {
-    document.body.style.overflow = 'visible';
     setSidebarShown(false);
   }, [setSidebarShown]);
 
   const onToggleChange = useCallback(
-    e => setTheme(e.target.checked ? 'dark' : ''),
-    [setTheme],
+    e => (e.target.checked ? setDarkTheme() : setLightTheme()),
+    [setLightTheme, setDarkTheme],
   );
 
-  const logoUrl = useBaseUrl(logo.src);
+  const logoLink = logo.href || baseUrl;
+  const isExternalLogoLink = /http/.test(logoLink);
+  const logoLinkProps = isExternalLogoLink
+    ? {
+        rel: 'noopener noreferrer',
+        target: '_blank',
+      }
+    : null;
+  const logoSrc = logo.srcDark && isDarkTheme ? logo.srcDark : logo.src;
+  const logoImageUrl = useBaseUrl(logoSrc);
+
   return (
     <nav
       ref={navbarRef}
@@ -148,9 +164,9 @@ function Navbar() {
               />
             </svg>
           </div>
-          <Link className="navbar__brand" to={baseUrl}>
+          <Link className="navbar__brand" to={logoLink} {...logoLinkProps}>
             {logo != null && (
-              <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
+              <SVG className="navbar__logo" src={logoImageUrl} alt={logo.alt} />
             )}
             {title != null && (
               <strong
@@ -162,20 +178,20 @@ function Navbar() {
           {links
             .filter(linkItem => linkItem.position !== 'right')
             .map((linkItem, i) => (
-              <NavLink {...linkItem} key={i} />
+              <NavLink {...linkItem} left={true} key={i} />
             ))}
         </div>
         <div className="navbar__items navbar__items--right">
           {links
             .filter(linkItem => linkItem.position === 'right')
             .map((linkItem, i) => (
-              <NavLink {...linkItem} hideText={true} key={i} />
+              <NavLink {...linkItem} right={true} key={i} />
             ))}
           {!disableDarkMode && (
             <Toggle
               className={styles.displayOnlyInLargeViewport}
               aria-label="Dark mode toggle"
-              checked={theme === 'dark'}
+              checked={isDarkTheme}
               onChange={onToggleChange}
             />
           )}
@@ -192,16 +208,20 @@ function Navbar() {
       />
       <div className="navbar-sidebar">
         <div className="navbar-sidebar__brand">
-          <Link className="navbar__brand" onClick={hideSidebar} to={baseUrl}>
+          <Link
+            className="navbar__brand"
+            onClick={hideSidebar}
+            to={logoLink}
+            {...logoLinkProps}>
             {logo != null && (
-              <SVG className="navbar__logo" src={logoUrl} alt={logo.alt} />
+              <SVG className="navbar__logo" src={logoImageUrl} alt={logo.alt} />
             )}
             {title != null && <strong>{title}</strong>}
           </Link>
           {!disableDarkMode && sidebarShown && (
             <Toggle
               aria-label="Dark mode toggle in sidebar"
-              checked={theme === 'dark'}
+              checked={isDarkTheme}
               onChange={onToggleChange}
             />
           )}

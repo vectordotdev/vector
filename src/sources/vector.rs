@@ -1,14 +1,16 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     event::proto,
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
 use bytes::{Bytes, BytesMut};
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio::codec::LengthDelimitedCodec;
+use tokio01::codec::LengthDelimitedCodec;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -17,17 +19,20 @@ pub struct VectorConfig {
     pub address: SocketListenAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
+    tls: Option<TlsConfig>,
 }
 
 fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
+#[cfg(test)]
 impl VectorConfig {
-    pub fn new(address: SocketListenAddr) -> Self {
+    pub fn new(address: SocketListenAddr, tls: Option<TlsConfig>) -> Self {
         Self {
             address,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            tls,
         }
     }
 }
@@ -42,10 +47,12 @@ impl SourceConfig for VectorConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
-        vector.run(self.address, self.shutdown_timeout_secs, out)
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -67,7 +74,7 @@ impl TcpSource for VectorSource {
         LengthDelimitedCodec::new()
     }
 
-    fn build_event(&self, frame: BytesMut, _host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
                 trace!(
@@ -84,31 +91,39 @@ impl TcpSource for VectorSource {
     }
 }
 
+#[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
     use super::VectorConfig;
+    use crate::shutdown::ShutdownSignal;
     use crate::{
-        buffers::Acker,
-        sinks::vector::vector,
+        sinks::vector::VectorSinkConfig,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
-        topology::config::{GlobalOptions, SourceConfig},
+        tls::{TlsConfig, TlsOptions},
+        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Event,
     };
-    use futures::{stream, sync::mpsc, Future, Sink};
+    use futures01::{stream, sync::mpsc, Future, Sink};
+    use std::net::SocketAddr;
 
-    #[test]
-    fn tcp_it_works_with_vector_sink() {
+    fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
         let (tx, rx) = mpsc::channel(100);
 
-        let addr = next_addr();
-        let server = VectorConfig::new(addr.into())
-            .build("default", &GlobalOptions::default(), tx)
+        let server = source
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
             .unwrap();
         let mut rt = crate::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        let sink = vector("NONE".into(), addr, Acker::Null);
+        let cx = SinkContext::new_test(rt.executor());
+        let (sink, _) = sink.build(cx).unwrap();
+
         let events = vec![
             Event::from("test"),
             Event::from("events"),
@@ -128,5 +143,47 @@ mod test {
 
         let (_, output) = CollectCurrent::new(rx).wait().unwrap();
         assert_eq!(events, output);
+    }
+
+    #[test]
+    fn it_works_with_vector_sink() {
+        let addr = next_addr();
+        stream_test(
+            addr,
+            VectorConfig::new(addr.into(), None),
+            VectorSinkConfig {
+                address: format!("localhost:{}", addr.port()),
+                tls: None,
+            },
+        );
+    }
+
+    #[test]
+    fn it_works_with_vector_sink_tls() {
+        let addr = next_addr();
+        stream_test(
+            addr,
+            VectorConfig::new(
+                addr.into(),
+                Some(TlsConfig {
+                    enabled: Some(true),
+                    options: TlsOptions {
+                        crt_path: Some("tests/data/localhost.crt".into()),
+                        key_path: Some("tests/data/localhost.key".into()),
+                        ..Default::default()
+                    },
+                }),
+            ),
+            VectorSinkConfig {
+                address: format!("localhost:{}", addr.port()),
+                tls: Some(TlsConfig {
+                    enabled: Some(true),
+                    options: TlsOptions {
+                        verify_certificate: Some(false),
+                        ..Default::default()
+                    },
+                }),
+            },
+        );
     }
 }

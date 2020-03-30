@@ -1,7 +1,7 @@
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use tokio::timer::Delay;
+use tokio01::timer::Delay;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct BatchBytesConfig {
@@ -33,6 +33,7 @@ impl BatchEventsConfig {
     }
 }
 
+#[derive(Debug)]
 pub struct BatchSettings {
     pub size: usize,
     pub timeout: Duration,
@@ -99,6 +100,10 @@ where
 
     pub fn new_min(inner: S, batch: B, min_size: usize, max_linger: Option<Duration>) -> Self {
         Self::build(inner, batch, min_size, min_size, max_linger)
+    }
+
+    pub fn from_settings(inner: S, batch: B, settings: BatchSettings) -> Self {
+        Self::new_min(inner, batch, settings.size, settings.timeout.into())
     }
 
     fn build(
@@ -235,14 +240,14 @@ where
 mod test {
     use super::{Batch, BatchSink};
     use crate::sinks::util::Buffer;
-    use futures::{Future, Sink};
+    use futures01::{Future, Sink};
 
     #[test]
     fn batch_sink_buffers_messages_until_limit() {
         let buffered = BatchSink::new(vec![], Vec::new(), 10);
 
         let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(0..22))
+            .send_all(futures01::stream::iter_ok(0..22))
             .wait()
             .unwrap();
 
@@ -281,7 +286,7 @@ mod test {
             vec![24],
         ];
         let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
+            .send_all(futures01::stream::iter_ok(input))
             .wait()
             .unwrap();
 

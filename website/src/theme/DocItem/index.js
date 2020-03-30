@@ -14,6 +14,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import DocPaginator from '@theme/DocPaginator';
 import useTOCHighlight from '@theme/hooks/useTOCHighlight';
 
+import _ from 'lodash';
 import styles from './styles.module.css';
 
 const LINK_CLASS_NAME = 'contents__link';
@@ -42,23 +43,48 @@ function Headings({headings, isChild}) {
   );
 }
 
-function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOperatingSystems}) {
-  if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
-    return null;
+function SupportedEventTypes({values}) {
+  const context = useDocusaurusContext();
+  const {siteConfig = {}} = context;
+  const {metadata: {event_types: eventTypes}} = siteConfig.customFields;
 
+  let els = [];
+
+  eventTypes.forEach(eventType => {
+    if (values.includes(eventType)) {
+      els.push(<span key={eventType} className="text--primary">{_.capitalize(eventType)}</span>);
+    } else {
+      els.push(<del key={eventType} className="text--warning">{_.capitalize(eventType)}</del>);
+    }
+    els.push(<>, </>);
+  });
+
+  els.pop();
+
+  return els;
+}
+
+function OperatingSystemsStatus({operatingSystems, unsupportedOperatingSystems}) {
   let operatingSystemsEls = [];
 
   (operatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<span className="text--primary">{operatingSystem}</span>);
+    operatingSystemsEls.push(<span key={operatingSystem} className="text--primary">{operatingSystem}</span>);
     operatingSystemsEls.push(<>, </>);
   });
 
   (unsupportedOperatingSystems || []).forEach(operatingSystem => {
-    operatingSystemsEls.push(<del className="text--warning">{operatingSystem}</del>);
+    operatingSystemsEls.push(<del key={operatingSystem} className="text--warning">{operatingSystem}</del>);
     operatingSystemsEls.push(<>, </>);
   });
 
   operatingSystemsEls.pop();
+
+  return operatingSystemsEls;
+}
+
+function Statuses({deliveryGuarantee, eventTypes, minVersion, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
+  if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
+    return null;
 
   return (
     <div className="section">
@@ -66,32 +92,42 @@ function Statuses({status, deliveryGuarantee, operatingSystems, unsupportedOpera
       {status == "beta" &&
         <div>
           <Link to="/docs/about/guarantees/#beta" className="text--warning" title="This component is in beta and is not recommended for production environments. Click to learn more.">
-            <i className="feather icon-alert-triangle"></i> beta
+            <i className="feather icon-alert-triangle"></i> Beta Status
           </Link>
         </div>}
       {status == "prod-ready" &&
         <div>
           <Link to="/docs/about/guarantees/#prod-ready" className="text--primary" title="This component has passed reliability standards that make it production ready. Click to learn more.">
-            <i className="feather icon-award"></i> prod-ready
+            <i className="feather icon-award"></i> Prod-Ready Status
           </Link>
         </div>}
       {deliveryGuarantee == "best_effort" &&
         <div>
           <Link to="/docs/about/guarantees/#best-effort" className="text--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data. Click to learn more.">
-            <i className="feather icon-shield-off"></i> best-effort
+            <i className="feather icon-shield-off"></i> Best-Effort Delivery
           </Link>
         </div>}
       {deliveryGuarantee == "at_least_once" &&
         <div>
           <Link to="/docs/about/guarantees/#at-least-once" className="text--primary" title="This component offers an at-least-once delivery guarantee. Click to learn more.">
-            <i className="feather icon-shield"></i> at-least-once
+            <i className="feather icon-shield"></i> At-Least-Once
           </Link>
         </div>}
-      {operatingSystemsEls.length > 0 &&
+      {eventTypes &&
+        <div>
+          <Link to="/docs/about/data-model/" title={`This component works on the these event types.`}>
+            <i className="feather icon-database"></i> <SupportedEventTypes values={eventTypes} />
+          </Link>
+        </div>}
+      {operatingSystems && unsupportedOperatingSystems &&
         <div>
           <Link to="/docs/setup/installation/operating-systems/" title={`This component works on the ${operatingSystems.join(", ")} operating systems.`}>
-            <i className="feather icon-cpu"></i> {operatingSystemsEls}
+            <i className="feather icon-cpu"></i> <OperatingSystemsStatus operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
           </Link>
+        </div>}
+      {minVersion &&
+        <div className="text--primary">
+          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {serviceName} versions</> : <>{serviceName} >= {minVersion}</>}
         </div>}
     </div>
   );
@@ -116,13 +152,17 @@ function DocItem(props) {
   } = metadata;
   const {
     frontMatter: {
+      component_title: componentTitle,
       delivery_guarantee: deliveryGuarantee,
       event_types: eventTypes,
+      function_category: functionCategory,
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
       issues_url: issuesUrl,
+      min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
+      service_name: serviceName,
       source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
@@ -152,7 +192,7 @@ function DocItem(props) {
       <div className="padding-vert--lg">
         <div className="container container--fluid">
           <div className="row">
-            <div className="col">
+            <div className="col col--9" style={{width: "1px"}}>
               <div className={styles.docItemContainer}>
                 <article>
                   {version && (
@@ -166,8 +206,7 @@ function DocItem(props) {
                   {!metadata.hide_title && (
                     <header>
                       <div className="badges">
-                        {eventTypes && eventTypes.includes("log") && <Link to="/docs/about/data-model/log/" className="badge badge--primary" title="This component works with log events.">LOG</Link>}
-                        {eventTypes && eventTypes.includes("metric") && <Link to="/docs/about/data-model/metric/" className="badge badge--primary" title="This component works with metric events.">METRIC</Link>}
+                        {functionCategory && <Link to={`/components?functions[]=${functionCategory}`} className="badge badge--primary">{functionCategory}</Link>}
                       </div>
                       <h1 className={styles.docTitle}>{metadata.title}</h1>
                     </header>
@@ -187,7 +226,14 @@ function DocItem(props) {
             {DocContent.rightToc && (
               <div className="col col--3">
                 <div className="table-of-contents">
-                  <Statuses status={status} deliveryGuarantee={deliveryGuarantee} operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
+                  <Statuses
+                    deliveryGuarantee={deliveryGuarantee}
+                    eventTypes={eventTypes}
+                    minVersion={minVersion}
+                    operatingSystems={operatingSystems}
+                    serviceName={serviceName}
+                    status={status}
+                    unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&
                     <div className="section">
                       <div className="title">Contents</div>

@@ -7,31 +7,39 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
 
-Vector is an [open-source][urls.vector_repo] utility for building observability
-pipelines. [Collect][docs.sources], [transform][docs.transforms], and
-[route][docs.sinks] log, metrics and events with one simple tool.
+Vector is a lightweight and ultra-fast tool for building observability
+pipelines. Compared to Logstash and friends, Vector [improves throughput by
+~10X while significanly reducing CPU and memory usage](#performance).
 
-Built in [Rust][urls.rust], Vector places high-value on
-[performance][pages.index#performance], [correctness][pages.index#correctness],
-and [operator friendliness][docs.administration]. It compiles to a single static
-binary and is designed to be [deployed][docs.deployment] across your entire
-infrastructure, serving both as a light-weight [agent][docs.roles.agent] and a
-highly efficient [service][docs.roles.service]. Take back ownership and control
-of your observability data with Vector.
+### Principles
+
+* **Reliability First.** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
+* **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
+* **Single Responsibility.** - Vector is a _data router_, it does not plan to become a distributed processing framework.
+
+### Who should use Vector?
+
+* You _SHOULD_ use Vector to replace Logstash, Fluent*, Telegraf, Beats, or similar tools.
+* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
+* You _SHOULD_ use Vector in resource constrained environments (such as devices).
+* You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
+* You _SHOULD NOT_ use Vector to replace Kafka. Vector is designed to work with Kafka!
+* You _SHOULD NOT_ use Vector for non-observability data such as analytics data.
+
+### Community
+
+* Vector is **downloaded over 100,000 times per day**.
+* Vector's largest user **processes over 10TB daily**.
+* Vector is **used by multiple fortune 500 companies** with stringent production requirements.
+* Vector has **over 15 active contributors** and growing.
 
 import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/setup/guides/getting-started/">Get started</Jump>
 
 
-[docs.administration]: /docs/administration/
-[docs.deployment]: /docs/setup/deployment/
+[docs.data-model.log]: /docs/about/data-model/log/
+[docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.roles.agent]: /docs/setup/deployment/roles/agent/
-[docs.roles.service]: /docs/setup/deployment/roles/service/
-[docs.sinks]: /docs/reference/sinks/
-[docs.sources]: /docs/reference/sources/
-[docs.transforms]: /docs/reference/transforms/
-[pages.index#correctness]: /#correctness
-[pages.index#performance]: /#performance
 [urls.rust]: https://www.rust-lang.org/
-[urls.vector_repo]: https://github.com/timberio/vector

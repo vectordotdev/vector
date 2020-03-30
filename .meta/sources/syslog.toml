@@ -1,32 +1,34 @@
 [sources.syslog]
 title = "Syslog"
+beta = false
 common = true
 delivery_guarantee = "best_effort"
 function_category = "receive"
-guides = []
 output_types = ["log"]
-resources = []
-through_description = "the Syslog 5424 protocol"
+requirements = {}
+through_description = "the Syslog protocol"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "syslog") %>
 
 [sources.syslog.options.address]
 type = "string"
 common = true
 examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
 relevant_when = {mode = ["tcp", "udp"]}
+required = true
 description = """\
 The TCP or UDP address to listen for connections on, or "systemd#N" to use \
 the Nth socket passed by systemd socket activation.\
 """
 
 [sources.syslog.options.host_key]
-name = "host_key"
 type = "string"
 category = "Context"
-required = true
 default = "host"
-section = "context"
 description = """\
-The key name added to each event representing the current host.\
+The key name added to each event representing the current host. This can also \
+be globally set via the \
+[global `host_key` option][docs.reference.global-options#host_key].\
 """
 
 [sources.syslog.options.max_length]
@@ -53,35 +55,37 @@ type = "string"
 common = true
 examples = ["/path/to/socket"]
 relevant_when = {mode = "unix"}
+required = true
 description = """\
 The unix socket path. *This should be absolute path.*
 """
+
+<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.syslog.options", relevant: "") %>
 
 [sources.syslog.output.log.fields.appname]
 type = "string"
 examples = ["app-name"]
 description = """\
-The appname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-appname is not found, then the key will not be added.\
+The appname extracted from the Syslog formatted line. If a appname is not \
+found, then the key will not be added.\
 """
 
 [sources.syslog.output.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
-key_name_option = "host_key"
 required = true
 description = """\
-The hostname extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-hostname is not found, then Vector will use the upstream hostname. In the \
-case where `mode` = `"unix"` the socket path will be used.\
+The hostname extracted from the Syslog line. If a hostname is not found, then \
+Vector will use the upstream hostname. In the case where `mode` = `"unix"` the \
+socket path will be used. This key can be renamed via the `host_key` option.\
 """
 
 [sources.syslog.output.log.fields.facility]
 type = "string"
 examples = ["1"]
 description = """\
-The facility extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-facility is not found, then the key will not be added.\
+The facility extracted from the Syslog line. If a facility is not found, then \
+the key will not be added.\
 """
 
 [sources.syslog.output.log.fields.message]
@@ -96,24 +100,24 @@ The raw message, unaltered.
 type = "string"
 examples = ["ID47"]
 description = """\
-The msgid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-msgid is not found, then the key will not be added.\
+The msgid extracted from the Syslog line. If a msgid is not found, then the \
+key will not be added.\
 """
 
 [sources.syslog.output.log.fields.procid]
-type = "int"
-examples = [8710]
+type = "string"
+examples = ["8710"]
 description = """\
-The procid extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-procid is not found, then the key will not be added.\
+The procid extracted from the Syslog line. If a procid is not found, then the \
+key will not be added.\
 """
 
 [sources.syslog.output.log.fields.severity]
 type = "string"
 examples = ["notice"]
 description = """\
-The severity extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-severity is not found, then the key will not be added.\
+The severity extracted from the Syslog line. If a severity is not found, then \
+the key will not be added.\
 """
 
 [sources.syslog.output.log.fields.timestamp]
@@ -129,6 +133,45 @@ then Vector will use the current time.\
 type = "int"
 examples = [1]
 description = """\
-The version extracted from the [Syslog 5424][urls.syslog_5424] line. If a \
-version is not found, then the key will not be added.
+The version extracted from the Syslog line. If a version is not found, then \
+the key will not be added.\
 """
+
+[sources.syslog.output.log.fields."`[field-name]`"]
+type = "*"
+examples = [
+  {custom_field1 = "custom value 1"},
+]
+description = """\
+In addition to the defined fields, any Syslog 5424 structured fields are \
+parsed and inserted as root level fields.
+"""
+
+[[sources.syslog.output.log.examples]]
+label = "RFC5424"
+body = """\
+Given the following [Syslog 5424][urls.syslog_5424] log line:
+
+```text
+<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut=\"3\" eventSource= \"Application\" eventID=\"1011\"] Try to override the THX port, maybe it will reboot the neural interface!
+```
+
+A `log` event will be produced with the following structure:
+
+```javascript
+{
+  "severity": "notice",
+  "facility": "user",
+  "timestamp": "2020-03-13T20:45:38.119Z",
+  "host": "dynamicwireless.name", // controlled via the `host_key` option,
+  "appname": "non",
+  "procid": "2426",
+  "msgid": "ID931",
+  "iut": "3",
+  "eventSource": "Application",
+  "eventID": "1011",
+  "message": "Try to override the THX port, maybe it will reboot the neural interface!"
+}
+```
+"""
+

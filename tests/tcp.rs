@@ -1,8 +1,10 @@
+#![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
+
 use approx::assert_relative_eq;
-use futures::{Future, Stream};
+use futures01::{Future, Stream};
 use stream_cancel::{StreamExt, Tripwire};
-use tokio::codec::{FramedRead, LinesCodec};
-use tokio::net::TcpListener;
+use tokio01::codec::{FramedRead, LinesCodec};
+use tokio01::net::TcpListener;
 use vector::test_util::{
     block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
 };
@@ -65,6 +67,7 @@ fn sample() {
         &["in"],
         transforms::sampler::SamplerConfig {
             rate: 10,
+            key_field: None,
             pass_list: vec![],
         },
     );
@@ -326,7 +329,7 @@ fn reconnect() {
         .flatten()
         .map_err(|e| panic!("{:?}", e))
         .collect();
-    let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
+    let output_lines = futures01::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
@@ -351,15 +354,25 @@ fn reconnect() {
 #[test]
 fn healthcheck() {
     let addr = next_addr();
+    let rt = vector::test_util::runtime();
+    let resolver = vector::dns::Resolver::new(Vec::new(), rt.executor()).unwrap();
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(addr);
+    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
+        addr.ip().to_string(),
+        addr.port(),
+        resolver.clone(),
+    );
 
     assert!(healthcheck.wait().is_ok());
 
     let bad_addr = next_addr();
-    let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(bad_addr);
+    let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
+        bad_addr.ip().to_string(),
+        bad_addr.port(),
+        resolver,
+    );
 
     assert!(bad_healthcheck.wait().is_err());
 }

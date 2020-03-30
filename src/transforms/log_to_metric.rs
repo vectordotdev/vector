@@ -1,15 +1,14 @@
 use super::Transform;
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
-    event::{self, ValueKind},
-    runtime::TaskExecutor,
+    event::{self, Value},
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,7 +74,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
@@ -118,11 +117,11 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
 fn render_tags(
     tags: &Option<IndexMap<Atom, String>>,
     event: &Event,
-) -> Option<HashMap<String, String>> {
+) -> Option<BTreeMap<String, String>> {
     match tags {
         None => None,
         Some(tags) => {
-            let mut map = HashMap::new();
+            let mut map = BTreeMap::new();
             for (name, value) in tags {
                 if let Ok(tag) = render_template(value, event) {
                     map.insert(name.to_string(), tag);
@@ -141,8 +140,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&event::TIMESTAMP)
-        .and_then(ValueKind::as_timestamp)
+        .get(&event::log_schema().timestamp_key())
+        .and_then(Value::as_timestamp)
         .cloned();
 
     match config {
@@ -283,9 +282,9 @@ mod tests {
 
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
-        log.as_mut_log().insert_explicit(key, value);
+        log.as_mut_log().insert(key, value);
         log.as_mut_log()
-            .insert_implicit(event::TIMESTAMP.clone(), ts());
+            .insert(event::log_schema().timestamp_key().clone(), ts());
         log
     }
 
@@ -328,8 +327,8 @@ mod tests {
         );
 
         let mut event = create_event("message", "i am log");
-        event.as_mut_log().insert_explicit("method", "post");
-        event.as_mut_log().insert_explicit("code", "200");
+        event.as_mut_log().insert("method", "post");
+        event.as_mut_log().insert("code", "200");
 
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
@@ -507,9 +506,9 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert_implicit(event::TIMESTAMP.clone(), ts());
-        event.as_mut_log().insert_explicit("status", "42");
-        event.as_mut_log().insert_explicit("backtrace", "message");
+            .insert(event::log_schema().timestamp_key().clone(), ts());
+        event.as_mut_log().insert("status", "42");
+        event.as_mut_log().insert("backtrace", "message");
 
         let mut transform = LogToMetric::new(config);
 
@@ -557,12 +556,12 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert_implicit(event::TIMESTAMP.clone(), ts());
-        event.as_mut_log().insert_explicit("status", "42");
-        event.as_mut_log().insert_explicit("backtrace", "message");
-        event.as_mut_log().insert_implicit("host", "local");
-        event.as_mut_log().insert_implicit("worker", "abc");
-        event.as_mut_log().insert_implicit("service", "xyz");
+            .insert(event::log_schema().timestamp_key().clone(), ts());
+        event.as_mut_log().insert("status", "42");
+        event.as_mut_log().insert("backtrace", "message");
+        event.as_mut_log().insert("host", "local");
+        event.as_mut_log().insert("worker", "abc");
+        event.as_mut_log().insert("service", "xyz");
 
         let mut transform = LogToMetric::new(config);
 

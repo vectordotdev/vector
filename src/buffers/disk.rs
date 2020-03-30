@@ -1,7 +1,7 @@
 #![cfg(feature = "leveldb")]
 
 use crate::event::{proto, Event};
-use futures::{
+use futures01::{
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,
 };
@@ -189,14 +189,13 @@ impl Stream for Reader {
 
         // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
         // the app), this will have to go to disk.
-        let next = tokio_threadpool::blocking(|| {
+        let next = tokio::task::block_in_place(|| {
             self.db
                 .get(ReadOptions::new(), Key(self.read_offset))
                 .unwrap()
-        })
-        .unwrap();
+        });
 
-        if let Async::Ready(Some(value)) = next {
+        if let Some(value) = next {
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 

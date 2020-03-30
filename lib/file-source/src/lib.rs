@@ -1,4 +1,3 @@
-#![cfg_attr(windows, feature(windows_by_handle))]
 #[macro_use]
 extern crate scan_fmt;
 #[macro_use]
@@ -20,7 +19,10 @@ mod test {
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
     use std::fs;
     use std::io::Write;
+    #[cfg(unix)]
     use std::os::unix::fs::MetadataExt;
+    #[cfg(windows)]
+    use std::os::windows::fs::MetadataExt;
     use std::str;
     // Welcome.
     //
@@ -194,9 +196,10 @@ mod test {
     // time, recording the total number of reads/writes. The SUT reads should be
     // bounded below by the model reads, bounded above by the writes.
     fn experiment(actions: Vec<FWAction>) {
-        let dir = tempfile::TempDir::new().unwrap();
+        let dir = tempfile::TempDir::new().expect("could not create tempdir");
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
+        let mut rotation_count = 0;
         let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
 
         let mut writes = 0;
@@ -221,8 +224,14 @@ mod test {
                         .write(true)
                         .truncate(true)
                         .open(&path)
-                        .unwrap();
-                    assert_eq!(fp.metadata().unwrap().size(), 0);
+                        .expect("could not truncate");
+                    #[cfg(unix)]
+                    assert_eq!(fp.metadata().expect("could not get metadata").size(), 0);
+                    #[cfg(windows)]
+                    assert_eq!(
+                        fp.metadata().expect("could not get metadata").file_size(),
+                        0
+                    );
                     assert!(path.exists());
                 }
                 FWAction::Pause(ps) => delay(ps),
@@ -236,13 +245,9 @@ mod test {
                 }
                 FWAction::RotateFile => {
                     let mut new_path = path.clone();
-                    new_path.set_extension("log.1");
-                    match fs::rename(&path, &new_path) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            assert!(false);
-                        }
-                    }
+                    new_path.set_extension(format!("log.{}", rotation_count));
+                    rotation_count += 1;
+                    fs::rename(&path, &new_path).expect("could not rename");
                     fp = fs::File::create(&path).expect("could not create");
                     fwfiles.insert(0, FWFile::new());
                     read_index += 1;
@@ -283,9 +288,10 @@ mod test {
     // model and SUT should agree exactly. To that end, we confirm that every
     // read from SUT exactly matches the reads from the model.
     fn experiment_no_truncations(actions: Vec<FWAction>) {
-        let dir = tempfile::TempDir::new().unwrap();
+        let dir = tempfile::TempDir::new().expect("could not create tempdir");
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
+        let mut rotation_count = 0;
         let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
@@ -310,13 +316,9 @@ mod test {
                 }
                 FWAction::RotateFile => {
                     let mut new_path = path.clone();
-                    new_path.set_extension("log.1");
-                    match fs::rename(&path, &new_path) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            assert!(false);
-                        }
-                    }
+                    new_path.set_extension(format!("log.{}", rotation_count));
+                    rotation_count += 1;
+                    fs::rename(&path, &new_path).expect("could not rename");
                     fp = fs::File::create(&path).expect("could not create");
                     fwfiles.insert(0, FWFile::new());
                     read_index += 1;
@@ -335,7 +337,8 @@ mod test {
                                 continue;
                             }
                             Ok(sz) => {
-                                let exp = fwfiles[read_index].read_line().unwrap();
+                                let exp =
+                                    fwfiles[read_index].read_line().expect("could not readline");
                                 assert_eq!(exp.into_bytes(), buf);
                                 assert_eq!(sz, buf.len() + 1);
                                 buf.clear();

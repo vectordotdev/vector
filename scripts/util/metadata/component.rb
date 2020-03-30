@@ -1,12 +1,9 @@
 #encoding: utf-8
 
-require_relative "option"
+require_relative "field"
+require_relative "requirements"
 
 class Component
-  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
-  EVENT_TYPES = ["log", "metric"].freeze
-  OPERATING_SYSTEMS = ["linux", "macos", "windows"].freeze
-
   include Comparable
 
   attr_reader :beta,
@@ -14,11 +11,14 @@ class Component
     :env_vars,
     :function_category,
     :id,
+    :min_version,
     :name,
     :operating_systems,
     :options,
     :posts,
-    :resources,
+    :requirements,
+    :service_name,
+    :service_providers,
     :title,
     :type,
     :unsupported_operating_systems
@@ -26,14 +26,24 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
-    @env_vars = Option.build_struct(hash["env_vars"] || {})
-    @function_category = hash.fetch("function_category")
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
+    @function_category = hash.fetch("function_category").downcase
+    @min_version = hash["min_version"]
     @name = hash.fetch("name")
     @posts = hash.fetch("posts")
+    @requirements = Requirements.new(hash["requirements"] || {})
+    @service_name = hash["service_name"] || hash.fetch("title")
+    @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
-    @options = Option.build_struct(hash["options"] || {})
+    @options = (hash["options"] || {}).to_struct_with_name(Field)
+
+    # Requirements
+
+    if @min_version && @min_version != "0" && (!@requirements.additional || !@requirements.additional.include?(@min_version))
+      @requirements.additional = "* #{@service_name} version >= #{@min_version} is required.\n#{@requirements.additional}"
+    end
 
     # Operating Systems
 
@@ -46,44 +56,10 @@ class Component
     end
 
     @unsupported_operating_systems = OPERATING_SYSTEMS - @operating_systems
-
-    # Resources
-
-    @resources = (hash.delete("resources") || []).collect do |resource_hash|
-      OpenStruct.new(resource_hash)
-    end
-
-    # Default options
-
-    @options.type =
-      Option.new({
-        "name" => "type",
-        "description" => "The component type. This is a required field that tells Vector which component to use. The value _must_ be `#{name}`.",
-        "enum" => {
-          name => "The name of this component"
-        },
-        "null" => false,
-        "type" => "string"
-      })
-
-    if type != "source"
-      @options.inputs =
-        Option.new({
-          "name" => "inputs",
-          "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [configuration][docs.configuration] for more info.",
-          "examples" => [["my-source-id"]],
-          "null" => false,
-          "type" => "[string]"
-        })
-    end
   end
 
   def <=>(other)
     name <=> other.name
-  end
-
-  def advanced_relevant?
-    options_list.any?(&:advanced?)
   end
 
   def beta?
@@ -103,29 +79,97 @@ class Component
   end
 
   def event_types
-    types = []
+    @event_types ||=
+      begin
+        types = []
 
-    if respond_to?(:input_types)
-      types += input_types
-    end
+        if respond_to?(:input_types)
+          types += input_types
+        end
 
-    if respond_to?(:output_types)
-      types += output_types
-    end
+        if respond_to?(:output_types)
+          types += output_types
+        end
 
-    types.uniq
+        types.uniq
+      end
+  end
+
+  def field_path_notation_options
+    options_list.select(&:field_path_notation?)
+  end
+
+  def only_service_provider?(provider_name)
+    service_providers.length == 1 && service_provider?(provider_name)
   end
 
   def options_list
     @options_list ||= options.to_h.values.sort
   end
 
+  def option_groups
+    @option_groups ||= options_list.collect(&:groups).flatten.uniq.sort
+  end
+
+  def option_example_groups
+    @option_example_groups ||=
+      begin
+        groups = {}
+
+        if option_groups.any?
+          option_groups.each do |group|
+            groups[group] =
+              lambda do |option|
+                option.group?(group) && option.common?
+              end
+          end
+
+          option_groups.each do |group|
+            if options_list.any? { |option| option.group?(group) && !option.common? }
+              groups["#{group} (adv)"] =
+                lambda do |option|
+                  option.group?(group)
+                end
+            end
+          end
+        else
+          groups["Common"] =
+            lambda do |option|
+              option.common?
+            end
+
+          if options_list.any? { |option| !option.common? }
+            groups["Advanced"] =
+              lambda do |option|
+                true
+              end
+          end
+        end
+
+        groups
+      end
+  end
+
   def partition_options
     options_list.select(&:partition_key?)
   end
 
+  def service_provider?(provider_name)
+    service_providers.collect(&:downcase).include?(provider_name.downcase)
+  end
+
   def sink?
     type == "sink"
+  end
+
+  def sorted_option_group_keys
+    option_example_groups.keys.sort_by do |key|
+      if key.downcase.include?("adv")
+        -1
+      else
+        1
+      end
+    end.reverse
   end
 
   def source?
@@ -156,11 +200,26 @@ class Component
       id: id,
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
-      service_provider: (respond_to?(:service_provider, true) ? service_provider : nil),
+      service_providers: service_providers,
       status: status,
       type: type,
       unsupported_operating_systems: unsupported_operating_systems
     }
+  end
+
+  def to_toml_example(common: true)
+    example_options = options_list.sort_by(&:config_file_sort_token)
+    example_options = common ? example_options.select(&:common?) : example_options
+
+    option_examples =
+      included_options.collect do |option|
+        option.to_toml_example(common: common)
+      end
+
+    <<~EOF
+    [#{type.pluralize}.my_#{type}_id]
+    #{option_examples.join}
+    EOF
   end
 
   def transform?

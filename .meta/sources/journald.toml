@@ -4,11 +4,19 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 function_category = "collect"
-guides = []
-only_operating_systems = ["linux"]
+only_operating_systems = ["Linux"]
 output_types = ["log"]
-resources = []
+requirements.additional = """\
+* The `journald` source requires the presence of the `journalctl` binary. \
+This ensures that this source works across all platforms. Please see the \
+["Communication strategy"](#communication-strategy) section for more info.
+* If you run Vector from a non-root user, you need to add that user to the \
+`systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
+section for more info.\
+"""
 through_description = "log records from journald"
+
+<%= render("_partials/_component_options.toml", type: "source", name: "journald") %>
 
 [sources.journald.options.current_boot_only]
 type = "bool"
@@ -33,10 +41,14 @@ default, the global `data_dir` is used. Please make sure the Vector \
 project has write permissions to this dir.\
 """
 
-[sources.journald.options.local_only]
-type = "bool"
-default = true
-description = "Include only entries from the local system"
+[sources.journald.options.journalctl_path]
+type = "string"
+examples = ["/usr/local/bin/journalctl"]
+default = "journalctl"
+description = """\
+The full path of the `journalctl` executable. \
+If not set, Vector will search the path for `journalctl`.\
+"""
 
 [sources.journald.options.units]
 type = "[string]"
@@ -125,7 +137,7 @@ type = "string"
 examples = ["my.host.com"]
 required = true
 description = """\
-The value of the journald `_HOSTNAME` field.\
+The value of the journald `_HOSTNAME` field.
 """
 
 [sources.journald.output.log.fields.message]

@@ -2,6 +2,7 @@
 .DEFAULT_GOAL := help
 _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
+export USE_CONTAINER ?= docker
 
 
 help:
@@ -21,34 +22,39 @@ help:
 bench: ## Run internal benchmarks
 	@cargo bench --all
 
-build: ## Build the project
-	@cargo build --no-default-features --features="$${FEATURES:-default}"
+build: ## Build the project in release mode
+	@cargo build --no-default-features --features="$${FEATURES:-default}" --release
 
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors (only default features)
-	@cargo check --all --all-targets
+	@scripts/run.sh checker cargo check --all --all-targets --features docker,kubernetes
 
 check-fmt: ## Checks code formatting correctness
-	@scripts/check-style.sh
-	@cargo fmt -- --check
+	@scripts/run.sh checker scripts/check-style.sh
+	@scripts/run.sh checker cargo fmt -- --check
+
+check-markdown: ## Check Markdown style
+	@scripts/run.sh checker-markdown markdownlint .
 
 check-generate: ## Checks for pending `make generate` changes
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/check-generate.sh
+	@scripts/run.sh checker scripts/check-generate.sh
 
 check-examples: ## Validates the config examples
 	@cargo run -q -- validate --topology --deny-warnings ./config/examples/*.toml
 
 check-version: ## Checks that the version in Cargo.toml is up-to-date
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/check-version.rb
+	@scripts/run.sh checker scripts/check-version.rb
 
-CHECK_URLS=false
-export CHECK_URLS
+check-blog: ## Checks that all blog articles are signed by their authors
+	@scripts/run.sh checker scripts/check-blog-signatures.rb
+
+check-component-features: ## Checks that all component are behind corresponding features
+	@scripts/run.sh checker-component-features scripts/check-component-features.sh
+
+export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta
-	@bundle install --gemfile=scripts/Gemfile --quiet
-	@scripts/generate.rb
+	@scripts/run.sh checker scripts/generate.rb
 
 fmt: ## Format code
 	@scripts/check-style.sh --fix
@@ -59,15 +65,25 @@ release: ## Release a new Vector version
 	@$(MAKE) generate CHECK_URLS=false
 	@$(MAKE) release-commit
 
+release-push: ## Push new Vector version
+	@scripts/release-push.sh
+
 run: ## Starts Vector in development mode
 	@cargo run
 
 signoff: ## Signsoff all previous commits since branch creation
 	@scripts/signoff.sh
 
+sign-blog: ## Sign newly added blog articles using GPG
+	@scripts/sign-blog.sh
+
 test: ## Spins up Docker resources and runs _every_ test
-	@docker-compose up -d
+	@cargo test --all --features docker --no-run
+	@docker-compose up -d test-runtime-deps
 	@cargo test --all --features docker -- --test-threads 4
+
+test-behavior: ## Runs behavioral tests
+	@cargo run -- test tests/behavior/**/*.toml
 
 clean: ## Remove build artifacts
 	@cargo clean
