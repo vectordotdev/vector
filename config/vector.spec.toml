@@ -3473,10 +3473,10 @@ end
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * default: 5
+    # * default: 50
     # * type: int
     # * unit: requests
-    in_flight_limit = 5
+    in_flight_limit = 50
 
     # The time window, in seconds, used for the `rate_limit_num` option.
     #
@@ -3490,9 +3490,9 @@ end
     # time window.
     #
     # * optional
-    # * default: 5
+    # * default: 250
     # * type: int
-    rate_limit_num = 5
+    rate_limit_num = 250
 
     # The maximum number of retries to make for failed requests.
     #
@@ -3845,6 +3845,16 @@ end
     verify_certificate = true
     verify_certificate = false
 
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
   #
@@ -4085,6 +4095,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Batches `metric` events to Datadog's metrics service using HTTP API.
 [sinks.datadog_metrics]
@@ -4528,6 +4548,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` events to a file.
 [sinks.file]
@@ -5545,6 +5575,16 @@ end
     verify_certificate = true
     verify_certificate = false
 
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to Honeycomb via the batch events API.
 [sinks.honeycomb]
   #
@@ -6015,6 +6055,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Batches `log` events to Humio via the HEC API.
 [sinks.humio_logs]
@@ -7847,7 +7897,7 @@ end
     # * unit: seconds
     timeout_secs = 60
 
-# Streams `log` events to a socket, such as a TCP or Unix domain socket.
+# Streams `log` events to a socket, such as a TCP, UDP, or Unix domain socket.
 [sinks.socket]
   #
   # General
@@ -7871,15 +7921,16 @@ end
   #
   # * required
   # * type: string
-  # * required when mode = "tcp"
+  # * required when mode = "tcp" or mode = "udp"
   address = "92.12.333.224:5000"
 
   # The type of socket to use.
   #
   # * required
   # * type: string
-  # * enum: "tcp" or "unix"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
+  mode = "udp"
   mode = "unix"
 
   # The unix socket path. This should be the absolute path.
@@ -8315,6 +8366,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]

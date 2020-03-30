@@ -1,4 +1,4 @@
-use crate::event::{Event, LogEvent, Value};
+use crate::event::{LogEvent, Value};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
@@ -12,7 +12,7 @@ impl<'a> FromLua<'a> for LogEvent {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
             LuaValue::Table(t) => {
-                let mut log = Event::new_empty_log().into_log();
+                let mut log = LogEvent::new();
                 for pair in t.pairs() {
                     let (key, value): (String, Value) = pair?;
                     log.insert_flat(key, value);
@@ -31,6 +31,7 @@ impl<'a> FromLua<'a> for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::event::Event;
 
     #[test]
     fn to_lua() {

@@ -391,7 +391,7 @@ influxdb-integration-tests = []
 pulsar-integration-tests = []
 
 kubernetes = ["kubernetes-integration-tests"]
-kubernetes-integration-tests = []
+kubernetes-integration-tests = ["uuid"]
 
 disable-resolv-conf = []
 

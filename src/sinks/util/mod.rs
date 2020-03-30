@@ -10,6 +10,7 @@ pub mod sink;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
+pub mod udp;
 #[cfg(all(feature = "sinks-socket", unix))]
 pub mod unix;
 pub mod uri;
@@ -18,6 +19,7 @@ use crate::event::{self, Event};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 
 pub use batch::{Batch, BatchBytesConfig, BatchEventsConfig, BatchSettings};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
@@ -28,10 +30,18 @@ pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, Towe
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 pub use uri::UriSerde;
 
+#[derive(Debug, Snafu)]
+enum SinkBuildError {
+    #[snafu(display("Missing host in address field"))]
+    MissingHost,
+    #[snafu(display("Missing port in address field"))]
+    MissingPort,
+}
+
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
  */
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,

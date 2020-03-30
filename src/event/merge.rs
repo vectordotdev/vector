@@ -9,7 +9,9 @@ pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, merge_fie
             Some(val) => val,
         };
         match current.get_mut(merge_field) {
-            None => current.insert(merge_field, incoming_val),
+            None => {
+                current.insert(merge_field, incoming_val);
+            }
             Some(current_val) => merge_value(current_val, incoming_val),
         }
     }
@@ -28,7 +30,6 @@ pub fn merge_value(current: &mut Value, incoming: Value) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::Event;
 
     fn assert_merge_value(
         current: impl Into<Value>,
@@ -53,10 +54,6 @@ mod test {
         assert_merge_value(1, 2, 2);
     }
 
-    fn new_log_event() -> LogEvent {
-        Event::new_empty_log().into_log()
-    }
-
     #[test]
     fn merge_event_combines_values_accordingly() {
         // Specify the fields that will be merged.
@@ -70,7 +67,7 @@ mod test {
         ];
 
         let current = {
-            let mut log = new_log_event();
+            let mut log = LogEvent::new();
 
             log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
             log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
@@ -88,7 +85,7 @@ mod test {
         };
 
         let incoming = {
-            let mut log = new_log_event();
+            let mut log = LogEvent::new();
 
             log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
             log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
@@ -108,7 +105,7 @@ mod test {
         merge_log_event(&mut merged, incoming, &fields_to_merge);
 
         let expected = {
-            let mut log = new_log_event();
+            let mut log = LogEvent::new();
             log.insert("merge", "hello world");
             log.insert("do_not_merge", "my_first_value");
             log.insert("a", true);
