@@ -6,7 +6,7 @@ use super::{
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{SslContextBuilder, SslVerifyMode},
+    ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     x509::{store::X509StoreBuilder, X509},
 };
 use serde::{Deserialize, Serialize};
@@ -171,6 +171,10 @@ impl TlsSettings {
                 .context(SetVerifyCert)?;
         }
         Ok(())
+    }
+
+    pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) {
+        connection.set_verify_hostname(self.verify_hostname);
     }
 }
 

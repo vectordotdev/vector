@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 title: Deployment Topologies
 description: The various topologies that Vector can accomplish and when to use each.
 sidebar_label: Topologies

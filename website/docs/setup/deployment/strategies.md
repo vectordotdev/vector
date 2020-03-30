@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 title: Deployment Strategies
 description: The various strategies used to deploy Vector across your infrastructure.
 sidebar_label: Strategies

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 delivery_guarantee: "best_effort"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -111,6 +111,7 @@ endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-b
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
+  tls.verify_hostname = true # optional, default
 ```
 
 </TabItem>
@@ -1105,6 +1106,33 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host. Do NOT set this to `false` unless you understand the risks of not
 verifying the remote certificate.
+
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"verify_hostname"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_hostname
+
+If `true` (the default), Vector will validate the configured remote host name
+against the remote host's TLS certificate. Do NOT set this to `false` unless
+you understand the risks of not verifying the remote hostname.
 
 
 

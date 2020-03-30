@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 title: Install Vector via Homebrew
 sidebar_label: Homebrew
 description: Install Vector through the Homebrew package manager

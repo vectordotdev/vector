@@ -97,7 +97,13 @@ examples = ["mytable"]
 required = true
 description = "The table that data will be inserted into."
 
-<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sinks.clickhouse.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render(
+  "_partials/fields/_tls_connector_options.toml",
+  namespace: "sinks.clickhouse.options",
+  can_enable: false,
+  can_verify_certificate: true,
+  can_verify_hostname: true
+) %>
 
 [sinks.clickhouse.options.database]
 type = "string"
@@ -105,7 +111,8 @@ common = true
 examples = ["mydatabase"]
 description = "The database that contains the stable that data will be inserted into."
 
-<%= render("_partials/fields/_encoding_options.toml",
+<%= render(
+  "_partials/fields/_encoding_options.toml",
   namespace: "sinks.clickhouse.options",
   encodings: [],
   common: ["timestamp_format"]

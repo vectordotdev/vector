@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS

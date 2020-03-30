@@ -23,7 +23,13 @@ static USER_CONTAINERS_MARKER: &'static str = "$(USER_CONTAINERS)";
 static USER_POD_UID_MARKER: &'static str = "$(USER_POD_UIDS)";
 static ARGS_MARKER: &'static str = "$(ARGS_MARKER)";
 static ECHO_NAME: &'static str = "$(ECHO_NAME)";
-static WAIT_LIMIT: usize = 60; //s
+static WAIT_LIMIT: usize = 120; //s
+/// Environment variable which contains name of the image to be tested.
+/// Image tag defines imagePullPolicy:
+/// - tag is 'latest' => imagePullPolicy: Always
+/// - else => imagePullPolicy: IfNotPresent
+static KUBE_TEST_IMAGE_ENV: &'static str = "KUBE_TEST_IMAGE";
+static IMAGE_MARKER: &'static str = "$(IMAGE)";
 
 // ******************************* CONFIG ***********************************//
 // Replacing configurations need to have :
@@ -112,8 +118,11 @@ spec:
         emptyDir: {}
       containers:
       - name: vector
-        image: ktff/vector-kube-watch-fix:latest
-        imagePullPolicy: Always
+        image: $(IMAGE)
+        # By ommiting imagePullPolicy, https://kubernetes.io/docs/concepts/configuration/overview/#container-images comes into effect.
+        # This allows the caller to define imagePullPolicy with image tag:
+        # - tag is 'latest' => imagePullPolicy: Always
+        # - else => imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
@@ -250,7 +259,14 @@ impl Kube {
                     number_available: Some(number_available),
                     ..
                 } if number_available == desired_number_scheduled => Ok(object.clone()),
-                status => Err(format!("DaemonSet not yet ready with status: {:?}", status)),
+                status => Err(format!(
+                    "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
+                    status,
+                    self.list(&object)
+                        .into_iter()
+                        .map(|pod| pod.status)
+                        .collect::<Vec<_>>()
+                )),
             }
         })
     }
@@ -302,7 +318,8 @@ impl Drop for Kube {
 /// Panics if all trys fail.
 fn retry<F: FnMut() -> Result<R, E>, R, E: std::fmt::Debug>(mut f: F) -> R {
     let mut last_error = None;
-    for _ in 0..WAIT_LIMIT {
+    let started = std::time::Instant::now();
+    while started.elapsed() < std::time::Duration::from_secs(WAIT_LIMIT as u64) {
         match f() {
             Ok(data) => return data,
             Err(error) => {
@@ -357,6 +374,14 @@ fn create_vector<'a>(
         .map(|uid| format!("\"{}\"", uid))
         .unwrap_or("".to_string());
 
+    let image_name = std::env::var(KUBE_TEST_IMAGE_ENV).expect(
+        format!(
+            "{} environment variable must be set with the image name to be tested.",
+            KUBE_TEST_IMAGE_ENV
+        )
+        .as_str(),
+    );
+
     // Start vector
     kube.create(
         Api::v1ConfigMap,
@@ -367,7 +392,12 @@ fn create_vector<'a>(
             .as_str(),
     );
 
-    kube.create(Api::v1DaemonSet, VECTOR_YAML)
+    kube.create(
+        Api::v1DaemonSet,
+        VECTOR_YAML
+            .replace(IMAGE_MARKER, image_name.as_str())
+            .as_str(),
+    )
 }
 
 fn start_vector<'a>(
@@ -497,7 +527,7 @@ fn kube_multi_log() {
 
 #[test]
 fn kube_object_uid() {
-    let namespace = format!("object-uid-{}", Uuid::new_v4());
+    let namespace = "kube-object-uid".to_owned(); //format!("object-uid-{}", Uuid::new_v4());
     let message = random_string(300);
     let user_namespace = user_namespace(&namespace);
 

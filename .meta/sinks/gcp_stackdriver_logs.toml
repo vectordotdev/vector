@@ -147,7 +147,7 @@ For example, Compute Engine VM instances use the labels `projectId`, \
   namespace: "sinks.gcp_stackdriver_logs.options",
   can_enable: false,
   can_verify_certificate: true,
-  can_verify_hostname: false) %>
+  can_verify_hostname: true) %>
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.gcp_stackdriver_logs.options",

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 title: Sources
 description: "Sources are reponsible for collect or receiving log and metrics data. These could be local sources, like a file, or a protocols, like HTTP or TCP."
 sidebar_label: hidden

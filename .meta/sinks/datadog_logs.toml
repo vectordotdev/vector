@@ -48,5 +48,5 @@ description = "The endpoint to stream logs to."
   namespace: "sinks.datadog_logs.options",
   can_enable: true,
   can_verify_certificate: true,
-  can_verify_hostname: false
+  can_verify_hostname: true
 ) %>
