@@ -6,17 +6,18 @@ description: "A simple guide to send logs from STDIN to AWS Kinesis Firehose in 
 author_github: https://github.com/binarylogic
 cover_label: "STDIN to AWS Kinesis Firehose Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: stdin","sink: aws_kinesis_firehose"]
+hide_pagination: true
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
+import SidecarDiagram from '@site/src/components/SidecarDiagram';
 
 Logs are an _essential_ part of observing any
-service; without them you are flying blind. But collecting and analying them can
-be a real challenge -- especially at scale. Not only do you need to solve the
-basic task of collecting your logs, but you must do it in
-a reliable, performant, and robust manner. Nothing is more frustrating than
+service; without them you are flying blind. But collecting and analyzing them
+can be a real challenge -- especially at scale. Not only do you need to solve
+the basic task of collecting your logs, but you must do it
+in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
@@ -36,7 +37,7 @@ your observability strategy.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--semi-bold list--flush">
+<ol className="list--checks list--flush">
   <li>
     Accept new line delimited log data through STDIN.
     <ol>
@@ -61,15 +62,15 @@ is a [popular][urls.vector_stars], lightweight, and
 [ultra-fast][urls.vector_performance] utility for building observability
 pipelines. It's written in [Rust][urls.rust], making it memory safe and
 reliable. We'll be deploying Vector as a
-[sidecar][docs.strategies.sidecar].
+[sidecar][docs.strategies#sidecar].
 
-The [sidecar deployment strategy][docs.strategies.sidecar] is designed to
+The [sidecar deployment strategy][docs.strategies#sidecar] is designed to
 collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
-the service. Typically data is collected by tailing local files via Vector's
+each service. Typically data is collected by tailing local files via Vector's
 [`file` source][docs.sources.file], but can be collected through any of Vector's
 [sources][docs.sources]. The following diagram demonstrates how it works.
 
-<ServiceDiagram
+<SidecarDiagram
   platformName={null}
   sourceName={"stdin"}
   sinkName={"aws_kinesis_firehose"} />
@@ -113,7 +114,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.sources]: /docs/reference/sources/
-[docs.strategies.sidecar]: /docs/setup/deployment/strategies/sidecar/
+[docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

@@ -34,6 +34,10 @@
       "type": "boolean",
       "description": "Draft mode ensure this guide is not included in releases."
     },
+    "hide_pagination": {
+      "type": "boolean",
+      "description": "Hides the pagination nav"
+    },
     "last_modified_on": {
       "type": "string",
       "description": "When the guide was last modified."

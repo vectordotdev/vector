@@ -10,6 +10,7 @@ import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
+import SidecarDiagram from '@site/src/components/SidecarDiagram';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -35,7 +36,7 @@ architectures.
   values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Sidecar","value":"sidecar"},{"label":"As a Service","value":"service"}]}>
 <TabItem value="daemon">
 
-The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
 
@@ -106,13 +107,13 @@ compose!
 </TabItem>
 <TabItem value="sidecar">
 
-The [sidecar deployment strategy][docs.strategies.sidecar] is designed to
+The [sidecar deployment strategy][docs.strategies#sidecar] is designed to
 collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
-the service. Typically data is collected by tailing local files via Vector's
+each service. Typically data is collected by tailing local files via Vector's
 [`file` source][docs.sources.file], but can be collected through any of Vector's
 [sources][docs.sources]. The following diagram demonstrates how it works.
 
-<ServiceDiagram
+<SidecarDiagram
   platformName={"docker"}
   sourceName={null}
   sinkName={null} />
@@ -174,7 +175,7 @@ compose!
 </TabItem>
 <TabItem value="service">
 
-The [service deployment strategy][docs.strategies.service] treats Vector like a
+The [service deployment strategy][docs.strategies#service] treats Vector like a
 separate service. It is desigend to receive data from an upstream source and
 fan-out to one or more destinations.
 Typically, upstream sources are other Vector instances sending data via the
@@ -328,9 +329,9 @@ Vector's Docker source files are located
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
-[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
-[docs.strategies.service]: /docs/setup/deployment/strategies/service/
-[docs.strategies.sidecar]: /docs/setup/deployment/strategies/sidecar/
+[docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian

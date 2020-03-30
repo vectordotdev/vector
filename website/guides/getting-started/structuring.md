@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-29"
 $schema: "/.meta/.schemas/guides.json"
 title: Structuring Your Log Data
 description: How to parse log data in Vector
@@ -328,7 +328,13 @@ test vector.toml: test apache regex ... passed
 Success! Next, try experimenting by adding more [transforms][docs.transforms] to
 your pipeline before moving onto the next guide.
 
+<Alert type="info">
 
+While we're at, did you know you can control all of Vector's field names via
+the [global `log_schema` options][docs.reference.global-options#log_schema]?
+Vector does not lock you into any specific schema.
+
+</Alert>
 </li>
 </ol>
 </div>
@@ -341,6 +347,7 @@ deploy Vector. Onto the next guide!
 
 
 [docs.data-model]: /docs/about/data-model/
+[docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.elasticsearch]: /docs/reference/sinks/elasticsearch/
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/

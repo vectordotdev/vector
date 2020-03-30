@@ -81,25 +81,7 @@ module.exports = {
           label: 'Deployment',
           items: [
             "setup/deployment",
-            {
-              type: 'category',
-              label: 'Roles',
-              items: [
-                "setup/deployment/roles",
-                "setup/deployment/roles/agent",
-                "setup/deployment/roles/service",
-              ]
-            },
-            {
-              type: 'category',
-              label: 'Strategies',
-              items: [
-                "setup/deployment/strategies",
-                "setup/deployment/strategies/daemon",
-                "setup/deployment/strategies/sidecar",
-                "setup/deployment/strategies/service",
-              ]
-            },
+            "setup/deployment/strategies",
             "setup/deployment/topologies",
           ]
         },

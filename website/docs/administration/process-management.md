@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-29"
 title: Process Management
 description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---
@@ -95,19 +96,19 @@ test
 </Fields>
 
 
-| Flag | Description |
-| :--- | :--- |
-| **Required** |  |  |
-| `-c, --config <path>` | Path the Vector [configuration file][docs.configuration]. |
-| **Optional** |  |  |
-| `-d, --dry-run` | Vector will [validate configuration][docs.validating] and exit. |
-| `-q, --quiet` | Raises the log level to `warn`. |
-| `-qq` | Raises the log level to `error`, the highest level possible. |
-| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks. |
-| `-t, --threads` | Limits the number of internal threads Vector can spawn. See the [Limiting Resources][docs.roles.agent#limiting-resources] in the [Agent role][docs.roles.agent] documentation. |
-| `-v, --verbose` | Drops the log level to `debug`. |
-| `-vv` | Drops the log level to `trace`, the lowest level possible. |
-| `-w, --watch-config` | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |
+| Flag                    | Description                                                                                                         |  |
+|:------------------------|:--------------------------------------------------------------------------------------------------------------------|:-|
+| **Required**            |                                                                                                                     |  |
+| `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |  |
+| **Optional**            |                                                                                                                     |  |
+| `-d, --dry-run`         | Vector will [validate configuration][docs.validating] and exit.                                                     |  |
+| `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |  |
+| `-qq`                   | Raises the log level to `error`, the highest level possible.                                                        |  |
+| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks.                                             |  |
+| `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |  |
+| `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |  |
+| `-vv`                   | Drops the log level to `trace`, the lowest level possible.                                                          |  |
+| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |  |
 
 ### Daemonizing
 
@@ -272,8 +273,6 @@ transition from the old to new pipeline is graceful.
 
 
 [docs.configuration]: /docs/setup/configuration/
-[docs.roles.agent#limiting-resources]: /docs/setup/deployment/roles/agent/#limiting-resources
-[docs.roles.agent]: /docs/setup/deployment/roles/agent/
 [docs.sources]: /docs/reference/sources/
 [docs.validating]: /docs/administration/validating/
 [urls.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants

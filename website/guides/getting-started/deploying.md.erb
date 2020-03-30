@@ -7,4 +7,16 @@ author_github: https://github.com/binarylogic
 tags: ["type: tutorial", "domain: operations"]
 ---
 
-Fill me in
+What good is a Vector pipeline if you can't deploy it? This guide will walk
+you through deploying Vector. Because deploying is largely depending on your
+environment this will be an interactive guide:
+
+## Deployment Strategy
+
+For the purposes of this guide we'll keep things simple and deploy Vector
+as a daemon.
+<%= installation_tutorial(
+  metadata.installation.interfaces_list,
+  [metadata.installation.strategies.daemon] ,
+  heading_depth: 3
+) %>

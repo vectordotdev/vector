@@ -26364,7 +26364,7 @@ module.exports = {
     },
     {
       "avatar": "https://github.com/binarylogic.png",
-      "bio": "Ben is the CTO/Co-Founder at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He is an open-source OG, creating <a href=\"https://github.com/binarylogic/authlogic\">Authlogic</a> over 15 years ago before helping to launch Vector.",
+      "bio": "Ben is the CTO/Co-Founder at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He is an open-source veteran, creating <a href=\"https://github.com/binarylogic/authlogic\">Authlogic</a> over 15 years ago before helping to launch Vector.",
       "github": "https://github.com/binarylogic",
       "id": "ben",
       "keybase": "https://keybase.io/binarylogic",

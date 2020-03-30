@@ -75,25 +75,7 @@ module.exports = {
           label: 'Deployment',
           items: [
             <%= metadata.links.fetch_id("docs.deployment").to_json %>,
-            {
-              type: 'category',
-              label: 'Roles',
-              items: [
-                <%= metadata.links.fetch_id("docs.deployment.roles").to_json %>,
-                <%= metadata.links.fetch_id("docs.deployment.roles.agent").to_json %>,
-                <%= metadata.links.fetch_id("docs.deployment.roles.service").to_json %>,
-              ]
-            },
-            {
-              type: 'category',
-              label: 'Strategies',
-              items: [
-                <%= metadata.links.fetch_id("docs.deployment.strategies").to_json %>,
-                <%= metadata.links.fetch_id("docs.deployment.strategies.daemon").to_json %>,
-                <%= metadata.links.fetch_id("docs.deployment.strategies.sidecar").to_json %>,
-                <%= metadata.links.fetch_id("docs.deployment.strategies.service").to_json %>,
-              ]
-            },
+            <%= metadata.links.fetch_id("docs.deployment.strategies").to_json %>,
             <%= metadata.links.fetch_id("docs.deployment.topologies").to_json %>,
           ]
         },

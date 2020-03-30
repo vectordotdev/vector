@@ -32,7 +32,7 @@ will cover how to install Vector on this operating system.
   values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
 <TabItem value="daemon">
 
-The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
 
@@ -244,7 +244,7 @@ compose!
 </TabItem>
 <TabItem value="service">
 
-The [service deployment strategy][docs.strategies.service] treats Vector like a
+The [service deployment strategy][docs.strategies#service] treats Vector like a
 separate service. It is desigend to receive data from an upstream source and
 fan-out to one or more destinations.
 Typically, upstream sources are other Vector instances sending data via the
@@ -463,5 +463,5 @@ compose!
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
-[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
-[docs.strategies.service]: /docs/setup/deployment/strategies/service/
+[docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[docs.strategies#service]: /docs/setup/deployment/strategies/#service

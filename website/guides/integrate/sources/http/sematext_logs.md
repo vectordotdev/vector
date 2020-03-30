@@ -6,6 +6,7 @@ description: "A simple guide to send logs from HTTP to Sematext in just a few mi
 author_github: https://github.com/binarylogic
 cover_label: "HTTP to Sematext Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: http","sink: sematext_logs"]
+hide_pagination: true
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
@@ -13,10 +14,10 @@ import InstallationCommand from '@site/src/components/InstallationCommand';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
 
 Logs are an _essential_ part of observing any
-service; without them you are flying blind. But collecting and analying them can
-be a real challenge -- especially at scale. Not only do you need to solve the
-basic task of collecting your logs, but you must do it in
-a reliable, performant, and robust manner. Nothing is more frustrating than
+service; without them you are flying blind. But collecting and analyzing them
+can be a real challenge -- especially at scale. Not only do you need to solve
+the basic task of collecting your logs, but you must do it
+in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
@@ -36,7 +37,7 @@ your observability strategy.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--semi-bold list--flush">
+<ol className="list--checks list--flush">
   <li>
     Accept log data over HTTP.
     <ol>
@@ -62,9 +63,9 @@ is a [popular][urls.vector_stars], lightweight, and
 [ultra-fast][urls.vector_performance] utility for building observability
 pipelines. It's written in [Rust][urls.rust], making it memory safe and
 reliable. We'll be deploying Vector as a
-[service][docs.strategies.service].
+[service][docs.strategies#service].
 
-The [service deployment strategy][docs.strategies.service] treats Vector like a
+The [service deployment strategy][docs.strategies#service] treats Vector like a
 separate service. It is desigend to receive data from an upstream source and
 fan-out to one or more destinations.
 For this guide, Vector will receive data from
@@ -115,7 +116,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 
 [docs.sources.http]: /docs/reference/sources/http/
-[docs.strategies.service]: /docs/setup/deployment/strategies/service/
+[docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

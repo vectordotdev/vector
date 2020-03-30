@@ -30,7 +30,7 @@ This document will cover installing Vector on Raspbian.
   values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
-The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
 
@@ -140,4 +140,4 @@ compose!
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
-[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon

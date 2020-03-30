@@ -32,7 +32,7 @@ function ServiceDiagram({sourceName, sinkName}) {
 
   return (
     <svg width="850px" height="375px" viewBox="0 0 850 375" version="1.1" xmlns="http://www.w3.org/2000/svg">
-        <title>Service Diagram</title>
+        <title>Vector Service Deployment Strategy</title>
         <desc>Vector service deployment strategy</desc>
         <defs>
             <linearGradient x1="100%" y1="50%" x2="0%" y2="50%" id="linearGradient-1">

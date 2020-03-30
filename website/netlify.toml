@@ -69,11 +69,31 @@
 #
 # Internal redirects
 #
+# Sorted by the `from` attribute.
+#
 
 [[redirects]]
   from = "/docs/"
   to = "/docs/about/what-is-vector/"
   status = 302
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/deployment/roles/"
+  to = "/docs/setup/strategies/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/deployment/roles/agent/"
+  to = "/docs/setup/strategies/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/deployment/roles/service/"
+  to = "/docs/setup/strategies/"
+  status = 301
   force = true
 
 [[redirects]]
@@ -101,24 +121,6 @@
   force = true
 
 [[redirects]]
-  from = "/docs/reference/sinks/tcp/"
-  to = "/docs/reference/sinks/socket/"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "/docs/reference/sources/tcp/"
-  to = "/docs/reference/sources/socket/"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "/docs/reference/sources/udp/"
-  to = "/docs/reference/sources/socket/"
-  status = 301
-  force = true
-
-[[redirects]]
   from = "/docs/setup/installation/containers/"
   to = "/docs/setup/installation/platforms/"
   status = 301
@@ -139,6 +141,24 @@
 [[redirects]]
   from = "/docs/setup/installation/deployment/roles/service/"
   to = "/docs/setup/installation/deployment/strategies/service"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/reference/sinks/tcp/"
+  to = "/docs/reference/sinks/socket/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/reference/sources/tcp/"
+  to = "/docs/reference/sources/socket/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/reference/sources/udp/"
+  to = "/docs/reference/sources/socket/"
   status = 301
   force = true
 

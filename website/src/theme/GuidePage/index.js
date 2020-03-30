@@ -229,14 +229,14 @@ function GuidePage(props) {
               )}
             </section>
           </aside>
-          <div className={classnames('col', styles.rightCol)}>
+          <div className={classnames('col', 'col--7-2', styles.rightCol)}>
             <article>
               <div className="markdown">
                 <a aria-hidden="true" tabIndex="-1" className="anchor" id="overview"></a>
                 <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
               </div>
             </article>
-            <PagePaginator previous={metadata.prevItem} next={metadata.nextItem} className={styles.paginator} />
+            {!frontMatter.hide_pagination && <PagePaginator previous={metadata.prevItem} next={metadata.nextItem} className={styles.paginator} />}
           </div>
         </div>
       </main>

@@ -25,9 +25,6 @@
 }
 
 .rightCol {
-  --ifm-width: calc(7.1 / 12 * 100%);
-  flex: 0 0 var(--ifm-width) !important;
-  max-width: var(--ifm-width) !important;
   padding-left: calc( var(--ifm-spacing-horizontal) * 2 ) !important;
 }
 
@@ -37,16 +34,7 @@
 }
 
 @media (max-width: 996px) {
-  .container {
-    display: block;
-  }
-
-  .container > aside {
-    width: auto;
-  }
-
-  .container > div {
-    max-width: none;
-    margin-left: 0;
+  .rightCol {
+    padding-left: var(--ifm-spacing-horizontal) !important;
   }
 }

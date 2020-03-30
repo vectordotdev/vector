@@ -30,8 +30,8 @@ Or [choose your preferred installation method][docs.installation].
 ### Configure it
 
 Vector runs with a [configuration file][docs.configuration] that tells it which
-components to run and how they should interact. Let's create one that simply
-pipes a [`stdin` source][docs.sources.stdin] to a
+[components][pages.components] to run and how they should interact. Let's create
+one that simply pipes a [`stdin` source][docs.sources.stdin] to a
 [`console` sink][docs.sinks.console]:
 
 <CodeHeader text="vector.toml" />
@@ -85,8 +85,7 @@ Hello World!
 
 That's because the raw input text of our source was captured internally within
 the field `message`, and the `text` `encoding.codec` option of our sink prints
-the raw contents of `message` only. These field names can be controlled via the
-[global `log_schema` options][docs.reference.global-options#log_schema].
+the raw contents of `message` only.
 
 <Alert type="info">
 

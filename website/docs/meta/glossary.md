@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-29"
 title: Glossary
 description: "Vector documentation glossary of terms"
 ---
@@ -90,11 +91,6 @@ a metric.
 "Repo" refers to a Git respository, usually the
 [Vector Git repository][urls.vector_repo].
 
-## Role
-
-"Role" refers to a [deployment role][docs.roles] that Vector is deployed
-under.
-
 ## Router
 
 "Router" refers is something that accepts and routes data to many destinations,
@@ -116,6 +112,11 @@ written in.
 ## Source
 
 "Source" refers to the Vector [source concept][docs.sources].
+
+## Strategy
+
+"Strategy" refers to a [deployment strategy][docs.strategies] that Vector is
+deployed under.
 
 ## Structured Log
 
@@ -155,9 +156,9 @@ reducing cost, etc.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.data_model]: /docs/about/data-model/
-[docs.roles]: /docs/setup/deployment/roles/
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
+[docs.strategies]: /docs/setup/deployment/strategies/
 [docs.topologies]: /docs/setup/deployment/topologies/
 [docs.transforms]: /docs/reference/transforms/
 [guides.index]: /guides

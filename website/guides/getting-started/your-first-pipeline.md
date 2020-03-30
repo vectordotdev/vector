@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-03-29"
 $schema: "/.meta/.schemas/guides.json"
 title: Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
@@ -44,8 +44,8 @@ Or [choose your preferred installation method][docs.installation].
 ### Configure it
 
 Vector runs with a [configuration file][docs.configuration] that tells it which
-components to run and how they should interact. Let's create one that simply
-pipes a [`stdin` source][docs.sources.stdin] to a
+[components][pages.components] to run and how they should interact. Let's create
+one that simply pipes a [`stdin` source][docs.sources.stdin] to a
 [`console` sink][docs.sinks.console]:
 
 <CodeHeader text="vector.toml" />
@@ -99,8 +99,7 @@ Hello World!
 
 That's because the raw input text of our source was captured internally within
 the field `message`, and the `text` `encoding.codec` option of our sink prints
-the raw contents of `message` only. These field names can be controlled via the
-[global `log_schema` options][docs.reference.global-options#log_schema].
+the raw contents of `message` only.
 
 <Alert type="info">
 
@@ -122,6 +121,6 @@ that by following the next guide in the series.
 [docs.configuration]: /docs/setup/configuration/
 [docs.data-model]: /docs/about/data-model/
 [docs.installation]: /docs/setup/installation/
-[docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.sinks.console]: /docs/reference/sinks/console/
 [docs.sources.stdin]: /docs/reference/sources/stdin/
+[pages.components]: /components/

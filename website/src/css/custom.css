@@ -315,6 +315,10 @@ blockquote > footer {
   --ifm-col-width: calc(2.5 / 12 * 100%);
 }
 
+.col.col--7-2 {
+  --ifm-col-width: calc(7.1 / 12 * 100%);
+}
+
 .col.col--7-5 {
   --ifm-col-width: calc(7.5 / 12 * 100%);
 }

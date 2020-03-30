@@ -6,6 +6,7 @@ description: "A simple guide to send logs from a file to Datadog in just a few m
 author_github: https://github.com/binarylogic
 cover_label: "File to Datadog Logs Integration"
 tags: ["type: tutorial","domain: sources","domain: sinks","source: file","sink: datadog_logs"]
+hide_pagination: true
 ---
 
 import ConfigExample from '@site/src/components/ConfigExample';
@@ -13,10 +14,10 @@ import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 
 Logs are an _essential_ part of observing any
-service; without them you are flying blind. But collecting and analying them can
-be a real challenge -- especially at scale. Not only do you need to solve the
-basic task of collecting your logs, but you must do it in
-a reliable, performant, and robust manner. Nothing is more frustrating than
+service; without them you are flying blind. But collecting and analyzing them
+can be a real challenge -- especially at scale. Not only do you need to solve
+the basic task of collecting your logs, but you must do it
+in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
@@ -36,7 +37,7 @@ your observability strategy.
 
 To be clear, here's everything we'll accomplish in this short guide:
 
-<ol className="list--checks list--semi-bold list--flush">
+<ol className="list--checks list--flush">
   <li>
     Tail one or more files.
     <ol>
@@ -65,9 +66,9 @@ is a [popular][urls.vector_stars], lightweight, and
 [ultra-fast][urls.vector_performance] utility for building observability
 pipelines. It's written in [Rust][urls.rust], making it memory safe and
 reliable. We'll be deploying Vector as a
-[daemon][docs.strategies.daemon].
+[daemon][docs.strategies#daemon].
 
-The [daemon deployment strategy][docs.strategies.daemon] is designed for data
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
 For this guide, Vector will collect data from
@@ -118,7 +119,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 
 [docs.sources.file]: /docs/reference/sources/file/
-[docs.strategies.daemon]: /docs/setup/deployment/strategies/daemon/
+[docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
