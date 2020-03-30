@@ -302,7 +302,7 @@ where
 
 type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send + 'static>;
 
-/// A parition based batcher, given some `Service` and `Batch` where the
+/// A partition based batcher, given some `Service` and `Batch` where the
 /// input is partitionable via the `Partition` trait, it will hold many
 /// in flight batches.
 ///
