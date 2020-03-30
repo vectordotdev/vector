@@ -1,4 +1,4 @@
-use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, SinkExt};
+use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink};
 use crate::{
     dns::{Resolver, ResolverFuture},
     sinks::{Healthcheck, RouterSink},
@@ -52,11 +52,11 @@ pub fn raw_udp(
     encoding: EncodingConfig<Encoding>,
     cx: SinkContext,
 ) -> Result<RouterSink, UdpBuildError> {
-    Ok(Box::new(
-        UdpSink::new(host, port, cx.resolver())?
-            .stream_ack(cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-    ))
+    let sink = UdpSink::new(host, port, cx.resolver())?;
+    let sink = StreamSink::new(sink, cx.acker());
+    Ok(Box::new(sink.with_flat_map(move |event| {
+        iter_ok(encode_event(event, &encoding))
+    })))
 }
 
 fn udp_healthcheck() -> Healthcheck {
