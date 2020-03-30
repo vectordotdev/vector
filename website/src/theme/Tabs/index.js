@@ -42,8 +42,6 @@ function SelectSwitcher({placeholder, selectedValue, setSelectedValue, size, val
     });
   }
 
-  console.log(values)
-
   return (
     <Select
       className={`react-select-container react-select--${size}`}

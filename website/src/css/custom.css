@@ -1932,6 +1932,7 @@ ul.tabs.rounded li.tab-item.tab-item--active {
 
 .markdown pre {
   font-size: 90%;
+  margin-bottom: var(--ifm-leading);
 }
 
 .markdown table {

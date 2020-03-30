@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-29"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs and metrics to blackhole"
 description: "A simple guide to send logs and metrics to blackhole in just a few minutes."
@@ -40,7 +40,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <ol className="list--checks list--flush">
   <li>
-    Collect your ["logs", "metrics"] from one or more sources
+    Collect your logs and metrics from one or more sources
   </li>
   <li>
     Test log throughput.

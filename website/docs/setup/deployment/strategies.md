@@ -6,6 +6,7 @@ sidebar_label: Strategies
 ---
 
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
+import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import SidecarDiagram from '@site/src/components/SidecarDiagram';
 
 Vector is designed to be the single and only tool needed to get data from A to
@@ -88,16 +89,15 @@ each service. Typically data is collected by tailing local files via Vector's
 ## Service
 
 
-The [daemon deployment strategy][docs.strategies#daemon] is designed for data
-collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host.
-
-Typically data is collected from a process manager, such as Journald via
-Vector's [`journald` source][docs.sources.journald], but can be collected
-through any of Vector's [sources][docs.sources].
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+Typically, upstream sources are other Vector instances sending data via the
+[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
+[sources][docs.sources].
 The following diagram demonstrates how it works.
 
-<DaemonDiagram
+<ServiceDiagram
   platformName={null}
   sourceName={null}
   sinkName={null} />
@@ -125,5 +125,6 @@ The following diagram demonstrates how it works.
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
 [docs.topologies]: /docs/setup/deployment/topologies/

@@ -84,7 +84,7 @@ class Templates
             }.to_struct
           else
             features << {
-              text: "Collect your #{@event_types.collect(&:pluralize)} from one or more sources",
+              text: "Collect your #{@event_types.collect(&:pluralize).to_sentence} from one or more sources",
               features: []
             }.to_struct
           end
