@@ -129,7 +129,7 @@ impl StartsWithPredicate {
                 target: target.into(),
                 arg: s.clone(),
             })),
-            _ => Err("contains predicate requires a string argument".to_owned()),
+            _ => Err("starts_with predicate requires a string argument".to_owned()),
         }
     }
 }
