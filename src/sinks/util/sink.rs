@@ -820,7 +820,7 @@ mod tests {
             sink.poll_complete().unwrap();
 
             // Check that events 3,4,6 have not been acked yet
-            // only the three pervious should be acked.
+            // only the three previous should be acked.
             assert_eq!(ack_counter.load(Relaxed), 3);
 
             handle.advance(Duration::from_secs(5));
