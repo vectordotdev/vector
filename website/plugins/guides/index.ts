@@ -298,39 +298,43 @@ export default function pluginContentGuide(
 
       // Guide categories
       if (guideCategories.length > 0) {
-        await Promise.all(
-          guideCategories.map(async category => {
-            const permalink = category.permalink;
-            const metadata = {category: category};
-            const categoryMetadataPath = await createData(
-              `${docuHash(permalink)}.json`,
-              JSON.stringify(metadata, null, 2),
-            );
+        let guidePermalinks = _.uniq(guides.map(guide => guide.metadata.permalink));
 
-            addRoute({
-              path: permalink,
-              component: guideCategoryComponent,
-              exact: true,
-              modules: {
-                items: guides.
-                  filter(guide => guide.metadata.categories.map(category => category.permalink).includes(category.permalink)).
-                  map(guide => {
-                    const metadata = guideItemsToMetadata[guide.id];
-                    // To tell routes.js this is an import and not a nested object to recurse.
-                    return {
-                      content: {
-                        __import: true,
-                        path: metadata.source,
-                        query: {
-                          truncated: true,
+        await Promise.all(
+          guideCategories.
+            filter(category => guidePermalinks.includes(category.permalink)).
+            map(async category => {
+              const permalink = category.permalink;
+              const metadata = {category: category};
+              const categoryMetadataPath = await createData(
+                `${docuHash(permalink)}.json`,
+                JSON.stringify(metadata, null, 2),
+              );
+
+              addRoute({
+                path: permalink,
+                component: guideCategoryComponent,
+                exact: true,
+                modules: {
+                  items: guides.
+                    filter(guide => guide.metadata.categories.map(category => category.permalink).includes(category.permalink)).
+                    map(guide => {
+                      const metadata = guideItemsToMetadata[guide.id];
+                      // To tell routes.js this is an import and not a nested object to recurse.
+                      return {
+                        content: {
+                          __import: true,
+                          path: metadata.source,
+                          query: {
+                            truncated: true,
+                          },
                         },
-                      },
-                    };
-                  }),
-                metadata: aliasedSource(categoryMetadataPath),
-              },
-            });
-          })
+                      };
+                    }),
+                  metadata: aliasedSource(categoryMetadataPath),
+                },
+              });
+            })
         );
       }
 
