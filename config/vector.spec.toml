@@ -3845,6 +3845,16 @@ end
     verify_certificate = true
     verify_certificate = false
 
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
 [sinks.console]
   #
@@ -4085,6 +4095,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Batches `metric` events to Datadog's metrics service using HTTP API.
 [sinks.datadog_metrics]
@@ -4528,6 +4548,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` events to a file.
 [sinks.file]
@@ -5545,6 +5575,16 @@ end
     verify_certificate = true
     verify_certificate = false
 
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
+
 # Batches `log` events to Honeycomb via the batch events API.
 [sinks.honeycomb]
   #
@@ -6015,6 +6055,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Batches `log` events to Humio via the HEC API.
 [sinks.humio_logs]
@@ -8316,6 +8366,16 @@ end
     # * type: bool
     verify_certificate = true
     verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]

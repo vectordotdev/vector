@@ -149,8 +149,18 @@ where
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector_builder(&tls_settings.into())?;
-        let https = HttpsConnector::with_connector(http, tls)?;
+        let settings = tls_settings.into();
+        let tls = tls_connector_builder(&settings)?;
+        let mut https = HttpsConnector::with_connector(http, tls)?;
+
+        let settings = settings.tls().cloned();
+        https.set_callback(move |c, _uri| {
+            if let Some(settings) = &settings {
+                settings.apply_connect_configuration(c);
+            }
+
+            Ok(())
+        });
 
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
