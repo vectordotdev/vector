@@ -151,6 +151,7 @@ lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 bloom = "0.3.2"
 pulsar = { version = "0.3.0", optional = true }
+quick-js = { version = "0.3.1", optional = true, features = ["chrono", "bigint"] }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -252,6 +253,7 @@ transforms = [
   "transforms-field_filter",
   "transforms-geoip",
   "transforms-grok_parser",
+  "transforms-javascript",
   "transforms-json_parser",
   "transforms-kubernetes",
   "transforms-log_to_metric",
@@ -278,6 +280,7 @@ transforms-dedupe = []
 transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
+transforms-javascript = ["quick-js"]
 transforms-json_parser = []
 transforms-kubernetes = ["k8s-openapi"]
 transforms-log_to_metric = []

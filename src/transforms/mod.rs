@@ -21,6 +21,8 @@ pub mod field_filter;
 pub mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 pub mod grok_parser;
+#[cfg(all(feature = "quick-js", feature = "transforms-javascript"))]
+pub mod javascript;
 #[cfg(feature = "transforms-json_parser")]
 pub mod json_parser;
 #[cfg(feature = "transforms-kubernetes")]

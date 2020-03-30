@@ -465,8 +465,9 @@ dependencies = [
 name = "copy_dir"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e4281031634644843bd2f5aa9c48cf98fc48d6b083bd90bb11becf10deaf8b0"
 dependencies = [
- "walkdir 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "walkdir 0.1.8",
 ]
 
 [[package]]
@@ -527,7 +528,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
- "walkdir",
+ "walkdir 2.3.1",
 ]
 
 [[package]]
@@ -552,7 +553,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "tinytemplate",
- "walkdir",
+ "walkdir 2.3.1",
 ]
 
 [[package]]
@@ -1813,10 +1814,11 @@ dependencies = [
 
 [[package]]
 name = "libquickjs-sys"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6207af1e59a756278947eb3a964a1c6768343230b37fbc2a766289da61c76017"
 dependencies = [
- "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "copy_dir",
 ]
 
 [[package]]
@@ -2081,8 +2083,9 @@ dependencies = [
 name = "mktemp"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edf4fc746c5c977923b802d86fc9a95ca79a27d8c487613f68830d68d07c7b27"
 dependencies = [
- "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.4",
 ]
 
 [[package]]
@@ -2186,18 +2189,19 @@ dependencies = [
  "libc",
  "mio",
  "mio-extras",
- "walkdir",
+ "walkdir 2.3.1",
  "winapi 0.3.8",
 ]
 
 [[package]]
 name = "num-bigint"
-version = "0.2.4"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
 dependencies = [
- "autocfg 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-integer 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "autocfg 1.0.0",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -2722,14 +2726,15 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quick-js"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85c8c096831b9da56822010c42661db619919d68141c6d161e8a272d17818824"
 dependencies = [
- "chrono 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "libquickjs-sys 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-bigint 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "once_cell 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono",
+ "libquickjs-sys",
+ "num-bigint",
+ "num-traits",
+ "once_cell",
 ]
 
 [[package]]
@@ -4874,6 +4879,7 @@ dependencies = [
  "lru",
  "matches",
  "maxminddb",
+ "mktemp",
  "native-tls",
  "nix",
  "nom 5.1.0",
@@ -4890,6 +4896,7 @@ dependencies = [
  "prost-derive",
  "prost-types",
  "pulsar",
+ "quick-js",
  "rand 0.5.6",
  "rdkafka",
  "regex",
@@ -4944,7 +4951,7 @@ dependencies = [
  "typetag",
  "url 1.7.2",
  "uuid 0.7.4",
- "walkdir",
+ "walkdir 2.3.1",
  "warp",
 ]
 
@@ -4982,6 +4989,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f200f5b12eb75f8c1ed65abd4b2db8a6e1b138a20de009dacee265a2498f3f6"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "walkdir"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c66c0b9792f0a765345452775f3adbd28dde9d33f30d13e5dcc5ae17cf6f3780"
+dependencies = [
+ "kernel32-sys",
+ "winapi 0.2.8",
 ]
 
 [[package]]

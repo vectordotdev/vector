@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
-    event::{Event, ValueKind},
+    event::{Event, Value},
     runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig},
+    topology::config::{DataType, TransformConfig, TransformContext},
 };
 use lazy_static::lazy_static;
 use quick_js::{Context, JsValue};
@@ -139,7 +139,7 @@ pub struct JavaScriptConfig {
 
 #[typetag::serde(name = "javascript")]
 impl TransformConfig for JavaScriptConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         JavaScript::new(self.clone()).map(|js| -> Box<dyn Transform> { Box::new(js) })
     }
 
@@ -323,22 +323,28 @@ impl JavaScriptProcessor {
     }
 }
 
+fn encode_value(value: Value) -> JsValue {
+    match value {
+        Value::Bytes(b) => JsValue::String(String::from_utf8_lossy(&b).to_string()),
+        Value::Integer(i) => JsValue::BigInt(i.into()),
+        Value::Float(f) => JsValue::Float(f),
+        Value::Boolean(b) => JsValue::Bool(b),
+        Value::Timestamp(t) => JsValue::Date(t),
+        Value::Null => JsValue::Null,
+        Value::Array(a) => JsValue::Array(a.into_iter().map(encode_value).collect()),
+        Value::Map(m) => JsValue::Object(
+            m.into_iter()
+                .map(|(k, v)| (k.to_string(), encode_value(v)))
+                .collect(),
+        ),
+    }
+}
+
 fn encode(event: Event) -> JsValue {
     let js_event = event
-        .as_log()
-        .all_fields()
-        .map(|(key, value)| {
-            (
-                key.to_string(),
-                match value {
-                    ValueKind::Bytes(v) => JsValue::String(String::from_utf8_lossy(v).to_string()),
-                    ValueKind::Integer(v) => JsValue::BigInt((*v).into()),
-                    ValueKind::Float(v) => JsValue::Float(*v),
-                    ValueKind::Boolean(v) => JsValue::Bool(*v),
-                    ValueKind::Timestamp(v) => JsValue::Date(*v),
-                },
-            )
-        })
+        .into_log()
+        .into_iter()
+        .map(|(key, value)| (key.to_string(), encode_value(value)))
         .collect();
     JsValue::Object(js_event)
 }
@@ -376,17 +382,17 @@ fn object_to_event(object: HashMap<String, JsValue>) -> crate::Result<Event> {
         let v =
             match v {
                 JsValue::Null => continue,
-                JsValue::Bool(v) => ValueKind::Boolean(v),
+                JsValue::Bool(v) => Value::Boolean(v),
                 JsValue::BigInt(v) => {
                     let int = v.as_i64().ok_or(Box::new(
                         ProcessError::JavascriptBigintOverflowError { value: v },
                     ))?;
-                    ValueKind::Integer(int)
+                    Value::Integer(int)
                 }
-                JsValue::Int(v) => ValueKind::Float(v as f64),
-                JsValue::Float(v) => ValueKind::Float(v),
-                JsValue::String(v) => ValueKind::Bytes(v.into()),
-                JsValue::Date(v) => ValueKind::Timestamp(v),
+                JsValue::Int(v) => Value::Float(v as f64),
+                JsValue::Float(v) => Value::Float(v),
+                JsValue::String(v) => Value::Bytes(v.into()),
+                JsValue::Date(v) => Value::Timestamp(v),
                 JsValue::Object(v) => {
                     return Err(Box::new(ProcessError::JavascriptNestedObjectsError {
                         field: k,
@@ -405,7 +411,7 @@ fn object_to_event(object: HashMap<String, JsValue>) -> crate::Result<Event> {
                     }))
                 }
             };
-        log.insert_implicit(k, v);
+        log.insert(k, v);
     }
     Ok(event)
 }
@@ -414,7 +420,7 @@ fn object_to_event(object: HashMap<String, JsValue>) -> crate::Result<Event> {
 mod tests {
     use super::{JavaScript, JavaScriptConfig};
     use crate::{
-        event::{Event, ValueKind, TIMESTAMP},
+        event::{Event, Value},
         transforms::Transform,
     };
     use chrono::{TimeZone, Utc};
@@ -611,9 +617,9 @@ mod tests {
         // only millisecond precision is supported by JavaScript,
         // so our timestamp has millisecond precision in order to
         // not lose precision after conversions
-        log.insert_implicit(
-            TIMESTAMP.clone(),
-            ValueKind::Timestamp(Utc.ymd(2020, 1, 2).and_hms_milli(3, 4, 5, 6)),
+        log.insert(
+            &crate::event::log_schema().timestamp_key(),
+            Value::Timestamp(Utc.ymd(2020, 1, 2).and_hms_milli(3, 4, 5, 6)),
         );
         event
     }
@@ -652,7 +658,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field".to_string(), "value".as_bytes());
+        expected_log.insert("field".to_string(), "value".as_bytes());
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -670,7 +676,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field", 123);
+        expected_log.insert("field", 123);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -688,7 +694,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field", 123.0);
+        expected_log.insert("field", 123.0);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -706,7 +712,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field", 3.14159);
+        expected_log.insert("field", 3.14159);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -724,7 +730,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("field", true);
+        expected_log.insert("field", true);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -743,7 +749,7 @@ mod tests {
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
         let date = Utc.ymd(2020, 1, 1).and_hms_milli(0, 0, 0, 123);
-        expected_log.insert_implicit("field", date);
+        expected_log.insert("field", date);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -788,7 +794,7 @@ mod tests {
 
         let mut source_event = make_event();
         let source_log = source_event.as_mut_log();
-        source_log.insert_implicit("field", "value");
+        source_log.insert("field", "value");
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
@@ -808,7 +814,7 @@ mod tests {
 
         let mut source_event = make_event();
         let source_log = source_event.as_mut_log();
-        source_log.insert_implicit("field", "value");
+        source_log.insert("field", "value");
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
@@ -828,7 +834,7 @@ mod tests {
 
         let mut source_event = make_event();
         let source_log = source_event.as_mut_log();
-        source_log.insert_implicit("field".to_string(), "value".as_bytes());
+        source_log.insert("field".to_string(), "value".as_bytes());
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
@@ -851,12 +857,12 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("a", 3);
+        expected_log.insert("a", 3);
         expected_events.push(expected_event);
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("b", 4);
+        expected_log.insert("b", 4);
         expected_events.push(expected_event);
 
         let mut transformed_events = vec![];
@@ -879,7 +885,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("count", 1);
+        expected_log.insert("count", 1);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -889,7 +895,7 @@ mod tests {
 
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
-        expected_log.insert_implicit("count", 2);
+        expected_log.insert("count", 2);
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
