@@ -68,7 +68,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
     conditions."message.contains" = "foo" # example
-    conditions."environment.prefix" = "staging-" # example
+    conditions."environment.starts_with" = "staging-" # example
 ```
 
 </TabItem>
@@ -121,7 +121,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     conditions."host.exists" = true # example
     conditions."method.neq" = "POST" # example
     conditions."message.contains" = "foo" # example
-    conditions."environment.prefix" = "staging-" # example
+    conditions."environment.starts_with" = "staging-" # example
 ```
 
 </TabItem>
@@ -764,9 +764,9 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"environment.starts_with":"staging-"}]}
   groups={[]}
-  name={"`[field_name]`.prefix"}
+  name={"`[field_name]`.starts_with"}
   path={"outputs.conditions"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -775,9 +775,9 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-##### `[field_name]`.prefix
+##### `[field_name]`.starts_with
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field starts with a string argument.
 
 
 
