@@ -1,5 +1,5 @@
 require "erb"
-require "json_schemer"
+
 require "ostruct"
 require "toml-rb"
 
@@ -7,6 +7,8 @@ require_relative "metadata/batching_sink"
 require_relative "metadata/data_model"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/field"
+require_relative "metadata/guides"
+require_relative "metadata/installation"
 require_relative "metadata/links"
 require_relative "metadata/post"
 require_relative "metadata/release"
@@ -38,25 +40,29 @@ class Metadata
   end
 
   class << self
-    def load!(meta_dir, docs_root, pages_root)
+    def load!(meta_dir, docs_root, guides_root, pages_root)
       metadata = load_metadata!(meta_dir)
-      json_schema = load_json_schema!(meta_dir)
-      validate_schema!(json_schema, metadata)
-      new(metadata, docs_root, pages_root)
+      errors = metadata.validate_schema
+
+      if errors.any?
+        Printer.error!(
+          <<~EOF
+          The resulting hash from the `/.meta/**/*.toml` files failed
+          validation against the following schema:
+
+              /.meta/schema/meta.json
+
+          The errors include:
+
+              * #{errors[0..50].join("\n*    ")}
+          EOF
+        )
+      end
+
+      new(metadata, docs_root, guides_root, pages_root)
     end
 
     private
-      def load_json_schema!(meta_dir)
-        json_schema = read_json("#{meta_dir}/.schema.json")
-
-        Dir.glob("#{meta_dir}/.schema/**/*.json").each do |file|
-          hash = read_json("#{meta_dir}/.schema.json")
-          json_schema.deep_merge!(hash)
-        end
-
-        json_schema
-      end
-
       def load_metadata!(meta_dir)
         metadata = {}
 
@@ -65,7 +71,7 @@ class Metadata
             begin
               Template.render(file)
             rescue Exception => e
-              error!(
+              Printer.error!(
                 <<~EOF
                 The follow metadata file failed to load:
 
@@ -74,7 +80,7 @@ class Metadata
                 The error received was:
 
                   #{e.message}
-                  #{e.stacktrace.join("\n")}
+                  #{e.backtrace.join("\n  ")}
                 EOF
               )
             end
@@ -84,40 +90,20 @@ class Metadata
         TomlRB.parse(content)
       end
 
-      def posts
-        @posts ||=
-          Dir.glob("#{POSTS_ROOT}/**/*.md").collect do |path|
-            Post.new(path)
-          end.sort_by { |post| [ post.date, post.id ] }
-      end
-
-      def read_json(path)
-        body = File.read(path)
-        JSON.parse(body)
-      end
-
-      def validate_schema!(schema, metadata)
-        schemer = JSONSchemer.schema(schema, ref_resolver: 'net/http')
-        errors = schemer.validate(metadata).to_a
-        limit = 50
+      def validate_schema!(metadata)
+        errors = metadata.validate_schema
 
         if errors.any?
-          error_messages =
-            errors[0..(limit - 1)].collect do |error|
-              "The value at `#{error.fetch("data_pointer")}` failed validation for `#{error.fetch("schema_pointer")}`, reason: `#{error.fetch("type")}`"
-            end
-
-          if errors.size > limit
-            error_messages << "+ #{errors.size} errors"
-          end
-
-          error!(
+          Printer.error!(
             <<~EOF
-            The metadata schema is invalid. This means the the resulting
-            hash from the `/.meta/**/*.toml` files violates the defined
-            schema. Errors include:
+            The resulting hash from the `/.meta/**/*.toml` files failed
+            validation against the following schema:
 
-            * #{error_messages.join("\n* ")}
+                /.meta/schema/meta.json
+
+            The errors include:
+
+                * #{errors[0..50].join("\n*    ")}
             EOF
           )
         end
@@ -128,6 +114,7 @@ class Metadata
     :data_model,
     :domains,
     :env_vars,
+    :guides,
     :installation,
     :links,
     :options,
@@ -139,10 +126,11 @@ class Metadata
     :team,
     :transforms
 
-  def initialize(hash, docs_root, pages_root)
+  def initialize(hash, docs_root, guides_root, pages_root)
     @data_model = DataModel.new(hash.fetch("data_model"))
-    @installation = OpenStruct.new()
-    @options = hash.fetch("options").to_struct_with_name(Field)
+    @guides = hash.fetch("guides").to_struct_with_name(constructor: Guides)
+    @installation = Installation.new(hash.fetch("installation"))
+    @options = hash.fetch("options").to_struct_with_name(constructor: Field)
     @releases = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
@@ -152,14 +140,6 @@ class Metadata
     # domains
 
     @domains = hash.fetch("domains").collect { |h| OpenStruct.new(h) }
-
-    # installation
-
-    installation_hash = hash.fetch("installation")
-    @installation.containers = installation_hash.fetch("containers").collect { |h| OpenStruct.new(h) }
-    @installation.downloads = installation_hash.fetch("downloads").collect { |h| OpenStruct.new(h) }
-    @installation.operating_systems = installation_hash.fetch("operating_systems").collect { |h| OpenStruct.new(h) }
-    @installation.package_managers = installation_hash.fetch("package_managers").collect { |h| OpenStruct.new(h) }
 
     # posts
 
@@ -236,11 +216,11 @@ class Metadata
 
     # links
 
-    @links = Links.new(hash.fetch("links"), docs_root, pages_root)
+    @links = Links.new(hash.fetch("links"), docs_root, guides_root, pages_root)
 
     # env vars
 
-    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
 
     components.each do |component|
       component.env_vars.to_h.each do |key, val|
@@ -258,15 +238,6 @@ class Metadata
 
   def components
     @components ||= sources_list + transforms_list + sinks_list
-  end
-
-  def downloads(arch: nil, os: nil, package_manager: nil, type: nil)
-    downloads = installation.downloads
-    downloads = downloads.select { |d| d.arch && d.arch.downcase == arch.to_s.downcase } if arch
-    downloads = downloads.select { |d| d.os && d.os.downcase == os.to_s.downcase } if os
-    downloads = downloads.select { |d| d.package_manager && d.package_manager.downcase == package_manager.to_s.downcase } if package_manager
-    downloads = downloads.select { |d| d.type && d.type.downcase == type.to_s.downcase } if type
-    downloads
   end
 
   def env_vars_list
@@ -334,9 +305,9 @@ class Metadata
   end
 
   def platforms
-    @platforms ||= installation.containers +
-      installation.operating_systems +
-      installation.package_managers
+    @platforms ||= installation.operating_systems_list +
+      installation.package_managers_list +
+      installation.platforms_list
   end
 
   def previous_minor_releases(release)
@@ -370,6 +341,7 @@ class Metadata
   def to_h
     {
       event_types: event_types,
+      guides: guides.deep_to_h,
       installation: installation.deep_to_h,
       latest_post: posts.last.deep_to_h,
       latest_release: latest_release.deep_to_h,

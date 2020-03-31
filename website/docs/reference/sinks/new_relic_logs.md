@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+new_relic_logs%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "New Relic Logs"
 sidebar_label: "new_relic_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/new_relic_logs.rs
 status: "beta"
 title: "New Relic Logs Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `new_relic_logs` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [New
@@ -30,20 +36,14 @@ API][urls.new_relic_log_api].
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -102,10 +102,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -476,7 +472,7 @@ Enables/disables the sink healthcheck upon start.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["xxxx","${INSERT_KEY_ENV_VAR}"]}
+  examples={["xxxx","${NEW_RELIC_INSERT_KEY}"]}
   groups={[]}
   name={"insert_key"}
   path={null}
@@ -501,7 +497,7 @@ Your New Relic insert key (if applicable).
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["xxxx","${LICENSE_KEY_ENV_VAR}"]}
+  examples={["xxxx","${NEW_RELIC_LICENSE_KEY}"]}
   groups={[]}
   name={"license_key"}
   path={null}
@@ -762,8 +758,6 @@ duplicate data downstream.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+splunk_hec%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
 status: "prod-ready"
 title: "Splunk HEC Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `splunk_hec` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to a [Splunk's
@@ -29,20 +35,14 @@ HTTP Event Collector][urls.splunk_hec].
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -50,7 +50,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
   healthcheck = true # optional, default
   host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
@@ -62,7 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -70,7 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
   host = "http://my-splunk-host.com" # required
-  token = "${TOKEN_ENV_VAR}" # required
+  token = "${SPLUNK_HEC_TOKEN}" # required
   healthcheck = true # optional, default
   host_key = "hostname" # optional, no default
   index = "custom_index" # optional, no default
@@ -112,10 +112,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -987,7 +983,7 @@ you understand the risks of not verifying the remote hostname.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${TOKEN_ENV_VAR}","A94A8FE5CCB19BA61C4C08"]}
+  examples={["${SPLUNK_HEC_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
   groups={[]}
   name={"token"}
   path={null}
@@ -1013,8 +1009,6 @@ Your Splunk HEC token.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

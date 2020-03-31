@@ -1,10 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React, {useCallback, useState} from 'react';
 
 import GitHubButton from 'react-github-btn'
@@ -44,6 +37,11 @@ function navLinkAttributes(label, right) {
       attrs.icon = 'message-circle';
       return attrs;
 
+    case 'community':
+      attrs.hideText = right == true;
+      attrs.icon = 'users';
+      return attrs;
+
     case 'download':
       const newRelease = fetchNewRelease();
 
@@ -58,8 +56,8 @@ function navLinkAttributes(label, right) {
       return attrs;
 
     case 'github':
-      attrs.badge = '3.5k';
-      attrs.hideText = right == true;
+      attrs.badge = '4k';
+      attrs.hideText = false;
       attrs.icon = 'github';
       return attrs;
 

@@ -1,0 +1,35 @@
+<Steps headingDepth={<%= heading_depth.to_json %>}>
+<ol>
+<li>
+
+### Configure Vector
+
+<ConfigExample
+  format="toml"
+  path="<%= tutorial.config_path %>"
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
+
+</li>
+<li>
+
+### Start the Vector container
+
+```bash
+docker run \
+<%= tutorial.start_command_lines.join(" \\\n").indent(2) %>
+```
+
+<%- if tutorial.start_command_explanations.any? -%>
+<CodeExplanation>
+
+* <%= tutorial.start_command_explanations.join("\n* ") %>
+
+</CodeExplanation>
+<%- end -%>
+
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
+</Steps>

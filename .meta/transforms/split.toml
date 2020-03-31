@@ -11,7 +11,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "split") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "split") %>
 
 [transforms.split.options.field]
 type = "string"
@@ -46,7 +46,7 @@ common = true
 default = true
 description = "If `true` the `field` will be dropped after parsing."
 
-<%= render("_partials/_types.toml", namespace: "transforms.split", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.split.options", common: true) %>
 
 [[transforms.split.output.log.examples]]
 label = "CSV"

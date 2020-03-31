@@ -1,8 +1,15 @@
 ---
+last_modified_on: "2020-03-31"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The intention of these tests is to
@@ -25,8 +32,6 @@ vector test /etc/vector/*.toml
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
@@ -36,13 +41,9 @@ import Tabs from '@theme/Tabs';
   ]
 }>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.foo]
@@ -75,7 +76,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.foo]
@@ -130,13 +131,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </Tabs>
 
-For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
+For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
 ## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -856,4 +853,4 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
-[docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing/
+[guides.advanced.unit-testing]: /guides/advanced/unit-testing/

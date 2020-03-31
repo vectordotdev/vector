@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/docs/setup/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.2<a/>
+    <a href="https://vector.dev/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.2<a/>
   </strong>
 </p>
 
@@ -34,7 +34,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 ### Who should use Vector?
 
 * You _SHOULD_ use Vector to replace Logstash, Fluent*, Telegraf, Beats, or similar tools.
-* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector as a [daemon][docs.strategies#daemon] or [sidecar][docs.strategies#sidecar].
 * You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
 * You _SHOULD_ use Vector in resource constrained environments (such as devices).
 * You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
@@ -59,10 +59,9 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 
 ### Setup
 
-* [**Installation**][docs.installation] - [containers][docs.containers], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
+* [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Configuration**][docs.configuration]
-* [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
-* [**Guides**][docs.guides] - [getting started][docs.guides.getting_started], [unit testing][docs.guides.unit-testing]
+* [**Deployment**][docs.deployment] - [strategies][docs.strategies], [topologies][docs.topologies]
 
 ### Reference
 
@@ -147,8 +146,8 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
 * **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
-* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][docs.guides.unit-testing] make Vector CI friendly.
-* **Configurable concurrency** - All CPU cores ([service][docs.roles.service]) or just one ([agent][docs.roles.agent]) via the [`--threads` flag][docs.process-management#starting].
+* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
+* **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
 * **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
 * **TLS support** - All relevant Vector components offer TLS options for secure communication.
@@ -166,7 +165,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 ### UX
 
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
-* **Config unit tests** - [Develop Vector config files like code][docs.guides.unit-testing]. Avoid the frustrating dev style required by other tools.
+* **Config unit tests** - [Develop Vector config files like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
 * **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 
@@ -203,7 +202,6 @@ Or use your own [preferred method][docs.installation].
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.concepts]: https://vector.dev/docs/about/concepts/
 [docs.configuration]: https://vector.dev/docs/setup/configuration/
-[docs.containers]: https://vector.dev/docs/setup/installation/containers/
 [docs.data-model.log#timestamps]: https://vector.dev/docs/about/data-model/log/#timestamps
 [docs.data-model.log#types]: https://vector.dev/docs/about/data-model/log/#types
 [docs.data-model.log]: https://vector.dev/docs/about/data-model/log/
@@ -217,20 +215,15 @@ Or use your own [preferred method][docs.installation].
 [docs.global-options#dns_servers]: https://vector.dev/docs/reference/global-options/#dns_servers
 [docs.global-options#log_schema]: https://vector.dev/docs/reference/global-options/#log_schema
 [docs.guarantees]: https://vector.dev/docs/about/guarantees/
-[docs.guides.getting_started]: https://vector.dev/docs/setup/guides/getting-started/
-[docs.guides.unit-testing]: https://vector.dev/docs/setup/guides/unit-testing/
-[docs.guides]: https://vector.dev/docs/setup/guides/
 [docs.installation]: https://vector.dev/docs/setup/installation/
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems/
 [docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
+[docs.platforms]: https://vector.dev/docs/setup/installation/platforms/
 [docs.process-management#reloading]: https://vector.dev/docs/administration/process-management/#reloading
 [docs.process-management#starting]: https://vector.dev/docs/administration/process-management/#starting
 [docs.process-management]: https://vector.dev/docs/administration/process-management/
 [docs.reference.templating]: https://vector.dev/docs/reference/templating/
-[docs.roles.agent]: https://vector.dev/docs/setup/deployment/roles/agent/
-[docs.roles.service]: https://vector.dev/docs/setup/deployment/roles/service/
-[docs.roles]: https://vector.dev/docs/setup/deployment/roles/
 [docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sinks.aws_s3#partitioning]: https://vector.dev/docs/reference/sinks/aws_s3/#partitioning
 [docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3/
@@ -247,6 +240,10 @@ Or use your own [preferred method][docs.installation].
 [docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka/
 [docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
 [docs.sources]: https://vector.dev/docs/reference/sources/
+[docs.strategies#daemon]: https://vector.dev/docs/setup/deployment/strategies/#daemon
+[docs.strategies#service]: https://vector.dev/docs/setup/deployment/strategies/#service
+[docs.strategies#sidecar]: https://vector.dev/docs/setup/deployment/strategies/#sidecar
+[docs.strategies]: https://vector.dev/docs/setup/deployment/strategies/
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
@@ -260,6 +257,7 @@ Or use your own [preferred method][docs.installation].
 [docs.updating]: https://vector.dev/docs/administration/updating/
 [docs.validating]: https://vector.dev/docs/administration/validating/
 [docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
+[guides.advanced.unit-testing]: https://vector.dev/guides/advanced/unit-testing/
 [pages.releases]: https://vector.dev/releases/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.mailing_list]: https://vector.dev/community/

@@ -1,16 +1,19 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
 function_category: "sanitize"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+ansi_stripper%22
-min_version: null
-service_name: "ANSI Stripper"
 sidebar_label: "ansi_stripper|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/ansi_stripper.rs
 status: "prod-ready"
 title: "ANSI Stripper Transform"
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `ansi_stripper` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to strips
@@ -26,9 +29,7 @@ ANSI escape sequences from the specified field.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -36,10 +37,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   field = "message" # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -96,7 +93,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_ansi_stripper_transform_id]

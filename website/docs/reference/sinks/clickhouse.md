@@ -1,19 +1,26 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
-min_version: "1.1.54378"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Clickhouse"
 sidebar_label: "clickhouse|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
 status: "beta"
 title: "Clickhouse Sink"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `clickhouse` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,31 +36,22 @@ The Vector `clickhouse` sink
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Clickhouse version >= 1.1.54378 is required.
-
+* Clickhouse version `>= 1.1.54378` is required.
 
 </Alert>
 
 ## Configuration
-
-import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -72,7 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -89,8 +87,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Auth
   auth.strategy = "basic" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${CLICKHOUSE_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${CLICKHOUSE_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
@@ -127,10 +125,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -188,7 +182,7 @@ The authentication strategy to use.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${CLICKHOUSE_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -213,7 +207,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${CLICKHOUSE_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}
@@ -1080,8 +1074,6 @@ you understand the risks of not verifying the remote hostname.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

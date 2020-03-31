@@ -1,16 +1,19 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+geoip%22
-min_version: null
-service_name: "GeoIP"
 sidebar_label: "geoip|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/geoip.rs
 status: "beta"
 title: "GeoIP Transform"
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector [`geoip`](#geoip) transform
 accepts and [outputs `log` events](#output) allowing you to enrich events with
@@ -26,9 +29,7 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -38,10 +39,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   source = "ip_address" # required
   target = "geoip" # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -383,7 +380,7 @@ The [`source`](#source) and [`target`](#target) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_geoip_transform_id]

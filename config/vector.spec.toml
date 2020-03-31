@@ -351,7 +351,7 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   address = "0.0.0.0:80"
-  address = "localhost:8080"
+  address = "localhost:80"
 
   # The expected encoding of received data. Note that for `json` and `ndjson`
   # encodings, the fields of the JSON objects are output as separate fields.
@@ -432,7 +432,7 @@ dns_servers = ["0.0.0.0:53"]
     verify_certificate = false
     verify_certificate = true
 
-# Ingests data through log records from journald and outputs `log` events.
+# Ingests data through Systemd's Journald utility and outputs `log` events.
 [sources.journald]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -484,7 +484,7 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   units = ["ntpd", "sysinit.target"]
 
-# Ingests data through Kafka 0.9 or later and outputs `log` events.
+# Ingests data through Kafka and outputs `log` events.
 [sources.kafka]
   #
   # General
@@ -549,7 +549,7 @@ dns_servers = ["0.0.0.0:53"]
   # * optional
   # * no default
   # * type: string
-  key_field = "user_id"
+  key_field = "topic"
 
   # The Kafka session timeout in milliseconds.
   #
@@ -648,7 +648,7 @@ dns_servers = ["0.0.0.0:53"]
   #
   # * required
   # * type: string
-  address = "0.0.0.0:8088"
+  address = "0.0.0.0:80"
 
   #
   # TLS
@@ -724,13 +724,15 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   hosts = ["http://localhost:9090"]
 
-  # The interval between scrapes in seconds.
+  # The interval between scrapes, in seconds.
   #
-  # * required
+  # * optional
+  # * default: 15
   # * type: int
-  scrape_interval_secs = 1
+  # * unit: seconds
+  scrape_interval_secs = 15
 
-# Ingests data through a socket, such as a TCP, UDP, or Unix socket and outputs `log` events.
+# Ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events.
 [sources.socket]
   #
   # General
@@ -881,9 +883,9 @@ dns_servers = ["0.0.0.0:53"]
   # The address to accept connections on.
   #
   # * optional
-  # * default: "0.0.0.0:8088"
+  # * default: "0.0.0.0:80"
   # * type: string
-  address = "0.0.0.0:8088"
+  address = "0.0.0.0:80"
 
   # If supplied, incoming requests must supply this token in the `Authorization`
   # header, just as a client would if it was communicating with the Splunk HEC
@@ -1023,7 +1025,7 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   # * required when mode = "tcp" or mode = "udp"
-  address = "0.0.0.0:9000"
+  address = "0.0.0.0:514"
   address = "systemd"
   address = "systemd#2"
 
@@ -2420,14 +2422,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * required
-  # * type: string
-  # * required when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # The group name of the target CloudWatch Logs stream.
   #
   # * required
@@ -2475,6 +2469,15 @@ end
   # * type: bool
   create_missing_stream = true
   create_missing_stream = false
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2666,14 +2669,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * required
-  # * type: string
-  # * required when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # A namespace that will isolate different metrics from each other.
   #
   # * required
@@ -2694,6 +2689,15 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2744,14 +2748,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * required
-  # * type: string
-  # * required when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
@@ -2772,6 +2768,15 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -2963,14 +2968,6 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * required
-  # * type: string
-  # * required when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
@@ -2991,6 +2988,15 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # The log field used as the Kinesis record's partition key value.
   #
@@ -3195,14 +3201,6 @@ end
   compression = "gzip"
   compression = "none"
 
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * required
-  # * type: string
-  # * required when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
   # The AWS region of the target service. If `endpoint` is provided it will
   # override this value since the endpoint includes the region.
   #
@@ -3217,6 +3215,15 @@ end
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -3639,7 +3646,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${CLICKHOUSE_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.
@@ -3647,7 +3654,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${CLICKHOUSE_USERNAME}"
     user = "username"
 
   #
@@ -3863,7 +3870,7 @@ end
     verify_hostname = true
     verify_hostname = false
 
-# Streams `log` and `metric` events to standard output streams, such as `STDOUT` and `STDERR`.
+# Streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR.
 [sinks.console]
   #
   # General
@@ -4138,7 +4145,7 @@ end
   #
   # * required
   # * type: string
-  api_key = "${DATADOG_API_KEY_ENV_VAR}"
+  api_key = "${DATADOG_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # A prefix that will be added to all metric names.
@@ -4320,7 +4327,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${ELASTICSEARCH_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.
@@ -4328,7 +4335,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${ELASTICSEARCH_USERNAME}"
     user = "username"
 
   #
@@ -4429,7 +4436,7 @@ end
     #
     # * required
     # * type: string
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${ELASTICSEARCH_TOKEN}"
     X-Powered-By = "Vector"
 
   #
@@ -5032,7 +5039,7 @@ end
   # * optional
   # * no default
   # * type: string
-  api_key = "${GCP_API_KEY_ENV_VAR}"
+  api_key = "${GCP_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # The filename for a Google Cloud service account credentials JSON file used to
@@ -5617,7 +5624,7 @@ end
   #
   # * required
   # * type: string
-  api_key = "${MY_API_KEY}"
+  api_key = "${HONEYCOMB_API_KEY}"
   api_key = "some-api-key"
 
   # The dataset that Vector will send logs to.
@@ -5829,7 +5836,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${HTTP_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.
@@ -5837,7 +5844,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${HTTP_USERNAME}"
     user = "username"
 
   #
@@ -5947,7 +5954,7 @@ end
     #
     # * required
     # * type: string
-    Authorization = "${TOKEN_ENV_VAR}"
+    Authorization = "${HTTP_TOKEN}"
     X-Powered-By = "Vector"
 
   #
@@ -6098,7 +6105,7 @@ end
   #
   # * required
   # * type: string
-  token = "${TOKEN_ENV_VAR}"
+  token = "${HUMIO_TOKEN}"
   token = "A94A8FE5CCB19BA61C4C08"
 
   # Enables/disables the sink healthcheck upon start.
@@ -6348,7 +6355,7 @@ end
   #
   # * required
   # * type: string
-  token = "${INFLUXDB_TOKEN_ENV_VAR}"
+  token = "${INFLUXDB_TOKEN}"
   token = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # Sets the password for authentication if you’ve enabled authentication for the
@@ -6357,7 +6364,7 @@ end
   # * optional
   # * no default
   # * type: string
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}"
+  password = "${INFLUXDB_PASSWORD}"
   password = "influxdb4ever"
 
   # Sets the username for authentication if you’ve enabled authentication for the
@@ -6716,7 +6723,7 @@ end
   #
   # * required
   # * type: string
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}"
+  api_key = "${LOGDNA_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
   # The hostname that will be attached to each batch of events.
@@ -7007,7 +7014,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    password = "${PASSWORD_ENV_VAR}"
+    password = "${LOKI_PASSWORD}"
     password = "password"
 
     # The basic authentication user name.If using GrafanaLab's hosted Loki then
@@ -7016,7 +7023,7 @@ end
     # * required
     # * type: string
     # * required when strategy = "basic"
-    user = "${USERNAME_ENV_VAR}"
+    user = "${LOKI_USERNAME}"
     user = "username"
 
   #
@@ -7287,7 +7294,7 @@ end
   # * no default
   # * type: string
   insert_key = "xxxx"
-  insert_key = "${INSERT_KEY_ENV_VAR}"
+  insert_key = "${NEW_RELIC_INSERT_KEY}"
 
   # Your New Relic license key (if applicable).
   #
@@ -7295,7 +7302,7 @@ end
   # * no default
   # * type: string
   license_key = "xxxx"
-  license_key = "${LICENSE_KEY_ENV_VAR}"
+  license_key = "${NEW_RELIC_LICENSE_KEY}"
 
   # The API region to send logs to.
   #
@@ -7629,6 +7636,20 @@ end
   # General
   #
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "pulsar"
+  type = "pulsar"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
   # A host and port pair that the pulsar client should connect to.
   #
   # * required
@@ -7641,6 +7662,14 @@ end
   # * type: string
   topic = "topic-1234"
 
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
   #
   # Auth
   #
@@ -7651,7 +7680,7 @@ end
     # * optional
     # * no default
     # * type: string
-    name = "${NAME_ENV_VAR}"
+    name = "${PULSAR_NAME}"
     name = "name123"
 
     # The basic authentication password.
@@ -7659,7 +7688,7 @@ end
     # * optional
     # * no default
     # * type: string
-    token = "${TOKEN_ENV_VAR}"
+    token = "${PULSAR_TOKEN}"
     token = "123456789"
 
   #
@@ -7722,7 +7751,7 @@ end
   #
   # * required
   # * type: string
-  token = "${SEMATEXT_TOKEN_ENV_VAR}"
+  token = "${SEMATEXT_TOKEN}"
   token = "some-sematext-token"
 
   # Enables/disables the sink healthcheck upon start.
@@ -7905,7 +7934,7 @@ end
     # * unit: seconds
     timeout_secs = 60
 
-# Streams `log` events to a socket, such as a TCP, UDP, or Unix domain socket.
+# Streams `log` events to a socket, such as a TCP, UDP, or UDS socket.
 [sinks.socket]
   #
   # General
@@ -8129,7 +8158,7 @@ end
   #
   # * required
   # * type: string
-  token = "${TOKEN_ENV_VAR}"
+  token = "${SPLUNK_HEC_TOKEN}"
   token = "A94A8FE5CCB19BA61C4C08"
 
   # Enables/disables the sink healthcheck upon start.

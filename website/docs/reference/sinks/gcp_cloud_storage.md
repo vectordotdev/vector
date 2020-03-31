@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_cloud_storage%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "GCP Cloud Storage (GCS)"
 sidebar_label: "gcp_cloud_storage|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/cloud_storage.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp/cloud_storage.rs
 status: "beta"
 title: "GCP Cloud Storage (GCS) Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `gcp_cloud_storage` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Google
@@ -30,20 +36,14 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -68,7 +68,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -127,10 +127,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -1222,8 +1218,6 @@ authenticate access to the Cloud Storage API.
 
 ### Buffers & Batches
 
-import SVG from 'react-inlinesvg';
-
 <SVG src="/img/buffers-and-batches-partitioned.svg" />
 
 The `gcp_cloud_storage` sink buffers & batches data as
@@ -1390,7 +1384,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sinks.my_gcp_cloud_storage_sink_id]

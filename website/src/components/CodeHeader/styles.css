@@ -4,7 +4,7 @@
   border-top-right-radius: var(--ifm-global-radius);
   color: var(--ifm-color-emphasis-400);
   font-size: 0.8rem;
-  padding: 2px 8px;
+  padding: calc( var(--ifm-pre-padding) / 2 ) var(--ifm-pre-padding);
 }
 
 .code-header + div[class^='mdxCodeBlock_'] pre {
