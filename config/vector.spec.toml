@@ -380,21 +380,47 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.http.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_path` or `key_text` must also be set. Either this or `crt_text` is
+    # required if `enabled` is set to `true`. Only one of this and `crt_path` may
+    # be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this server, in PEM format. If
+    # this is set, either `key_path` or `key_text` must also be set. Either this or
+    # `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -406,7 +432,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -415,12 +441,25 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
+    # or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this server, in PEM
+    # format (PKCS#8). If this is set, either `crt_path` or `crt_text` must also be
+    # set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -589,21 +628,47 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.kafka.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Enable TLS during connections to the remote.
     #
@@ -614,7 +679,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -623,12 +688,25 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
 # Ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events.
 [sources.logplex]
@@ -656,21 +734,47 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.logplex.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_path` or `key_text` must also be set. Either this or `crt_text` is
+    # required if `enabled` is set to `true`. Only one of this and `crt_path` may
+    # be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this server, in PEM format. If
+    # this is set, either `key_path` or `key_text` must also be set. Either this or
+    # `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -682,7 +786,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -691,12 +795,25 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
+    # or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this server, in PEM
+    # format (PKCS#8). If this is set, either `crt_path` or `crt_text` must also be
+    # set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -808,7 +925,7 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.socket.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
@@ -816,15 +933,43 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when mode = "tcp"
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_path` or `key_text` must also be set. Either this or `crt_text` is
+    # required if `enabled` is set to `true`. Only one of this and `crt_path` may
+    # be set.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when mode = "tcp"
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this server, in PEM format. If
+    # this is set, either `key_path` or `key_text` must also be set. Either this or
+    # `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when mode = "tcp"
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -837,23 +982,34 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
     # * type: string
-    # * relevant when mode = "tcp"
     key_pass = "${KEY_PASS_ENV_VAR}"
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
+    # or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
-    # * relevant when mode = "tcp"
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this server, in PEM
+    # format (PKCS#8). If this is set, either `crt_path` or `crt_text` must also be
+    # set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -903,21 +1059,47 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.splunk_hec.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_path` or `key_text` must also be set. Either this or `crt_text` is
+    # required if `enabled` is set to `true`. Only one of this and `crt_path` may
+    # be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this server, in PEM format. If
+    # this is set, either `key_path` or `key_text` must also be set. Either this or
+    # `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -929,7 +1111,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -938,12 +1120,25 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
+    # or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this server, in PEM
+    # format (PKCS#8). If this is set, either `crt_path` or `crt_text` must also be
+    # set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1071,21 +1266,47 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.syslog.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_path` or `key_text` must also be set. Either this or `crt_text` is
+    # required if `enabled` is set to `true`. Only one of this and `crt_path` may
+    # be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this server, in PEM format. If
+    # this is set, either `key_path` or `key_text` must also be set. Either this or
+    # `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -1097,7 +1318,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -1106,12 +1327,25 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
+    # or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this server, in PEM
+    # format (PKCS#8). If this is set, either `crt_path` or `crt_text` must also be
+    # set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -1161,21 +1395,47 @@ dns_servers = ["0.0.0.0:53"]
 
   [sources.vector.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this server, in DER or
     # PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-    # `key_path` must also be set. This is required if `enabled` is set to `true`.
+    # `key_path` or `key_text` must also be set. Either this or `crt_text` is
+    # required if `enabled` is set to `true`. Only one of this and `crt_path` may
+    # be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this server, in PEM format. If
+    # this is set, either `key_path` or `key_text` must also be set. Either this or
+    # `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Require TLS for incoming connections. If this is set, an identity certificate
     # is also required.
@@ -1187,7 +1447,7 @@ dns_servers = ["0.0.0.0:53"]
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -1196,12 +1456,25 @@ dns_servers = ["0.0.0.0:53"]
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this server, in DER
-    # or PEM format (PKCS#8).
+    # or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this server, in PEM
+    # format (PKCS#8). If this is set, either `crt_path` or `crt_text` must also be
+    # set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
@@ -3817,24 +4090,50 @@ end
 
   [sinks.clickhouse.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -3843,12 +4142,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -4060,21 +4372,47 @@ end
 
   [sinks.datadog_logs.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Enable TLS during connections to the remote.
     #
@@ -4085,7 +4423,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -4094,12 +4432,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -4521,24 +4872,50 @@ end
 
   [sinks.elasticsearch.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -4547,12 +4924,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -4948,24 +5338,50 @@ end
 
   [sinks.gcp_cloud_storage.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -4974,12 +5390,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -5220,24 +5649,50 @@ end
 
   [sinks.gcp_pubsub.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -5246,12 +5701,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -5547,24 +6015,50 @@ end
 
   [sinks.gcp_stackdriver_logs.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -5573,12 +6067,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -6028,24 +6535,50 @@ end
 
   [sinks.http.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -6054,12 +6587,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -6658,21 +7204,47 @@ end
 
   [sinks.kafka.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Enable TLS during connections to the remote.
     #
@@ -6683,7 +7255,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -6692,12 +7264,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
 # Batches `log` events to LogDna's HTTP Ingestion API.
 [sinks.logdna]
@@ -7207,24 +7792,50 @@ end
 
   [sinks.loki.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -7233,12 +7844,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -8067,21 +8691,47 @@ end
 
   [sinks.socket.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Enable TLS during connections to the remote.
     #
@@ -8092,7 +8742,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -8101,12 +8751,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -8361,24 +9024,50 @@ end
 
   [sinks.splunk_hec.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
 
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -8387,12 +9076,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -8532,21 +9234,47 @@ end
 
   [sinks.vector.tls]
     # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
+    # (X.509). Only one of this and `ca_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     ca_path = "/path/to/certificate_authority.crt"
 
+    # Inline text of an additional CA certificate, in PEM format. Only one of this
+    # and `ca_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
+
     # Absolute path to a certificate file used to identify this connection, in DER
     # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
+    # archive, `key_path` or `key_text` must also be set. Either this or `crt_text`
+    # is required if `enabled` is set to `true`. Only one of this and `crt_path`
+    # may be set.
     #
     # * optional
     # * no default
     # * type: string
     crt_path = "/path/to/host_certificate.crt"
+
+    # Inline text of a certificate used to identify this connection, in PEM format.
+    # If this is set, either `key_path` or `key_text` must also be set. Either this
+    # or `crt_path` is required if `enabled` is set to `true`. Only one of this and
+    # `crt_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """
 
     # Enable TLS during connections to the remote.
     #
@@ -8557,7 +9285,7 @@ end
     enabled = true
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_path` is set.
+    # either `key_path` or `key_text` is set.
     #
     # * optional
     # * no default
@@ -8566,12 +9294,25 @@ end
     key_pass = "PassWord1"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text`
+    # must also be set. Only one of this and `key_text` may be set.
     #
     # * optional
     # * no default
     # * type: string
     key_path = "/path/to/host_certificate.key"
+
+    # Inline text of a certificate key file used to identify this connection, in
+    # PEM format (PKCS#8). If this is set, either `crt_path` or `crt_text` must
+    # also be set. Only one of this and `key_path` may be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of

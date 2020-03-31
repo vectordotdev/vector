@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
@@ -73,10 +73,22 @@ protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
+  tls.ca_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """ # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
+  tls.crt_text = """
+  -----BEGIN CERTIFICATE-----
+  MII...
+  """ # optional, no default
   tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
+  tls.key_text = """
+  -----BEGIN PRIVATE KEY-----
+  MII...
+  """ # optional, no default
   tls.verify_certificate = false # optional, default
 ```
 
@@ -153,7 +165,33 @@ Configures the TLS options for connections from this source.
 #### ca_path
 
 Absolute path to an additional CA certificate file, in DER or PEM format
-(X.509).
+(X.509). Only one of this and [`ca_text`](#ca_text) may be set.
+
+
+
+
+</Field>
+
+
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["-----BEGIN CERTIFICATE-----\nMII..."]}
+  groups={[]}
+  name={"ca_text"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### ca_text
+
+Inline text of an additional CA certificate, in PEM format. Only one of this
+and [`ca_path`](#ca_path) may be set.
 
 
 
@@ -180,7 +218,37 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 Absolute path to a certificate file used to identify this server, in DER or PEM
 format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
-`key_path` must also be set. This is required if [`enabled`](#enabled) is set to `true`.
+`key_path` or [`key_text`](#key_text) must also be set. Either this or [`crt_text`](#crt_text) is
+required if [`enabled`](#enabled) is set to `true`. Only one of this and [`crt_path`](#crt_path) may be
+set.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["-----BEGIN CERTIFICATE-----\nMII..."]}
+  groups={[]}
+  name={"crt_text"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### crt_text
+
+Inline text of a certificate used to identify this server, in PEM format. If
+this is set, either [`key_path`](#key_path) or [`key_text`](#key_text) must also be set. Either this or
+`crt_path` is required if [`enabled`](#enabled) is set to `true`. Only one of this and
+`crt_path` may be set.
 
 
 
@@ -215,7 +283,7 @@ is also required.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["${KEY_PASS_ENV_VAR}","PassWord1"]}
@@ -232,7 +300,7 @@ is also required.
 #### key_pass
 
 Pass phrase used to unlock the encrypted key file. This has no effect unless
-`key_path` is set.
+either [`key_path`](#key_path) or [`key_text`](#key_text) is set.
 
 
 
@@ -258,7 +326,35 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 #### key_path
 
 Absolute path to a certificate key file used to identify this server, in DER or
-PEM format (PKCS#8).
+PEM format (PKCS#8). If this is set, either [`crt_path`](#crt_path) or [`crt_text`](#crt_text) must also
+be set. Only one of this and [`key_text`](#key_text) may be set.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["-----BEGIN PRIVATE KEY-----\nMII..."]}
+  groups={[]}
+  name={"key_text"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### key_text
+
+Inline text of a certificate key file used to identify this server, in PEM
+format (PKCS#8). If this is set, either [`crt_path`](#crt_path) or [`crt_text`](#crt_text) must also be
+set. Only one of this and [`key_path`](#key_path) may be set.
 
 
 

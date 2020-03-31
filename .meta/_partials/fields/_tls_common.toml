@@ -1,0 +1,80 @@
+[<%= namespace %>.tls.children.ca_path]
+type = "string"
+examples = ["/path/to/certificate_authority.crt"]
+groups = <%= groups.to_toml %>
+<%= relevant %>
+description = """\
+Absolute path to an additional CA certificate file, in DER or PEM format \
+(X.509). \
+Only one of this and `ca_text` may be set.
+"""
+
+[<%= namespace %>.tls.children.ca_text]
+type = "string"
+examples = ["-----BEGIN CERTIFICATE-----\nMII..."]
+groups = <%= groups.to_toml %>
+<%= relevant %>
+description = """\
+Inline text of an additional CA certificate, in PEM format. \
+Only one of this and `ca_path` may be set.
+"""
+
+[<%= namespace %>.tls.children.crt_path]
+type = "string"
+common = true
+examples = ["/path/to/host_certificate.crt"]
+groups = <%= groups.to_toml %>
+<%= relevant %>
+description = """\
+Absolute path to a certificate file used to identify this <%= mode %>, in DER \
+or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, \
+`key_path` or `key_text` must also be set. \
+Either this or `crt_text` is required if `enabled` is set to `true`. \
+Only one of this and `crt_path` may be set.\
+"""
+
+[<%= namespace %>.tls.children.crt_text]
+type = "string"
+common = true
+examples = ["-----BEGIN CERTIFICATE-----\nMII..."]
+groups = <%= groups.to_toml %>
+<%= relevant %>
+description = """\
+Inline text of a certificate used to identify this <%= mode %>, in PEM format. \
+If this is set, either `key_path` or `key_text` must also be set. \
+Either this or `crt_path` is required if `enabled` is set to `true`. \
+Only one of this and `crt_path` may be set.\
+"""
+
+[<%= namespace %>.tls.children.key_path]
+type = "string"
+common = true
+examples = ["/path/to/host_certificate.key"]
+groups = <%= groups.to_toml %>
+description = """\
+Absolute path to a certificate key file used to identify this <%= mode %>, in \
+DER or PEM format (PKCS#8). \
+If this is set, either `crt_path` or `crt_text` must also be set. \
+Only one of this and `key_text` may be set.\
+"""
+
+[<%= namespace %>.tls.children.key_text]
+type = "string"
+common = true
+examples = ["-----BEGIN PRIVATE KEY-----\nMII..."]
+groups = <%= groups.to_toml %>
+description = """\
+Inline text of a certificate key file used to identify this <%= mode %>, in \
+PEM format (PKCS#8). \
+If this is set, either `crt_path` or `crt_text` must also be set. \
+Only one of this and `key_path` may be set.\
+"""
+
+[<%= namespace %>.tls.children.key_pass]
+type = "string"
+examples = ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+groups = <%= groups.to_toml %>
+description = """\
+Pass phrase used to unlock the encrypted key file. This has no effect unless \
+either `key_path` or `key_text` is set.\
+"""
