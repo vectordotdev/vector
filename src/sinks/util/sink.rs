@@ -217,7 +217,7 @@ where
             self.poll_complete()?;
 
             if self.batch.len() > self.settings.size {
-                debug!(message = "Buffer full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
+                debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
                 return Ok(AsyncSink::NotReady(item));
             }
         }
@@ -255,7 +255,7 @@ where
 
                     let fut = self.service.call(request, batch_size);
 
-                    self.exec.spawn(fut).unwrap();
+                    self.exec.spawn(fut).expect("Spawn service future");
 
                     // Disable linger timeout
                     self.linger.take();
@@ -268,9 +268,9 @@ where
                     if let Some(linger) = &mut self.linger {
                         trace!("polling batch linger.");
                         self.service.poll_complete()?;
-                        return linger.poll().map_err(Into::into);
+                        try_ready!(linger.poll());
                     } else {
-                        return self.service.poll_complete();
+                        try_ready!(self.service.poll_complete());
                     }
                 }
             }
@@ -419,7 +419,7 @@ where
             let batch = batch.finish();
             let fut = self.service.call(batch, batch_size);
 
-            self.exec.spawn(fut).unwrap();
+            self.exec.spawn(fut).expect("Spawn service future");
 
             self.service.poll_complete()
         }
