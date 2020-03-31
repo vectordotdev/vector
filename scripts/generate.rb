@@ -38,6 +38,13 @@ require_relative "generate/templates"
 dry_run = ARGV.include?("--dry-run")
 
 #
+# Constants
+#
+
+BLACKLISTED_SINKS = ["vector"]
+BLACKLISTED_SOURCES = ["vector"]
+
+#
 # Functions
 #
 
@@ -204,7 +211,11 @@ metadata.installation.platforms_list.each do |platform|
   )
 
   metadata.sinks_list.
-    select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
+    select do |sink|
+      source.can_send_to?(sink) &&
+        !sink.function_category?("test") &&
+        !BLACKLISTED_SINKS.include?(sink.name)
+    end.
     each do |sink|
       template_path = "#{GUIDES_ROOT}/integrate/platforms/#{platform.name}/#{sink.name}.md.erb"
 
@@ -237,7 +248,11 @@ metadata.sources_list.
     )
 
     metadata.sinks_list.
-      select { |sink| source.can_send_to?(sink) && !sink.function_category?("test") }.
+      select do |sink|
+        source.can_send_to?(sink) &&
+          !sink.function_category?("test") &&
+          !BLACKLISTED_SINKS.include?(sink.name)
+      end.
       each do |sink|
         template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}/#{sink.name}.md.erb"
 
@@ -257,7 +272,10 @@ metadata.sources_list.
 #
 
 metadata.sinks_list.
-  select { |sink| !sink.function_category?("test") }.
+  select do |sink|
+    !sink.function_category?("test") &&
+      !BLACKLISTED_SINKS.include?(sink.name)
+  end.
   each do |sink|
     template_path = "#{GUIDES_ROOT}/integrate/sinks/#{sink.name}.md.erb"
 

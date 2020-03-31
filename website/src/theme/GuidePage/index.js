@@ -141,7 +141,7 @@ function GuidePage(props) {
           </header>
           <VectorComponents
             exceptFunctions={['test']}
-            exceptNames={[source && source.name, 'docker']}
+            exceptNames={[source && source.name, 'docker', 'vector']}
             eventTypes={sink && sink.event_types}
             pathTemplate={sourcePathTemplate}
             titles={false}
@@ -160,7 +160,7 @@ function GuidePage(props) {
           </header>
           <VectorComponents
             exceptFunctions={['test']}
-            exceptNames={[sink && sink.name]}
+            exceptNames={[sink && sink.name, 'vector']}
             eventTypes={source && source.event_types}
             pathTemplate={sinkPathTemplate}
             titles={false}
