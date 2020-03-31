@@ -324,7 +324,7 @@ mod integration_tests {
         let client = ClickhouseClient::new(host);
         client.create_table(
             &table,
-            "host String, timestamp DateTime('Europe/London'), message String",
+            "host String, timestamp DateTime('UTC'), message String",
         );
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -382,7 +382,7 @@ compression = "none"
         let client = ClickhouseClient::new(host);
         client.create_table(
             &table,
-            "host String, timestamp DateTime('Europe/London'), message String",
+            "host String, timestamp DateTime('UTC'), message String",
         );
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();

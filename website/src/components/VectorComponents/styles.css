@@ -29,10 +29,10 @@
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
-  color: var(--ifm-panel-color);
+  color: var(--ifm-heading-color);
   font-weight: 500;
   padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
-  transition: var(--ifm-transition-fast) ease;
+  transition: all var(--ifm-transition-fast) ease;
 }
 
 .vector-component:hover {
@@ -50,8 +50,16 @@
 
 .vector-component--name {
   font-size: 1.1em;
+  font-weight: 600;
   line-height: 1;
   margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
+}
+
+.vector-component--name svg {
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: bottom;
+  width: 1em;
 }
 
 .vector-component--badges {
@@ -81,9 +89,7 @@
   }
 
   .vector-components--cols .filters {
-    border-right: 1px solid var(--ifm-hr-border-color);
     flex: 0 0 25%;
-    margin-left: calc( var(--ifm-spacing-horizontal) * -1 );
     max-width: calc( var(--ifm-sidebar-width) - var(--ifm-spacing-horizontal) );
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
   }
@@ -118,8 +124,7 @@
 
   .vector-components--cols .vector-components--results {
     flex: 1 0;
-    margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
     max-width: 100%;
-    padding: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 3 );
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
   }
 }

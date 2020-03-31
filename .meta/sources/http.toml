@@ -1,19 +1,26 @@
 [sources.http]
 title = "HTTP"
+noun = "HTTP"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Accept log data over HTTP.",
+  "Decode JSON, NDJSON, and text.",
+  "Enrich your logs with select HTTP headers.",
+]
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
-through_description = "the HTTP protocol"
+requirements.network_port = "80"
+strategies = ["service"]
+through_description = "the [HTTP protocol][urls.http]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "http") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "http") %>
 
 [sources.http.options.address]
 type = "string"
 common = true
-examples = ["0.0.0.0:80", "localhost:8080"]
+examples = ["0.0.0.0:80", "localhost:80"]
 required = true
 description = "The address to listen for connections on"
 
@@ -43,6 +50,8 @@ will be inserted into the log event if the corresponding HTTP header was \
 missing.\
 """
 
+<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.http.options", relevant: "") %>
+
 [sources.http.output.log.fields.message]
 type = "string"
 examples = ["This is one line from the plain text HTTP body"]
@@ -57,5 +66,3 @@ required = true
 description = """\
 The time the event was ingested. Note this may be overridden by JSON payloads.\
 """
-
-<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.http.options", relevant: "") %>

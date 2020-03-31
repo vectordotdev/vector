@@ -1,19 +1,26 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
-min_version: "0.8"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Kafka"
 sidebar_label: "kafka|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
 status: "prod-ready"
 title: "Kafka Sink"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `kafka` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to [Apache
@@ -29,31 +36,22 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Kafka version >= 0.8 is required.
-
+* Kafka version `>= 0.8` is required.
 
 </Alert>
 
 ## Configuration
-
-import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -73,7 +71,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -115,10 +113,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -798,8 +792,6 @@ within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] o
 how to do this.
 
 ### Buffers
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers.svg" />
 

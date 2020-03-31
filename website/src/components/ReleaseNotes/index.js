@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 
 import Alert from '@site/src/components/Alert';
 import Avatar from '@site/src/components/Avatar';
-import BlogPostTags from '@site/src/components/BlogPostTags';
 import Changelog from '@site/src/components/Changelog';
 import Heading from '@theme/Heading';
 import Jump from '@site/src/components/Jump';
@@ -10,6 +9,7 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import MailingListForm from '@site/src/components/MailingListForm';
 import MDXComponents from '@theme/MDXComponents';
+import Tags from '@site/src/components/Tags';
 
 import classnames from 'classnames';
 import {commitTypeName, sortCommitTypes} from '@site/src/exports/commits';
@@ -64,7 +64,7 @@ function BlogHighlight({post}) {
   return (
     <div className="section">
       <div className="badges">
-        <BlogPostTags tags={post.tags} valuesOnly={true} />
+        <Tags tags={post.tags} valuesOnly={true} />
       </div>
       <AnchoredH3 id={post.id}><Link to={`/blog/${post.id}`}>{post.title}</Link></AnchoredH3>
       <Avatar github={post.author_github} size="sm" subTitle={dateFormat(date, "mmmm dS, yyyy")} className="sub__title" />

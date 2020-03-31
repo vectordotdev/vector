@@ -4,6 +4,10 @@ description: "A full list of Vector's supported environment variables and how to
 sidebar_label: Env Vars
 ---
 
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+
 You can control Vector's behavior through select environment variables:
 
 ```bash
@@ -22,10 +26,6 @@ options][docs.global-options] as well.
 -->
 
 ## Special Variables
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -222,8 +222,6 @@ Vector supports custom environment variables via the `${...}` syntax:
 ```toml
 option = "${ENV_VAR}"
 ```
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="info">
 

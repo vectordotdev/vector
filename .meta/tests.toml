@@ -174,7 +174,7 @@ An expected output without conditions instead prints the input and output of a \
 target without checking its values.\
 """
 
-<%= render("_partials/_conditions.toml", namespace: "tests.children.outputs.children.conditions.children") %>
+<%= render("_partials/fields/_conditions_options.toml", namespace: "tests.children.outputs.children.conditions.children") %>
 
 [tests.children.no_outputs_from]
 type = "[string]"

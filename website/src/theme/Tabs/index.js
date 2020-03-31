@@ -1,10 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React, {useState, useEffect, Children} from 'react';
 
 import Select from 'react-select';
@@ -14,7 +7,7 @@ import queryString from 'query-string';
 
 function ListSwitcher({block, centered, className, style, values, selectedValue, setSelectedValue}) {
   return (
-    <div className={centered ? "tabs--centered" : ""}>
+    <div className={centered ? "tabs--centered" : null}>
       <ul
         className={classnames('tabs', className, {
           'tabs--block': block,
@@ -35,21 +28,34 @@ function ListSwitcher({block, centered, className, style, values, selectedValue,
     </div>
   );
 }
-function SelectSwitcher({selectedValue, setSelectedValue, values}) {
+function SelectSwitcher({placeholder, selectedValue, setSelectedValue, size, values}) {
+  let options = values;
+
+  if (options[0].group) {
+    let groupedOptions = _.groupBy(options, 'group');
+
+    options = Object.keys(groupedOptions).map(group => {
+      return {
+        label: group,
+        options: groupedOptions[group]
+      }
+    });
+  }
+
   return (
     <Select
-      className='react-select-container'
+      className={`react-select-container react-select--${size}`}
       classNamePrefix='react-select'
-      options={values}
-      isClearable={false}
-      placeholder="Select a version..."
+      options={options}
+      isClearable={selectedValue}
+      placeholder={placeholder}
       value={values.find(option => option.value == selectedValue)}
       onChange={(selectedOption) => setSelectedValue(selectedOption ? selectedOption.value : null)} />
   );
 }
 
 function Tabs(props) {
-  const {block, centered, children, defaultValue, select, style, values, urlKey} = props;
+  const {block, centered, children, defaultValue, label, placeholder, select, size, style, values, urlKey} = props;
   const [selectedValue, setSelectedValue] = useState(defaultValue);
 
   useEffect(() => {
@@ -62,18 +68,25 @@ function Tabs(props) {
   }, []);
 
   return (
-    <div>
-      {values.length > 1 && (select ?
-        <SelectSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} /> :
-        <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
-      <div className="margin-vert--md">
-        {
-          Children.toArray(children).filter(
-            child => child.props.value === selectedValue,
-          )[0]
-        }
+    <>
+      <div className={`margin-bottom--${size || 'md'}`}>
+        {label && <div className="margin-vert--sm">{label}</div>}
+        {values.length > 1 && (select ?
+          <SelectSwitcher
+            placeholder={placeholder}
+            selectedValue={selectedValue}
+            setSelectedValue={setSelectedValue}
+            size={size}
+            {...props} /> :
+          <ListSwitcher selectedValue={selectedValue} setSelectedValue={setSelectedValue} {...props} />)}
       </div>
-    </div>
+
+      {
+        Children.toArray(children).filter(
+          child => child.props.value === selectedValue,
+        )[0]
+      }
+    </>
   );
 }
 

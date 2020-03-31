@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_metrics%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Datadog Metrics"
 sidebar_label: "datadog_metrics|[\"metric\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_metrics.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog/metrics.rs
 status: "beta"
 title: "Datadog Metrics Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `datadog_metrics` sink
 [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to
@@ -30,26 +35,20 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
@@ -58,14 +57,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
-  api_key = "${DATADOG_API_KEY_ENV_VAR}" # required
+  api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
   healthcheck = true # optional, default
   host = "https://api.datadoghq.com" # optional, default
@@ -87,10 +86,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
 
 
@@ -98,7 +93,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={[]}
   name={"api_key"}
   path={null}

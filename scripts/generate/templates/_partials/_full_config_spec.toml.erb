@@ -31,7 +31,7 @@
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
 <% metadata.sources.to_h.values.sort.each do |source| %>
-# <%= component_description(source).remove_markdown_links %>
+# <%= component_short_description(source).remove_markdown_links %>
 <%= config_spec(source.options.to_h.values.sort, path: "sources.#{source.name}") %>
 <% end %>
 
@@ -40,7 +40,7 @@
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 <% metadata.transforms.to_h.values.sort.each do |transform| %>
-# <%= component_description(transform).remove_markdown_links %>
+# <%= component_short_description(transform).remove_markdown_links %>
 <%= config_spec(transform.options.to_h.values.sort, path: "transforms.#{transform.name}") %>
 <% end %>
 
@@ -49,6 +49,6 @@
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
 <% metadata.sinks.to_h.values.sort.each do |sink| %>
-# <%= component_description(sink).remove_markdown_links %>
+# <%= component_short_description(sink).remove_markdown_links %>
 <%= config_spec(sink.options.to_h.values.sort, path: "sinks.#{sink.name}") %>
 <% end %>

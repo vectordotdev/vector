@@ -1,8 +1,10 @@
 import React, {useState} from 'react';
 
 import CheckboxList from '@site/src/components/CheckboxList';
+import Empty from '@site/src/components/Empty';
 import Jump from '@site/src/components/Jump';
 import Link from '@docusaurus/Link';
+import SVG from 'react-inlinesvg';
 
 import _ from 'lodash';
 import classnames from 'classnames';
@@ -12,38 +14,44 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import './styles.css';
 
-function Component({delivery_guarantee, description, event_types, function_category, name, status, type}) {
-  let path = null;
-  if(type == "source") path = `/docs/reference/sources/${name}/`;
-  if(type == "transform") path = `/docs/reference/transforms/${name}/`;
-  if(type == "sink") path = `/docs/reference/sinks/${name}/`;
+function Component({delivery_guarantee, description, event_types, function_category, logo_path, name, pathTemplate, status, title, type}) {
+  let template = pathTemplate;
+
+  if (!template) {
+    if(type == "source") template = '/docs/reference/sources/<name>/';
+    if(type == "transform") template = '/docs/reference/transforms/<name>/';
+    if(type == "sink") template = '/docs/reference/sinks/<name>/';
+  }
+
+  let path = template.replace('<name>', name);
 
   return (
-    <Link to={path} className="vector-component">
+    <Link to={path} className="vector-component" title={description}>
       <div className="vector-component--header">
-        {description && <i className="feather icon-info" title={description}></i>}
-        <div className="vector-component--name">{name} {type}</div>
+        <div className="vector-component--name">
+          {title}
+        </div>
       </div>
       <div className="vector-component--badges">
-        {event_types.includes("log") ?
-          <span className="badge badge--primary" title="This component works with log event types">L</span> :
-          ''}
-        {event_types.includes("metric") ?
-          <span className="badge badge--primary" title="This component works with metric event types">M</span> :
-          ''}
         {status == "beta" ?
           <span className="badge badge--warning" title="This component is in beta and is not recommended for production environments"><i className="feather icon-alert-triangle"></i></span> :
           <span className="badge badge--primary" title="This component has passed reliability standards that make it production ready"><i className="feather icon-award"></i></span>}
         {delivery_guarantee == "best_effort" ?
           <span className="badge badge--warning" title="This component makes a best-effort delivery guarantee, and in rare cases can lose data"><i className="feather icon-shield-off"></i></span> :
           <span className="badge badge--primary" title="This component offers an at-least-once delivery guarantee"><i className="feather icon-shield"></i></span>}
-        <span className="badge badge--secondary">{function_category}</span>
+        {event_types.includes("log") ?
+          <span className="badge badge--primary" title="This component works with log event types">log</span> :
+          ''}
+        {event_types.includes("metric") ?
+          <span className="badge badge--primary" title="This component works with metric event types">metric</span> :
+          ''}
+        <span className="badge badge--primary">{function_category}</span>
       </div>
     </Link>
   );
 }
 
-function Components({components, headingLevel, titles}) {
+function Components({components, headingLevel, pathTemplate, titles}) {
   const sourceComponents = components.filter(component => component.type == "source");
   const transformComponents = components.filter(component => component.type == "transform");
   const sinkComponents = components.filter(component => component.type == "sink");
@@ -57,7 +65,7 @@ function Components({components, headingLevel, titles}) {
             {titles && <HeadingTag>{sourceComponents.length} Sources</HeadingTag>}
             <div className="vector-components--grid">
               {sourceComponents.map((props, idx) => (
-                <Component key={idx} {...props} />
+                <Component key={idx} pathTemplate={pathTemplate} {...props} />
               ))}
             </div>
           </>:
@@ -67,7 +75,7 @@ function Components({components, headingLevel, titles}) {
             {titles && <HeadingTag>{transformComponents.length} Transforms</HeadingTag>}
             <div className="vector-components--grid">
               {transformComponents.map((props, idx) => (
-                <Component key={idx} {...props} />
+                <Component key={idx} pathTemplate={pathTemplate} {...props} />
               ))}
             </div>
           </>:
@@ -77,23 +85,23 @@ function Components({components, headingLevel, titles}) {
             {titles && <HeadingTag>{sinkComponents.length} Sinks</HeadingTag>}
             <div className="vector-components--grid">
               {sinkComponents.map((props, idx) => (
-                <Component key={idx} {...props} />
+                <Component key={idx} pathTemplate={pathTemplate} {...props} />
               ))}
             </div>
           </>:
           ''}
         <hr />
-        <Jump to="https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature" target="_blank" icon="plus-circle">
+        <Jump
+          to="https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature"
+          target="_blank"
+          rightIcon="plus-circle">
           Request a new component
         </Jump>
       </>
     );
   } else {
     return (
-      <div className="empty">
-        <div className="icon">☹</div>
-        <div>No components found</div>
-      </div>
+      <Empty text="no components found" />
     );
   }
 }
@@ -104,9 +112,10 @@ function VectorComponents(props) {
   //
 
   const {siteConfig} = useDocusaurusContext();
-  const {metadata: {event_types, sources, transforms, sinks}} = siteConfig.customFields;
+  const {metadata: {sources, transforms, sinks}} = siteConfig.customFields;
   const titles = props.titles || props.titles == undefined;
   const filterColumn = props.filterColumn == true;
+  const pathTemplate = props.pathTemplate;
   const queryObj = props.location ? qs.parse(props.location.search, {ignoreQueryPrefix: true}) : {};
 
   let components = [];
@@ -120,15 +129,15 @@ function VectorComponents(props) {
   //
 
   const [onlyAtLeastOnce, setOnlyAtLeastOnce] = useState(queryObj['at-least-once'] == 'true');
-  const [onlyEventTypes, setOnlyEventTypes] = useState(new Set(queryObj['event-types']));
+  const [onlyEventTypes, setOnlyEventTypes] = useState(new Set(queryObj['event-types'] || props.eventTypes));
   const [onlyFunctions, setOnlyFunctions] = useState(new Set(queryObj['functions']));
   const [onlyOperatingSystems, setOnlyOperatingSystems] = useState(new Set(queryObj['operating-systems']));
   const [onlyProductionReady, setOnlyProductionReady] = useState(queryObj['prod-ready'] == 'true');
   const [onlyProviders, setOnlyProviders] = useState(new Set(queryObj['providers']));
-  const [searchTerm, setSearchTerm] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(queryObj['search']);
 
   //
-  // Filtering
+  // State Filtering
   //
 
   if (searchTerm) {
@@ -143,7 +152,7 @@ function VectorComponents(props) {
   }
 
   if (onlyEventTypes.size > 0) {
-    components = components.filter(component => Array.from(onlyEventTypes).every(x => component.event_types.includes(x)));
+    components = components.filter(component => Array.from(onlyEventTypes).some(x => component.event_types.includes(x)));
   }
 
   if (onlyFunctions.size > 0) {
@@ -163,10 +172,32 @@ function VectorComponents(props) {
   }
 
   //
+  // Prop Filtering
+  //
+
+  if (props.exceptNames && props.exceptNames.length > 0) {
+    components = components.filter(component => !props.exceptNames.includes(component.name) );
+  }
+
+  if (props.exceptFunctions && props.exceptFunctions.length > 0) {
+    components = components.filter(component => !props.exceptFunctions.includes(component.function_category) );
+  }
+
+  //
   // Filter options
   //
 
-  const eventTypes = new Set(event_types);
+  const eventTypes = onlyEventTypes.size > 0 ?
+    onlyEventTypes :
+    new Set(
+      _(components).
+        map(component => component.event_types).
+        flatten().
+        uniq().
+        compact().
+        sort().
+        value()
+    );
 
   const operatingSystems = new Set(
     _(components).
@@ -223,6 +254,7 @@ function VectorComponents(props) {
       <div className="filters">
         <div className="search">
           <input
+            className="input--text input--lg"
             type="text"
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
             placeholder="🔍 Search..." />
@@ -337,7 +369,11 @@ function VectorComponents(props) {
         )}
       </div>
       <div className="vector-components--results">
-        <Components components={components} headingLevel={props.headingLevel} titles={titles} />
+        <Components
+          components={components}
+          headingLevel={props.headingLevel}
+          pathTemplate={pathTemplate}
+          titles={titles} />
       </div>
     </div>
   );

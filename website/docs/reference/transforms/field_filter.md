@@ -1,16 +1,19 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "Field Filter"
 description: "The Vector `field_filter` transform accepts and outputs `log` events allowing you to filter events by a log field's value."
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22
-min_version: null
-service_name: "Field Filter"
 sidebar_label: "field_filter|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 status: "beta"
 title: "Field Filter Transform"
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `field_filter` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to filter
@@ -26,9 +29,7 @@ events by a log field's value.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -37,10 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   field = "application_id" # required
   value = "/var/log/nginx.log" # required
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -132,7 +129,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_field_filter_transform_id]

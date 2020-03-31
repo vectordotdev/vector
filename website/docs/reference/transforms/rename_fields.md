@@ -1,16 +1,22 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
-min_version: null
-service_name: "Rename Fields"
 sidebar_label: "rename_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/rename_fields.rs
 status: "prod-ready"
 title: "Rename Fields Transform"
 ---
+
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `rename_fields` transform
 accepts and [outputs `log` events](#output) allowing you to rename one or more
@@ -26,20 +32,14 @@ log fields.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -55,7 +55,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -71,10 +71,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -182,7 +178,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_transform]
@@ -220,8 +216,6 @@ full programming runtime.
 #### Key Conflicts
 
 Keys specified in this transform will replace existing keys.
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 

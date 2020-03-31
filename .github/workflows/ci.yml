@@ -22,3 +22,70 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: "cd tests && make check-component-features"
+
+
+## Kubernetes
+# Build exectuables in parallel, and then tests on different Kubernetes versions in parallel.
+
+  # Builds vector executable that will be tested.
+  build-vector-kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release --no-default-features  --features "sources-kubernetes transforms-kubernetes sinks-console"
+    - name: Save vector
+      uses: actions/upload-artifact@v1
+      with:
+        name: builds
+        path: ./target/release/vector
+
+  # Builds vector executable that will be testing.
+  build-test-vector-kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo test --lib --features "sources-kubernetes transforms-kubernetes kubernetes-integration-tests" --no-run
+    - name: Rename test executable
+      run: find -regex "./target/debug/deps/vector-[0-9a-fA-F]+" -exec mv {} ./target/debug/deps/vector-test ';'
+    - name: Save vector
+      uses: actions/upload-artifact@v1
+      with:
+        name: builds
+        path: ./target/debug/deps/vector-test
+
+  # Uses two previosuly builded vector executables to do testing.
+  test-kubernetes:
+    needs: [build-vector-kubernetes,build-test-vector-kubernetes]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kube: [1.14.10, 1.17.2]
+    steps:
+    - name: Load vector
+      uses: actions/download-artifact@v1
+      with:
+        name: builds
+    - uses: opsgang/ga-setup-minikube@v0.1.1
+      with:
+        minikube-version: 1.9.0
+        k8s-version: ${{ matrix.kube }}
+    - name: Start local repository
+      run: docker run -d -p 5000:5000 --restart=always --name registry registry:2
+    - name: Start minikube
+      run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=v${{ matrix.kube }}
+    - name: Build & push image
+      run: |
+        docker build -t "localhost:5000/vector_test:latest" -f - . << EOF
+        FROM buildpack-deps:18.04-curl
+        COPY ./builds/vector /usr/local/bin
+        RUN chmod +x /usr/local/bin/vector
+        ENTRYPOINT ["/usr/local/bin/vector"]
+        EOF
+        docker push localhost:5000/vector_test:latest
+    - name: Make test binary executable
+      run: chmod +x ./builds/vector-test
+    - name: Run kubernetes integration tests
+      run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest ./builds/vector-test --test-threads=1 kubernetes
+

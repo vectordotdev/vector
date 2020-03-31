@@ -1,16 +1,19 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
-min_version: null
-service_name: "Grok Parser"
 sidebar_label: "grok_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 status: "prod-ready"
 title: "Grok Parser Transform"
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `grok_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -26,9 +29,7 @@ log field value with [Grok][urls.grok].
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -47,10 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -224,7 +221,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_grok_parser_transform_id]

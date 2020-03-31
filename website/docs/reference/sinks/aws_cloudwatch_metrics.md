@@ -1,13 +1,12 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_metrics%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "AWS Cloudwatch Metrics"
 sidebar_label: "aws_cloudwatch_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_metrics.rs
 status: "beta"
@@ -15,9 +14,15 @@ title: "AWS Cloudwatch Metrics Sink"
 unsupported_operating_systems: []
 ---
 
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Vector `aws_cloudwatch_metrics` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to [Amazon Web
-Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the
+Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the
 [`PutMetricData` API
 endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
 
@@ -31,20 +36,14 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -58,17 +57,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
 
   # Batch
@@ -78,10 +77,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -199,7 +194,7 @@ The maximum age of a batch before it is flushed.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -447,9 +442,9 @@ event-by-event basis. It does not batch data.
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_cloudwatch_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
