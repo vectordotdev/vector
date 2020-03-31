@@ -865,7 +865,7 @@ input[type="text"] {
   transition: var(--ifm-transition-slow) ease;
   vertical-align: middle;
 }
-input.input--text,
+input.input--text:focus,
 input[type="email"]:focus,
 input[type="text"]:focus {
   background: var(--ifm-panel-background-active);
