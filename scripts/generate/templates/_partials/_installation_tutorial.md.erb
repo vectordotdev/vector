@@ -13,9 +13,8 @@
 
 <%- interfaces_style = interfaces.length > 4 ? "select" : "pills" -%>
 <Tabs
-  block={<%= (interfaces_style == "select").to_json %>}
   centered={<%= (interfaces_style == "pills").to_json %>}
-  className={<%= (interfaces_style == "pill" ? "rounded" : nil).to_json %>}
+  className={<%= (interfaces_style == "pills" ? "rounded" : nil).to_json %>}
   defaultValue={<%= interfaces.first.name.parameterize.to_json %>}
   placeholder="Please choose an installation method..."
   select={<%= (interfaces_style == "select").to_json %>}

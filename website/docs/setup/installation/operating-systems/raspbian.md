@@ -48,9 +48,8 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  block={false}
   centered={true}
-  className={null}
+  className={"rounded"}
   defaultValue={"vector-cli"}
   placeholder="Please choose an installation method..."
   select={false}

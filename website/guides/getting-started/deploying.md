@@ -126,7 +126,6 @@ act of deploying Vector within your environment.
 
 
 <Tabs
-  block={true}
   centered={false}
   className={null}
   defaultValue={"dpkg"}

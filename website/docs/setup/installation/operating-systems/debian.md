@@ -49,9 +49,8 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  block={false}
   centered={true}
-  className={null}
+  className={"rounded"}
   defaultValue={"dpkg"}
   placeholder="Please choose an installation method..."
   select={false}
@@ -307,9 +306,8 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  block={false}
   centered={true}
-  className={null}
+  className={"rounded"}
   defaultValue={"dpkg"}
   placeholder="Please choose an installation method..."
   select={false}

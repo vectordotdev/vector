@@ -69,7 +69,7 @@ function Tabs(props) {
 
   return (
     <>
-      <div className={`margin-vert--${size || 'md'}`}>
+      <div className={`margin-bottom--${size || 'md'}`}>
         {label && <div className="margin-vert--sm">{label}</div>}
         {values.length > 1 && (select ?
           <SelectSwitcher
