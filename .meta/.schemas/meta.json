@@ -221,6 +221,10 @@
           "type": "boolean",
           "description": "Requires access to the file system"
         },
+        "heroku": {
+          "type": "boolean",
+          "description": "If the Heroku platform is required."
+        },
         "journalctl": {
           "type": "boolean",
           "description": "If the `journalctl` binary is required."

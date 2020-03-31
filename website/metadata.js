@@ -65,7 +65,7 @@ module.exports = {
           "title": "Hello World. Your First Vector Pipeline."
         },
         {
-          "author_github": "https://github.com/lukesteensen",
+          "author_github": "https://github.com/binarylogic",
           "description": null,
           "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/monitoring",
           "last_modified_on": null,
@@ -127,15 +127,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/http.md",
           "series_position": null,
           "title": "Collect logs from HTTP and send them anywhere"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex.md",
-          "series_position": null,
-          "title": "Collect logs from Heroku Logplex and send them anywhere"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -217,24 +208,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/statsd.md",
           "series_position": null,
           "title": "Collect metrics from Statsd and send them anywhere"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/blackhole",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/blackhole.md",
-          "series_position": null,
-          "title": "Send logs and metrics to blackhole"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/console",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sinks/console.md",
-          "series_position": null,
-          "title": "Send logs and metrics to the console"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -667,222 +640,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/http/vector.md",
           "series_position": null,
           "title": "Send logs from HTTP to another Vector instance"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_cloudwatch_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/aws_cloudwatch_logs.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to AWS Cloudwatch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_kinesis_streams",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/aws_kinesis_streams.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to AWS Kinesis Data Streams"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_kinesis_firehose",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/aws_kinesis_firehose.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to AWS Kinesis Firehose"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/aws_s3",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/aws_s3.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to AWS S3"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/pulsar",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/pulsar.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Apache Pulsar"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/clickhouse",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/clickhouse.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Clickhouse"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/datadog_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/datadog_logs.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Datadog"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/elasticsearch",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/elasticsearch.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Elasticsearch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_cloud_storage",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/gcp_cloud_storage.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to GCP Cloud Storage (GCS)"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_pubsub",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/gcp_pubsub.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to GCP PubSub"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/gcp_stackdriver_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/gcp_stackdriver_logs.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/honeycomb",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/honeycomb.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Honeycomb"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/humio_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/humio_logs.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Humio"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/kafka",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/kafka.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Kafka"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/logdna",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/logdna.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to LogDNA"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/loki",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/loki.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Loki"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/new_relic_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/new_relic_logs.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to New Relic"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/papertrail",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/papertrail.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Papertrail"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/sematext_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/sematext_logs.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to Sematext"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/splunk_hec",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/splunk_hec.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to a Splunk HEC"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/socket.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to a TCP, UDP, or UDS socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/file.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to a file"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/http.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to an HTTP endpoint"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/logplex/vector",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/logplex/vector.md",
-          "series_position": null,
-          "title": "Send logs from Heroku Logplex to another Vector instance"
         },
         {
           "author_github": "https://github.com/binarylogic",

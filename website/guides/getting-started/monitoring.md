@@ -1,10 +1,10 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: Monitoring Vector
 description: How to monitoring and observe Vector in production
 series_position: 4
-author_github: https://github.com/lukesteensen
+author_github: https://github.com/binarylogic
 tags: ["type: guide", "domain: observability"]
 ---
 

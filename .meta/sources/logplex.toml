@@ -16,6 +16,7 @@ features = [
 ]
 function_category = "receive"
 output_types = ["log"]
+requirements.heroku = true
 requirements.network_port = "80"
 service_providers = ["Heroku"]
 strategies = ["service"]

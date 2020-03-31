@@ -139,7 +139,7 @@ def url_valid?(url)
 
   # Some URLs, like download URLs, contain variables and are not meant
   # to be validated.
-  when /<([A-Z_.]*)>/
+  when /<([A-Z_\-.]*)>/
     true
 
   else
@@ -256,17 +256,19 @@ metadata.sources_list.
 # Create missing sink integration guides
 #
 
-metadata.sinks_list.each do |sink|
-  template_path = "#{GUIDES_ROOT}/integrate/sinks/#{sink.name}.md.erb"
+metadata.sinks_list.
+  select { |sink| !sink.function_category?("test") }.
+  each do |sink|
+    template_path = "#{GUIDES_ROOT}/integrate/sinks/#{sink.name}.md.erb"
 
-  write_new_file(
-    template_path,
-    <<~EOF
-    <%- sink = metadata.sinks.send("#{sink.name}") -%>
-    <%= integration_guide(sink: sink) %>
-    EOF
-  )
-end
+    write_new_file(
+      template_path,
+      <<~EOF
+      <%- sink = metadata.sinks.send("#{sink.name}") -%>
+      <%= integration_guide(sink: sink) %>
+      EOF
+    )
+  end
 
 #
 # Create missing release pages

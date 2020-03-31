@@ -112,7 +112,7 @@ class Component
   end
 
   def for_platform?
-    !requirements.docker_api.nil?
+    !requirements.docker_api.nil? || requirements.heroku == true
   end
 
   def field_path_notation_options
