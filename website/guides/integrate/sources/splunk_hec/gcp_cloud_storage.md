@@ -11,7 +11,9 @@ hide_pagination: true
 
 import ConfigExample from '@site/src/components/ConfigExample';
 import InstallationCommand from '@site/src/components/InstallationCommand';
+import Jump from '@site/src/components/Jump';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
+import Steps from '@site/src/components/Steps';
 
 Logs are an _essential_ part of observing any
 service; without them you are flying blind. But collecting and analyzing them
@@ -41,7 +43,7 @@ The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient
 
 ### What is GCP Cloud Storage (GCS)?
 
-[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities.
+[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.
 
 ## Strategy
 
@@ -97,7 +99,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 ## Tutorial
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -129,7 +131,28 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
+
+## Next Steps
+
+Vector is _powerful_ utility and we're just scratching the surface in this
+guide. Here are a few pages we recommend that demonstrate the power and
+flexibility of Vector:
+
+<Jump to="https://github.com/timberio/vector" leftIcon="github" target="_blank">
+  <div className="title">Vector Github repo <span className="badge badge--primary"><i className="feather icon-star"></i> 4k</span></div>
+  <div className="sub-title">Vector is free and open-source!</div>
+</Jump>
+
+<Jump to="/guides/getting-started/" leftIcon="book">
+  <div className="title">Vector getting started series</div>
+  <div className="sub-title">Go from zero to production in under 10 minutes!</div>
+</Jump>
+
+<Jump to="/guides/getting-started/" leftIcon="book">
+  <div className="title">Vector documentation</div>
+  <div className="sub-title">Thoughtful, detailed docs that respect your time.</div>
+</Jump>
 
 
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/

@@ -12,7 +12,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/managing-complex-configs",
+          "id": "/advanced/managing-complex-configs",
           "last_modified_on": null,
           "path": "website/guides/advanced/managing-complex-configs.md",
           "series_position": null,
@@ -21,7 +21,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/troubleshooting",
+          "id": "/advanced/troubleshooting",
           "last_modified_on": null,
           "path": "website/guides/advanced/troubleshooting.md",
           "series_position": null,
@@ -30,7 +30,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/advanced/unit-testing",
+          "id": "/advanced/unit-testing",
           "last_modified_on": null,
           "path": "website/guides/advanced/unit-testing.md",
           "series_position": null,
@@ -49,7 +49,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/deploying",
+          "id": "/getting-started/deploying",
           "last_modified_on": null,
           "path": "website/guides/getting-started/deploying.md",
           "series_position": null,
@@ -58,7 +58,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/your-first-pipeline",
+          "id": "/getting-started/your-first-pipeline",
           "last_modified_on": null,
           "path": "website/guides/getting-started/your-first-pipeline.md",
           "series_position": null,
@@ -67,7 +67,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/monitoring",
+          "id": "/getting-started/monitoring",
           "last_modified_on": null,
           "path": "website/guides/getting-started/monitoring.md",
           "series_position": null,
@@ -76,7 +76,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/next-steps",
+          "id": "/getting-started/next-steps",
           "last_modified_on": null,
           "path": "website/guides/getting-started/next-steps.md",
           "series_position": null,
@@ -85,7 +85,7 @@ module.exports = {
         {
           "author_github": "https://github.com/Jeffail",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/getting-started/structuring",
+          "id": "/getting-started/structuring",
           "last_modified_on": null,
           "path": "website/guides/getting-started/structuring.md",
           "series_position": null,
@@ -104,7 +104,16 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker",
+          "id": "/integrate/sources/vector",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector.md",
+          "series_position": null,
+          "title": "Collect logs and metrics from Vector and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/platforms/docker",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker.md",
           "series_position": null,
@@ -113,7 +122,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http",
+          "id": "/integrate/sources/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http.md",
           "series_position": null,
@@ -122,7 +131,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald",
+          "id": "/integrate/sources/journald",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald.md",
           "series_position": null,
@@ -131,7 +140,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka",
+          "id": "/integrate/sources/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka.md",
           "series_position": null,
@@ -140,7 +149,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin",
+          "id": "/integrate/sources/stdin",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin.md",
           "series_position": null,
@@ -149,7 +158,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec",
+          "id": "/integrate/sources/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec.md",
           "series_position": null,
@@ -158,7 +167,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog",
+          "id": "/integrate/sources/syslog",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog.md",
           "series_position": null,
@@ -167,7 +176,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket",
+          "id": "/integrate/sources/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket.md",
           "series_position": null,
@@ -176,7 +185,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file",
+          "id": "/integrate/sources/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file.md",
           "series_position": null,
@@ -185,7 +194,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus",
+          "id": "/integrate/sources/prometheus",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus.md",
           "series_position": null,
@@ -194,7 +203,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd",
+          "id": "/integrate/sources/statsd",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/statsd.md",
           "series_position": null,
@@ -203,7 +212,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_cloudwatch_logs",
+          "id": "/integrate/platforms/docker/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -212,7 +221,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_kinesis_streams",
+          "id": "/integrate/platforms/docker/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/aws_kinesis_streams.md",
           "series_position": null,
@@ -221,7 +230,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_kinesis_firehose",
+          "id": "/integrate/platforms/docker/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/aws_kinesis_firehose.md",
           "series_position": null,
@@ -230,7 +239,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/aws_s3",
+          "id": "/integrate/platforms/docker/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/aws_s3.md",
           "series_position": null,
@@ -239,7 +248,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/pulsar",
+          "id": "/integrate/platforms/docker/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/pulsar.md",
           "series_position": null,
@@ -248,7 +257,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/clickhouse",
+          "id": "/integrate/platforms/docker/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/clickhouse.md",
           "series_position": null,
@@ -257,7 +266,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/datadog_logs",
+          "id": "/integrate/platforms/docker/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/datadog_logs.md",
           "series_position": null,
@@ -266,7 +275,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/elasticsearch",
+          "id": "/integrate/platforms/docker/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/elasticsearch.md",
           "series_position": null,
@@ -275,7 +284,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_cloud_storage",
+          "id": "/integrate/platforms/docker/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/gcp_cloud_storage.md",
           "series_position": null,
@@ -284,7 +293,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_pubsub",
+          "id": "/integrate/platforms/docker/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/gcp_pubsub.md",
           "series_position": null,
@@ -293,7 +302,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/gcp_stackdriver_logs",
+          "id": "/integrate/platforms/docker/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -302,7 +311,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/honeycomb",
+          "id": "/integrate/platforms/docker/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/honeycomb.md",
           "series_position": null,
@@ -311,7 +320,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/humio_logs",
+          "id": "/integrate/platforms/docker/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/humio_logs.md",
           "series_position": null,
@@ -320,7 +329,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/kafka",
+          "id": "/integrate/platforms/docker/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/kafka.md",
           "series_position": null,
@@ -329,7 +338,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/logdna",
+          "id": "/integrate/platforms/docker/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/logdna.md",
           "series_position": null,
@@ -338,7 +347,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/loki",
+          "id": "/integrate/platforms/docker/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/loki.md",
           "series_position": null,
@@ -347,7 +356,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/new_relic_logs",
+          "id": "/integrate/platforms/docker/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/new_relic_logs.md",
           "series_position": null,
@@ -356,7 +365,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/papertrail",
+          "id": "/integrate/platforms/docker/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/papertrail.md",
           "series_position": null,
@@ -365,7 +374,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/sematext_logs",
+          "id": "/integrate/platforms/docker/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/sematext_logs.md",
           "series_position": null,
@@ -374,7 +383,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/splunk_hec",
+          "id": "/integrate/platforms/docker/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/splunk_hec.md",
           "series_position": null,
@@ -383,7 +392,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/socket",
+          "id": "/integrate/platforms/docker/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/socket.md",
           "series_position": null,
@@ -392,7 +401,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/file",
+          "id": "/integrate/platforms/docker/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/file.md",
           "series_position": null,
@@ -401,7 +410,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/platforms/docker/http",
+          "id": "/integrate/platforms/docker/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/http.md",
           "series_position": null,
@@ -410,7 +419,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_cloudwatch_logs",
+          "id": "/integrate/sources/http/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -419,7 +428,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_kinesis_streams",
+          "id": "/integrate/sources/http/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/aws_kinesis_streams.md",
           "series_position": null,
@@ -428,7 +437,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_kinesis_firehose",
+          "id": "/integrate/sources/http/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/aws_kinesis_firehose.md",
           "series_position": null,
@@ -437,7 +446,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/aws_s3",
+          "id": "/integrate/sources/http/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/aws_s3.md",
           "series_position": null,
@@ -446,7 +455,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/pulsar",
+          "id": "/integrate/sources/http/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/pulsar.md",
           "series_position": null,
@@ -455,7 +464,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/clickhouse",
+          "id": "/integrate/sources/http/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/clickhouse.md",
           "series_position": null,
@@ -464,7 +473,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/datadog_logs",
+          "id": "/integrate/sources/http/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/datadog_logs.md",
           "series_position": null,
@@ -473,7 +482,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/elasticsearch",
+          "id": "/integrate/sources/http/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/elasticsearch.md",
           "series_position": null,
@@ -482,7 +491,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_cloud_storage",
+          "id": "/integrate/sources/http/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/gcp_cloud_storage.md",
           "series_position": null,
@@ -491,7 +500,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_pubsub",
+          "id": "/integrate/sources/http/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/gcp_pubsub.md",
           "series_position": null,
@@ -500,7 +509,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/gcp_stackdriver_logs",
+          "id": "/integrate/sources/http/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -509,7 +518,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/honeycomb",
+          "id": "/integrate/sources/http/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/honeycomb.md",
           "series_position": null,
@@ -518,7 +527,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/humio_logs",
+          "id": "/integrate/sources/http/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/humio_logs.md",
           "series_position": null,
@@ -527,7 +536,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/kafka",
+          "id": "/integrate/sources/http/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/kafka.md",
           "series_position": null,
@@ -536,7 +545,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/logdna",
+          "id": "/integrate/sources/http/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/logdna.md",
           "series_position": null,
@@ -545,7 +554,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/loki",
+          "id": "/integrate/sources/http/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/loki.md",
           "series_position": null,
@@ -554,7 +563,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/new_relic_logs",
+          "id": "/integrate/sources/http/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/new_relic_logs.md",
           "series_position": null,
@@ -563,7 +572,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/papertrail",
+          "id": "/integrate/sources/http/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/papertrail.md",
           "series_position": null,
@@ -572,7 +581,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/sematext_logs",
+          "id": "/integrate/sources/http/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/sematext_logs.md",
           "series_position": null,
@@ -581,7 +590,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/splunk_hec",
+          "id": "/integrate/sources/http/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/splunk_hec.md",
           "series_position": null,
@@ -590,7 +599,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/socket",
+          "id": "/integrate/sources/http/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/socket.md",
           "series_position": null,
@@ -599,7 +608,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/file",
+          "id": "/integrate/sources/http/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/file.md",
           "series_position": null,
@@ -608,7 +617,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/http",
+          "id": "/integrate/sources/http/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/http.md",
           "series_position": null,
@@ -617,7 +626,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/http/vector",
+          "id": "/integrate/sources/http/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http/vector.md",
           "series_position": null,
@@ -626,7 +635,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_cloudwatch_logs",
+          "id": "/integrate/sources/journald/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -635,7 +644,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_kinesis_streams",
+          "id": "/integrate/sources/journald/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/aws_kinesis_streams.md",
           "series_position": null,
@@ -644,7 +653,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_kinesis_firehose",
+          "id": "/integrate/sources/journald/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/aws_kinesis_firehose.md",
           "series_position": null,
@@ -653,7 +662,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/aws_s3",
+          "id": "/integrate/sources/journald/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/aws_s3.md",
           "series_position": null,
@@ -662,7 +671,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/pulsar",
+          "id": "/integrate/sources/journald/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/pulsar.md",
           "series_position": null,
@@ -671,7 +680,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/clickhouse",
+          "id": "/integrate/sources/journald/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/clickhouse.md",
           "series_position": null,
@@ -680,7 +689,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/datadog_logs",
+          "id": "/integrate/sources/journald/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/datadog_logs.md",
           "series_position": null,
@@ -689,7 +698,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/elasticsearch",
+          "id": "/integrate/sources/journald/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/elasticsearch.md",
           "series_position": null,
@@ -698,7 +707,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_cloud_storage",
+          "id": "/integrate/sources/journald/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/gcp_cloud_storage.md",
           "series_position": null,
@@ -707,7 +716,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_pubsub",
+          "id": "/integrate/sources/journald/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/gcp_pubsub.md",
           "series_position": null,
@@ -716,7 +725,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/gcp_stackdriver_logs",
+          "id": "/integrate/sources/journald/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -725,7 +734,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/honeycomb",
+          "id": "/integrate/sources/journald/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/honeycomb.md",
           "series_position": null,
@@ -734,7 +743,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/humio_logs",
+          "id": "/integrate/sources/journald/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/humio_logs.md",
           "series_position": null,
@@ -743,7 +752,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/kafka",
+          "id": "/integrate/sources/journald/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/kafka.md",
           "series_position": null,
@@ -752,7 +761,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/logdna",
+          "id": "/integrate/sources/journald/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/logdna.md",
           "series_position": null,
@@ -761,7 +770,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/loki",
+          "id": "/integrate/sources/journald/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/loki.md",
           "series_position": null,
@@ -770,7 +779,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/new_relic_logs",
+          "id": "/integrate/sources/journald/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/new_relic_logs.md",
           "series_position": null,
@@ -779,7 +788,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/papertrail",
+          "id": "/integrate/sources/journald/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/papertrail.md",
           "series_position": null,
@@ -788,7 +797,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/sematext_logs",
+          "id": "/integrate/sources/journald/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/sematext_logs.md",
           "series_position": null,
@@ -797,7 +806,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/splunk_hec",
+          "id": "/integrate/sources/journald/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/splunk_hec.md",
           "series_position": null,
@@ -806,7 +815,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/socket",
+          "id": "/integrate/sources/journald/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/socket.md",
           "series_position": null,
@@ -815,7 +824,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/file",
+          "id": "/integrate/sources/journald/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/file.md",
           "series_position": null,
@@ -824,7 +833,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/http",
+          "id": "/integrate/sources/journald/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/http.md",
           "series_position": null,
@@ -833,7 +842,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/journald/vector",
+          "id": "/integrate/sources/journald/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/vector.md",
           "series_position": null,
@@ -842,7 +851,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_cloudwatch_logs",
+          "id": "/integrate/sources/kafka/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -851,7 +860,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_kinesis_streams",
+          "id": "/integrate/sources/kafka/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_kinesis_streams.md",
           "series_position": null,
@@ -860,7 +869,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_kinesis_firehose",
+          "id": "/integrate/sources/kafka/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_kinesis_firehose.md",
           "series_position": null,
@@ -869,7 +878,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/aws_s3",
+          "id": "/integrate/sources/kafka/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/aws_s3.md",
           "series_position": null,
@@ -878,7 +887,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/pulsar",
+          "id": "/integrate/sources/kafka/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/pulsar.md",
           "series_position": null,
@@ -887,7 +896,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/clickhouse",
+          "id": "/integrate/sources/kafka/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/clickhouse.md",
           "series_position": null,
@@ -896,7 +905,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/datadog_logs",
+          "id": "/integrate/sources/kafka/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/datadog_logs.md",
           "series_position": null,
@@ -905,7 +914,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/elasticsearch",
+          "id": "/integrate/sources/kafka/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/elasticsearch.md",
           "series_position": null,
@@ -914,7 +923,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_cloud_storage",
+          "id": "/integrate/sources/kafka/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_cloud_storage.md",
           "series_position": null,
@@ -923,7 +932,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_pubsub",
+          "id": "/integrate/sources/kafka/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_pubsub.md",
           "series_position": null,
@@ -932,7 +941,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/gcp_stackdriver_logs",
+          "id": "/integrate/sources/kafka/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -941,7 +950,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/honeycomb",
+          "id": "/integrate/sources/kafka/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/honeycomb.md",
           "series_position": null,
@@ -950,7 +959,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/humio_logs",
+          "id": "/integrate/sources/kafka/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/humio_logs.md",
           "series_position": null,
@@ -959,7 +968,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/kafka",
+          "id": "/integrate/sources/kafka/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/kafka.md",
           "series_position": null,
@@ -968,7 +977,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/logdna",
+          "id": "/integrate/sources/kafka/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/logdna.md",
           "series_position": null,
@@ -977,7 +986,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/loki",
+          "id": "/integrate/sources/kafka/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/loki.md",
           "series_position": null,
@@ -986,7 +995,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/new_relic_logs",
+          "id": "/integrate/sources/kafka/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/new_relic_logs.md",
           "series_position": null,
@@ -995,7 +1004,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/papertrail",
+          "id": "/integrate/sources/kafka/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/papertrail.md",
           "series_position": null,
@@ -1004,7 +1013,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/sematext_logs",
+          "id": "/integrate/sources/kafka/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/sematext_logs.md",
           "series_position": null,
@@ -1013,7 +1022,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/splunk_hec",
+          "id": "/integrate/sources/kafka/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/splunk_hec.md",
           "series_position": null,
@@ -1022,7 +1031,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/socket",
+          "id": "/integrate/sources/kafka/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/socket.md",
           "series_position": null,
@@ -1031,7 +1040,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/file",
+          "id": "/integrate/sources/kafka/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/file.md",
           "series_position": null,
@@ -1040,7 +1049,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/http",
+          "id": "/integrate/sources/kafka/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/http.md",
           "series_position": null,
@@ -1049,7 +1058,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/kafka/vector",
+          "id": "/integrate/sources/kafka/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/kafka/vector.md",
           "series_position": null,
@@ -1058,7 +1067,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_cloudwatch_logs",
+          "id": "/integrate/sources/stdin/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -1067,7 +1076,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_kinesis_streams",
+          "id": "/integrate/sources/stdin/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/aws_kinesis_streams.md",
           "series_position": null,
@@ -1076,7 +1085,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_kinesis_firehose",
+          "id": "/integrate/sources/stdin/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/aws_kinesis_firehose.md",
           "series_position": null,
@@ -1085,7 +1094,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/aws_s3",
+          "id": "/integrate/sources/stdin/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/aws_s3.md",
           "series_position": null,
@@ -1094,7 +1103,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/pulsar",
+          "id": "/integrate/sources/stdin/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/pulsar.md",
           "series_position": null,
@@ -1103,7 +1112,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/clickhouse",
+          "id": "/integrate/sources/stdin/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/clickhouse.md",
           "series_position": null,
@@ -1112,7 +1121,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/datadog_logs",
+          "id": "/integrate/sources/stdin/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/datadog_logs.md",
           "series_position": null,
@@ -1121,7 +1130,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/elasticsearch",
+          "id": "/integrate/sources/stdin/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/elasticsearch.md",
           "series_position": null,
@@ -1130,7 +1139,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_cloud_storage",
+          "id": "/integrate/sources/stdin/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/gcp_cloud_storage.md",
           "series_position": null,
@@ -1139,7 +1148,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_pubsub",
+          "id": "/integrate/sources/stdin/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/gcp_pubsub.md",
           "series_position": null,
@@ -1148,7 +1157,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/gcp_stackdriver_logs",
+          "id": "/integrate/sources/stdin/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -1157,7 +1166,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/honeycomb",
+          "id": "/integrate/sources/stdin/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/honeycomb.md",
           "series_position": null,
@@ -1166,7 +1175,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/humio_logs",
+          "id": "/integrate/sources/stdin/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/humio_logs.md",
           "series_position": null,
@@ -1175,7 +1184,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/kafka",
+          "id": "/integrate/sources/stdin/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/kafka.md",
           "series_position": null,
@@ -1184,7 +1193,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/logdna",
+          "id": "/integrate/sources/stdin/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/logdna.md",
           "series_position": null,
@@ -1193,7 +1202,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/loki",
+          "id": "/integrate/sources/stdin/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/loki.md",
           "series_position": null,
@@ -1202,7 +1211,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/new_relic_logs",
+          "id": "/integrate/sources/stdin/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/new_relic_logs.md",
           "series_position": null,
@@ -1211,7 +1220,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/papertrail",
+          "id": "/integrate/sources/stdin/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/papertrail.md",
           "series_position": null,
@@ -1220,7 +1229,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/sematext_logs",
+          "id": "/integrate/sources/stdin/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/sematext_logs.md",
           "series_position": null,
@@ -1229,7 +1238,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/splunk_hec",
+          "id": "/integrate/sources/stdin/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/splunk_hec.md",
           "series_position": null,
@@ -1238,7 +1247,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/socket",
+          "id": "/integrate/sources/stdin/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/socket.md",
           "series_position": null,
@@ -1247,7 +1256,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/file",
+          "id": "/integrate/sources/stdin/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/file.md",
           "series_position": null,
@@ -1256,7 +1265,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/http",
+          "id": "/integrate/sources/stdin/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/http.md",
           "series_position": null,
@@ -1265,7 +1274,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/stdin/vector",
+          "id": "/integrate/sources/stdin/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/vector.md",
           "series_position": null,
@@ -1274,7 +1283,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_cloudwatch_logs",
+          "id": "/integrate/sources/splunk_hec/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -1283,7 +1292,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_kinesis_streams",
+          "id": "/integrate/sources/splunk_hec/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/aws_kinesis_streams.md",
           "series_position": null,
@@ -1292,7 +1301,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_kinesis_firehose",
+          "id": "/integrate/sources/splunk_hec/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/aws_kinesis_firehose.md",
           "series_position": null,
@@ -1301,7 +1310,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/aws_s3",
+          "id": "/integrate/sources/splunk_hec/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/aws_s3.md",
           "series_position": null,
@@ -1310,7 +1319,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/pulsar",
+          "id": "/integrate/sources/splunk_hec/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/pulsar.md",
           "series_position": null,
@@ -1319,7 +1328,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/clickhouse",
+          "id": "/integrate/sources/splunk_hec/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/clickhouse.md",
           "series_position": null,
@@ -1328,7 +1337,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/datadog_logs",
+          "id": "/integrate/sources/splunk_hec/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/datadog_logs.md",
           "series_position": null,
@@ -1337,7 +1346,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/elasticsearch",
+          "id": "/integrate/sources/splunk_hec/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/elasticsearch.md",
           "series_position": null,
@@ -1346,7 +1355,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_cloud_storage",
+          "id": "/integrate/sources/splunk_hec/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/gcp_cloud_storage.md",
           "series_position": null,
@@ -1355,7 +1364,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_pubsub",
+          "id": "/integrate/sources/splunk_hec/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/gcp_pubsub.md",
           "series_position": null,
@@ -1364,7 +1373,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs",
+          "id": "/integrate/sources/splunk_hec/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -1373,7 +1382,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/honeycomb",
+          "id": "/integrate/sources/splunk_hec/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/honeycomb.md",
           "series_position": null,
@@ -1382,7 +1391,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/humio_logs",
+          "id": "/integrate/sources/splunk_hec/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/humio_logs.md",
           "series_position": null,
@@ -1391,7 +1400,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/kafka",
+          "id": "/integrate/sources/splunk_hec/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/kafka.md",
           "series_position": null,
@@ -1400,7 +1409,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/logdna",
+          "id": "/integrate/sources/splunk_hec/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/logdna.md",
           "series_position": null,
@@ -1409,7 +1418,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/loki",
+          "id": "/integrate/sources/splunk_hec/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/loki.md",
           "series_position": null,
@@ -1418,7 +1427,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/new_relic_logs",
+          "id": "/integrate/sources/splunk_hec/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/new_relic_logs.md",
           "series_position": null,
@@ -1427,7 +1436,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/papertrail",
+          "id": "/integrate/sources/splunk_hec/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/papertrail.md",
           "series_position": null,
@@ -1436,7 +1445,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/sematext_logs",
+          "id": "/integrate/sources/splunk_hec/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/sematext_logs.md",
           "series_position": null,
@@ -1445,7 +1454,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/splunk_hec",
+          "id": "/integrate/sources/splunk_hec/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/splunk_hec.md",
           "series_position": null,
@@ -1454,7 +1463,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/socket",
+          "id": "/integrate/sources/splunk_hec/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/socket.md",
           "series_position": null,
@@ -1463,7 +1472,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/file",
+          "id": "/integrate/sources/splunk_hec/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/file.md",
           "series_position": null,
@@ -1472,7 +1481,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/http",
+          "id": "/integrate/sources/splunk_hec/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/http.md",
           "series_position": null,
@@ -1481,7 +1490,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/splunk_hec/vector",
+          "id": "/integrate/sources/splunk_hec/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/splunk_hec/vector.md",
           "series_position": null,
@@ -1490,7 +1499,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_cloudwatch_logs",
+          "id": "/integrate/sources/syslog/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -1499,7 +1508,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_kinesis_streams",
+          "id": "/integrate/sources/syslog/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/aws_kinesis_streams.md",
           "series_position": null,
@@ -1508,7 +1517,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_kinesis_firehose",
+          "id": "/integrate/sources/syslog/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/aws_kinesis_firehose.md",
           "series_position": null,
@@ -1517,7 +1526,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/aws_s3",
+          "id": "/integrate/sources/syslog/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/aws_s3.md",
           "series_position": null,
@@ -1526,7 +1535,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/pulsar",
+          "id": "/integrate/sources/syslog/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/pulsar.md",
           "series_position": null,
@@ -1535,7 +1544,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/clickhouse",
+          "id": "/integrate/sources/syslog/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/clickhouse.md",
           "series_position": null,
@@ -1544,7 +1553,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/datadog_logs",
+          "id": "/integrate/sources/syslog/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/datadog_logs.md",
           "series_position": null,
@@ -1553,7 +1562,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/elasticsearch",
+          "id": "/integrate/sources/syslog/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/elasticsearch.md",
           "series_position": null,
@@ -1562,7 +1571,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_cloud_storage",
+          "id": "/integrate/sources/syslog/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/gcp_cloud_storage.md",
           "series_position": null,
@@ -1571,7 +1580,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_pubsub",
+          "id": "/integrate/sources/syslog/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/gcp_pubsub.md",
           "series_position": null,
@@ -1580,7 +1589,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/gcp_stackdriver_logs",
+          "id": "/integrate/sources/syslog/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -1589,7 +1598,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/honeycomb",
+          "id": "/integrate/sources/syslog/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/honeycomb.md",
           "series_position": null,
@@ -1598,7 +1607,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/humio_logs",
+          "id": "/integrate/sources/syslog/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/humio_logs.md",
           "series_position": null,
@@ -1607,7 +1616,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/kafka",
+          "id": "/integrate/sources/syslog/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/kafka.md",
           "series_position": null,
@@ -1616,7 +1625,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/logdna",
+          "id": "/integrate/sources/syslog/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/logdna.md",
           "series_position": null,
@@ -1625,7 +1634,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/loki",
+          "id": "/integrate/sources/syslog/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/loki.md",
           "series_position": null,
@@ -1634,7 +1643,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/new_relic_logs",
+          "id": "/integrate/sources/syslog/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/new_relic_logs.md",
           "series_position": null,
@@ -1643,7 +1652,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/papertrail",
+          "id": "/integrate/sources/syslog/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/papertrail.md",
           "series_position": null,
@@ -1652,7 +1661,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/sematext_logs",
+          "id": "/integrate/sources/syslog/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/sematext_logs.md",
           "series_position": null,
@@ -1661,7 +1670,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/splunk_hec",
+          "id": "/integrate/sources/syslog/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/splunk_hec.md",
           "series_position": null,
@@ -1670,7 +1679,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/socket",
+          "id": "/integrate/sources/syslog/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/socket.md",
           "series_position": null,
@@ -1679,7 +1688,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/file",
+          "id": "/integrate/sources/syslog/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/file.md",
           "series_position": null,
@@ -1688,7 +1697,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/http",
+          "id": "/integrate/sources/syslog/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/http.md",
           "series_position": null,
@@ -1697,7 +1706,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/syslog/vector",
+          "id": "/integrate/sources/syslog/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/vector.md",
           "series_position": null,
@@ -1706,7 +1715,214 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_cloudwatch_logs",
+          "id": "/integrate/sources/vector/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Vector to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Vector to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/loki.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Vector to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Vector to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/socket.md",
+          "series_position": null,
+          "title": "Send logs from Vector to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/file.md",
+          "series_position": null,
+          "title": "Send logs from Vector to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/http.md",
+          "series_position": null,
+          "title": "Send logs from Vector to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -1715,7 +1931,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_kinesis_streams",
+          "id": "/integrate/sources/socket/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/aws_kinesis_streams.md",
           "series_position": null,
@@ -1724,7 +1940,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_kinesis_firehose",
+          "id": "/integrate/sources/socket/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/aws_kinesis_firehose.md",
           "series_position": null,
@@ -1733,7 +1949,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/aws_s3",
+          "id": "/integrate/sources/socket/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/aws_s3.md",
           "series_position": null,
@@ -1742,7 +1958,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/pulsar",
+          "id": "/integrate/sources/socket/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/pulsar.md",
           "series_position": null,
@@ -1751,7 +1967,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/clickhouse",
+          "id": "/integrate/sources/socket/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/clickhouse.md",
           "series_position": null,
@@ -1760,7 +1976,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/datadog_logs",
+          "id": "/integrate/sources/socket/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/datadog_logs.md",
           "series_position": null,
@@ -1769,7 +1985,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/elasticsearch",
+          "id": "/integrate/sources/socket/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/elasticsearch.md",
           "series_position": null,
@@ -1778,7 +1994,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_cloud_storage",
+          "id": "/integrate/sources/socket/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/gcp_cloud_storage.md",
           "series_position": null,
@@ -1787,7 +2003,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_pubsub",
+          "id": "/integrate/sources/socket/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/gcp_pubsub.md",
           "series_position": null,
@@ -1796,7 +2012,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/gcp_stackdriver_logs",
+          "id": "/integrate/sources/socket/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -1805,7 +2021,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/honeycomb",
+          "id": "/integrate/sources/socket/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/honeycomb.md",
           "series_position": null,
@@ -1814,7 +2030,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/humio_logs",
+          "id": "/integrate/sources/socket/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/humio_logs.md",
           "series_position": null,
@@ -1823,7 +2039,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/kafka",
+          "id": "/integrate/sources/socket/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/kafka.md",
           "series_position": null,
@@ -1832,7 +2048,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/logdna",
+          "id": "/integrate/sources/socket/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/logdna.md",
           "series_position": null,
@@ -1841,7 +2057,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/loki",
+          "id": "/integrate/sources/socket/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/loki.md",
           "series_position": null,
@@ -1850,7 +2066,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/new_relic_logs",
+          "id": "/integrate/sources/socket/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/new_relic_logs.md",
           "series_position": null,
@@ -1859,7 +2075,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/papertrail",
+          "id": "/integrate/sources/socket/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/papertrail.md",
           "series_position": null,
@@ -1868,7 +2084,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/sematext_logs",
+          "id": "/integrate/sources/socket/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/sematext_logs.md",
           "series_position": null,
@@ -1877,7 +2093,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/splunk_hec",
+          "id": "/integrate/sources/socket/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/splunk_hec.md",
           "series_position": null,
@@ -1886,7 +2102,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/socket",
+          "id": "/integrate/sources/socket/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/socket.md",
           "series_position": null,
@@ -1895,7 +2111,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/file",
+          "id": "/integrate/sources/socket/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/file.md",
           "series_position": null,
@@ -1904,7 +2120,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/http",
+          "id": "/integrate/sources/socket/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/http.md",
           "series_position": null,
@@ -1913,7 +2129,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/socket/vector",
+          "id": "/integrate/sources/socket/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/vector.md",
           "series_position": null,
@@ -1922,7 +2138,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_cloudwatch_logs",
+          "id": "/integrate/sources/file/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -1931,7 +2147,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_kinesis_streams",
+          "id": "/integrate/sources/file/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/aws_kinesis_streams.md",
           "series_position": null,
@@ -1940,7 +2156,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_kinesis_firehose",
+          "id": "/integrate/sources/file/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/aws_kinesis_firehose.md",
           "series_position": null,
@@ -1949,7 +2165,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/aws_s3",
+          "id": "/integrate/sources/file/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/aws_s3.md",
           "series_position": null,
@@ -1958,7 +2174,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/pulsar",
+          "id": "/integrate/sources/file/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/pulsar.md",
           "series_position": null,
@@ -1967,7 +2183,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/clickhouse",
+          "id": "/integrate/sources/file/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/clickhouse.md",
           "series_position": null,
@@ -1976,7 +2192,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/datadog_logs",
+          "id": "/integrate/sources/file/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/datadog_logs.md",
           "series_position": null,
@@ -1985,7 +2201,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/elasticsearch",
+          "id": "/integrate/sources/file/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/elasticsearch.md",
           "series_position": null,
@@ -1994,7 +2210,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_cloud_storage",
+          "id": "/integrate/sources/file/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/gcp_cloud_storage.md",
           "series_position": null,
@@ -2003,7 +2219,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_pubsub",
+          "id": "/integrate/sources/file/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/gcp_pubsub.md",
           "series_position": null,
@@ -2012,7 +2228,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/gcp_stackdriver_logs",
+          "id": "/integrate/sources/file/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -2021,7 +2237,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/honeycomb",
+          "id": "/integrate/sources/file/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/honeycomb.md",
           "series_position": null,
@@ -2030,7 +2246,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/humio_logs",
+          "id": "/integrate/sources/file/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/humio_logs.md",
           "series_position": null,
@@ -2039,7 +2255,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/kafka",
+          "id": "/integrate/sources/file/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/kafka.md",
           "series_position": null,
@@ -2048,7 +2264,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/logdna",
+          "id": "/integrate/sources/file/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/logdna.md",
           "series_position": null,
@@ -2057,7 +2273,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/loki",
+          "id": "/integrate/sources/file/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/loki.md",
           "series_position": null,
@@ -2066,7 +2282,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/new_relic_logs",
+          "id": "/integrate/sources/file/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/new_relic_logs.md",
           "series_position": null,
@@ -2075,7 +2291,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/papertrail",
+          "id": "/integrate/sources/file/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/papertrail.md",
           "series_position": null,
@@ -2084,7 +2300,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/sematext_logs",
+          "id": "/integrate/sources/file/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/sematext_logs.md",
           "series_position": null,
@@ -2093,7 +2309,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/splunk_hec",
+          "id": "/integrate/sources/file/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/splunk_hec.md",
           "series_position": null,
@@ -2102,7 +2318,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/socket",
+          "id": "/integrate/sources/file/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/socket.md",
           "series_position": null,
@@ -2111,7 +2327,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/file",
+          "id": "/integrate/sources/file/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/file.md",
           "series_position": null,
@@ -2120,7 +2336,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/http",
+          "id": "/integrate/sources/file/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/http.md",
           "series_position": null,
@@ -2129,7 +2345,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/file/vector",
+          "id": "/integrate/sources/file/vector",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/vector.md",
           "series_position": null,
@@ -2138,7 +2354,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_cloudwatch_logs",
+          "id": "/integrate/sinks/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/aws_cloudwatch_logs.md",
           "series_position": null,
@@ -2147,7 +2363,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_kinesis_streams",
+          "id": "/integrate/sinks/aws_kinesis_streams",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/aws_kinesis_streams.md",
           "series_position": null,
@@ -2156,7 +2372,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_kinesis_firehose",
+          "id": "/integrate/sinks/aws_kinesis_firehose",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/aws_kinesis_firehose.md",
           "series_position": null,
@@ -2165,7 +2381,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_s3",
+          "id": "/integrate/sinks/aws_s3",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/aws_s3.md",
           "series_position": null,
@@ -2174,7 +2390,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/pulsar",
+          "id": "/integrate/sinks/pulsar",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/pulsar.md",
           "series_position": null,
@@ -2183,7 +2399,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/clickhouse",
+          "id": "/integrate/sinks/clickhouse",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/clickhouse.md",
           "series_position": null,
@@ -2192,7 +2408,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/datadog_logs",
+          "id": "/integrate/sinks/datadog_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/datadog_logs.md",
           "series_position": null,
@@ -2201,7 +2417,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/elasticsearch",
+          "id": "/integrate/sinks/elasticsearch",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/elasticsearch.md",
           "series_position": null,
@@ -2210,7 +2426,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/gcp_cloud_storage",
+          "id": "/integrate/sinks/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/gcp_cloud_storage.md",
           "series_position": null,
@@ -2219,7 +2435,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/gcp_pubsub",
+          "id": "/integrate/sinks/gcp_pubsub",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/gcp_pubsub.md",
           "series_position": null,
@@ -2228,7 +2444,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/gcp_stackdriver_logs",
+          "id": "/integrate/sinks/gcp_stackdriver_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/gcp_stackdriver_logs.md",
           "series_position": null,
@@ -2237,7 +2453,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/honeycomb",
+          "id": "/integrate/sinks/honeycomb",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/honeycomb.md",
           "series_position": null,
@@ -2246,7 +2462,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/humio_logs",
+          "id": "/integrate/sinks/humio_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/humio_logs.md",
           "series_position": null,
@@ -2255,7 +2471,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/kafka",
+          "id": "/integrate/sinks/kafka",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/kafka.md",
           "series_position": null,
@@ -2264,7 +2480,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/logdna",
+          "id": "/integrate/sinks/logdna",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/logdna.md",
           "series_position": null,
@@ -2273,7 +2489,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/loki",
+          "id": "/integrate/sinks/loki",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/loki.md",
           "series_position": null,
@@ -2282,7 +2498,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/new_relic_logs",
+          "id": "/integrate/sinks/new_relic_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/new_relic_logs.md",
           "series_position": null,
@@ -2291,7 +2507,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/papertrail",
+          "id": "/integrate/sinks/papertrail",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/papertrail.md",
           "series_position": null,
@@ -2300,7 +2516,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/sematext_logs",
+          "id": "/integrate/sinks/sematext_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/sematext_logs.md",
           "series_position": null,
@@ -2309,7 +2525,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/splunk_hec",
+          "id": "/integrate/sinks/splunk_hec",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/splunk_hec.md",
           "series_position": null,
@@ -2318,7 +2534,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/socket",
+          "id": "/integrate/sinks/socket",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/socket.md",
           "series_position": null,
@@ -2327,7 +2543,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/file",
+          "id": "/integrate/sinks/file",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/file.md",
           "series_position": null,
@@ -2336,7 +2552,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/http",
+          "id": "/integrate/sinks/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/http.md",
           "series_position": null,
@@ -2345,7 +2561,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics",
+          "id": "/integrate/sources/prometheus/aws_cloudwatch_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus/aws_cloudwatch_metrics.md",
           "series_position": null,
@@ -2354,7 +2570,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/datadog_metrics",
+          "id": "/integrate/sources/prometheus/datadog_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus/datadog_metrics.md",
           "series_position": null,
@@ -2363,7 +2579,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/influxdb_metrics",
+          "id": "/integrate/sources/prometheus/influxdb_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus/influxdb_metrics.md",
           "series_position": null,
@@ -2372,7 +2588,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/prometheus",
+          "id": "/integrate/sources/prometheus/prometheus",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus/prometheus.md",
           "series_position": null,
@@ -2381,7 +2597,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/prometheus/statsd",
+          "id": "/integrate/sources/prometheus/statsd",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/prometheus/statsd.md",
           "series_position": null,
@@ -2390,7 +2606,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/aws_cloudwatch_metrics",
+          "id": "/integrate/sources/statsd/aws_cloudwatch_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/statsd/aws_cloudwatch_metrics.md",
           "series_position": null,
@@ -2399,7 +2615,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/datadog_metrics",
+          "id": "/integrate/sources/statsd/datadog_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/statsd/datadog_metrics.md",
           "series_position": null,
@@ -2408,7 +2624,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/influxdb_metrics",
+          "id": "/integrate/sources/statsd/influxdb_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/statsd/influxdb_metrics.md",
           "series_position": null,
@@ -2417,7 +2633,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/prometheus",
+          "id": "/integrate/sources/statsd/prometheus",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/statsd/prometheus.md",
           "series_position": null,
@@ -2426,7 +2642,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sources/statsd/statsd",
+          "id": "/integrate/sources/statsd/statsd",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/statsd/statsd.md",
           "series_position": null,
@@ -2435,7 +2651,52 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/aws_cloudwatch_metrics",
+          "id": "/integrate/sources/vector/aws_cloudwatch_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/datadog_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/influxdb_metrics",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/influxdb_metrics.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to InfluxDB"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/prometheus",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/prometheus.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to Prometheus"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/vector/statsd",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/statsd.md",
+          "series_position": null,
+          "title": "Send metrics from Vector to Statsd"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/aws_cloudwatch_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/aws_cloudwatch_metrics.md",
           "series_position": null,
@@ -2444,7 +2705,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/datadog_metrics",
+          "id": "/integrate/sinks/datadog_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/datadog_metrics.md",
           "series_position": null,
@@ -2453,7 +2714,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/influxdb_metrics",
+          "id": "/integrate/sinks/influxdb_metrics",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/influxdb_metrics.md",
           "series_position": null,
@@ -2462,7 +2723,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/prometheus",
+          "id": "/integrate/sinks/prometheus",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/prometheus.md",
           "series_position": null,
@@ -2471,7 +2732,7 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/Users/benjohnson/Code/timber/vector/website/guides/integrate/sinks/statsd",
+          "id": "/integrate/sinks/statsd",
           "last_modified_on": null,
           "path": "website/guides/integrate/sinks/statsd.md",
           "series_position": null,
@@ -24554,7 +24815,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"gcp_cloud_storage\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  credentials_path = \"/path/to/credentials.json\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities.",
+      "description": "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",
       "event_types": [
         "log"
       ],

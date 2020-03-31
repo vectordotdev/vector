@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -14,6 +14,7 @@ import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import SidecarDiagram from '@site/src/components/SidecarDiagram';
+import Steps from '@site/src/components/Steps';
 import SVG from 'react-inlinesvg';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -140,7 +141,7 @@ act of deploying Vector within your environment.
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -183,10 +184,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <TabItem value="arm64">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -229,10 +230,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <TabItem value="armv7">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -275,14 +276,14 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 </Tabs>
 
 </TabItem>
 <TabItem value="docker-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -318,7 +319,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-compose">
@@ -328,7 +329,7 @@ compose!
 </TabItem>
 <TabItem value="homebrew">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -362,12 +363,12 @@ brew services start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="msi">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <Tabs
   centered={true}
   className="rounded"
@@ -412,12 +413,12 @@ brew services start vector
 
 </TabItem>
 </Tabs>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="nix">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1.  ### Install Vector
 
@@ -457,12 +458,12 @@ brew services start vector
 
     </CodeExplanation>
 
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="rpm">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <Tabs
   centered={true}
   className="rounded"
@@ -563,12 +564,12 @@ brew services start vector
 
 </TabItem>
 </Tabs>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="vector-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -600,7 +601,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 </Tabs>

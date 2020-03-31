@@ -21,7 +21,6 @@ module PostProcessors
       'Jump' => "import Jump from '@site/src/components/Jump';",
       'ServiceDiagram' => "import ServiceDiagram from '@site/src/components/ServiceDiagram';",
       'SidecarDiagram' => "import SidecarDiagram from '@site/src/components/SidecarDiagram';",
-      'Step' => "import Step from '@site/src/components/Step';",
       'Steps' => "import Steps from '@site/src/components/Steps';",
       'SVG' => "import SVG from 'react-inlinesvg';",
       'Tabs' => "import Tabs from '@theme/Tabs';",

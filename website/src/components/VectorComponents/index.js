@@ -91,7 +91,10 @@ function Components({components, headingLevel, pathTemplate, titles}) {
           </>:
           ''}
         <hr />
-        <Jump to="https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature" target="_blank" icon="plus-circle">
+        <Jump
+          to="https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature"
+          target="_blank"
+          rightIcon="plus-circle">
           Request a new component
         </Jump>
       </>

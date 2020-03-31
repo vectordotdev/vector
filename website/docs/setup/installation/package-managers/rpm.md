@@ -9,6 +9,7 @@ import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
+import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -56,7 +57,7 @@ The following diagram demonstrates how it works.
   values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <Tabs
   centered={true}
   className="rounded"
@@ -157,7 +158,7 @@ The following diagram demonstrates how it works.
 
 </TabItem>
 </Tabs>
-</div>
+</Steps>
 
 </TabItem>
 </Tabs>
@@ -188,7 +189,7 @@ The following diagram demonstrates how it works.
   values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <Tabs
   centered={true}
   className="rounded"
@@ -289,7 +290,7 @@ The following diagram demonstrates how it works.
 
 </TabItem>
 </Tabs>
-</div>
+</Steps>
 
 </TabItem>
 </Tabs>

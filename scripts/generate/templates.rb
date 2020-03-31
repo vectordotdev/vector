@@ -534,10 +534,6 @@ class Templates
     render("#{partials_path}/_topologies.md", binding).strip
   end
 
-  def tutorial_steps(steps, heading_depth: 3)
-    render("#{partials_path}/_tutorial_steps.md", binding).strip
-  end
-
   def transform_short_description(transform)
     if transform.input_types == transform.output_types
       strip <<~EOF

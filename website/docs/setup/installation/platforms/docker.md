@@ -11,6 +11,7 @@ import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import SidecarDiagram from '@site/src/components/SidecarDiagram';
+import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -61,7 +62,7 @@ The following diagram demonstrates how it works.
   values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -97,7 +98,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-compose">
@@ -131,7 +132,7 @@ each service. Typically data is collected by tailing local files via Vector's
   values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -167,7 +168,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-compose">
@@ -203,7 +204,7 @@ The following diagram demonstrates how it works.
   values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -239,7 +240,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-compose">

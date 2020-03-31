@@ -7,7 +7,7 @@
 
 <%- downloads.each do |download| -%>
 <TabItem value="<%= download.arch.parameterize %>">
-<div className="steps steps--h<%= heading_depth %>">
+<Steps headingDepth={<%= heading_depth.to_json %>}>
 <ol>
 <li>
 
@@ -50,7 +50,7 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <%- end -%>
 </Tabs>

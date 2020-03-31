@@ -10,6 +10,7 @@ import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
+import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -57,7 +58,7 @@ The following diagram demonstrates how it works.
   values={[{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="rpm">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <Tabs
   centered={true}
   className="rounded"
@@ -158,12 +159,12 @@ The following diagram demonstrates how it works.
 
 </TabItem>
 </Tabs>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="vector-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -195,12 +196,12 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -234,7 +235,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-compose">
@@ -270,7 +271,7 @@ The following diagram demonstrates how it works.
   values={[{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="rpm">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <Tabs
   centered={true}
   className="rounded"
@@ -371,12 +372,12 @@ The following diagram demonstrates how it works.
 
 </TabItem>
 </Tabs>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="vector-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -408,12 +409,12 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-cli">
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -449,7 +450,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 </li>
 </ol>
-</div>
+</Steps>
 
 </TabItem>
 <TabItem value="docker-compose">

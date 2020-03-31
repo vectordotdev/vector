@@ -9,6 +9,7 @@ import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
 import ServiceDiagram from '@site/src/components/ServiceDiagram';
+import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -63,7 +64,7 @@ The following diagram demonstrates how it works.
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -106,10 +107,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <TabItem value="arm64">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -152,10 +153,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <TabItem value="armv7">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -198,7 +199,7 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 </Tabs>
 
@@ -238,7 +239,7 @@ The following diagram demonstrates how it works.
   values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
 
 <TabItem value="x86_64">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -281,10 +282,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <TabItem value="arm64">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -327,10 +328,10 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 <TabItem value="armv7">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -373,7 +374,7 @@ sudo systemctl start vector
 
 </li>
 </ol>
-</div>
+</Steps>
 </TabItem>
 </Tabs>
 
