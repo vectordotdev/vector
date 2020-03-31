@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-31"
 title: Install Vector From Archives
 sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
@@ -6,6 +7,7 @@ description: Install Vector from pre-compiled archives
 
 import Alert from '@site/src/components/Alert';
 import CodeHeader from '@site/src/components/CodeHeader';
+import Steps from '@site/src/components/Steps';
 
 This page covers installing Vector from a pre-built archive. These archives
 contain the `vector` binary as well as supporting configuration files.
@@ -40,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 
 <TabItem value="vector-aarch64-unknown-linux-musl-tar-gz">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 
 1.  ### Download & unpack the archive
@@ -94,11 +96,11 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 
 <TabItem value="vector-armv7-unknown-linux-musleabihf-tar-gz">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 
 1.  ### Download & unpack the archive
@@ -152,11 +154,11 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 
 <TabItem value="vector-x86_64-apple-darwin-tar-gz">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 
 1.  ### Download & unpack the archive
@@ -210,11 +212,11 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 
 <TabItem value="vector-x86_64-pc-windows-msvc-zip">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 
 1.  ### Download Vector release archive (latest)
@@ -261,11 +263,11 @@ import TabItem from '@theme/TabItem';
     .\bin\vector --config config\vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 
 <TabItem value="vector-x86_64-unknown-linux-musl-tar-gz">
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 
 1.  ### Download & unpack the archive
@@ -319,7 +321,7 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 </Tabs>
 

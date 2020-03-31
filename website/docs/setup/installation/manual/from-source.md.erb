@@ -39,7 +39,7 @@ section.
 
 The following steps should be used to compile Vector directly on Linux based systems.
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1.  ### Install Rust
 
@@ -111,14 +111,14 @@ The following steps should be used to compile Vector directly on Linux based sys
     target/<target>/release/vector --config config/vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 <TabItem value="windows">
 
 The steps to compile Vector on Windows are different from the ones for other
 operating systems.
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1. ### Install Rust
 
@@ -185,7 +185,7 @@ operating systems.
     .\target\release\vector --config config\vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 <TabItem value="docker">
 
@@ -197,7 +197,7 @@ needed, as all of them would be automatically pulled by Docker.
 
 Building steps:
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1.  ### Download Vector's Source
 
@@ -278,7 +278,7 @@ Building steps:
     Container. The target binary is located in
     `target/<target triple>/release/vector` like in the previous case.
 
-</div>
+</Steps>
 </TabItem>
 </Tabs>
 

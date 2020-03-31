@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: Structuring Your Log Data
 description: How to parse log data in Vector
@@ -10,6 +10,7 @@ tags: ["type: tutorial", "domain: config"]
 
 import Alert from '@site/src/components/Alert';
 import CodeHeader from '@site/src/components/CodeHeader';
+import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -47,7 +48,7 @@ And have them coming out the other end in a structured format like this:
 
 ## Tutorial
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 <ol>
 <li>
 
@@ -337,7 +338,7 @@ Vector does not lock you into any specific schema.
 </Alert>
 </li>
 </ol>
-</div>
+</Steps>
 
 ## Next Steps
 

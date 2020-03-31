@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-03-31"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
@@ -6,6 +7,7 @@ description: Install Vector from the Vector source code
 
 import Alert from '@site/src/components/Alert';
 import CodeHeader from '@site/src/components/CodeHeader';
+import Steps from '@site/src/components/Steps';
 
 This page covers installing Vector from source using the native toolchain for
 the host.
@@ -50,7 +52,7 @@ section.
 
 The following steps should be used to compile Vector directly on Linux based systems.
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1.  ### Install Rust
 
@@ -122,14 +124,14 @@ The following steps should be used to compile Vector directly on Linux based sys
     target/<target>/release/vector --config config/vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 <TabItem value="windows">
 
 The steps to compile Vector on Windows are different from the ones for other
 operating systems.
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1. ### Install Rust
 
@@ -196,7 +198,7 @@ operating systems.
     .\target\release\vector --config config\vector.toml
     ```
 
-</div>
+</Steps>
 </TabItem>
 <TabItem value="docker">
 
@@ -208,7 +210,7 @@ needed, as all of them would be automatically pulled by Docker.
 
 Building steps:
 
-<div className="steps steps--h3">
+<Steps headingDepth={3}>
 
 1.  ### Download Vector's Source
 
@@ -289,7 +291,7 @@ Building steps:
     Container. The target binary is located in
     `target/<target triple>/release/vector` like in the previous case.
 
-</div>
+</Steps>
 </TabItem>
 </Tabs>
 
