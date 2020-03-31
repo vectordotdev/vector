@@ -51,9 +51,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"msi"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="msi">
 
@@ -210,9 +212,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"msi"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="msi">
 

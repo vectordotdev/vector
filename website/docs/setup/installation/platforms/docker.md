@@ -56,9 +56,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"docker-cli"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
@@ -126,9 +128,11 @@ each service. Typically data is collected by tailing local files via Vector's
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"docker-cli"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
@@ -198,9 +202,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"docker-cli"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 

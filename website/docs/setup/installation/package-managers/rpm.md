@@ -51,9 +51,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"rpm"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 
@@ -183,9 +185,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"rpm"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 

@@ -51,9 +51,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"homebrew"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"}]}>
 <TabItem value="homebrew">
 
@@ -116,9 +118,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"homebrew"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"}]}>
 <TabItem value="homebrew">
 

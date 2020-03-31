@@ -51,9 +51,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"dpkg"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"DPKG","value":"dpkg"}]}>
 <TabItem value="dpkg">
 
@@ -226,9 +228,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"dpkg"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"DPKG","value":"dpkg"}]}>
 <TabItem value="dpkg">
 

@@ -126,11 +126,13 @@ act of deploying Vector within your environment.
 
 
 <Tabs
-  block={false}
-  centered={true}
+  block={true}
+  centered={false}
+  className={null}
+  defaultValue={"dpkg"}
   placeholder="Please choose an installation method..."
   select={true}
-  size="lg"
+  size={"lg"}
   values={[{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"}]}>
 <TabItem value="dpkg">
 

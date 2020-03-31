@@ -11,16 +11,18 @@
 ---
 <%- end -%>
 
-<%- interfaces_style = interfaces.length > 4 -%>
+<%- interfaces_style = interfaces.length > 4 ? "select" : "pills" -%>
 <Tabs
-  block={<%= !interfaces_style.to_json %>}
-  centered={true}
+  block={<%= (interfaces_style == "select").to_json %>}
+  centered={<%= (interfaces_style == "pills").to_json %>}
+  className={<%= (interfaces_style == "pill" ? "rounded" : nil).to_json %>}
+  defaultValue={<%= interfaces.first.name.parameterize.to_json %>}
   placeholder="Please choose an installation method..."
-  select={<%= interfaces_style.to_json %>}
-  size="lg"
-  values={<%= interfaces.collect { |interface| {group: interface.type.humanize.pluralize, label: interface.title, value: interface.name } }.to_json %>}>
+  select={<%= (interfaces_style == "select").to_json %>}
+  size={<%= (interfaces_style == "select" ? "lg" : nil).to_json %>}
+  values={<%= interfaces.collect { |interface| {group: interface.type.humanize.pluralize, label: interface.title, value: interface.name.parameterize } }.to_json %>}>
 <%- interfaces.each do |interface| -%>
-<TabItem value="<%= interface.name %>">
+<TabItem value="<%= interface.name.parameterize %>">
 
 <%- source = metadata.sources.send(strategy.source) -%>
 <%= interface_installation_tutorial(interface, source: source, heading_depth: heading_depth) %>

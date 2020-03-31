@@ -50,9 +50,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"msi"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"MSI","value":"msi"}]}>
 <TabItem value="msi">
 
@@ -126,9 +128,11 @@ The following diagram demonstrates how it works.
 <Tabs
   block={false}
   centered={true}
+  className={null}
+  defaultValue={"msi"}
   placeholder="Please choose an installation method..."
   select={false}
-  size="lg"
+  size={null}
   values={[{"group":"Package managers","label":"MSI","value":"msi"}]}>
 <TabItem value="msi">
 
