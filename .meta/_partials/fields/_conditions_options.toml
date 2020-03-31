@@ -57,6 +57,17 @@ description = """\
 Checks whether a string field contains a string argument.\
 """
 
+[<%= namespace %>."`[field_name]`.ends_with"]
+type = "string"
+examples = [
+  { "environment.ends_with" = "-staging" }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field ends with a string argument.\
+"""
+
 [<%= namespace %>."`[field_name]`.starts_with"]
 type = "string"
 examples = [
