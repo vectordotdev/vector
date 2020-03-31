@@ -65,7 +65,7 @@ burglarizing squirrel should ever need to suffer again.
           </div>
         </section>
         <section>
-          <div className="container container--narrow">
+          <div className="container container--xs">
             <div className="row">
               <div className="col text--center">
                 <h3 className="margin-bottom--sm">Emojis</h3>

@@ -3,6 +3,10 @@ title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
 
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Jump from '@site/src/components/Jump';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/data-model-log.svg" />
@@ -75,8 +79,6 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="info">
 
 The following fields are the _default_ schema. All of these field names can be
@@ -84,10 +86,6 @@ changed via the
 [global `log_schema` options][docs.reference.global-options#log_schema].
 
 </Alert>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -204,8 +202,6 @@ additional fields. This includes nested fields.
 </Fields>
 
 ## Components
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/components/?event-types[]=log">View all log compatible components</Jump>
 

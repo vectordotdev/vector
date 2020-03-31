@@ -3,6 +3,7 @@ title: Concepts
 description: The fundamental Vector concepts. A great place to start learning about Vector.
 ---
 
+import Jump from '@site/src/components/Jump';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/concepts.svg" />
@@ -24,8 +25,6 @@ proceed and is also cool to brag about amongst friends.
 "Component" is the generic term we use for [sources](#sources),
 [transforms](#transforms), and [sinks](#sinks). You compose components to create
 pipelines, allowing you to ingest, transform, and send data.
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/components/">View all components</Jump>
 

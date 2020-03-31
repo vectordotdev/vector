@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+logdna%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "LogDNA"
 sidebar_label: "logdna|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/logdna.rs
 status: "beta"
 title: "LogDNA Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `logdna` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,26 +35,20 @@ The Vector `logdna` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   type = "logdna" # required
   inputs = ["my-source-id"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
   healthcheck = true # optional, default
 ```
@@ -56,14 +56,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # General
   type = "logdna" # required
   inputs = ["my-source-id"] # required
-  api_key = "${LOGDNA_API_KEY_ENV_VAR}" # required
+  api_key = "${LOGDNA_API_KEY}" # required
   hostname = "my-local-machine" # required
   default_app = "vector" # optional, default
   healthcheck = true # optional, default
@@ -100,10 +100,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
 
 
@@ -111,7 +107,7 @@ import Field from '@site/src/components/Field';
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${LOGDNA_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${LOGDNA_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={[]}
   name={"api_key"}
   path={null}
@@ -835,8 +831,6 @@ The tags that will be attached to each batch of events.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

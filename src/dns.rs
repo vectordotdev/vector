@@ -188,7 +188,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::net::{IpAddr, SocketAddr, UdpSocket};
     use std::str::FromStr;
-    use tokio::prelude::{future::poll_fn, Async};
+    use tokio01::prelude::{future::poll_fn, Async};
     use trust_dns::rr::{record_data::RData, LowerName, Name, RecordSet, RecordType, RrKey};
     use trust_dns_proto::rr::rdata::soa::SOA;
     use trust_dns_server::{

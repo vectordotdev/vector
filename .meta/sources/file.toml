@@ -1,14 +1,23 @@
 [sources.file]
 title = "File"
+noun = "a file"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Tail one or more files.",
+  "Automatically discover new files with glob patterns.",
+  "Merge multi-line logs into one event.",
+  "Checkpoint your position to ensure data is not lost between restarts.",
+  "Enrich your logs with useful file and host-level context.",
+]
 function_category = "collect"
 output_types = ["log"]
-requirements = {}
+requirements.file_system = true
+strategies = ["daemon", "sidecar"]
 through_description = "one or more local files"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "file") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "file") %>
 
 [sources.file.options.data_dir]
 type = "string"

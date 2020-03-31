@@ -1,8 +1,16 @@
+#
+# domain
+#
+
 <%- metadata.domains.each do |domain| -%>
 - name: "domain: <%= domain.name.downcase %>"
   description: Anything <%= domain.name %> related
   color: 212f3e
 <%- end -%>
+
+#
+# event type
+#
 
 - name: "event type: log"
   description: Anything log event related
@@ -10,6 +18,14 @@
 - name: "event type: metric"
   description: Anything metric event related
   color: 1cd1a1
+- name: "event type: trace"
+  description: Anything trace event related
+  color: 1cd1a1
+
+#
+# meta
+#
+
 - name: "meta: announcement"
   description: Any issues that serve as announcements (pinned issues)
   color: c8d6e5
@@ -37,6 +53,25 @@
 - name: "meta: regression"
   description: This issue represents a regression
   color: c8d6e5
+
+#
+# have
+#
+
+- name: "have: nice"
+  description: This feature is nice to have. It is low priority.
+  color: 10ac84
+- name: "have: should"
+  description: We should have this feature, but is not required. It is medium priority.
+  color: ff9f43
+- name: "have: must"
+  description: We must have this feature, it is critical to Vector's success. It is high priority.
+  color: ee5353
+
+#
+# needs
+#
+
 - name: "needs: approval"
   description: Needs review & approval before work can begin (post spec)
   color: feca57
@@ -56,11 +91,19 @@
   description: Needs a light specification before work can begin
   color: feca57
 
+#
+# platform
+#
+
 <%- metadata.platforms.each do |platform| -%>
 - name: "platform: <%= platform.name.downcase %>"
-  description: Anything <%= platform.name %> related
+  description: Anything <%= platform.title %> related
   color: ff9ff3
 <%- end -%>
+
+#
+# provider
+#
 
 <%- metadata.service_providers.each do |service_provider| -%>
 - name: "provider: <%= service_provider.downcase %>"
@@ -68,11 +111,19 @@
   color: ff9f43
 <%- end -%>
 
+#
+# source
+#
+
 <%- metadata.sources.to_h.values.sort.each do |source| -%>
 - name: "source: <%= source.name.downcase %>"
   description: Anything `<%= source.name %>` source realted
   color: ff9ff3
 <%- end -%>
+
+#
+# transform
+#
 
 <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
 - name: "transform: <%= transform.name.downcase %>"
@@ -80,11 +131,19 @@
   color: 54a0ff
 <%- end -%>
 
+#
+# sink
+#
+
 <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
 - name: "sink: <%= sink.name.downcase %>"
   description: Anything `<%= sink.name %>` sink related
   color: 4ddbfb
 <%- end -%>
+
+#
+# type
+#
 
 - name: "type: bug"
   description: A user facing bug

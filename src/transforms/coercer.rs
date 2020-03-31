@@ -60,7 +60,9 @@ impl Transform for Coercer {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
                     match conv.convert(value) {
-                        Ok(converted) => new_log.insert(field, converted),
+                        Ok(converted) => {
+                            new_log.insert(field, converted);
+                        }
                         Err(error) => {
                             warn!(
                                 message = "Could not convert types.",
@@ -77,7 +79,9 @@ impl Transform for Coercer {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
                     match conv.convert(value) {
-                        Ok(converted) => log.insert(field, converted),
+                        Ok(converted) => {
+                            log.insert(field, converted);
+                        }
                         Err(error) => {
                             warn!(
                                 message = "Could not convert types.",

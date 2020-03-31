@@ -1,0 +1,12 @@
+If you've started Vector through the `docker` CLI you can access Vector's logs
+via the `docker logs` command. First, find the Vector container ID:
+
+```bash
+docker ps | grep vector
+```
+
+Copy Vector's container ID and use it to tail the logs:
+
+```bash
+docker logs -f <container-id>
+```

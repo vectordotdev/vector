@@ -2,41 +2,47 @@ use super::{Atom, PathComponent, PathIter, Value};
 use std::{collections::BTreeMap, iter::Peekable};
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
-pub fn insert(fields: &mut BTreeMap<Atom, Value>, path: &str, value: Value) {
-    map_insert(fields, PathIter::new(path).peekable(), value);
+pub fn insert(fields: &mut BTreeMap<Atom, Value>, path: &str, value: Value) -> Option<Value> {
+    map_insert(fields, PathIter::new(path).peekable(), value)
 }
 
-fn map_insert<I>(fields: &mut BTreeMap<Atom, Value>, mut path_iter: Peekable<I>, value: Value)
+fn map_insert<I>(
+    fields: &mut BTreeMap<Atom, Value>,
+    mut path_iter: Peekable<I>,
+    value: Value,
+) -> Option<Value>
 where
     I: Iterator<Item = PathComponent>,
 {
     match (path_iter.next(), path_iter.peek()) {
-        (Some(PathComponent::Key(current)), None) => {
-            fields.insert(current, value);
-        }
+        (Some(PathComponent::Key(current)), None) => fields.insert(current, value),
         (Some(PathComponent::Key(current)), Some(PathComponent::Key(_))) => {
             if let Some(Value::Map(map)) = fields.get_mut(&current) {
-                map_insert(map, path_iter, value);
+                map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
-                fields.insert(current, Value::Map(map));
+                fields.insert(current, Value::Map(map))
             }
         }
         (Some(PathComponent::Key(current)), Some(&PathComponent::Index(next))) => {
             if let Some(Value::Array(array)) = fields.get_mut(&current) {
-                array_insert(array, path_iter, value);
+                array_insert(array, path_iter, value)
             } else {
                 let mut array = Vec::with_capacity(next + 1);
                 array_insert(&mut array, path_iter, value);
-                fields.insert(current, Value::Array(array));
+                fields.insert(current, Value::Array(array))
             }
         }
-        _ => return,
+        _ => None,
     }
 }
 
-fn array_insert<I>(values: &mut Vec<Value>, mut path_iter: Peekable<I>, value: Value)
+fn array_insert<I>(
+    values: &mut Vec<Value>,
+    mut path_iter: Peekable<I>,
+    value: Value,
+) -> Option<Value>
 where
     I: Iterator<Item = PathComponent>,
 {
@@ -45,33 +51,33 @@ where
             while values.len() <= current {
                 values.push(Value::Null);
             }
-            values[current] = value;
+            Some(std::mem::replace(&mut values[current], value))
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Key(_))) => {
             if let Some(Value::Map(map)) = values.get_mut(current) {
-                map_insert(map, path_iter, value);
+                map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
                 while values.len() <= current {
                     values.push(Value::Null);
                 }
-                values[current] = Value::Map(map);
+                Some(std::mem::replace(&mut values[current], Value::Map(map)))
             }
         }
         (Some(PathComponent::Index(current)), Some(PathComponent::Index(next))) => {
             if let Some(Value::Array(array)) = values.get_mut(current) {
-                array_insert(array, path_iter, value);
+                array_insert(array, path_iter, value)
             } else {
                 let mut array = Vec::with_capacity(next + 1);
                 array_insert(&mut array, path_iter, value);
                 while values.len() <= current {
                     values.push(Value::Null);
                 }
-                values[current] = Value::Array(array);
+                Some(std::mem::replace(&mut values[current], Value::Array(array)))
             }
         }
-        _ => return,
+        _ => None,
     }
 }
 

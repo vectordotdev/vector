@@ -11,7 +11,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "tokenizer") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "tokenizer") %>
 
 [transforms.tokenizer.options.field]
 type = "string"
@@ -35,4 +35,4 @@ common = true
 default = true
 description = "If `true` the `field` will be dropped after parsing."
 
-<%= render("_partials/_types.toml", namespace: "transforms.tokenizer", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.tokenizer.options", common: true) %>

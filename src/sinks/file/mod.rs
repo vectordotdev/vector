@@ -2,7 +2,7 @@ use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
     event::{self, Event},
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         SinkExt,
     },
     template::Template,
@@ -14,7 +14,7 @@ use futures::pin_mut;
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use tokio02::{
+use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
@@ -29,7 +29,10 @@ use super::streaming_sink::{self, StreamingSink};
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 }
 
@@ -112,7 +115,7 @@ impl FileSink {
     async fn run(&mut self, input: impl Stream<Item = Event> + Send + Sync) -> crate::Result<()> {
         pin_mut!(input);
         loop {
-            tokio02::select! {
+            tokio::select! {
                 event = input.next() => {
                     match event {
                         None => {

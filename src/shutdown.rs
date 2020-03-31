@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use stream_cancel::{Trigger, Tripwire};
-use tokio::timer;
+use tokio01::timer;
 
 /// When this struct goes out of scope and its internal refcount goes to 0 it is a signal that its
 /// corresponding Source has completed executing and may be cleaned up.  It is the responsibility

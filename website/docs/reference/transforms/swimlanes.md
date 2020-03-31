@@ -1,16 +1,21 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
 function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
-min_version: null
-service_name: "Swimlanes"
 sidebar_label: "swimlanes|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/swimlanes.rs
 status: "beta"
 title: "Swimlanes Transform"
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `swimlanes` transform
 accepts and [outputs `log` events](#output) allowing you to route events across
@@ -26,9 +31,7 @@ parallel streams using logical filters.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -41,12 +44,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
     type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
     "message.contains" = "foo" # example
-    "environment.prefix" = "staging-" # example
+    "environment.ends_with" = "-staging" # example
+    "environment.starts_with" = "staging-" # example
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -231,9 +231,9 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"environment.ends_with":"-staging"}]}
   groups={[]}
-  name={"`[field_name]`.prefix"}
+  name={"`[field_name]`.ends_with"}
   path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -242,9 +242,34 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-##### `[field_name]`.prefix
+##### `[field_name]`.ends_with
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field ends with a string argument.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.starts_with":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.starts_with"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.starts_with
+
+Checks whether a string field starts with a string argument.
 
 
 
@@ -270,20 +295,16 @@ The `swimlanes` transform accepts and [outputs `log` events](#output) allowing y
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="ifelse"
   values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="ifelse">
 
 The `swimlanes` transform, in it's simplest form, can act as a simple if/else stream splitter. For example, we can route events from the host `gerry` to a sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.splitting_gerrys]
@@ -315,7 +336,7 @@ This syntax makes it easy to create arbitrary numbers of swimlanes, each with th
 
 To follow up with the previous `If/Else` example, let's say we want to split a log stream based on all of the log `level` values:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.level_splitter]

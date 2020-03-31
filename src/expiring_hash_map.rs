@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::time::{Duration, Instant};
-use tokio02::time::{delay_queue, DelayQueue, Error};
+use tokio::time::{delay_queue, DelayQueue, Error};
 
 /// An expired item, holding the value and the key with an expiration
 /// information.
@@ -150,7 +150,6 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// # use tokio02 as tokio;
     /// # let mut rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// use vector::expiring_hash_map::ExpiringHashMap;
@@ -201,7 +200,6 @@ where
 mod tests {
     use super::*;
     use std::task::Poll;
-    use tokio02 as tokio;
     use tokio_test::{assert_pending, assert_ready, task};
 
     fn unwrap_ready<T>(poll: Poll<T>) -> T {

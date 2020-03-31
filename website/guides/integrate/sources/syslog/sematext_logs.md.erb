@@ -1,0 +1,3 @@
+<%- source = metadata.sources.send("syslog") -%>
+<%- sink = metadata.sinks.send("sematext_logs") -%>
+<%= integration_guide(source: source, sink: sink) %>

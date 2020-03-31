@@ -74,6 +74,7 @@ run: ## Starts Vector in development mode
 signoff: ## Signsoff all previous commits since branch creation
 	@scripts/signoff.sh
 
+export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 

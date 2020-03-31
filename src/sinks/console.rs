@@ -9,7 +9,7 @@ use futures::pin_mut;
 use futures::stream::{Stream, StreamExt};
 use futures01::future;
 use serde::{Deserialize, Serialize};
-use tokio02::io::{self, AsyncWriteExt};
+use tokio::io::{self, AsyncWriteExt};
 
 use super::streaming_sink::{self, StreamingSink};
 

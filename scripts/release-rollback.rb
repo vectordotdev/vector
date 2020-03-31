@@ -13,7 +13,7 @@ require_relative "setup"
 # Commit
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 release = metadata.latest_release
 version = release.version
 
@@ -21,10 +21,10 @@ version = release.version
 # Rollback
 #
 
-input = get("Do you want to rollback #{version}?")
+input = Printer.get("Do you want to rollback #{version}?")
 
 if input == "n"
-  error!("You can only rollback the latest release")
+  Printer.error!("You can only rollback the latest release")
 end
 
 branch_commands =
@@ -58,15 +58,15 @@ words =
   Proceed to execute the above commands?
   EOF
 
-if get(words, ["y", "n"]) == "n"
-  error!("Ok, I've aborted. Please re-run this command when you're ready.")
+if Printer.get(words, ["y", "n"]) == "n"
+  Printer.error!("Ok, I've aborted. Please re-run this command when you're ready.")
 end
 
 commands.chomp.split("\n").each do |command|
     system(command)
 
     if !$?.success?
-      error!(
+      Printer.error!(
         <<~EOF
         Command failed!
 
