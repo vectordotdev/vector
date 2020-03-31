@@ -73,7 +73,7 @@ impl TlsSettings {
         }
 
         if options.key_path.is_some() && options.crt_path.is_none() {
-            return Err(TlsError::MissingCrtKeyFile.into());
+            return Err(TlsError::MissingCrtKeyFile);
         }
 
         let authority = match options.ca_path {
@@ -206,7 +206,7 @@ impl MaybeTlsSettings {
                         TlsSettings::from_options_base(&Some(config.options.clone()), for_server)?;
                     match (for_server, &tls.identity) {
                         // Servers require an identity certificate
-                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
+                        (true, None) => Err(TlsError::MissingRequiredIdentity),
                         _ => Ok(Self::Tls(tls)),
                     }
                 }
