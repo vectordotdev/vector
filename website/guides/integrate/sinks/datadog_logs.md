@@ -22,7 +22,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs to Datadog
+Fear not! In this guide we'll show you how to send send logs to [Datadog][urls.datadog]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,6 +33,10 @@ your observability strategy.
 
      website/guides/integrate/sinks/datadog_logs.md.erb
 -->
+
+## What is Datadog Logs?
+
+[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.
 
 ## What We'll Accomplish
 
@@ -230,6 +234,7 @@ sudo systemctl start vector
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.datadog]: https://www.datadoghq.com
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

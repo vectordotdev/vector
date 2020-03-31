@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Kafka to AWS Cloudwatch
+Fear not! In this guide we'll show you how to send send logs from [Kafka][urls.kafka] to [AWS Cloudwatch][urls.aws_cloudwatch]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/kafka/aws_cloudwatch_logs.md.erb
 -->
+
+## What is Kafka?
+
+[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
+
+## What is AWS Cloudwatch Logs?
+
+[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.
 
 ## What We'll Accomplish
 
@@ -118,6 +126,8 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.aws_cloudwatch]: https://aws.amazon.com/cloudwatch/
+[urls.kafka]: https://kafka.apache.org/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

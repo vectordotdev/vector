@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send collect metrics from Prometheus and send them anywhere
+Fear not! In this guide we'll show you how to send collect metrics from [Prometheus][urls.prometheus] and send them anywhere
 and build a metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/prometheus.md.erb
 -->
+
+## What is Prometheus?
+
+[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.
 
 ## What We'll Accomplish
 
@@ -112,6 +116,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.prometheus]: https://prometheus.io/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send collect logs from Docker and send them anywhere
+Fear not! In this guide we'll show you how to send collect logs from [Docker][urls.docker] and send them anywhere
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 

@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Syslog to Honeycomb
+Fear not! In this guide we'll show you how to send send logs from [Syslog][urls.syslog] to [Honeycomb][urls.honeycomb]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/syslog/honeycomb.md.erb
 -->
+
+## What is Syslog?
+
+[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.
+
+## What is Honeycomb?
+
+[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.
 
 ## What We'll Accomplish
 
@@ -116,7 +124,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.honeycomb]: https://honeycomb.io
 [urls.rust]: https://www.rust-lang.org/
+[urls.syslog]: https://en.wikipedia.org/wiki/Syslog
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

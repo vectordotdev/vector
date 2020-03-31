@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send metrics from Statsd to Datadog
+Fear not! In this guide we'll show you how to send send metrics from [Statsd][urls.statsd] to [Datadog][urls.datadog]
 and build a metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/statsd/datadog_metrics.md.erb
 -->
+
+## What is Statsd?
+
+[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node.
+
+## What is Datadog Metrics?
+
+[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.
 
 ## What We'll Accomplish
 
@@ -116,7 +124,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.statsd]: /docs/reference/sources/statsd/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.datadog]: https://www.datadoghq.com
+[urls.etsy]: https://www.etsy.com
 [urls.rust]: https://www.rust-lang.org/
+[urls.statsd]: https://github.com/statsd/statsd
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

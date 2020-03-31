@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Splunk HEC to Kafka
+Fear not! In this guide we'll show you how to send send logs from [Splunk HEC][urls.splunk_hec] to [Kafka][urls.kafka]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/splunk_hec/kafka.md.erb
 -->
+
+## What is Splunk HEC?
+
+The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.
+
+## What is Kafka?
+
+[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
 
 ## What We'll Accomplish
 
@@ -118,7 +126,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.kafka]: https://kafka.apache.org/
 [urls.rust]: https://www.rust-lang.org/
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

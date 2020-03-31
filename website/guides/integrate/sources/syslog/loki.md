@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Syslog to Loki
+Fear not! In this guide we'll show you how to send send logs from [Syslog][urls.syslog] to [Loki][urls.loki]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/syslog/loki.md.erb
 -->
+
+## What is Syslog?
+
+[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.
+
+## What is Loki?
+
+[Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by [Prometheus][urls.prometheus]. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.
 
 ## What We'll Accomplish
 
@@ -117,7 +125,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.loki]: https://grafana.com/oss/loki/
+[urls.prometheus]: https://prometheus.io/
 [urls.rust]: https://www.rust-lang.org/
+[urls.syslog]: https://en.wikipedia.org/wiki/Syslog
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

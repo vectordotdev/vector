@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Docker to Humio
+Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to [Humio][urls.humio]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -37,6 +37,10 @@ your observability strategy.
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
+
+## What is Humio Logs?
+
+[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.
 
 ## What We'll Accomplish
 
@@ -129,6 +133,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.docker]: https://www.docker.com/
+[urls.humio]: https://humio.com
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

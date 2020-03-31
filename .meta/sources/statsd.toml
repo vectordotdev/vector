@@ -4,6 +4,7 @@ noun = "Statsd"
 beta = false
 common = false
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_statsd.toml") %>
 features = [
   "Accept metrics data over the Statsd UDP protocol.",
   "Automatically parse metrics into a lossless interoperable data model.",

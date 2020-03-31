@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Kafka to AWS Kinesis Data Streams
+Fear not! In this guide we'll show you how to send send logs from [Kafka][urls.kafka] to [AWS Kinesis Data Streams][urls.aws_kinesis_streams]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/kafka/aws_kinesis_streams.md.erb
 -->
+
+## What is Kafka?
+
+[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
+
+## What is AWS Kinesis Data Streams?
+
+[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.
 
 ## What We'll Accomplish
 
@@ -117,6 +125,8 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.aws_kinesis_streams]: https://aws.amazon.com/kinesis/data-streams/
+[urls.kafka]: https://kafka.apache.org/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

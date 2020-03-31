@@ -4,6 +4,7 @@ noun = "Syslog"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_syslog.toml") %>
 features = [
   "Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.",
   "Automatically parse Syslog 3164 and 5424 formats.",

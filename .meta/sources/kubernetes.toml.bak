@@ -3,6 +3,7 @@ title = "Kubernetes"
 noun = "Kubernetes cluster"
 beta = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_kubernetes.toml") %>
 features = [
   "Collect Kubernetes logs.",
   "Automatically discover new containers and pods.",

@@ -4,6 +4,7 @@ noun = "GCP Stackdriver Logs"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_gcp_stackdriver.toml") %>
 features = [
   "Send logs to GCP Stackdriver.",
   "Leverage any of GCP's IAM strategies.",

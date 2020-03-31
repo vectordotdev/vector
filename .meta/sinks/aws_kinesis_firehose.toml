@@ -4,6 +4,12 @@ noun = "AWS Kinesis Firehose"
 beta = false
 common = false
 delivery_guarantee = "at_least_once"
+description = """\
+[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed \
+service for delivering real-time streaming data to destinations such as \
+Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon \
+Elasticsearch Service (Amazon ES), and Splunk.\
+"""
 egress_method = "batching"
 features = [
   "Send logs to AWS Kinesis Firehose.",
@@ -17,7 +23,7 @@ input_types = ["log"]
 requirements = {}
 service_limits_short_link = "aws_kinesis_firehose_service_limits"
 service_providers = ["AWS"]
-write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)"
+write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)"
 
 <%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_firehose.env_vars") %>
 
@@ -56,7 +62,7 @@ type = "string"
 common = true
 examples = ["my-stream"]
 required = true
-description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Firehose delivery stream."
+description = "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Firehose delivery stream."
 
 [[sinks.aws_kinesis_firehose.output.examples]]
 label = "Generic"

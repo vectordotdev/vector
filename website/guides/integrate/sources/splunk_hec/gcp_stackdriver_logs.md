@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Splunk HEC to GCP Stackdriver
+Fear not! In this guide we'll show you how to send send logs from [Splunk HEC][urls.splunk_hec] to [GCP Stackdriver][urls.gcp_stackdriver]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/splunk_hec/gcp_stackdriver_logs.md.erb
 -->
+
+## What is Splunk HEC?
+
+The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.
+
+## What is GCP Stackdriver Logs?
+
+[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.
 
 ## What We'll Accomplish
 
@@ -118,7 +126,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.gcp_stackdriver]: https://cloud.google.com/products/operations
 [urls.rust]: https://www.rust-lang.org/
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

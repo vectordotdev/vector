@@ -302,7 +302,7 @@ export default function pluginContentGuide(
 
         await Promise.all(
           guideCategories.
-            filter(category => guidePermalinks.includes(category.permalink)).
+            filter(category => !guidePermalinks.includes(category.permalink)).
             map(async category => {
               const permalink = category.permalink;
               const metadata = {category: category};

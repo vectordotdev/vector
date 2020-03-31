@@ -23,8 +23,8 @@ import TabItem from '@theme/TabItem';
 
 The Vector `aws_cloudwatch_logs` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web
-Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents`
-API
+Service's CloudWatch Logs service][urls.aws_cloudwatch_logs] via the
+[`PutLogEvents` API
 endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 
 <!--
@@ -363,9 +363,9 @@ The behavior when the buffer becomes full.
 
 ### create_missing_group
 
-Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not
-already exist. This will ignore [`create_missing_stream`](#create_missing_stream) directly after creating
-the group and will create the first stream.
+Dynamically create a [log group][urls.aws_cloudwatch_logs_group_name] if it
+does not already exist. This will ignore [`create_missing_stream`](#create_missing_stream) directly after
+creating the group and will create the first stream.
 
 
 
@@ -390,8 +390,8 @@ the group and will create the first stream.
 
 ### create_missing_stream
 
-Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not
-already exist.
+Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it
+does not already exist.
 
 
 
@@ -571,8 +571,8 @@ this option will make [`region`](#region) moot.
 
 ### group_name
 
-The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs
-stream.
+The [group name][urls.aws_cloudwatch_logs_group_name] of the target CloudWatch
+Logs stream.
 
  See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
@@ -858,8 +858,8 @@ duplicate data downstream.
 
 ### stream_name
 
-The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs
-stream.
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target
+CloudWatch Logs stream.
 
  See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
 
@@ -930,7 +930,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 ## Output
 
-The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
+The `aws_cloudwatch_logs` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cloudwatch_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
@@ -1099,11 +1099,11 @@ You can learn more about the complete syntax in the
 [docs.reference.templating]: /docs/reference/templating/
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_cloudwatch_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_cloudwatch_logs_group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+[urls.aws_cloudwatch_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
-[urls.aws_cw_logs_group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-[urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html

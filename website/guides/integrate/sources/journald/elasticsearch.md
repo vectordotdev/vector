@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Journald to Elasticsearch
+Fear not! In this guide we'll show you how to send send logs from [Journald][urls.journald] to [Elasticsearch][urls.elasticsearch]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/journald/elasticsearch.md.erb
 -->
+
+## What is Journald?
+
+[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
+
+## What is Elasticsearch?
+
+[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.
 
 ## What We'll Accomplish
 
@@ -119,7 +127,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
+[urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [urls.rust]: https://www.rust-lang.org/
+[urls.systemd]: https://systemd.io/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

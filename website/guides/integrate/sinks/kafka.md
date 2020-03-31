@@ -22,7 +22,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs to Kafka
+Fear not! In this guide we'll show you how to send send logs to [Kafka][urls.kafka]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,6 +33,10 @@ your observability strategy.
 
      website/guides/integrate/sinks/kafka.md.erb
 -->
+
+## What is Kafka?
+
+[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
 
 ## What We'll Accomplish
 
@@ -230,6 +234,7 @@ sudo systemctl start vector
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.kafka]: https://kafka.apache.org/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

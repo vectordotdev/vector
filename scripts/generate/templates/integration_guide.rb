@@ -45,11 +45,11 @@ class Templates
         end
 
       if @source && @sink
-        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_noun(@source.noun)} to #{normalize_noun(@sink.noun)}"
+        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{noun_link(@source)} to #{noun_link(@sink)}"
       elsif @source
-        "collect #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{normalize_noun(@source.noun)} and send them #{target}"
+        "collect #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} from #{noun_link(@source)} and send them #{target}"
       elsif @sink
-        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} to #{normalize_noun(@sink.noun)}"
+        "send #{pronoun}#{@event_types.collect(&:pluralize).to_sentence} to #{noun_link(@sink)}"
       end
     end
 
@@ -142,6 +142,19 @@ class Templates
     end
 
     private
+      def noun_link(component)
+        case component.name
+        when "blackhole"
+          return normalize_noun(component.noun)
+        else
+          "[#{normalize_noun(component.noun)}][#{short_link(component.name)}]"
+        end
+      end
+
+      def short_link(name)
+        "urls." + name.gsub(/_(logs|metrics)$/i, '')
+      end
+
       def normalize_noun(title)
         title.gsub(/ (logs|metrics)$/i, '')
       end

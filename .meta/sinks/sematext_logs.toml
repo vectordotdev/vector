@@ -4,6 +4,11 @@ noun = "Sematext"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
+description = """\
+[Sematext][urls.sematext] is a hosted monitoring platform based on \
+Elasticsearch. Providing powerful monitoring and management solutions to \
+monitor and observe your apps in real-time.\
+"""
 egress_method = "batching"
 features = [
   "Send logs to the Sematext monitoring service.",

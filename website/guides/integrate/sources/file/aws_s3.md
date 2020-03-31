@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from a file to AWS S3
+Fear not! In this guide we'll show you how to send send logs from [a file][urls.file] to [AWS S3][urls.aws_s3]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/file/aws_s3.md.erb
 -->
+
+## What is AWS S3?
+
+[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.
 
 ## What We'll Accomplish
 
@@ -121,6 +125,8 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.file]: https://en.wikipedia.org/wiki/Computer_file
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

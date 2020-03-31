@@ -4,6 +4,12 @@ noun = "LogDNA"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
+description = """\
+[LogDNA][urls.logdna] is a log management system that allows engineering and \
+DevOps to aggregate all system, server, and application logs into one \
+platform. Collect, monitor, store, tail, and search application logs in with \
+one command-line or web interface.\
+"""
 egress_method = "batching"
 features = [
   "Send logs to the LogDNA logging service.",

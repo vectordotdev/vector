@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Journald to Sematext
+Fear not! In this guide we'll show you how to send send logs from [Journald][urls.journald] to [Sematext][urls.sematext]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/journald/sematext_logs.md.erb
 -->
+
+## What is Journald?
+
+[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
+
+## What is Sematext Logs?
+
+[Sematext][urls.sematext] is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time.
 
 ## What We'll Accomplish
 
@@ -118,7 +126,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [urls.rust]: https://www.rust-lang.org/
+[urls.sematext]: https://sematext.com
+[urls.systemd]: https://systemd.io/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

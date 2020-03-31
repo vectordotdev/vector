@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Syslog to Elasticsearch
+Fear not! In this guide we'll show you how to send send logs from [Syslog][urls.syslog] to [Elasticsearch][urls.elasticsearch]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/syslog/elasticsearch.md.erb
 -->
+
+## What is Syslog?
+
+[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.
+
+## What is Elasticsearch?
+
+[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.
 
 ## What We'll Accomplish
 
@@ -117,7 +125,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.rust]: https://www.rust-lang.org/
+[urls.syslog]: https://en.wikipedia.org/wiki/Syslog
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

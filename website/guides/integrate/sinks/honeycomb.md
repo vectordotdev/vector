@@ -22,7 +22,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs to Honeycomb
+Fear not! In this guide we'll show you how to send send logs to [Honeycomb][urls.honeycomb]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,6 +33,10 @@ your observability strategy.
 
      website/guides/integrate/sinks/honeycomb.md.erb
 -->
+
+## What is Honeycomb?
+
+[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.
 
 ## What We'll Accomplish
 
@@ -229,6 +233,7 @@ sudo systemctl start vector
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.honeycomb]: https://honeycomb.io
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

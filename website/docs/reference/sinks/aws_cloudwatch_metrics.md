@@ -22,7 +22,7 @@ import TabItem from '@theme/TabItem';
 
 The Vector `aws_cloudwatch_metrics` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to [Amazon Web
-Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the
+Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the
 [`PutMetricData` API
 endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).
 
@@ -442,9 +442,9 @@ event-by-event basis. It does not batch data.
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_cloudwatch_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html

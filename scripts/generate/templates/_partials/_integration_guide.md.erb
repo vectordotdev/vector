@@ -1,7 +1,7 @@
 ---
 $schema: "/.meta/.schemas/guides.json"
-title: <%= guide.action_phrase.capitalize_first.to_json %>
-description: "A simple guide to <%= guide.action_phrase %> in just a few minutes."
+title: <%= guide.action_phrase.remove_markdown_links.capitalize_first.to_json %>
+description: "A simple guide to <%= guide.action_phrase.remove_markdown_links %> in just a few minutes."
 author_github: https://github.com/binarylogic
 cover_label: <%= guide.cover_label.to_json %>
 tags: <%= guide.tags.to_json %>

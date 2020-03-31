@@ -4,6 +4,11 @@ noun = "Honeycomb"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+description = """\
+[Honeycomb][urls.honeycomb] provides full stack observability—designed for \
+high cardinality data and collaborative problem solving, enabling engineers to \
+deeply understand and debug production software together.\
+"""
 egress_method = "batching"
 features = [
   "Send structured logs to the Honeycomb observability service.",

@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from STDIN to GCP Cloud Storage (GCS)
+Fear not! In this guide we'll show you how to send send logs from [STDIN][urls.stdin] to [GCP Cloud Storage (GCS)][urls.gcp_cloud_storage]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/stdin/gcp_cloud_storage.md.erb
 -->
+
+## What is GCP Cloud Storage (GCS)?
+
+[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities.
 
 ## What We'll Accomplish
 
@@ -120,7 +124,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
+[urls.gcp_cloud_storage]: https://cloud.google.com/storage
 [urls.rust]: https://www.rust-lang.org/
+[urls.stdin]: https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin)
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

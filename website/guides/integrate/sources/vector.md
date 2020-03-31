@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs and metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send collect logs and metrics from Vector and send them anywhere
+Fear not! In this guide we'll show you how to send collect logs and metrics from [Vector][urls.vector] and send them anywhere
 and build a logs and metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -109,6 +109,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

@@ -3,6 +3,7 @@ title = "Datadog Logs"
 noun = "Datadog Logs"
 beta = true
 common = false
+<%= render("_partials/descriptions/_datadog.toml") %>
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
 features = [

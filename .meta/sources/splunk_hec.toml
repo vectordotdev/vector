@@ -4,6 +4,7 @@ noun = "Splunk HEC"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_splunk_hec.toml") %>
 features = [
   "Accept log data just like the Splunk HTTP event collector.",
   "Automatically parse incoming data into structured events.",

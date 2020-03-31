@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Docker to an HTTP endpoint
+Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to [an HTTP endpoint][urls.http]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -130,6 +130,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.docker]: https://www.docker.com/
+[urls.http]: https://www.w3.org/Protocols/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

@@ -4,6 +4,7 @@ noun = "Docker"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_docker.toml") %>
 features = [
   "Collect Docker container logs.",
   "Filter which containers you collect them from.",

@@ -22,7 +22,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs to AWS Kinesis Firehose
+Fear not! In this guide we'll show you how to send send logs to [AWS Kinesis Firehose][urls.aws_kinesis_firehose]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,6 +33,10 @@ your observability strategy.
 
      website/guides/integrate/sinks/aws_kinesis_firehose.md.erb
 -->
+
+## What is AWS Kinesis Firehose?
+
+[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.
 
 ## What We'll Accomplish
 
@@ -229,6 +233,7 @@ sudo systemctl start vector
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.aws_kinesis_firehose]: https://aws.amazon.com/kinesis/data-firehose/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

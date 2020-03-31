@@ -4,6 +4,7 @@ noun = "AWS Cloudwatch Metrics"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_aws_cloudwatch.toml") %>
 egress_method = "streaming"
 features = [
   "Send metrics to AWS Cloudwatch.",
@@ -15,9 +16,9 @@ function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
 requirements = {}
-service_limits_short_link = "aws_cw_metrics_service_limits"
+service_limits_short_link = "aws_cloudwatch_metrics_service_limits"
 service_providers = ["AWS"]
-write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
+write_to_description = "[Amazon Web Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
 
 <%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_metrics.env_vars") %>
 

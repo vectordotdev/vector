@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Syslog to AWS Kinesis Data Streams
+Fear not! In this guide we'll show you how to send send logs from [Syslog][urls.syslog] to [AWS Kinesis Data Streams][urls.aws_kinesis_streams]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/syslog/aws_kinesis_streams.md.erb
 -->
+
+## What is Syslog?
+
+[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.
+
+## What is AWS Kinesis Data Streams?
+
+[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.
 
 ## What We'll Accomplish
 
@@ -116,7 +124,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.aws_kinesis_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.rust]: https://www.rust-lang.org/
+[urls.syslog]: https://en.wikipedia.org/wiki/Syslog
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

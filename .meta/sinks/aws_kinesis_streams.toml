@@ -4,6 +4,12 @@ noun = "AWS Kinesis Data Streams"
 beta = false
 common = false
 delivery_guarantee = "at_least_once"
+description = """\
+[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and \
+durable real-time data streaming service that can continuously capture \
+gigabytes of data per second from hundreds of thousands of sources. Making \
+it an excellent candidate for streaming logs and metrics data.\
+"""
 egress_method = "batching"
 features = [
   "Send logs to AWS Kinesis Data Streams.",
@@ -17,7 +23,7 @@ input_types = ["log"]
 requirements = {}
 service_limits_short_link = "aws_kinesis_streams_service_limits"
 service_providers = ["AWS"]
-write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
+write_to_description = "[Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
 
 <%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_kinesis_streams.env_vars") %>
 
@@ -62,7 +68,7 @@ type = "string"
 common = true
 examples = ["my-stream"]
 required = true
-description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
+description = "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Logs stream."
 
 [[sinks.aws_kinesis_streams.output.examples]]
 label = "Generic"

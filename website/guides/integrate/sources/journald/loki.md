@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Journald to Loki
+Fear not! In this guide we'll show you how to send send logs from [Journald][urls.journald] to [Loki][urls.loki]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/journald/loki.md.erb
 -->
+
+## What is Journald?
+
+[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
+
+## What is Loki?
+
+[Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by [Prometheus][urls.prometheus]. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.
 
 ## What We'll Accomplish
 
@@ -119,7 +127,11 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
+[urls.loki]: https://grafana.com/oss/loki/
+[urls.prometheus]: https://prometheus.io/
 [urls.rust]: https://www.rust-lang.org/
+[urls.systemd]: https://systemd.io/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

@@ -22,7 +22,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send metrics to Statsd
+Fear not! In this guide we'll show you how to send send metrics to [Statsd][urls.statsd]
 and build a metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,6 +33,10 @@ your observability strategy.
 
      website/guides/integrate/sinks/statsd.md.erb
 -->
+
+## What is Statsd?
+
+[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node.
 
 ## What We'll Accomplish
 
@@ -227,7 +231,9 @@ sudo systemctl start vector
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.etsy]: https://www.etsy.com
 [urls.rust]: https://www.rust-lang.org/
+[urls.statsd]: https://github.com/statsd/statsd
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

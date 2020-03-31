@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Syslog to Humio
+Fear not! In this guide we'll show you how to send send logs from [Syslog][urls.syslog] to [Humio][urls.humio]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/syslog/humio_logs.md.erb
 -->
+
+## What is Syslog?
+
+[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.
+
+## What is Humio Logs?
+
+[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.
 
 ## What We'll Accomplish
 
@@ -116,7 +124,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.syslog]: /docs/reference/sources/syslog/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.humio]: https://humio.com
 [urls.rust]: https://www.rust-lang.org/
+[urls.syslog]: https://en.wikipedia.org/wiki/Syslog
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
 
 The Vector `aws_kinesis_firehose` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web
-Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the
+Service's Kinesis Data Firehose][urls.aws_kinesis_firehose] via the
 [`PutRecordBatch` API
 endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).
 
@@ -773,8 +773,8 @@ duplicate data downstream.
 
 ### stream_name
 
-The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Firehose
-delivery stream.
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
+Firehose delivery stream.
 
 
 
@@ -845,7 +845,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 ## Output
 
-The `aws_kinesis_firehose` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_data_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).
+The `aws_kinesis_firehose` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
 batches](#buffers--batches) section.
@@ -978,11 +978,11 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [pages.aws_components]: /components?providers%5B%5D=aws/
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_cloudwatch_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-[urls.aws_kinesis_data_firehose]: https://aws.amazon.com/kinesis/data-firehose/
+[urls.aws_kinesis_firehose]: https://aws.amazon.com/kinesis/data-firehose/
 [urls.aws_regions]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_kinesis_firehose_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_kinesis_firehose

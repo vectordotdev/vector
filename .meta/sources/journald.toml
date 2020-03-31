@@ -4,6 +4,11 @@ noun = "Journald"
 beta = true
 common = true
 delivery_guarantee = "at_least_once"
+description = """\
+[Journald][urls.journald] is a utility for accessing log data across a variety \
+of system services. It was introduce with [Systemd][urls.systemd] to help \
+system administrator collect, access, and route log data.\
+"""
 features = [
   "Collect Journald/Systemd logs.",
   "Filter which Systemd units you collect them from.",

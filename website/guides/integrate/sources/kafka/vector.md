@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Kafka to another Vector instance
+Fear not! In this guide we'll show you how to send send logs from [Kafka][urls.kafka] to [another Vector instance][urls.vector]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/kafka/vector.md.erb
 -->
+
+## What is Kafka?
+
+[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
 
 ## What We'll Accomplish
 
@@ -112,7 +116,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.kafka]: https://kafka.apache.org/
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

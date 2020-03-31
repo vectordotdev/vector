@@ -60,6 +60,10 @@
   width: 100%;
 }
 
+.guide-item > article > footer > .logo {
+  margin-right: 10px;
+}
+
 .guide-item > article > footer > div.logo {
   font-size: 2.5em;
 }

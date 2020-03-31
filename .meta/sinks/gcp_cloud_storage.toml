@@ -4,6 +4,12 @@ noun = "GCP Cloud Storage (GCS)"
 beta = true
 common = true
 delivery_guarantee = "at_least_once"
+description = """\
+[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file \
+storage web service for storing and accessing data on Google Cloud Platform \
+infrastructure. The service combines the performance and scalability of \
+Google's cloud with advanced security and sharing capabilities.\
+"""
 features = [
   "Send logs to GCP Cloud Storage.",
   "Leverage any of GCP's IAM strategies.",

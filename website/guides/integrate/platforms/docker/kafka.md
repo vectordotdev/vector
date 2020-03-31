@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Docker to Kafka
+Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to [Kafka][urls.kafka]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -37,6 +37,10 @@ your observability strategy.
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
+
+## What is Kafka?
+
+[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
 
 ## What We'll Accomplish
 
@@ -130,6 +134,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.docker]: https://www.docker.com/
+[urls.kafka]: https://kafka.apache.org/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

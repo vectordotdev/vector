@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from HTTP to GCP PubSub
+Fear not! In this guide we'll show you how to send send logs from [HTTP][urls.http] to [GCP PubSub][urls.gcp_pubsub]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/http/gcp_pubsub.md.erb
 -->
+
+## What is GCP PubSub?
+
+[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform.
 
 ## What We'll Accomplish
 
@@ -118,6 +122,8 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.http]: /docs/reference/sources/http/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.gcp_pubsub]: https://cloud.google.com/pubsub/
+[urls.http]: https://www.w3.org/Protocols/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

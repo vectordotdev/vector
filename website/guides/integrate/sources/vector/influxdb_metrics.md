@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send metrics from Vector to InfluxDB
+Fear not! In this guide we'll show you how to send send metrics from [Vector][urls.vector] to [InfluxDB][urls.influxdb]
 and build a metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/vector/influxdb_metrics.md.erb
 -->
+
+## What is InfluxDB Metrics?
+
+[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.
 
 ## What We'll Accomplish
 
@@ -113,7 +117,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.influxdb]: https://www.influxdata.com/products/influxdb-overview/
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

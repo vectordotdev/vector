@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from a file to a file
+Fear not! In this guide we'll show you how to send send logs from [a file][urls.file] to [a file][urls.file]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -117,6 +117,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.file]: https://en.wikipedia.org/wiki/Computer_file
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers

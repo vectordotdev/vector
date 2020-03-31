@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from a TCP, UDP, or UDS socket to a Splunk HEC
+Fear not! In this guide we'll show you how to send send logs from [a TCP, UDP, or UDS socket][urls.socket] to [a Splunk HEC][urls.splunk_hec]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/socket/splunk_hec.md.erb
 -->
+
+## What is Splunk HEC?
+
+The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.
 
 ## What We'll Accomplish
 
@@ -118,6 +122,8 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.rust]: https://www.rust-lang.org/
+[urls.socket]: https://en.wikipedia.org/wiki/Network_socket
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

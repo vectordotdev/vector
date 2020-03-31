@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Splunk HEC to AWS Kinesis Firehose
+Fear not! In this guide we'll show you how to send send logs from [Splunk HEC][urls.splunk_hec] to [AWS Kinesis Firehose][urls.aws_kinesis_firehose]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,14 @@ your observability strategy.
 
      website/guides/integrate/sources/splunk_hec/aws_kinesis_firehose.md.erb
 -->
+
+## What is Splunk HEC?
+
+The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.
+
+## What is AWS Kinesis Firehose?
+
+[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.
 
 ## What We'll Accomplish
 
@@ -117,7 +125,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.aws_kinesis_firehose]: https://aws.amazon.com/kinesis/data-firehose/
 [urls.rust]: https://www.rust-lang.org/
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

@@ -4,6 +4,11 @@ noun = "GCP PubSub"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+description = """\
+[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service \
+that allows you to send and receive messages between independent applications \
+on the Google Cloud Platform.\
+"""
 features = [
   "Send logs to GCP PubSub.",
   "Leverage any of GCP's IAM strategies.",

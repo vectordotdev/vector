@@ -213,7 +213,7 @@ function pluginContentGuide(context, opts) {
             if (guideCategories.length > 0) {
                 let guidePermalinks = lodash_1.default.uniq(guides.map(guide => guide.metadata.permalink));
                 await Promise.all(guideCategories.
-                    filter(category => guidePermalinks.includes(category.permalink)).
+                    filter(category => !guidePermalinks.includes(category.permalink)).
                     map(async (category) => {
                     const permalink = category.permalink;
                     const metadata = { category: category };

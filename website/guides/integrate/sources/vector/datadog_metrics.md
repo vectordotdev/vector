@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send metrics from Vector to Datadog
+Fear not! In this guide we'll show you how to send send metrics from [Vector][urls.vector] to [Datadog][urls.datadog]
 and build a metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/vector/datadog_metrics.md.erb
 -->
+
+## What is Datadog Metrics?
+
+[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.
 
 ## What We'll Accomplish
 
@@ -113,7 +117,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.datadog]: https://www.datadoghq.com
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

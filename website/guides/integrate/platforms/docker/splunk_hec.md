@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Docker to a Splunk HEC
+Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to [a Splunk HEC][urls.splunk_hec]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -37,6 +37,10 @@ your observability strategy.
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
+
+## What is Splunk HEC?
+
+The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.
 
 ## What We'll Accomplish
 
@@ -131,6 +135,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.docker]: https://www.docker.com/
 [urls.rust]: https://www.rust-lang.org/
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

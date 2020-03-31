@@ -4,6 +4,10 @@ noun = "Papertrail"
 beta = true
 common = false
 delivery_guarantee = "best_effort"
+description = """\
+[Papertrail][urls.papertrail] is a web-based log aggregation application used \
+by developers and IT team to search and view logs in real time.\
+"""
 egress_method = "streaming"
 features = [
   "Send logs to the Papertrail logging service.",

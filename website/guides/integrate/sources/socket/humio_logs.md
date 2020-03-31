@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from a TCP, UDP, or UDS socket to Humio
+Fear not! In this guide we'll show you how to send send logs from [a TCP, UDP, or UDS socket][urls.socket] to [Humio][urls.humio]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/socket/humio_logs.md.erb
 -->
+
+## What is Humio Logs?
+
+[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.
 
 ## What We'll Accomplish
 
@@ -116,7 +120,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.humio]: https://humio.com
 [urls.rust]: https://www.rust-lang.org/
+[urls.socket]: https://en.wikipedia.org/wiki/Network_socket
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

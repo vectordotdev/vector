@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Docker to AWS Kinesis Firehose
+Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to [AWS Kinesis Firehose][urls.aws_kinesis_firehose]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -37,6 +37,10 @@ your observability strategy.
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
+
+## What is AWS Kinesis Firehose?
+
+[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.
 
 ## What We'll Accomplish
 
@@ -128,6 +132,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources.docker]: /docs/reference/sources/docker/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[urls.aws_kinesis_firehose]: https://aws.amazon.com/kinesis/data-firehose/
 [urls.docker]: https://www.docker.com/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance

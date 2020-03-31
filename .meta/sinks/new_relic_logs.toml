@@ -4,6 +4,11 @@ noun = "New Relic"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+description = """\
+[New Relic][urls.new_relic] is a San Francisco, California-based technology \
+company which develops cloud-based software to help website and application \
+owners track the performances of their services.\
+"""
 egress_method = "batching"
 features = [
   "Send logs to the New Relic logging service.",

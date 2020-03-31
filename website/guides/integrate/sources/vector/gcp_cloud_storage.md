@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from Vector to GCP Cloud Storage (GCS)
+Fear not! In this guide we'll show you how to send send logs from [Vector][urls.vector] to [GCP Cloud Storage (GCS)][urls.gcp_cloud_storage]
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -32,6 +32,10 @@ your observability strategy.
 
      website/guides/integrate/sources/vector/gcp_cloud_storage.md.erb
 -->
+
+## What is GCP Cloud Storage (GCS)?
+
+[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities.
 
 ## What We'll Accomplish
 
@@ -118,7 +122,9 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 [docs.sources.vector]: /docs/reference/sources/vector/
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
+[urls.gcp_cloud_storage]: https://cloud.google.com/storage
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev
