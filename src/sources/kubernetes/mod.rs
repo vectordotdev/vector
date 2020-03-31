@@ -47,7 +47,7 @@ pub struct KubernetesConfig {
     include_container_names: Vec<String>,
     include_pod_uids: Vec<String>,
     include_namespaces: Vec<String>,
-    #[derivative(Default(value = "false"))]
+    #[derivative(Default(value = "true"))]
     auto_partial_merge: bool,
 }
 
