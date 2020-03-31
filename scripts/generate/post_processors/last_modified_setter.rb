@@ -24,8 +24,13 @@ module PostProcessors
 
       private
         def content_changed?(old_content, new_content)
-          old_content = old_content.sub(/---\nlast_modified_on: .*?\n/, "---\n")
+          old_content = remove_last_modified_on(old_content)
+          new_content = remove_last_modified_on(new_content)
           old_content != new_content
+        end
+
+        def remove_last_modified_on(content)
+          content.sub(/^---\nlast_modified_on: "[0-9\-]*"\n/, "---\n")
         end
 
         def add_last_modified_on(content)
