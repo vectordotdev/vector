@@ -1,7 +1,7 @@
 use crate::{event::Event, transforms::Transform};
 use futures01::{stream, sync::mpsc::Receiver as FutureReceiver, Async, Stream as FutureStream};
 use std::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{self, Receiver, SyncSender},
     thread,
     time::Duration,
 };
@@ -20,7 +20,7 @@ pub trait ScriptedRuntime {
     {
     }
 
-    fn hook_process<F>(&mut self, _event: Event, _emit_fn: F)
+    fn hook_process<F>(&mut self, event: Event, emit_fn: F)
     where
         F: FnMut(Event) -> ();
 
@@ -41,8 +41,8 @@ pub trait ScriptedRuntime {
     }
 }
 
-struct ScriptedTransform {
-    input: Sender<Message>,
+pub struct ScriptedTransform {
+    input: SyncSender<Message>,
     output: Receiver<Option<Event>>,
     timers: Vec<Timer>,
 }
@@ -60,8 +60,8 @@ impl ScriptedTransform {
         F: FnOnce() -> T + Send + 'static,
         T: ScriptedRuntime,
     {
-        let (input, runtime_input) = mpsc::channel();
-        let (runtime_output, output) = mpsc::channel();
+        let (input, runtime_input) = mpsc::sync_channel(0);
+        let (runtime_output, output) = mpsc::sync_channel(0);
 
         // One-off channel to read statically defined list of timers from the runtime.
         let (timers_tx, timers_rx) = mpsc::sync_channel(0);
