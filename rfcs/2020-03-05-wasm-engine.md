@@ -548,13 +548,40 @@ A couple good questions to consider:
 How can we let users see what's happening in WASM modules? Can we use tracing somehow? Lucet supports tracing, perhaps
 we could hook in somehow?
 
+### Consider Platform Support
+
+There is ongoing work to support more platforms in Lucet, here are how things stand today:
+
+
+Platform support:
+
+* [x] Linux (x86_64)
+* [ ] Linux (ARMv7) (Likely never)
+* [ ] Linux (Aarch64) (Probably coming, ARM contributing)
+* [ ] Mac (x86_64)
+  + https://github.com/bytecodealliance/lucet/pull/437
+* [ ] Windows (x86_64)
+  + https://github.com/bytecodealliance/wasmtime/pull/1216
+  + https://github.com/bytecodealliance/lucet/issues/442
+  + https://github.com/bytecodealliance/lucet/pull/437
+* [ ] FreeBSD (x86_64)
+  + https://github.com/bytecodealliance/lucet/pull/419
+  + https://github.com/bytecodealliance/lucet/pull/437
+
 ## Plan of attack
 
 Incremental steps that execute this change.
 
-- v0.1: This RFC is accepted forming the basis for the RFC, and demoing a POC of how a theoretical user could use this
-  for a protobuf decoding transform, and permitting the first `engine` unit test to pass.
-- This RFC is amended to include Sinks and Sources information.
-- This RFC is amended to include information about possible codec changes.
+- v0.1: Draft accepted, forming basis for the RFC, and demoing a POC of how a theoretical user could use this
+  for a protobuf decoding transform, and permitting the first `wasm` transform test to pass.
+- v0.2: This RFC is amended to include Sinks and Sources information.
+- v0.3: This RFC is amended to include information about possible codec changes.
+- v0.4: The POC of the initial transform has it's v1
+- v0.5: We have benchmarks of the initial transform POC.
+- v0.6: Guest API expanded to support majority of Event API.
+- v0.7: We talk to a couple known users who would be interested in this feature and let them test it out.
+- v0.8: Source and Sink implementation POCs made.
+- v0.9: Final APIs specced and tested. Source, Sink, Transform POCs are in tree and running as tests/benches.
+- v1.0: This RFC is complete and we announce with the above guide.
 
 Note: This can be filled out during the review process.
