@@ -2263,6 +2263,14 @@ end
       # * relevant when type = "check_fields"
       "message.contains" = "foo"
 
+      # Checks whether a string field ends with a string argument.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "environment.ends_with" = "-staging"
+
       # Checks whether a string field starts with a string argument.
       #
       # * optional

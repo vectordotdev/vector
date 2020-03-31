@@ -41,6 +41,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
     "message.contains" = "foo" # example
+    "environment.ends_with" = "-staging" # example
     "environment.starts_with" = "staging-" # example
 ```
 
@@ -220,6 +221,31 @@ Check whether a fields contents does not match the value specified.
 ##### `[field_name]`.contains
 
 Checks whether a string field contains a string argument.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.ends_with":"-staging"}]}
+  groups={[]}
+  name={"`[field_name]`.ends_with"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.ends_with
+
+Checks whether a string field ends with a string argument.
 
 
 
