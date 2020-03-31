@@ -8,6 +8,8 @@ use crate::{
 use futures01::{prelude::Async, sync::mpsc::Receiver, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::{collections::VecDeque, mem};
+mod scripted_transform;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -70,7 +72,6 @@ const GC_INTERVAL: usize = 16;
 pub struct Lua {
     lua: rlua::Lua,
     invocations_after_gc: usize,
-    input_rx: Option<Receiver<Event>>,
 }
 
 impl Lua {
@@ -112,15 +113,17 @@ impl Lua {
         Ok(Self {
             lua,
             invocations_after_gc: 0,
-            input_rx: None,
         })
     }
 
-    fn process(&mut self, event: Event, output: &mut Vec<Event>) -> Result<(), rlua::Error> {
+    fn process<F>(&mut self, event: Event, mut emit_fn: F) -> Result<(), rlua::Error>
+    where
+        F: FnMut(Event) -> (),
+    {
         let result = self.lua.context(|ctx: rlua::Context<'_>| {
             ctx.scope(|scope| {
                 let emit = scope.create_function_mut(|_, event: Event| {
-                    output.push(event);
+                    emit_fn(event);
                     Ok(())
                 })?;
                 let process = ctx.named_registry_value::<_, rlua::Function<'_>>("hooks_process")?;
@@ -140,15 +143,15 @@ impl Lua {
     // Used only in tests.
     fn process_single(&mut self, event: Event) -> Result<Option<Event>, rlua::Error> {
         let mut out = Vec::new();
-        self.process(event, &mut out)?;
+        self.process(event, |event| out.push(event))?;
         assert!(out.len() <= 1);
         Ok(out.into_iter().next())
     }
 }
 
 impl Transform for Lua {
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
-        if let Err(err) = self.process(event, output) {
+    fn transform_into(&mut self, out: &mut Vec<Event>, event: Event) {
+        if let Err(err) = self.process(event, |event| out.push(event)) {
             error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
         }
     }
@@ -158,30 +161,51 @@ impl Transform for Lua {
     }
 
     fn transform_stream(
-        mut self: Box<Self>,
+        self: Box<Self>,
         input_rx: Receiver<Event>,
     ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
     where
         Self: 'static,
     {
-        self.input_rx = Some(input_rx);
-        self
+        Box::new(LuaStream::new(self, input_rx))
     }
 }
 
-impl Stream for Lua {
+struct LuaStream {
+    lua: Box<Lua>,
+    input_rx: Receiver<Event>,
+    output_buf: VecDeque<Event>,
+}
+
+impl LuaStream {
+    fn new(lua: Box<Lua>, input_rx: Receiver<Event>) -> LuaStream {
+        LuaStream {
+            lua,
+            input_rx,
+            output_buf: VecDeque::new(),
+        }
+    }
+}
+
+impl Stream for LuaStream {
     type Item = Event;
     type Error = ();
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
-        if let Some(input_rx) = &mut self.input_rx {
-            match input_rx.poll() {
-                Ok(Async::Ready(msg)) => Ok(Async::Ready(msg)),
-                Ok(Async::NotReady) => Ok(Async::NotReady),
-                Err(err) => Err(err),
+        if let Some(item) = self.output_buf.pop_front() {
+            return Ok(Async::Ready(Some(item)));
+        }
+        match self.input_rx.poll() {
+            Ok(Async::Ready(Some(event))) => {
+                let mut output_buf = mem::take(&mut self.output_buf);
+                let result = self.lua.process(event, |event| output_buf.push_back(event));
+                self.output_buf = output_buf;
+
+                result
+                    .map(|_| Async::Ready(self.output_buf.pop_front()))
+                    .map_err(|_| ())
             }
-        } else {
-            Ok(Async::NotReady)
+            other => other,
         }
     }
 }
