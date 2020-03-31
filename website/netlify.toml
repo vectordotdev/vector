@@ -97,14 +97,20 @@
   force = true
 
 [[redirects]]
-  from = "/docs/setup/guides/getting-started/"
-  to = "/guides/getting-started/"
+  from = "/docs/setup/guides/"
+  to = "/guides/"
   status = 301
   force = true
 
 [[redirects]]
   from = "/docs/setup/guides/advanced-configs/"
   to = "/guides/advanced/managing-complex-configs/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/guides/getting-started/"
+  to = "/guides/getting-started/"
   status = 301
   force = true
 
