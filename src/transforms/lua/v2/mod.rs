@@ -5,6 +5,7 @@ use crate::{
     topology::config::{DataType, TransformContext},
     transforms::Transform,
 };
+use futures01::{prelude::Async, sync::mpsc::Receiver, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
@@ -69,6 +70,7 @@ const GC_INTERVAL: usize = 16;
 pub struct Lua {
     lua: rlua::Lua,
     invocations_after_gc: usize,
+    input_rx: Option<Receiver<Event>>,
 }
 
 impl Lua {
@@ -110,6 +112,7 @@ impl Lua {
         Ok(Self {
             lua,
             invocations_after_gc: 0,
+            input_rx: None,
         })
     }
 
@@ -152,6 +155,34 @@ impl Transform for Lua {
 
     fn transform(&mut self, event: Event) -> Option<Event> {
         self.process_single(event).unwrap()
+    }
+
+    fn transform_stream(
+        mut self: Box<Self>,
+        input_rx: Receiver<Event>,
+    ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        self.input_rx = Some(input_rx);
+        self
+    }
+}
+
+impl Stream for Lua {
+    type Item = Event;
+    type Error = ();
+
+    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
+        if let Some(input_rx) = &mut self.input_rx {
+            match input_rx.poll() {
+                Ok(Async::Ready(msg)) => Ok(Async::Ready(msg)),
+                Ok(Async::NotReady) => Ok(Async::NotReady),
+                Err(err) => Err(err),
+            }
+        } else {
+            Ok(Async::NotReady)
+        }
     }
 }
 
