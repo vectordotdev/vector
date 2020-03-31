@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to Elasticsearch"
 description: "A simple guide to send logs from Docker to Elasticsearch in just a few minutes."
@@ -33,16 +33,42 @@ your observability strategy.
      website/guides/integrate/platforms/docker/elasticsearch.md.erb
 -->
 
-## What is Docker?
+## Background
+
+### What is Docker?
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
 
-## What is Elasticsearch?
+### What is Elasticsearch?
 
 [Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[daemon][docs.strategies#daemon].
+
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host.
+For this guide, Vector will collect data from
+Docker via Vector's
+[`docker`][docs.sources.docker].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={"docker"}
+  sourceName={"docker"}
+  sinkName={"elasticsearch"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -66,28 +92,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[daemon][docs.strategies#daemon].
-
-The [daemon deployment strategy][docs.strategies#daemon] is designed for data
-collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host.
-For this guide, Vector will collect data from
-Docker via Vector's
-[`docker`][docs.sources.docker].
-The following diagram demonstrates how it works.
-
-<DaemonDiagram
-  platformName={"docker"}
-  sourceName={"docker"}
-  sinkName={"elasticsearch"} />
 
 ## Tutorial
 

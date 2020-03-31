@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to Honeycomb"
 description: "A simple guide to send logs from Journald to Honeycomb in just a few minutes."
@@ -33,15 +33,41 @@ your observability strategy.
      website/guides/integrate/sources/journald/honeycomb.md.erb
 -->
 
-## What is Journald?
+## Background
+
+### What is Journald?
 
 [Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
 
-## What is Honeycomb?
+### What is Honeycomb?
 
 [Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[daemon][docs.strategies#daemon].
+
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host.
+For this guide, Vector will collect data from
+Journald via Vector's
+[`journald`][docs.sources.journald].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={null}
+  sourceName={"journald"}
+  sinkName={"honeycomb"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -64,28 +90,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[daemon][docs.strategies#daemon].
-
-The [daemon deployment strategy][docs.strategies#daemon] is designed for data
-collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host.
-For this guide, Vector will collect data from
-Journald via Vector's
-[`journald`][docs.sources.journald].
-The following diagram demonstrates how it works.
-
-<DaemonDiagram
-  platformName={null}
-  sourceName={"journald"}
-  sinkName={"honeycomb"} />
 
 ## Tutorial
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Logs"
 description: "The Vector `datadog_logs` sink streams `log` events to Datadog's logs via the TCP endpoint."
@@ -8,7 +8,7 @@ function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+datadog_logs%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "datadog_logs|[\"log\"]"
-source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog_logs.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/datadog/logs.rs
 status: "beta"
 title: "Datadog Logs Sink"
 unsupported_operating_systems: []

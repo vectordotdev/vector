@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from HTTP to another Vector instance"
 description: "A simple guide to send logs from HTTP to another Vector instance in just a few minutes."
@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from [HTTP][urls.http] to [another Vector instance][urls.vector]
+Fear not! In this guide we'll show you how to send send logs from [HTTP][urls.http] to another Vector instance
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,7 +33,31 @@ your observability strategy.
      website/guides/integrate/sources/http/vector.md.erb
 -->
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[service][docs.strategies#service].
+
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+For this guide, Vector will receive data from
+HTTP via Vector's
+[`http` source][docs.sources.http].
+The following diagram demonstrates how it works.
+
+<ServiceDiagram
+  platformName={null}
+  sourceName={"http"}
+  sinkName={"vector"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -50,28 +74,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[service][docs.strategies#service].
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-For this guide, Vector will receive data from
-HTTP via Vector's
-[`` source][docs.sources.http].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={"http"}
-  sinkName={"vector"} />
 
 ## Tutorial
 
@@ -114,7 +116,6 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.http]: https://www.w3.org/Protocols/
 [urls.rust]: https://www.rust-lang.org/
-[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

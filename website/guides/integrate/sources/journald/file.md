@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to a file"
 description: "A simple guide to send logs from Journald to a file in just a few minutes."
@@ -33,33 +33,15 @@ your observability strategy.
      website/guides/integrate/sources/journald/file.md.erb
 -->
 
-## What is Journald?
+## Background
+
+### What is Journald?
 
 [Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect Journald/Systemd logs.
-    <ol>
-      <li>Filter which Systemd units you collect them from.</li>
-      <li>Checkpoint your position to ensure data is not lost between restarts.</li>
-      <li>Enrich your logs with useful Systemd context.</li>
-    </ol>
-  </li>
-  <li>
-    Write logs to files.
-    <ol>
-      <li>Dynamically partition logs across multiple files.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -80,6 +62,28 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={"journald"}
   sinkName={"file"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect Journald/Systemd logs.
+    <ol>
+      <li>Filter which Systemd units you collect them from.</li>
+      <li>Checkpoint your position to ensure data is not lost between restarts.</li>
+      <li>Enrich your logs with useful Systemd context.</li>
+    </ol>
+  </li>
+  <li>
+    Write logs to files.
+    <ol>
+      <li>Dynamically partition logs across multiple files.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

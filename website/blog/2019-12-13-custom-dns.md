@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 id: custom-dns
 title: "Use Custom DNS Servers"
 description: "Point Vector to custom DNS servers"

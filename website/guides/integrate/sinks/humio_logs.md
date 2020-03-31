@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to Humio"
 description: "A simple guide to send logs to Humio in just a few minutes."
@@ -34,30 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/humio_logs.md.erb
 -->
 
-## What is Humio Logs?
+## Background
+
+### What is Humio Logs?
 
 [Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to the Humio logging service.
-    <ol>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -79,6 +64,25 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"humio_logs"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to the Humio logging service.
+    <ol>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

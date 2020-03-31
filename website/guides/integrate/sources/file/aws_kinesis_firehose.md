@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a file to AWS Kinesis Firehose"
 description: "A simple guide to send logs from a file to AWS Kinesis Firehose in just a few minutes."
@@ -33,11 +33,37 @@ your observability strategy.
      website/guides/integrate/sources/file/aws_kinesis_firehose.md.erb
 -->
 
-## What is AWS Kinesis Firehose?
+## Background
+
+### What is AWS Kinesis Firehose?
 
 [Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[daemon][docs.strategies#daemon].
+
+The [daemon deployment strategy][docs.strategies#daemon] is designed for data
+collection on a single host. Vector runs in the background, in its own process,
+collecting _all_ data for that host.
+For this guide, Vector will collect data from
+a file via Vector's
+[`file`][docs.sources.file].
+The following diagram demonstrates how it works.
+
+<DaemonDiagram
+  platformName={null}
+  sourceName={"file"}
+  sinkName={"aws_kinesis_firehose"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -61,28 +87,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[daemon][docs.strategies#daemon].
-
-The [daemon deployment strategy][docs.strategies#daemon] is designed for data
-collection on a single host. Vector runs in the background, in its own process,
-collecting _all_ data for that host.
-For this guide, Vector will collect data from
-a file via Vector's
-[`file`][docs.sources.file].
-The following diagram demonstrates how it works.
-
-<DaemonDiagram
-  platformName={null}
-  sourceName={"file"}
-  sinkName={"aws_kinesis_firehose"} />
 
 ## Tutorial
 

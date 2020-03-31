@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to GCP Stackdriver"
 description: "A simple guide to send logs to GCP Stackdriver in just a few minutes."
@@ -34,31 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/gcp_stackdriver_logs.md.erb
 -->
 
-## What is GCP Stackdriver Logs?
+## Background
+
+### What is GCP Stackdriver Logs?
 
 [Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to GCP Stackdriver.
-    <ol>
-      <li>Leverage any of GCP's IAM strategies.</li>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -80,6 +64,26 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"gcp_stackdriver_logs"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to GCP Stackdriver.
+    <ol>
+      <li>Leverage any of GCP's IAM strategies.</li>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

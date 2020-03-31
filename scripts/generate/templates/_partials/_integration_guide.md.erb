@@ -20,24 +20,41 @@ Fear not! In this guide we'll show you how to send <%= guide.action_phrase %>
 and build a <%= guide.events_phrase %> pipeline that will be the backbone of
 your observability strategy.
 
+<%- if guide.description_count > 0 -%>
+## Background
+
 <%- if platform && platform.description -%>
-## What is <%= platform.title %>?
+### What is <%= platform.title %>?
 
 <%= platform.description %>
 
 <%- elsif source && source.description -%>
-## What is <%= source.title %>?
+### What is <%= source.title %>?
 
 <%= source.description %>
 
 <%- end -%>
 <%- if sink && sink.description -%>
-## What is <%= sink.title %>?
+### What is <%= sink.title %>?
 
 <%= sink.description %>
 
 <%- end -%>
-## What We'll Accomplish
+<%- end -%>
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[<%= strategy.name %>][docs.strategies#<%= strategy.name %>].
+
+<%= deployment_strategy(strategy, platform: platform, sink: sink, source: source) %>
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -56,17 +73,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   <%- end -%>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[<%= strategy.name %>][docs.strategies#<%= strategy.name %>].
-
-<%= deployment_strategy(strategy, platform: platform, sink: sink, source: source) %>
 
 ## Tutorial
 

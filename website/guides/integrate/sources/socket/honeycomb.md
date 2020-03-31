@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to Honeycomb"
 description: "A simple guide to send logs from a TCP, UDP, or UDS socket to Honeycomb in just a few minutes."
@@ -33,11 +33,37 @@ your observability strategy.
      website/guides/integrate/sources/socket/honeycomb.md.erb
 -->
 
-## What is Honeycomb?
+## Background
+
+### What is Honeycomb?
 
 [Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[service][docs.strategies#service].
+
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+For this guide, Vector will receive data from
+a TCP, UDP, or UDS socket via Vector's
+[`socket` source][docs.sources.socket].
+The following diagram demonstrates how it works.
+
+<ServiceDiagram
+  platformName={null}
+  sourceName={"socket"}
+  sinkName={"honeycomb"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -58,28 +84,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[service][docs.strategies#service].
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-For this guide, Vector will receive data from
-a TCP, UDP, or UDS socket via Vector's
-[`` source][docs.sources.socket].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={"socket"}
-  sinkName={"honeycomb"} />
 
 ## Tutorial
 

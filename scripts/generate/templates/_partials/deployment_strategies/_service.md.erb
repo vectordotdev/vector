@@ -5,7 +5,7 @@ fan-out to one or more destinations.
 <%- if source -%>
 For this guide, Vector will <%= source.function_category %> data from
 <%= source.noun %> via Vector's
-[`<% source.name %>` source][docs.sources.<%= source.name %>].
+[`<%= source.name %>` source][docs.sources.<%= source.name %>].
 <%- else -%>
 Typically, upstream sources are other Vector instances sending data via the
 [`vector` sink][docs.sinks.vector], but can be collected through any of Vector's

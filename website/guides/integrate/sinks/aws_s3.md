@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to AWS S3"
 description: "A simple guide to send logs to AWS S3 in just a few minutes."
@@ -34,32 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/aws_s3.md.erb
 -->
 
-## What is AWS S3?
+## Background
+
+### What is AWS S3?
 
 [Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to AWS S3.
-    <ol>
-      <li>Dynamically partition logs across different key prefixes.</li>
-      <li>Compress and batch data to reduce storage cost and imrpove throughput.</li>
-      <li>Optionally adjust ACL and encryption settings.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -81,6 +64,27 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"aws_s3"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to AWS S3.
+    <ol>
+      <li>Dynamically partition logs across different key prefixes.</li>
+      <li>Compress and batch data to reduce storage cost and imrpove throughput.</li>
+      <li>Optionally adjust ACL and encryption settings.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

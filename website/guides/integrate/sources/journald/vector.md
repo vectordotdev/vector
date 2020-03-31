@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to another Vector instance"
 description: "A simple guide to send logs from Journald to another Vector instance in just a few minutes."
@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from [Journald][urls.journald] to [another Vector instance][urls.vector]
+Fear not! In this guide we'll show you how to send send logs from [Journald][urls.journald] to another Vector instance
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,30 +33,15 @@ your observability strategy.
      website/guides/integrate/sources/journald/vector.md.erb
 -->
 
-## What is Journald?
+## Background
+
+### What is Journald?
 
 [Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect Journald/Systemd logs.
-    <ol>
-      <li>Filter which Systemd units you collect them from.</li>
-      <li>Checkpoint your position to ensure data is not lost between restarts.</li>
-      <li>Enrich your logs with useful Systemd context.</li>
-    </ol>
-  </li>
-  <li>
-    Send data to another downstream Vector instance.
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -77,6 +62,25 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={"journald"}
   sinkName={"vector"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect Journald/Systemd logs.
+    <ol>
+      <li>Filter which Systemd units you collect them from.</li>
+      <li>Checkpoint your position to ensure data is not lost between restarts.</li>
+      <li>Enrich your logs with useful Systemd context.</li>
+    </ol>
+  </li>
+  <li>
+    Send data to another downstream Vector instance.
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 
@@ -120,7 +124,6 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [urls.rust]: https://www.rust-lang.org/
 [urls.systemd]: https://systemd.io/
-[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

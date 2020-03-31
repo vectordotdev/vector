@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to AWS Kinesis Data Streams"
 description: "A simple guide to send logs to AWS Kinesis Data Streams in just a few minutes."
@@ -34,30 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/aws_kinesis_streams.md.erb
 -->
 
-## What is AWS Kinesis Data Streams?
+## Background
+
+### What is AWS Kinesis Data Streams?
 
 [Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to AWS Kinesis Data Streams.
-    <ol>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -79,6 +64,25 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"aws_kinesis_streams"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to AWS Kinesis Data Streams.
+    <ol>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

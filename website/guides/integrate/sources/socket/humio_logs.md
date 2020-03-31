@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from a TCP, UDP, or UDS socket to Humio"
 description: "A simple guide to send logs from a TCP, UDP, or UDS socket to Humio in just a few minutes."
@@ -33,11 +33,37 @@ your observability strategy.
      website/guides/integrate/sources/socket/humio_logs.md.erb
 -->
 
-## What is Humio Logs?
+## Background
+
+### What is Humio Logs?
 
 [Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[service][docs.strategies#service].
+
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+For this guide, Vector will receive data from
+a TCP, UDP, or UDS socket via Vector's
+[`socket` source][docs.sources.socket].
+The following diagram demonstrates how it works.
+
+<ServiceDiagram
+  platformName={null}
+  sourceName={"socket"}
+  sinkName={"humio_logs"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -58,28 +84,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[service][docs.strategies#service].
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-For this guide, Vector will receive data from
-a TCP, UDP, or UDS socket via Vector's
-[`` source][docs.sources.socket].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={"socket"}
-  sinkName={"humio_logs"} />
 
 ## Tutorial
 

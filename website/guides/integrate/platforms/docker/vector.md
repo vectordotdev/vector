@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Docker to another Vector instance"
 description: "A simple guide to send logs from Docker to another Vector instance in just a few minutes."
@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your logs pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to [another Vector instance][urls.vector]
+Fear not! In this guide we'll show you how to send send logs from [Docker][urls.docker] to another Vector instance
 and build a logs pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,31 +33,16 @@ your observability strategy.
      website/guides/integrate/platforms/docker/vector.md.erb
 -->
 
-## What is Docker?
+## Background
+
+### What is Docker?
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect Docker container logs.
-    <ol>
-      <li>Filter which containers you collect them from.</li>
-      <li>Automatically merge logs that Docker splits.</li>
-      <li>Enrich your logs with useful Docker context.</li>
-    </ol>
-  </li>
-  <li>
-    Send data to another downstream Vector instance.
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -78,6 +63,25 @@ The following diagram demonstrates how it works.
   platformName={"docker"}
   sourceName={"docker"}
   sinkName={"vector"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect Docker container logs.
+    <ol>
+      <li>Filter which containers you collect them from.</li>
+      <li>Automatically merge logs that Docker splits.</li>
+      <li>Enrich your logs with useful Docker context.</li>
+    </ol>
+  </li>
+  <li>
+    Send data to another downstream Vector instance.
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 
@@ -125,7 +129,6 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [urls.docker]: https://www.docker.com/
 [urls.rust]: https://www.rust-lang.org/
-[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

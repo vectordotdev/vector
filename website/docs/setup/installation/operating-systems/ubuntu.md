@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 title: Install Vector On Ubuntu
 sidebar_label: Ubuntu
 description: Install Vector on the Ubuntu operating system

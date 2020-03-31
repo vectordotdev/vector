@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to Statsd"
 description: "A simple guide to send metrics to Statsd in just a few minutes."
@@ -34,28 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/statsd.md.erb
 -->
 
-## What is Statsd?
+## Background
+
+### What is Statsd?
 
 [StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your metrics from one or more sources
-  </li>
-  <li>
-    Stream metrics over a StatsD UDP protocol.
-    <ol>
-      <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -77,6 +64,23 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"statsd"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your metrics from one or more sources
+  </li>
+  <li>
+    Stream metrics over a StatsD UDP protocol.
+    <ol>
+      <li>Automatically aggregate metrics at the edge for improved performance.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

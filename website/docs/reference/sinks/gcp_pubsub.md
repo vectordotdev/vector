@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
@@ -8,7 +8,7 @@ function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_pubsub%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "gcp_pubsub|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/pubsub.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp/pubsub.rs
 status: "beta"
 title: "GCP PubSub Sink"
 unsupported_operating_systems: []

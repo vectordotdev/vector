@@ -68,6 +68,24 @@ class Templates
         end
     end
 
+
+    def description_count
+      @description_count ||=
+        begin
+          count = 0
+
+          if (platform && platform.description) || (source && source.description)
+            count += 1
+          end
+
+          if sink && sink.description
+            count += 1
+          end
+
+          count
+        end
+    end
+
     def events_phrase
       @events_phrase ||= event_types.collect(&:pluralize).to_sentence
     end
@@ -144,7 +162,7 @@ class Templates
     private
       def noun_link(component)
         case component.name
-        when "blackhole"
+        when "blackhole", "vector"
           return normalize_noun(component.noun)
         else
           "[#{normalize_noun(component.noun)}][#{short_link(component.name)}]"

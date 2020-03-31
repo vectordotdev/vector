@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Kafka to GCP Cloud Storage (GCS)"
 description: "A simple guide to send logs from Kafka to GCP Cloud Storage (GCS) in just a few minutes."
@@ -33,15 +33,41 @@ your observability strategy.
      website/guides/integrate/sources/kafka/gcp_cloud_storage.md.erb
 -->
 
-## What is Kafka?
+## Background
+
+### What is Kafka?
 
 [Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
 
-## What is GCP Cloud Storage (GCS)?
+### What is GCP Cloud Storage (GCS)?
 
 [Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[service][docs.strategies#service].
+
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+For this guide, Vector will collect data from
+Kafka via Vector's
+[`kafka` source][docs.sources.kafka].
+The following diagram demonstrates how it works.
+
+<ServiceDiagram
+  platformName={null}
+  sourceName={"kafka"}
+  sinkName={"gcp_cloud_storage"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -68,28 +94,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[service][docs.strategies#service].
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-For this guide, Vector will collect data from
-Kafka via Vector's
-[`` source][docs.sources.kafka].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={"kafka"}
-  sinkName={"gcp_cloud_storage"} />
 
 ## Tutorial
 

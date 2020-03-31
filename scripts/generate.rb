@@ -43,7 +43,8 @@ dry_run = ARGV.include?("--dry-run")
 
 def doc_valid?(url_path)
   parts = url_path.split("#", 2)
-  file_or_dir_path = WEBSITE_ROOT + parts[0][0..-2]
+  file_or_dir_path = WEBSITE_ROOT + parts[0][0..-1]
+  file_or_dir_path.delete_suffix!("/")
   anchor = parts[1]
   file_path =
     if File.directory?(file_or_dir_path) && File.file?("#{file_or_dir_path}/README.md")
@@ -52,6 +53,36 @@ def doc_valid?(url_path)
       "#{file_or_dir_path}.md"
     end
 
+  markdown_valid?(file_path, anchor)
+end
+
+def guide_valid?(url_path)
+  parts = url_path.split("#", 2)
+  file_or_dir_path = WEBSITE_ROOT + parts[0][0..-1]
+  file_or_dir_path.delete_suffix!("/")
+
+  if File.directory?(file_or_dir_path)
+    true
+  else
+    file_path = "#{file_or_dir_path}.md"
+    anchor = parts[1]
+    markdown_valid?(file_path, anchor)
+  end
+end
+
+def link_valid?(value)
+  if value.start_with?(DOCS_BASE_PATH)
+    doc_valid?(value)
+  elsif value.start_with?(GUIDES_BASE_PATH)
+    guide_valid?(value)
+  elsif value.start_with?("/")
+    page_valid?(value)
+  else
+    url_valid?(value)
+  end
+end
+
+def markdown_valid?(file_path, anchor)
   if File.exists?(file_path)
     if !anchor.nil?
       content = File.read(file_path)
@@ -63,16 +94,6 @@ def doc_valid?(url_path)
     end
   else
     false
-  end
-end
-
-def link_valid?(value)
-  if value.start_with?(DOCS_BASE_PATH)
-    doc_valid?(value)
-  elsif value.start_with?("/")
-    page_valid?(value)
-  else
-    url_valid?(value)
   end
 end
 
@@ -114,6 +135,11 @@ def url_valid?(url)
   # index.html file we use also serves as the error page. This is how
   # it serves directories.
   when /^https:\/\/packages\.timber\.io\/vector[^.]*$/
+    true
+
+  # Some URLs, like download URLs, contain variables and are not meant
+  # to be validated.
+  when /<([A-Z_.]*)>/
     true
 
   else

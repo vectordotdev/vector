@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to Kafka"
 description: "A simple guide to send logs to Kafka in just a few minutes."
@@ -34,31 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/kafka.md.erb
 -->
 
-## What is Kafka?
+## Background
+
+### What is Kafka?
 
 [Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to Kafka.
-    <ol>
-      <li>Leverage any of AWS' IAM strategies.</li>
-      <li>Optionally compress data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -80,6 +64,26 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"kafka"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to Kafka.
+    <ol>
+      <li>Leverage any of AWS' IAM strategies.</li>
+      <li>Optionally compress data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

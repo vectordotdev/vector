@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to New Relic"
 description: "A simple guide to send logs to New Relic in just a few minutes."
@@ -34,30 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/new_relic_logs.md.erb
 -->
 
-## What is New Relic Logs?
+## Background
+
+### What is New Relic Logs?
 
 [New Relic][urls.new_relic] is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to the New Relic logging service.
-    <ol>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -79,6 +64,25 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"new_relic_logs"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to the New Relic logging service.
+    <ol>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

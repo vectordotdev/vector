@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to a Splunk HEC"
 description: "A simple guide to send logs from STDIN to a Splunk HEC in just a few minutes."
@@ -33,11 +33,35 @@ your observability strategy.
      website/guides/integrate/sources/stdin/splunk_hec.md.erb
 -->
 
-## What is Splunk HEC?
+## Background
+
+### What is Splunk HEC?
 
 The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[sidecar][docs.strategies#sidecar].
+
+The [sidecar deployment strategy][docs.strategies#sidecar] is designed to
+collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
+each service. Typically data is collected by tailing local files via Vector's
+[`file` source][docs.sources.file], but can be collected through any of Vector's
+[sources][docs.sources]. The following diagram demonstrates how it works.
+
+<SidecarDiagram
+  platformName={null}
+  sourceName={"stdin"}
+  sinkName={"splunk_hec"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -59,26 +83,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[sidecar][docs.strategies#sidecar].
-
-The [sidecar deployment strategy][docs.strategies#sidecar] is designed to
-collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
-each service. Typically data is collected by tailing local files via Vector's
-[`file` source][docs.sources.file], but can be collected through any of Vector's
-[sources][docs.sources]. The following diagram demonstrates how it works.
-
-<SidecarDiagram
-  platformName={null}
-  sourceName={"stdin"}
-  sinkName={"splunk_hec"} />
 
 ## Tutorial
 

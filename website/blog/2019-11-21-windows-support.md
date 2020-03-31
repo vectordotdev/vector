@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 id: windows-support
 title: "Windows Support Is Here!"
 description: "Bringing the performance and reliability of Vector to Windows"

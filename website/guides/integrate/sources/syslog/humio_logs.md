@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to Humio"
 description: "A simple guide to send logs from Syslog to Humio in just a few minutes."
@@ -33,15 +33,41 @@ your observability strategy.
      website/guides/integrate/sources/syslog/humio_logs.md.erb
 -->
 
-## What is Syslog?
+## Background
+
+### What is Syslog?
 
 [Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.
 
-## What is Humio Logs?
+### What is Humio Logs?
 
 [Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[service][docs.strategies#service].
+
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+For this guide, Vector will receive data from
+Syslog via Vector's
+[`syslog` source][docs.sources.syslog].
+The following diagram demonstrates how it works.
+
+<ServiceDiagram
+  platformName={null}
+  sourceName={"syslog"}
+  sinkName={"humio_logs"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -62,28 +88,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[service][docs.strategies#service].
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-For this guide, Vector will receive data from
-Syslog via Vector's
-[`` source][docs.sources.syslog].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={"syslog"}
-  sinkName={"humio_logs"} />
 
 ## Tutorial
 

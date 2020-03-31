@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect metrics from Prometheus and send them anywhere"
 description: "A simple guide to collect metrics from Prometheus and send them anywhere in just a few minutes."
@@ -33,29 +33,15 @@ your observability strategy.
      website/guides/integrate/sources/prometheus.md.erb
 -->
 
-## What is Prometheus?
+## Background
+
+### What is Prometheus?
 
 [Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Scrape one or more Prometheus endpoints.
-    <ol>
-      <li>Ingest all Prometheus metric types.</li>
-      <li>Automatically parse metrics into a lossless interoperable data model.</li>
-    </ol>
-  </li>
-  <li>
-    Send your metrics to one or more destinations
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -76,6 +62,24 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={"prometheus"}
   sinkName={null} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Scrape one or more Prometheus endpoints.
+    <ol>
+      <li>Ingest all Prometheus metric types.</li>
+      <li>Automatically parse metrics into a lossless interoperable data model.</li>
+    </ol>
+  </li>
+  <li>
+    Send your metrics to one or more destinations
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

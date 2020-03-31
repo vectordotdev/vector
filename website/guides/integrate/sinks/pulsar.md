@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to Apache Pulsar"
 description: "A simple guide to send logs to Apache Pulsar in just a few minutes."
@@ -34,29 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/pulsar.md.erb
 -->
 
-## What is Apache Pulsar?
+## Background
+
+### What is Apache Pulsar?
 
 [Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your logs from one or more sources
-  </li>
-  <li>
-    Send logs to Apache Pulsar.
-    <ol>
-      <li>Stream data in a real-time fashion.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -78,6 +64,24 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"pulsar"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your logs from one or more sources
+  </li>
+  <li>
+    Send logs to Apache Pulsar.
+    <ol>
+      <li>Stream data in a real-time fashion.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

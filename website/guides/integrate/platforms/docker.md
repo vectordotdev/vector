@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from Docker and send them anywhere"
 description: "A simple guide to collect logs from Docker and send them anywhere in just a few minutes."
@@ -33,31 +33,16 @@ your observability strategy.
      website/guides/integrate/platforms/docker.md.erb
 -->
 
-## What is Docker?
+## Background
+
+### What is Docker?
 
 [Docker][urls.docker] is an open platform for developing, shipping, and running
 applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect Docker container logs.
-    <ol>
-      <li>Filter which containers you collect them from.</li>
-      <li>Automatically merge logs that Docker splits.</li>
-      <li>Enrich your logs with useful Docker context.</li>
-    </ol>
-  </li>
-  <li>
-    Send your logs to one or more destinations
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -78,6 +63,25 @@ The following diagram demonstrates how it works.
   platformName={"docker"}
   sourceName={"docker"}
   sinkName={null} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect Docker container logs.
+    <ol>
+      <li>Filter which containers you collect them from.</li>
+      <li>Automatically merge logs that Docker splits.</li>
+      <li>Enrich your logs with useful Docker context.</li>
+    </ol>
+  </li>
+  <li>
+    Send your logs to one or more destinations
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

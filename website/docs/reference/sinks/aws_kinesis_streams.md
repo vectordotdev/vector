@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Data Streams"
 description: "The Vector `aws_kinesis_streams` sink batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint."

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 title: Deployment
 sidebar_label: hidden
 description: How to deploy Vector into your own infrastructure

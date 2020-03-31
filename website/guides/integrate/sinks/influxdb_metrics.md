@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to InfluxDB"
 description: "A simple guide to send metrics to InfluxDB in just a few minutes."
@@ -34,30 +34,15 @@ your observability strategy.
      website/guides/integrate/sinks/influxdb_metrics.md.erb
 -->
 
-## What is InfluxDB Metrics?
+## Background
+
+### What is InfluxDB Metrics?
 
 [InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Collect your metrics from one or more sources
-  </li>
-  <li>
-    Send metrics to InfluxDB v1 or v2.
-    <ol>
-      <li>Batch data to maximize throughput.</li>
-      <li>Automatically retry failed requests, with backoff.</li>
-      <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -79,6 +64,25 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={null}
   sinkName={"influxdb_metrics"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Collect your metrics from one or more sources
+  </li>
+  <li>
+    Send metrics to InfluxDB v1 or v2.
+    <ol>
+      <li>Batch data to maximize throughput.</li>
+      <li>Automatically retry failed requests, with backoff.</li>
+      <li>Automatically aggregate metrics at the edge for improved performance.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

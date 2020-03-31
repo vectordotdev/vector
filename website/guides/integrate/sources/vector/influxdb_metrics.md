@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Vector to InfluxDB"
 description: "A simple guide to send metrics from Vector to InfluxDB in just a few minutes."
@@ -21,7 +21,7 @@ in a reliable, performant, and robust manner. Nothing is more frustrating than
 having your metrics pipeline fall on it's face during an
 outage, or even worse, disrupt more important services!
 
-Fear not! In this guide we'll show you how to send send metrics from [Vector][urls.vector] to [InfluxDB][urls.influxdb]
+Fear not! In this guide we'll show you how to send send metrics from Vector to [InfluxDB][urls.influxdb]
 and build a metrics pipeline that will be the backbone of
 your observability strategy.
 
@@ -33,11 +33,37 @@ your observability strategy.
      website/guides/integrate/sources/vector/influxdb_metrics.md.erb
 -->
 
-## What is InfluxDB Metrics?
+## Background
+
+### What is InfluxDB Metrics?
 
 [InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.
 
-## What We'll Accomplish
+## Strategy
+
+### How This Guide Works
+
+We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
+is a [popular][urls.vector_stars], lightweight, and
+[ultra-fast][urls.vector_performance] utility for building observability
+pipelines. It's written in [Rust][urls.rust], making it memory safe and
+reliable. We'll be deploying Vector as a
+[service][docs.strategies#service].
+
+The [service deployment strategy][docs.strategies#service] treats Vector like a
+separate service. It is desigend to receive data from an upstream source and
+fan-out to one or more destinations.
+For this guide, Vector will receive data from
+Vector via Vector's
+[`vector` source][docs.sources.vector].
+The following diagram demonstrates how it works.
+
+<ServiceDiagram
+  platformName={null}
+  sourceName={"vector"}
+  sinkName={"influxdb_metrics"} />
+
+### What We'll Accomplish
 
 To be clear, here's everything we'll accomplish in this short guide:
 
@@ -55,28 +81,6 @@ To be clear, here's everything we'll accomplish in this short guide:
   </li>
   <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
 </ol>
-
-## How It Works
-
-We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
-[service][docs.strategies#service].
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-For this guide, Vector will receive data from
-Vector via Vector's
-[`` source][docs.sources.vector].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={"vector"}
-  sinkName={"influxdb_metrics"} />
 
 ## Tutorial
 
@@ -119,7 +123,6 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 [docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.influxdb]: https://www.influxdata.com/products/influxdb-overview/
 [urls.rust]: https://www.rust-lang.org/
-[urls.vector]: https://vector.dev/releases/ector/download
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

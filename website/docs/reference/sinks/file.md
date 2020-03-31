@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
@@ -8,7 +8,7 @@ function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
 operating_systems: ["Linux","MacOS","Windows"]
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/file
 status: "prod-ready"
 title: "File Sink"
 unsupported_operating_systems: []

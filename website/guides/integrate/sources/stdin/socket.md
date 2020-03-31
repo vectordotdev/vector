@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from STDIN to a TCP, UDP, or UDS socket"
 description: "A simple guide to send logs from STDIN to a TCP, UDP, or UDS socket in just a few minutes."
@@ -33,27 +33,9 @@ your observability strategy.
      website/guides/integrate/sources/stdin/socket.md.erb
 -->
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Accept new line delimited log data through STDIN.
-    <ol>
-      <li>Automatically enrich logs with host-level context.</li>
-    </ol>
-  </li>
-  <li>
-    Stream logs over a TCP, UDP, or Unix socket.
-    <ol>
-      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -72,6 +54,26 @@ each service. Typically data is collected by tailing local files via Vector's
   platformName={null}
   sourceName={"stdin"}
   sinkName={"socket"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Accept new line delimited log data through STDIN.
+    <ol>
+      <li>Automatically enrich logs with host-level context.</li>
+    </ol>
+  </li>
+  <li>
+    Stream logs over a TCP, UDP, or Unix socket.
+    <ol>
+      <li>Buffer your data in-memory or on-disk for performance and durability.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]

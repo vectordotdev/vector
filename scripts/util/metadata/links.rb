@@ -232,8 +232,44 @@ class Links
 
       when /^(.*)_(sink|source|transform)_source$/
         name = $1
+        name_parts = name.split("_")
+        name_prefix = name_parts.first
+        suffixed_name = name_parts[1..-1].join("_")
         type = $2
-        source_file_url = "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}.rs"
+
+        variations =
+          [
+            "#{name}.rs",
+            "#{name_prefix}/#{suffixed_name}.rs",
+            "#{name}"
+          ]
+
+        paths =
+          variations.collect do |variation|
+            "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{variation}"
+          end
+
+        variations.each do |variation|
+          path = "#{ROOT_DIR}/src/#{type.pluralize}/#{variation}"
+          if File.exists?(path) || File.directory?(path)
+            return "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{variation}"
+          end
+        end
+
+        raise KeyError.new(
+          <<~EOF
+          Unknown link!
+
+            urls.#{name}
+
+          We tried the following paths:
+
+            * #{paths.join("\n   * ")}
+
+          If the path to the source file is unique, please add it to the
+          links.toml file.
+          EOF
+        )
 
       when /^(.*)_test$/
         "#{TEST_HARNESS_ROOT}/tree/master/cases/#{$1}"

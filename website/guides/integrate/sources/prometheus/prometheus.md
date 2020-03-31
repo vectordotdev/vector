@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-30"
+last_modified_on: "2020-03-31"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Prometheus to Prometheus"
 description: "A simple guide to send metrics from Prometheus to Prometheus in just a few minutes."
@@ -33,36 +33,19 @@ your observability strategy.
      website/guides/integrate/sources/prometheus/prometheus.md.erb
 -->
 
-## What is Prometheus?
+## Background
+
+### What is Prometheus?
 
 [Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.
 
-## What is Prometheus?
+### What is Prometheus?
 
 [Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.
 
-## What We'll Accomplish
+## Strategy
 
-To be clear, here's everything we'll accomplish in this short guide:
-
-<ol className="list--checks list--flush">
-  <li>
-    Scrape one or more Prometheus endpoints.
-    <ol>
-      <li>Ingest all Prometheus metric types.</li>
-      <li>Automatically parse metrics into a lossless interoperable data model.</li>
-    </ol>
-  </li>
-  <li>
-    Expose an endpoint that Prometheus can scrape for metrics data.
-    <ol>
-      <li>Automatically aggregate metrics at the edge for improved performance.</li>
-    </ol>
-  </li>
-  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
-</ol>
-
-## How It Works
+### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
 is a [popular][urls.vector_stars], lightweight, and
@@ -83,6 +66,27 @@ The following diagram demonstrates how it works.
   platformName={null}
   sourceName={"prometheus"}
   sinkName={"prometheus"} />
+
+### What We'll Accomplish
+
+To be clear, here's everything we'll accomplish in this short guide:
+
+<ol className="list--checks list--flush">
+  <li>
+    Scrape one or more Prometheus endpoints.
+    <ol>
+      <li>Ingest all Prometheus metric types.</li>
+      <li>Automatically parse metrics into a lossless interoperable data model.</li>
+    </ol>
+  </li>
+  <li>
+    Expose an endpoint that Prometheus can scrape for metrics data.
+    <ol>
+      <li>Automatically aggregate metrics at the edge for improved performance.</li>
+    </ol>
+  </li>
+  <li className="list--li--arrow list--li--pink text--bold">All in just a few minutes!</li>
+</ol>
 
 ## Tutorial
 
