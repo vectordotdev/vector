@@ -50,20 +50,21 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_complete` returns ready.
-pub struct BatchedHttpSink<T, B: Batch>
+pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
 where
+    B: Batch,
     B::Output: Clone,
+    L: RetryLogic<Response = hyper::Response<Bytes>>,
 {
     sink: Arc<T>,
-    inner:
-        BatchSink<B, TowerBatchedSink<B::Output, HttpRetryLogic, B, HttpBatchService<B::Output>>>,
+    inner: BatchSink<B, TowerBatchedSink<B::Output, L, B, HttpBatchService<B::Output>>>,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
     slot: Option<B::Input>,
 }
 
-impl<T, B> BatchedHttpSink<T, B>
+impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
 where
     B: Batch,
     B::Output: Clone,
@@ -77,12 +78,40 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         cx: &SinkContext,
     ) -> Self {
+        Self::with_retry_logic(
+            sink,
+            batch,
+            HttpRetryLogic,
+            request_settings,
+            batch_settings,
+            tls_settings,
+            cx,
+        )
+    }
+}
+
+impl<T, B, L> BatchedHttpSink<T, B, L>
+where
+    B: Batch,
+    B::Output: Clone,
+    L: RetryLogic<Response = hyper::Response<Bytes>, Error = hyper::Error>,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn with_retry_logic(
+        sink: T,
+        batch: B,
+        logic: L,
+        request_settings: TowerRequestSettings,
+        batch_settings: BatchSettings,
+        tls_settings: impl Into<MaybeTlsSettings>,
+        cx: &SinkContext,
+    ) -> Self {
         let sink = Arc::new(sink);
         let sink1 = sink.clone();
         let svc =
             HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
-        let service_sink = request_settings.batch_sink(HttpRetryLogic, svc, cx.acker());
+        let service_sink = request_settings.batch_sink(logic, svc, cx.acker());
         let inner = BatchSink::from_settings(service_sink, batch, batch_settings);
 
         Self {
@@ -93,11 +122,12 @@ where
     }
 }
 
-impl<T, B> Sink for BatchedHttpSink<T, B>
+impl<T, B, L> Sink for BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    L: RetryLogic<Response = hyper::Response<Bytes>>,
 {
     type SinkItem = crate::Event;
     type SinkError = ();
