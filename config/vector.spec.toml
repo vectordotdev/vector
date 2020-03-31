@@ -1605,13 +1605,21 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "message.contains" = "foo"
 
-    # Checks whether a string field has a string argument prefix.
+    # Checks whether a string field ends with a string argument.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
-    "environment.prefix" = "staging-"
+    "environment.ends_with" = "-staging"
+
+    # Checks whether a string field starts with a string argument.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "environment.starts_with" = "staging-"
 
 # Accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 [transforms.geoip]

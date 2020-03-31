@@ -1,16 +1,21 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` events allowing you to select events based on a set of logical conditions."
 event_types: ["log"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+filter%22
-min_version: null
-service_name: "Filter"
 sidebar_label: "filter|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/filter.rs
 status: "beta"
 title: "Filter Transform"
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `filter` transform
 accepts and [outputs `log` events](#output) allowing you to select events based
@@ -26,20 +31,14 @@ on a set of logical conditions.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -50,7 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -64,17 +63,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
   condition."host.exists" = true # example
   condition."method.neq" = "POST" # example
   condition."message.contains" = "foo" # example
-  condition."environment.prefix" = "staging-" # example
+  condition."environment.ends_with" = "-staging" # example
+  condition."environment.starts_with" = "staging-" # example
 ```
 
 </TabItem>
 </Tabs>
 
 ## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -233,9 +229,9 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"environment.ends_with":"-staging"}]}
   groups={[]}
-  name={"`[field_name]`.prefix"}
+  name={"`[field_name]`.ends_with"}
   path={"condition"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -244,9 +240,34 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-#### `[field_name]`.prefix
+#### `[field_name]`.ends_with
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field ends with a string argument.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.starts_with":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.starts_with"}
+  path={"condition"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field_name]`.starts_with
+
+Checks whether a string field starts with a string argument.
 
 
 
