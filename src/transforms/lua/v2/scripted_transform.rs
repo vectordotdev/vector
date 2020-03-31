@@ -122,7 +122,7 @@ impl Transform for ScriptedTransform {
     where
         Self: 'static,
     {
-        Box::new(ScriptedStream::new(self, input_rx))
+        Box::new(ScriptedStream::new(*self, input_rx))
     }
 }
 
@@ -131,18 +131,20 @@ enum StreamState {
     Idle,
 }
 
+type MessageStream = Box<dyn FutureStream<Item = Message, Error = ()> + Send>;
+
 struct ScriptedStream {
     transform: ScriptedTransform,
-    input_rx: Box<dyn FutureStream<Item = Message, Error = ()> + Send>,
+    input_rx: MessageStream,
     state: StreamState,
 }
 
 impl ScriptedStream {
     fn new(transform: ScriptedTransform, input_rx: FutureReceiver<Event>) -> ScriptedStream {
         let input_rx = input_rx.map(|event| Message::Process(event));
-        let input_rx: Box<dyn FutureStream<Item = Message, Error = ()>> = Box::new(input_rx);
-        for timer in transform.timers {
-            input_rx = Box::new(input_rx.select(interval_from_timer(timer)));
+        let mut input_rx: MessageStream = Box::new(input_rx);
+        for timer in transform.timers.iter() {
+            input_rx = Box::new(input_rx.select(interval_from_timer(*timer)));
         }
 
         ScriptedStream {
@@ -160,12 +162,11 @@ impl FutureStream for ScriptedStream {
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
         match self.state {
             StreamState::Idle => match self.input_rx.poll() {
-                Ok(Async::Ready(Some(event))) => {
-                    self.transform.input.send(Message::Process(event)).unwrap();
-                    self.state = StreamState::Processing;
+                Ok(Async::Ready(Some(msg))) => {
+                    self.transform.input.send(msg).unwrap();
                     Ok(Async::Ready(None))
                 }
-                other => other,
+                other => other.map(|_| Async::Ready(None)),
             },
             StreamState::Processing => match self.transform.output.try_recv() {
                 Ok(Some(event)) => Ok(Async::Ready(Some(event))),
@@ -179,9 +180,8 @@ impl FutureStream for ScriptedStream {
     }
 }
 
-fn interval_from_timer(timer: Timer) -> Box<dyn FutureStream<Item = Message, Error = ()>> {
-    let interval = Interval::new_interval(Duration::new(timer.interval_seconds, 0))
+fn interval_from_timer(timer: Timer) -> impl FutureStream<Item = Message, Error = ()> + Send {
+    Interval::new_interval(Duration::new(timer.interval_seconds, 0))
         .map(move |_| Message::Timer(timer))
-        .map_err(|_| ());
-    Box::new(interval)
+        .map_err(|_| ())
 }
