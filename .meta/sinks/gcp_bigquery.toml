@@ -4,6 +4,18 @@ noun = "GCP BigQuery"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+description = """\
+X
+X
+X
+"""
+features = [
+  "Send logs to a GCP BigQuery table.",
+  "Leverage any of GCP's IAM strategies.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"

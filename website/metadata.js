@@ -284,6 +284,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/platforms/docker/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/platforms/docker/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from Docker to GCP BigQuery"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/platforms/docker/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker/gcp_cloud_storage.md",
@@ -487,6 +496,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/http/elasticsearch.md",
           "series_position": null,
           "title": "Send logs from HTTP to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/http/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/http/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from HTTP to GCP BigQuery"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -707,6 +725,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/journald/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/journald/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from Journald to GCP BigQuery"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/journald/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/journald/gcp_cloud_storage.md",
@@ -919,6 +946,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/kafka/elasticsearch.md",
           "series_position": null,
           "title": "Send logs from Kafka to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/kafka/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/kafka/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from Kafka to GCP BigQuery"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1139,6 +1175,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/stdin/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/stdin/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from STDIN to GCP BigQuery"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/stdin/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/stdin/gcp_cloud_storage.md",
@@ -1351,6 +1396,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/splunk_hec/elasticsearch.md",
           "series_position": null,
           "title": "Send logs from Splunk HEC to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/splunk_hec/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/splunk_hec/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from Splunk HEC to GCP BigQuery"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -1571,6 +1625,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/syslog/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/syslog/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from Syslog to GCP BigQuery"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/syslog/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/syslog/gcp_cloud_storage.md",
@@ -1787,6 +1850,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/vector/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/vector/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from Vector to GCP BigQuery"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/vector/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/vector/gcp_cloud_storage.md",
@@ -1990,6 +2062,15 @@ module.exports = {
           "path": "website/guides/integrate/sources/socket/elasticsearch.md",
           "series_position": null,
           "title": "Send logs from a TCP, UDP, or UDS socket to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/socket/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/socket/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from a TCP, UDP, or UDS socket to GCP BigQuery"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -2210,6 +2291,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/file/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/file/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs from a file to GCP BigQuery"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/file/gcp_cloud_storage",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/file/gcp_cloud_storage.md",
@@ -2422,6 +2512,15 @@ module.exports = {
           "path": "website/guides/integrate/sinks/elasticsearch.md",
           "series_position": null,
           "title": "Send logs to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sinks/gcp_bigquery",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sinks/gcp_bigquery.md",
+          "series_position": null,
+          "title": "Send logs to GCP BigQuery"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -24815,12 +24914,16 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"gcp_bigquery\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  dataset = \"example-dataset\" # required\n  project = \"vector-123456\" # required\n  table = \"example-table\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": null,
+      "description": "X\nX\nX\n",
       "event_types": [
         "log"
       ],
       "features": [
-
+        "Send logs to a GCP BigQuery table.",
+        "Leverage any of GCP's IAM strategies.",
+        "Batch data to maximize throughput.",
+        "Automatically retry failed requests, with backoff.",
+        "Buffer your data in-memory or on-disk for performance and durability."
       ],
       "function_category": "transmit",
       "id": "gcp_bigquery_sink",
