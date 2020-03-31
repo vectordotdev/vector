@@ -26210,12 +26210,12 @@ module.exports = {
       "twitter": "https://twitter.com/lukesteensen"
     },
     {
-      "avatar": "https://github.com/lukesteensen.png",
-      "github": "https://github.com/lukesteensen",
+      "avatar": "https://github.com/MOZGIII.png",
+      "github": "https://github.com/MOZGIII",
       "id": "mike",
-      "keybase": "https://keybase.io/lukesteensen",
-      "name": "Luke",
-      "twitter": "https://twitter.com/lukesteensen"
+      "keybase": "https://keybase.io/MOZGIII",
+      "name": "Mike",
+      "twitter": "https://twitter.com/MOZGIII"
     },
     {
       "avatar": "https://github.com/vector-vic.png",
