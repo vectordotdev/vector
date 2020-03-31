@@ -28,6 +28,7 @@ impl<'a> FileSourceBuilder<'a> {
         kube_name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
+        vector_pod_uid: &str,
     ) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
         self.file_config.include.extend(
             Self::file_source_include(self.config)?
@@ -35,7 +36,7 @@ impl<'a> FileSourceBuilder<'a> {
                 .map(Into::into),
         );
         self.file_config.exclude.extend(
-            Self::file_source_exclude(self.config)
+            Self::file_source_exclude(self.config, vector_pod_uid)
                 .into_iter()
                 .map(Into::into),
         );
@@ -251,7 +252,7 @@ impl<'a> FileSourceBuilder<'a> {
     ///    with include, so exclude isn't necessary.
     /// b) if user has included "kube-system" or "vector*", then that is a sign that user wants
     ///    to log it so excluding it is not valid.
-    fn file_source_exclude(config: &KubernetesConfig) -> Vec<String> {
+    fn file_source_exclude(config: &KubernetesConfig, vector_pod_uid: &str) -> Vec<String> {
         // True if there is no includes
         let no_include = config.include_container_names.is_empty()
             && config.include_namespaces.is_empty()
@@ -266,10 +267,10 @@ impl<'a> FileSourceBuilder<'a> {
             // This is correct, but on best effort basis filtering out of logs from kuberentes system components.
             // More specificly, it will work for all Kubernetes 1.14 and higher, and for some bellow that.
             exclude.push((LOG_DIRECTORY.to_owned() + r"kube-system_*").into());
-
-            // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
-            exclude.push((LOG_DIRECTORY.to_owned() + r"*/vector*").into());
         }
+
+        // Always exclude vector
+        exclude.push((LOG_DIRECTORY.to_owned() + &format!("*{}/*", vector_pod_uid)).into());
 
         exclude
     }

@@ -134,6 +134,11 @@ spec:
           readOnly: true
         - name: tmp
           mountPath: /tmp/vector/
+        env:
+        - name: VECTOR_POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
 "#;
 
 static ECHO_YAML: &'static str = r#"
@@ -527,7 +532,7 @@ fn kube_multi_log() {
 
 #[test]
 fn kube_object_uid() {
-    let namespace = "kube-object-uid".to_owned(); //format!("object-uid-{}", Uuid::new_v4());
+    let namespace = format!("object-uid-{}", Uuid::new_v4());
     let message = random_string(300);
     let user_namespace = user_namespace(&namespace);
 

@@ -84,3 +84,8 @@ spec:
         - name: config-dir
           mountPath: /etc/vector
           readOnly: true
+        env:
+        - name: VECTOR_POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid

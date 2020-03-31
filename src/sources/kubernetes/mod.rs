@@ -20,6 +20,7 @@ use chrono::{DateTime, Utc};
 use futures01::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::env::{self, VarError};
 
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
@@ -31,12 +32,21 @@ use snafu::Snafu;
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &str = r"/var/log/pods/";
 
+/// Enviorment variable through which we are receiving uid of this vector's pod.
+const VECTOR_POD_UID_ENV: &str = "VECTOR_POD_UID";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("To large UID: {:?}", uid))]
     UidToLarge { uid: String },
     #[snafu(display("UID contains illegal characters: {:?}", uid))]
     IllegalCharacterInUid { uid: String },
+    #[snafu(display(
+        "Enviorment variable {}, that must be defined with this Vector's Pod's UID, is {:?}",
+        env,
+        error
+    ))]
+    PodUid { env: &'static str, error: VarError },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -65,8 +75,16 @@ impl SourceConfig for KubernetesConfig {
 
         let now = TimeFilter::new();
 
-        let (file_recv, file_source) =
-            file_source_builder::FileSourceBuilder::new(self).build(name, globals, shutdown)?;
+        let vector_pod_uid = env::var(VECTOR_POD_UID_ENV).map_err(|error| BuildError::PodUid {
+            env: VECTOR_POD_UID_ENV,
+            error,
+        })?;
+        let (file_recv, file_source) = file_source_builder::FileSourceBuilder::new(self).build(
+            name,
+            globals,
+            shutdown,
+            &vector_pod_uid,
+        )?;
 
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;
