@@ -41,7 +41,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
     "message.contains" = "foo" # example
-    "environment.prefix" = "staging-" # example
+    "environment.starts_with" = "staging-" # example
 ```
 
 import Fields from '@site/src/components/Fields';
@@ -231,9 +231,9 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"environment.starts_with":"staging-"}]}
   groups={[]}
-  name={"`[field_name]`.prefix"}
+  name={"`[field_name]`.starts_with"}
   path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -242,9 +242,9 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-##### `[field_name]`.prefix
+##### `[field_name]`.starts_with
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field starts with a string argument.
 
 
 

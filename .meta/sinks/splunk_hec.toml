@@ -56,6 +56,15 @@ The name of the log field to be used as the hostname sent to Splunk HEC. This ov
 [global `host_key` option][docs.reference.global-options#host_key].\
 """
 
+[sinks.splunk_hec.options.index]
+type = "string"
+common = false
+examples = ["custom_index"]
+required = false
+description = """\
+The name of the index where send the events to. If not specified, the default index is used.
+"""
+
 [sinks.splunk_hec.options.token]
 type = "string"
 common = true
@@ -71,4 +80,4 @@ relevant_when = {encoding = "json"}
 required = false
 description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: true) %>

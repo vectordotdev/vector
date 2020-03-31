@@ -17,26 +17,20 @@ scopes:
   - new sink
 
   # domains
-  - blog
   - buffers
   - cli
   - config
   - dependencies
-  - docs
-  - guides
-  - marketing
   - networking
   - observability
   - operations
-  - platforms
   - security
-  - setup
   - sinks
   - sources
-  - templating
-  - testing
+  - tests
   - topology
   - transforms
+  - ux
   - website
 
   # platforms

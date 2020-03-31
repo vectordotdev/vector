@@ -21997,7 +21997,7 @@ module.exports = {
     "socket": {
       "beta": false,
       "delivery_guarantee": "best_effort",
-      "description": "Streams log events to a socket, such as a TCP or Unix domain socket.",
+      "description": "Streams log events to a socket, such as a TCP, UDP, or Unix domain socket.",
       "event_types": [
         "log"
       ],

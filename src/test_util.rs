@@ -1,5 +1,5 @@
 use crate::runtime::Runtime;
-use crate::Event;
+use crate::{event::LogEvent, Event};
 
 use futures01::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -152,11 +152,11 @@ pub fn random_nested_events_with_stream(
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
     random_events_with_stream_generic(count, move || {
-        let mut log = Event::new_empty_log().into_log();
+        let mut log = LogEvent::new();
 
         let tree = random_pseudonested_map(len, breadth, depth);
         for (k, v) in tree.into_iter() {
-            log.insert(k, v)
+            log.insert(k, v);
         }
 
         Event::Log(log)
