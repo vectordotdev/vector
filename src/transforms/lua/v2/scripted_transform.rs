@@ -1,8 +1,8 @@
 use crate::{event::Event, transforms::Transform};
-use futures01::{sync::mpsc::Receiver as FutureReceiver, Async, Stream as FutureStream};
+use futures01::{stream, sync::mpsc::Receiver as FutureReceiver, Async, Stream as FutureStream};
 use std::{
     sync::mpsc::{self, Receiver, Sender},
-    thread::{self, JoinHandle},
+    thread,
     time::Duration,
 };
 use tokio01::timer::Interval;
@@ -14,29 +14,26 @@ pub struct Timer {
 }
 
 pub trait ScriptedRuntime {
-    fn hook_init<F>(&mut self, _emit_fn: F) -> crate::Result<()>
+    fn hook_init<F>(&mut self, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
-        Ok(())
     }
 
-    fn hook_process<F>(&mut self, _event: Event, _emit_fn: F) -> crate::Result<()>
+    fn hook_process<F>(&mut self, _event: Event, _emit_fn: F)
     where
         F: FnMut(Event) -> ();
 
-    fn hook_shutdown<F>(&mut self, _emit_fn: F) -> crate::Result<()>
+    fn hook_shutdown<F>(&mut self, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
-        Ok(())
     }
 
-    fn timer_handler<F>(&mut self, _timer: Timer, _emit_fn: F) -> crate::Result<()>
+    fn timer_handler<F>(&mut self, _timer: Timer, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
-        Ok(())
     }
 
     fn timers(&self) -> Vec<Timer> {
@@ -58,7 +55,7 @@ enum Message {
 }
 
 impl ScriptedTransform {
-    fn new<F, T>(create_runtime: F) -> ScriptedTransform
+    pub fn new<F, T>(create_runtime: F) -> ScriptedTransform
     where
         F: FnOnce() -> T + Send + 'static,
         T: ScriptedRuntime,
@@ -71,7 +68,7 @@ impl ScriptedTransform {
 
         thread::spawn(move || {
             let mut runtime = create_runtime();
-            timers_tx.send(runtime.timers());
+            timers_tx.send(runtime.timers()).unwrap();
 
             for msg in runtime_input {
                 match msg {
@@ -126,7 +123,7 @@ impl Transform for ScriptedTransform {
     }
 }
 
-enum StreamState {
+enum RuntimeState {
     Processing,
     Idle,
 }
@@ -136,21 +133,32 @@ type MessageStream = Box<dyn FutureStream<Item = Message, Error = ()> + Send>;
 struct ScriptedStream {
     transform: ScriptedTransform,
     input_rx: MessageStream,
-    state: StreamState,
+    state: RuntimeState,
+}
+
+fn interval_from_timer(timer: Timer) -> impl FutureStream<Item = Message, Error = ()> + Send {
+    Interval::new_interval(Duration::new(timer.interval_seconds, 0))
+        .map(move |_| Message::Timer(timer))
+        .map_err(|_| ())
 }
 
 impl ScriptedStream {
     fn new(transform: ScriptedTransform, input_rx: FutureReceiver<Event>) -> ScriptedStream {
-        let input_rx = input_rx.map(|event| Message::Process(event));
-        let mut input_rx: MessageStream = Box::new(input_rx);
+        let mut input_rx: MessageStream = Box::new(
+            input_rx
+                .map(|event| Message::Process(event))
+                .chain(stream::once(Ok(Message::Shutdown))),
+        );
         for timer in transform.timers.iter() {
             input_rx = Box::new(input_rx.select(interval_from_timer(*timer)));
         }
+        // `Message::Init` should come before any other message, including those from timers.
+        input_rx = Box::new(stream::once(Ok(Message::Init)).chain(input_rx));
 
         ScriptedStream {
             transform,
             input_rx,
-            state: StreamState::Idle,
+            state: RuntimeState::Idle,
         }
     }
 }
@@ -161,27 +169,22 @@ impl FutureStream for ScriptedStream {
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
         match self.state {
-            StreamState::Idle => match self.input_rx.poll() {
+            RuntimeState::Idle => match self.input_rx.poll() {
                 Ok(Async::Ready(Some(msg))) => {
                     self.transform.input.send(msg).unwrap();
+                    self.state = RuntimeState::Processing;
                     Ok(Async::Ready(None))
                 }
-                other => other.map(|_| Async::Ready(None)),
+                other => other.map(|async_| async_.map(|_| None)),
             },
-            StreamState::Processing => match self.transform.output.try_recv() {
+            RuntimeState::Processing => match self.transform.output.try_recv() {
                 Ok(Some(event)) => Ok(Async::Ready(Some(event))),
                 Ok(None) => {
-                    self.state = StreamState::Idle;
+                    self.state = RuntimeState::Idle;
                     Ok(Async::Ready(None))
                 }
                 Err(_) => Ok(Async::Ready(None)),
             },
         }
     }
-}
-
-fn interval_from_timer(timer: Timer) -> impl FutureStream<Item = Message, Error = ()> + Send {
-    Interval::new_interval(Duration::new(timer.interval_seconds, 0))
-        .map(move |_| Message::Timer(timer))
-        .map_err(|_| ())
 }
