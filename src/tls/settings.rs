@@ -29,9 +29,12 @@ pub struct TlsOptions {
     pub verify_certificate: Option<bool>,
     pub verify_hostname: Option<bool>,
     pub ca_path: Option<PathBuf>,
+    pub ca_text: Option<String>,
     pub crt_path: Option<PathBuf>,
+    pub crt_text: Option<String>,
     pub key_path: Option<PathBuf>,
     pub key_pass: Option<String>,
+    pub key_text: Option<String>,
 }
 
 /// Directly usable settings for TLS connectors
@@ -76,45 +79,47 @@ impl TlsSettings {
             return Err(TlsError::MissingCrtKeyFile);
         }
 
-        let authority = match options.ca_path {
+        let crt_data = load_file_or_text(&options.crt_path, &options.crt_text, "certificate")?;
+        let key_data = load_file_or_text(&options.key_path, &options.key_text, "key")?;
+
+        let ca_data =
+            load_file_or_text(&options.ca_path, &options.ca_text, "certificate authority")?;
+        let authority = match &ca_data {
             None => None,
-            Some(ref path) => Some(load_x509(path)?),
+            Some((path, text)) => Some(parse_x509(&text, path)?),
         };
 
-        let identity = match options.crt_path {
+        let identity = match crt_data {
             None => None,
-            Some(ref crt_path) => {
-                let name = crt_path.to_string_lossy().to_string();
-                let cert_data = open_read(crt_path, "certificate")?;
-                let key_pass: &str = options.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
-
-                match Pkcs12::from_der(&cert_data) {
+            Some((cert_filename, cert_text)) => {
+                match Pkcs12::from_der(&cert_text) {
                     // Certificate file is DER encoded PKCS#12 archive
                     Ok(pkcs12) => {
                         // Verify password
+                        let key_pass: &str =
+                            options.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
                         pkcs12.parse(&key_pass).context(ParsePkcs12)?;
-                        Some(IdentityStore(cert_data, key_pass.to_string()))
+                        Some(IdentityStore(cert_text, key_pass.to_string()))
                     }
-                    Err(source) => {
-                        if options.key_path.is_none() {
-                            return Err(TlsError::ParsePkcs12 { source });
+                    Err(source) => match key_data {
+                        None => return Err(TlsError::ParsePkcs12 { source }),
+                        Some((key_filename, key_text)) => {
+                            // Identity is a PEM encoded certficate+key pair
+                            let crt = parse_x509(&cert_text, &cert_filename)?;
+                            let key = parse_key(&key_text, &key_filename, &options.key_pass)?;
+                            let name = cert_filename.to_string_lossy();
+                            let pkcs12 = Pkcs12::builder()
+                                .build("", &name, &key, &crt)
+                                .context(Pkcs12Error)?;
+                            let identity = pkcs12.to_der().context(DerExportError)?;
+                            // Build the resulting parsed PKCS#12 archive,
+                            // but don't store it, as it cannot be cloned.
+                            // This is just for error checking.
+                            pkcs12.parse("").context(TlsIdentityError)?;
+
+                            Some(IdentityStore(identity, "".into()))
                         }
-                        // Identity is a PEM encoded certficate+key pair
-                        let crt = load_x509(crt_path)?;
-                        let key_path = options.key_path.as_ref().unwrap();
-                        let key = load_key(&key_path, &options.key_pass)?;
-                        let pkcs12 = Pkcs12::builder()
-                            .build("", &name, &key, &crt)
-                            .context(Pkcs12Error)?;
-                        let identity = pkcs12.to_der().context(DerExportError)?;
-
-                        // Build the resulting parsed PKCS#12 archive,
-                        // but don't store it, as it cannot be cloned.
-                        // This is just for error checking.
-                        pkcs12.parse("").context(TlsIdentityError)?;
-
-                        Some(IdentityStore(identity, "".into()))
-                    }
+                    },
                 }
             }
         };
@@ -221,9 +226,8 @@ impl From<TlsSettings> for MaybeTlsSettings {
     }
 }
 
-/// Load a private key from a named file
-fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Private>> {
-    let data = open_read(filename, "key")?;
+/// Parse a private key from the given data
+fn parse_key(data: &[u8], filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Private>> {
     match pass_phrase {
         None => Ok(PKey::private_key_from_der(&data)
             .or_else(|_| PKey::private_key_from_pem(&data))
@@ -236,11 +240,10 @@ fn load_key(filename: &Path, pass_phrase: &Option<String>) -> Result<PKey<Privat
     }
 }
 
-/// Load an X.509 certificate from a named file
-fn load_x509(filename: &Path) -> Result<X509> {
-    let data = open_read(filename, "certificate")?;
-    Ok(X509::from_der(&data)
-        .or_else(|_| X509::from_pem(&data))
+/// Parse an X.509 certificate from the given data
+fn parse_x509(data: &[u8], filename: &Path) -> Result<X509> {
+    Ok(X509::from_der(data)
+        .or_else(|_| X509::from_pem(data))
         .with_context(|| X509ParseError { filename })?)
 }
 
@@ -253,6 +256,22 @@ fn open_read(filename: &Path, note: &'static str) -> Result<Vec<u8>> {
         .with_context(|| FileReadFailed { note, filename })?;
 
     Ok(text)
+}
+
+fn load_file_or_text(
+    path: &Option<PathBuf>,
+    text: &Option<String>,
+    mode: &'static str,
+) -> Result<Option<(PathBuf, Vec<u8>)>> {
+    match (path, text) {
+        (None, None) => Ok(None),
+        (Some(_), Some(_)) => Err(TlsError::BothPathAndText { mode }),
+        (Some(path), None) => Ok(Some((path.clone(), open_read(path, mode)?))),
+        (None, Some(text)) => Ok(Some((
+            format!("<Vector config file {}>", mode).into(),
+            Vec::from(text.as_bytes()),
+        ))),
+    }
 }
 
 #[cfg(test)]

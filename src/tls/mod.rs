@@ -102,6 +102,8 @@ pub enum TlsError {
     Connect { source: std::io::Error },
     #[snafu(display("Could not get peer address: {}", source))]
     PeerAddress { source: std::io::Error },
+    #[snafu(display("Both a {} path and inline text is configured", mode))]
+    BothPathAndText { mode: &'static str },
 }
 
 impl MaybeTlsStream<TcpStream> {
