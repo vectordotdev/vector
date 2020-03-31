@@ -106,7 +106,7 @@ function GuideListPage(props) {
           <div className="hero--search">
             <input
               type="text"
-              className="input--xl"
+              className="input--text input--xl"
               onChange={(event) => setSearchTerm(event.currentTarget.value)}
               placeholder="🔍 Search by guide name or tag..." />
           </div>

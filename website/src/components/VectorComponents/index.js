@@ -254,7 +254,7 @@ function VectorComponents(props) {
       <div className="filters">
         <div className="search">
           <input
-            className="input--lg"
+            className="input--text input--lg"
             type="text"
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
             placeholder="🔍 Search..." />
