@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: "What is Vector?"
 description: "High-level description of the Vector observability data collector and router."
 ---
@@ -10,9 +10,10 @@ import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
 
-Vector is a lightweight and ultra-fast tool for building observability
-pipelines. Compared to Logstash and friends, Vector [improves throughput by
-~10X while significanly reducing CPU and memory usage](#performance).
+Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
+building observability pipelines. Compared to Logstash and friends, Vector
+[improves throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance].
 
 ### Principles
 
@@ -45,3 +46,5 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
 [docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_repo]: https://github.com/timberio/vector

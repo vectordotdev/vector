@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -14,7 +14,6 @@ title: "AWS Cloudwatch Metrics Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -43,9 +42,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
@@ -57,9 +54,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_metrics" # required
@@ -79,8 +74,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -104,8 +97,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -128,8 +119,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={20}
@@ -153,8 +142,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -178,13 +165,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -209,8 +192,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -234,8 +215,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -261,8 +240,6 @@ that will isolate different metrics from each other.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -287,15 +264,11 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -320,8 +293,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -346,8 +317,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

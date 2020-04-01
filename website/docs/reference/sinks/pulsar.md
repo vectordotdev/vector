@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Apache Pulsar"
 description: "The Vector `pulsar` sink streams `log` events to Apache Pulsar via the Pulsar protocol."
@@ -14,7 +14,6 @@ title: "Apache Pulsar Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -41,9 +40,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "pulsar" # required
@@ -59,9 +56,7 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "pulsar" # required
@@ -85,8 +80,6 @@ Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -110,8 +103,6 @@ A host and port pair that the pulsar client should connect to.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -134,8 +125,6 @@ Options for the authentication strategy.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -159,8 +148,6 @@ The basic authentication name.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -184,13 +171,9 @@ The basic authentication password.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -213,8 +196,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -238,8 +219,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -263,8 +242,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -288,8 +265,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -313,13 +288,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -343,8 +314,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -368,8 +337,6 @@ The Pulsar topic name to write events to.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

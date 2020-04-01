@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
@@ -11,7 +11,6 @@ status: "beta"
 title: "Tag Cardinality Limit Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
   inputs = ["my-source-id"] # required
@@ -52,9 +49,7 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
   inputs = ["my-source-id"] # required
@@ -68,8 +63,6 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={5120000}
@@ -95,8 +88,6 @@ a new value for tag even after we have reached the configured limits.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"drop_tag"}
@@ -121,8 +112,6 @@ the configured limit on cardinality.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -147,8 +136,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -172,8 +159,6 @@ How many distinct values to accept for any given key.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -187,9 +172,7 @@ configured [`value_limit`](#value_limit).
 
 For example, given this configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.cardinality_protection]
   type = "tag_cardinality_limit"
   inputs = [...]

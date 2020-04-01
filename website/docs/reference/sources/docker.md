@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,7 +37,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 * Docker API `>= 1.24` is required.
-* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See ["How it works"](#how-it-works) for more info.
+* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See the ["Docker Logging Drivers" section][docs.sources.docker#docker-logging-drivers] for more info.
 
 </Alert>
 
@@ -51,9 +50,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "docker" # required
   include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
@@ -64,9 +61,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "docker" # required
   auto_partial_merge = true # optional, default
@@ -80,8 +75,6 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -105,8 +98,6 @@ Setting this to `false` will disable the automatic merging of partial events.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -132,8 +123,6 @@ container ID or name. If not provided, all containers will be included.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -158,8 +147,6 @@ included.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -185,8 +172,6 @@ labels docs][urls.docker_object_labels].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"_partial"}
@@ -212,15 +197,11 @@ partial event. This allows to opt-out of partial event detection.
 
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={"unix:///var/run/docker.sock"}
@@ -244,8 +225,6 @@ The docker host to connect to.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -271,8 +250,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -296,8 +273,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -321,8 +296,6 @@ A UTC timestamp representing when the container was created.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -346,8 +319,6 @@ The Docker container ID that the log was collected from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -371,8 +342,6 @@ The Docker container name that the log was collected from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -396,8 +365,6 @@ The image name that the container is based on.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -422,8 +389,6 @@ it's exact key/value pair.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -447,8 +412,6 @@ The raw log message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -472,8 +435,6 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -497,8 +458,6 @@ The UTC timestamp extracted from the Docker log event.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -586,6 +545,7 @@ that we use to determine if an event is partial via the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.installation.platforms]: /docs/setup/installation/platforms/
+[docs.sources.docker#docker-logging-drivers]: /docs/reference/sources/docker/#docker-logging-drivers
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.sources.syslog]: /docs/reference/sources/syslog/

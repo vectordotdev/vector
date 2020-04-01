@@ -23,6 +23,7 @@ module.exports = {
       type: 'category',
       label: 'Setup',
       items: [
+        "setup",
         {
           type: 'category',
           label: 'Installation',
@@ -146,13 +147,15 @@ module.exports = {
             
               "reference/transforms/dedupe",
             
-              "reference/transforms/field_filter",
+              "reference/transforms/filter",
             
               "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",
             
               "reference/transforms/json_parser",
+            
+              "reference/transforms/kubernetes_pod_metadata",
             
               "reference/transforms/log_to_metric",
             

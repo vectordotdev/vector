@@ -18,8 +18,10 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use futures01::{sync::mpsc, Future, Sink, Stream};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use string_cache::DefaultAtom as Atom;
 
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
@@ -30,6 +32,10 @@ use snafu::Snafu;
 
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &str = r"/var/log/pods/";
+
+lazy_static! {
+    pub static ref POD_UID: Atom = Atom::from("object_uid");
+}
 
 #[derive(Debug, Snafu)]
 enum BuildError {

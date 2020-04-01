@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS
@@ -35,7 +35,6 @@ This document will cover installing Vector on MacOS.
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
-
 Typically data is collected from a process manager, such as Journald via
 Vector's [`journald` source][docs.sources.journald], but can be collected
 through any of Vector's [sources][docs.sources].
@@ -77,7 +76,7 @@ brew tap timberio/brew && brew install vector
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -112,7 +111,7 @@ brew services start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -142,7 +141,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -226,7 +225,7 @@ brew tap timberio/brew && brew install vector
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -261,7 +260,7 @@ brew services start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -291,7 +290,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

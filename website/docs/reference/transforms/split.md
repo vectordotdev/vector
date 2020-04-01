@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Split Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ value on a _literal_ separator and zip the tokens into ordered field names.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "split" # required
@@ -51,8 +48,6 @@ value on a _literal_ separator and zip the tokens into ordered field names.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -76,8 +71,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -101,8 +94,6 @@ The field to apply the split on.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -126,8 +117,6 @@ The field names assigned to the resulting tokens, in order.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"[whitespace]"}
@@ -153,8 +142,6 @@ Derived Core Property `White_Space`][urls.unicode_whitespace].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -178,8 +165,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -205,13 +190,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -284,9 +265,7 @@ The [`field`](#field) and [`field_names`](#field_names) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_split_transform_id]
   # ...
   field = "message"

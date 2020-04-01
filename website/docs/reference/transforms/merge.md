@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "beta"
 title: "Merge Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -31,9 +30,7 @@ events into a single event.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "merge" # required
   inputs = ["my-source-id"] # required
@@ -43,8 +40,6 @@ events into a single event.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={["message"]}
@@ -72,8 +67,6 @@ non-partial event fields are merged in, producing the resulting merged event.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"_partial"}
@@ -98,8 +91,6 @@ partial events along with the first non-partial event will be merged together.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={[]}
@@ -125,8 +116,6 @@ sources from mixing together, as this affects partial event processing.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -144,9 +133,7 @@ For example:
 
 Given the following _default_ configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
@@ -154,9 +141,7 @@ Given the following _default_ configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader text="first log event" />
-
-```javascript
+```javascript title="first log event"
 {
   "message": "First",
   "_partial": true,
@@ -167,9 +152,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader text="second log event" />
-
-```javascript
+```javascript title="second log event"
 {
   "message": "Second",
   "_partial": true,
@@ -180,9 +163,7 @@ and
 
 and
 
-<CodeHeader text="third log event" />
-
-```javascript
+```javascript title="third log event"
 {
   "message": "Third",
   "custom_string_field": "value3",
@@ -208,9 +189,7 @@ Notice that `custom_string_field` and `custom_int_field` were not overridden. Th
 
 Given the following configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
@@ -219,9 +198,7 @@ Given the following configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader text="first log event" />
-
-```javascript
+```javascript title="first log event"
 {
   "message": "First",
   "_partial": true,
@@ -232,9 +209,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader text="second log event" />
-
-```javascript
+```javascript title="second log event"
 {
   "message": "Second",
   "_partial": true,
@@ -245,9 +220,7 @@ and
 
 and
 
-<CodeHeader text="third log event" />
-
-```javascript
+```javascript title="third log event"
 {
   "message": "Third",
   "custom_string_field": "value3",
@@ -294,9 +267,7 @@ The [`merge_fields`](#merge_fields), [`partial_event_marker_field`](#partial_eve
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_merge_transform_id]
   # ...
   merge_fields = ["message"]

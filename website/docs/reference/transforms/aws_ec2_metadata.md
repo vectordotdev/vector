@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -12,7 +12,6 @@ title: "AWS EC2 Metadata Transform"
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -33,16 +32,14 @@ AWS EC2 instance metadata.
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 
-* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on
-* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See ["How it works"](#how-it-works) for more info.
+* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
+* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See the ["AWS imDS v2" section][docs.transforms.aws_ec2_metadata#aws-imds-v2] for more info.
 
 </Alert>
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
   inputs = ["my-source-id"] # required
@@ -53,8 +50,6 @@ AWS EC2 instance metadata.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]}
@@ -78,8 +73,6 @@ A list of fields to include in each event.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"http://169.254.169.254"}
@@ -103,8 +96,6 @@ Override the default EC2 Metadata host.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={""}
@@ -128,8 +119,6 @@ Prepend a namespace to each field's key.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={10}
@@ -153,8 +142,6 @@ The interval in seconds at which the EC2 Metadata api will be called.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -181,8 +168,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -206,8 +191,6 @@ The `ami-id` that the current EC2 instance is using.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -231,8 +214,6 @@ The `availability-zone` that the current EC2 instance is running in.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -256,8 +237,6 @@ The `instance-id` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -281,8 +260,6 @@ The `local-hostname` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -306,8 +283,6 @@ The `local-ipv4` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -331,8 +306,6 @@ The `public-hostname` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -356,8 +329,6 @@ The `public-ipv4` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -381,8 +352,6 @@ The [`region`](#region) that the current EC2 instance is running in.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -406,8 +375,6 @@ The `role-name` that the current EC2 instance is using.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -431,8 +398,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -456,8 +421,6 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -495,6 +458,7 @@ You can learn more in the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.transforms.aws_ec2_metadata#aws-imds-v2]: /docs/reference/transforms/aws_ec2_metadata/#aws-imds-v2
 [urls.aws_ec2_instance_metadata]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
 [urls.aws_imds_v1_security_problems]: https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

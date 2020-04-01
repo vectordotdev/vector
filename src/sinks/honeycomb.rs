@@ -7,7 +7,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{compat::Future01CompatExt, TryFutureExt};
-use futures01::Stream;
+use futures01::{Sink, Stream};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -48,7 +48,8 @@ impl SinkConfig for HoneycombConfig {
             batch_settings,
             None,
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
 
         let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
 

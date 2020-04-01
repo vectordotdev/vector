@@ -5,7 +5,7 @@ require "active_support/core_ext/string/output_safety"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 require_relative "templates/integration_guide"
-require_relative "templates/interface_tutorials"
+require_relative "templates/interface_start"
 
 # Renders templates in the templates sub-dir
 #
@@ -44,7 +44,7 @@ class Templates
 
     links =
       components.select(&:common?)[0..limit].collect do |component|
-        "[#{component.name}][docs.#{type.to_s.pluralize}.#{component.name}]"
+        "[#{component.name}][#{component_short_link(component)}]"
       end
 
     num_leftover = components.size - links.size
@@ -68,7 +68,7 @@ class Templates
     render("#{partials_path}/_component_header.md", binding).strip
   end
 
-  def component_output(component, output, breakout_top_keys: false, heading_depth: 1)
+  def component_output(component, output, breakout_top_keys: false, heading_depth: 3, root_key: nil)
     examples = output.examples
     fields = output.fields ? output.fields.to_h.values.sort : []
     render("#{partials_path}/_component_output.md", binding).strip
@@ -84,6 +84,10 @@ class Templates
 
   def component_short_description(component)
     send("#{component.type}_short_description", component)
+  end
+
+  def component_short_link(component)
+    "docs.#{component.type.to_s.pluralize}.#{component.name}"
   end
 
   def components_table(components)
@@ -193,7 +197,7 @@ class Templates
     fetch_strategies([strategy_reference]).first
   end
 
-  def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
+  def fields(fields, filters: true, heading_depth: 3, path: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -201,7 +205,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields)
+  def fields_example(fields, root_key: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -209,7 +213,7 @@ class Templates
     render("#{partials_path}/_fields_example.md", binding).strip
   end
 
-  def fields_hash(fields)
+  def fields_hash(fields, root_key: nil)
     hash = {}
 
     fields.each do |field|
@@ -226,7 +230,11 @@ class Templates
       end
     end
 
-    hash
+    if root_key
+      {root_key => hash}
+    else
+      hash
+    end
   end
 
   def full_config_spec
@@ -238,23 +246,45 @@ class Templates
   end
 
   def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
-    tutorial =
-      case (interface && interface.name)
-      when "docker-cli"
-        InterfaceTutorials::DockerCLI.new(source)
-      when "docker-compose"
-        InterfaceTutorials::DockerCLI.new(source)
-      end
-
-    render("#{partials_path}/interface_installation_tutorials/_#{interface.name}.md", binding).strip
+    render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
   end
 
   def interface_logs(interface)
     render("#{partials_path}/interface_logs/_#{interface.name}.md", binding).strip
   end
 
+  def interface_reload(interface)
+    render("#{partials_path}/interface_reload/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_start(interface, requirements: nil)
+    interface_start =
+      case interface.name
+      when "docker-cli"
+        InterfaceStart::DockerCLI.new(interface, requirements)
+      end
+
+    render("#{partials_path}/interface_start/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_stop(interface)
+    render("#{partials_path}/interface_stop/_#{interface.name}.md", binding).strip
+  end
+
   def interfaces_logs(interfaces, size: nil)
     render("#{partials_path}/_interfaces_logs.md", binding).strip
+  end
+
+  def interfaces_reload(interfaces, requirements: nil, size: nil)
+    render("#{partials_path}/_interfaces_reload.md", binding).strip
+  end
+
+  def interfaces_start(interfaces, requirements: nil, size: nil)
+    render("#{partials_path}/_interfaces_start.md", binding).strip
+  end
+
+  def interfaces_stop(interfaces, size: nil)
+    render("#{partials_path}/_interfaces_stop.md", binding).strip
   end
 
   def manual_installation_next_steps(type)
@@ -363,6 +393,14 @@ class Templates
     else
       "outputs #{event_type_links(component.output_types).to_sentence} events"
     end
+  end
+
+  def permissions(permissions, heading_depth: nil)
+    if !permissions.is_a?(Array)
+      raise ArgumentError.new("Permissions must be an Array")
+    end
+
+    render("#{partials_path}/_permissions.md", binding).strip
   end
 
   def partial?(template_path)

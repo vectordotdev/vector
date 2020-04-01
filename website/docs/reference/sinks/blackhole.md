@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Blackhole"
 description: "The Vector `blackhole` sink streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
@@ -14,7 +14,6 @@ title: "Blackhole Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -33,9 +32,7 @@ data, designed for testing and benchmarking purposes.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "blackhole" # required
   inputs = ["my-source-id"] # required
@@ -43,8 +40,6 @@ data, designed for testing and benchmarking purposes.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -69,8 +64,6 @@ activity.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
 event_types: ["log"]
@@ -12,7 +12,6 @@ title: "Rename Fields Transform"
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -39,9 +38,7 @@ log fields.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "rename_fields" # required
@@ -55,9 +52,7 @@ log fields.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "rename_fields" # required
@@ -73,8 +68,6 @@ log fields.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -99,8 +92,6 @@ field that are now empty.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -123,8 +114,6 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -148,13 +137,9 @@ Old-key/New-key pair reprsenting the key to be moved.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -178,9 +163,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "rename_fields"
   inputs = [...]

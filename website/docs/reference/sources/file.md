@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "file" # required
@@ -67,9 +64,7 @@ events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "file" # required
@@ -105,8 +100,6 @@ events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -132,8 +125,6 @@ sure the Vector project has write permissions to this dir.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -158,8 +149,6 @@ precedence over the [`include` option](#include).*
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"file"}
@@ -183,8 +172,6 @@ The key name added to each event with the full path of the file.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -207,8 +194,6 @@ Configuration for how the file source should identify files.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={"checksum"}
@@ -233,8 +218,6 @@ The strategy used to uniquely identify files. This is important for
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={256}
@@ -259,8 +242,6 @@ fingerprint.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={0}
@@ -285,13 +266,9 @@ fingerprint. This is helpful if all files share a common header.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1000}
@@ -316,8 +293,6 @@ searches for files.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -343,8 +318,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -368,8 +341,6 @@ Ignore files with a data modification date that does not exceed this age.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -393,8 +364,6 @@ Array of file patterns to include. [Globbing](#globbing) is supported.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={102400}
@@ -419,8 +388,6 @@ protects against malformed lines or tailing incorrect files.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={2048}
@@ -445,8 +412,6 @@ time.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -470,8 +435,6 @@ If not speicified, multiline parsing is disabled.
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -495,8 +458,6 @@ Start regex pattern to look for as a beginning of the message.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -520,8 +481,6 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -545,8 +504,6 @@ Condition regex pattern to look for. Exact behavior is configured via [`mode`](#
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -571,13 +528,9 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -602,8 +555,6 @@ draining the oldest files before moving on to read data from younger files.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -629,8 +580,6 @@ checkpoint.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -650,8 +599,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -676,8 +623,6 @@ via the [`file_key`](#file_key) option.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -702,8 +647,6 @@ renamed via the [`host_key`](#host_key) option.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -728,8 +671,6 @@ The raw log message, unaltered. This can be renamed via the [global
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -754,8 +695,6 @@ The exact time the event was ingested. This can be renamed via the [global
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

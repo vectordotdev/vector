@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
@@ -31,11 +31,7 @@ or more metrics.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -49,8 +45,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -73,8 +67,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -98,8 +90,6 @@ The log field to use as the metric.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -124,8 +114,6 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -150,8 +138,6 @@ for `gauge`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -174,8 +160,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -200,13 +184,9 @@ Environment variables and field interpolation is allowed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -230,13 +210,9 @@ The metric type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

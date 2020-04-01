@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "HTTP"
 description: "The Vector `http` source ingests data through the HTTP protocol and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "http" # required
   address = "0.0.0.0:80" # required
@@ -63,9 +60,7 @@ events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "http" # required
@@ -86,8 +81,6 @@ events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -111,8 +104,6 @@ The address to listen for connections on
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"text"}
@@ -137,8 +128,6 @@ encodings, the fields of the JSON objects are output as separate fields.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -165,8 +154,6 @@ missing.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -189,8 +176,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -215,8 +200,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -242,8 +225,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -268,8 +249,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -294,8 +273,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -320,8 +297,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -347,13 +322,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -371,8 +342,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -396,8 +365,6 @@ The message field, containing the plain text message.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -421,8 +388,6 @@ The time the event was ingested. Note this may be overridden by JSON payloads.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

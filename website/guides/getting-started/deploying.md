@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -170,7 +170,7 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 
@@ -216,7 +216,7 @@ sudo dpkg -i vector-arm64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 
@@ -262,7 +262,7 @@ sudo dpkg -i vector-armhf.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 
@@ -292,7 +292,7 @@ sudo systemctl start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 
@@ -349,7 +349,7 @@ brew tap timberio/brew && brew install vector
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 
@@ -402,7 +402,7 @@ brew services start vector
 
     <ConfigExample
       format="toml"
-      path="config\vector.toml"
+      path={"config\\vector.toml"}
       sourceName={"docker"}
       sinkName={null} />
 
@@ -441,7 +441,7 @@ brew services start vector
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"docker"}
       sinkName={null} />
 
@@ -491,7 +491,7 @@ brew services start vector
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"docker"}
       sinkName={null} />
 
@@ -522,7 +522,7 @@ brew services start vector
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"docker"}
       sinkName={null} />
 
@@ -553,7 +553,7 @@ brew services start vector
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"docker"}
       sinkName={null} />
 
@@ -585,7 +585,7 @@ brew services start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 

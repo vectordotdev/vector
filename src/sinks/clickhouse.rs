@@ -10,7 +10,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Request};
@@ -78,7 +78,8 @@ impl SinkConfig for ClickhouseConfig {
             batch,
             tls_settings,
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }

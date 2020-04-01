@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -14,7 +14,6 @@ title: "InfluxDB Metrics Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -42,9 +41,7 @@ The Vector `influxdb_metrics` sink
 
 <TabItem value="v2">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -62,9 +59,7 @@ The Vector `influxdb_metrics` sink
 </TabItem>
 <TabItem value="v1">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -86,9 +81,7 @@ The Vector `influxdb_metrics` sink
 </TabItem>
 <TabItem value="v2-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -119,9 +112,7 @@ The Vector `influxdb_metrics` sink
 </TabItem>
 <TabItem value="v1-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -157,8 +148,6 @@ The Vector `influxdb_metrics` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -181,8 +170,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={20}
@@ -206,8 +193,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -231,13 +216,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -261,8 +242,6 @@ InfluxDB endpoint to send metrics to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -286,8 +265,6 @@ The destination bucket for writes into InfluxDB 2.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -311,8 +288,6 @@ Sets the write consistency for the point for InfluxDB 1.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -336,8 +311,6 @@ Sets the target database for the write into InfluxDB 1.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -361,8 +334,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -386,8 +357,6 @@ A prefix that will be added to all metric names.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -411,8 +380,6 @@ Specifies the destination organization for writes into InfluxDB 2.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -437,8 +404,6 @@ write into InfluxDB 1.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -461,8 +426,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -486,8 +449,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -511,8 +472,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -537,8 +496,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -562,8 +519,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -589,8 +544,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -614,8 +567,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -642,13 +593,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -672,8 +619,6 @@ Sets the target retention policy for the write into InfluxDB 1.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -697,8 +642,6 @@ Sets the target retention policy for the write into InfluxDB 1.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -723,8 +666,6 @@ write into InfluxDB 1.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

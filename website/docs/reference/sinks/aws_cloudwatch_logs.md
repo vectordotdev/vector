@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -14,7 +14,6 @@ title: "AWS Cloudwatch Logs Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -44,9 +43,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_logs" # required
@@ -65,9 +62,7 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_cloudwatch_logs" # required
@@ -111,8 +106,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -136,8 +129,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -160,8 +151,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={1049000}
@@ -185,8 +174,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -210,13 +197,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -239,8 +222,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -264,8 +245,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -289,8 +268,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -314,8 +291,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -339,13 +314,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -371,8 +342,6 @@ creating the group and will create the first stream.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -397,8 +366,6 @@ does not already exist.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -421,8 +388,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -446,8 +411,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -471,8 +434,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -496,8 +457,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -521,13 +480,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -552,8 +507,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -578,8 +531,6 @@ Logs stream.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -603,8 +554,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -629,8 +578,6 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -653,8 +600,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -678,8 +623,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -703,8 +646,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -729,8 +670,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -754,8 +693,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -781,8 +718,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -806,8 +741,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={30}
@@ -834,13 +767,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -865,15 +794,11 @@ CloudWatch Logs stream.
 
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -898,8 +823,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -924,8 +847,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -1077,9 +998,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
   group_name = "group-name"

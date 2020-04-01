@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
@@ -14,7 +14,6 @@ title: "Papertrail Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -42,9 +41,7 @@ The Vector `papertrail` sink
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "papertrail" # required
@@ -59,9 +56,7 @@ The Vector `papertrail` sink
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "papertrail" # required
@@ -86,8 +81,6 @@ The Vector `papertrail` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -110,8 +103,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -135,8 +126,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -160,8 +149,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -185,8 +172,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -210,13 +195,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -239,8 +220,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -264,8 +243,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -289,8 +266,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -314,8 +289,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -339,13 +312,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -369,8 +338,6 @@ The endpoint to stream logs to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -394,8 +361,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

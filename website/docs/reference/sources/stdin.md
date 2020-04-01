@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
@@ -14,7 +14,6 @@ title: "STDIN Source"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -41,9 +40,7 @@ events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "stdin" # required
 ```
@@ -51,9 +48,7 @@ events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "stdin" # required
@@ -67,8 +62,6 @@ events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -94,8 +87,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={102400}
@@ -119,8 +110,6 @@ The maxiumum bytes size of a message before it is discarded.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -149,8 +138,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -174,8 +161,6 @@ The local hostname.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -199,8 +184,6 @@ The raw message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -224,8 +207,6 @@ The exact time the event was ingested.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

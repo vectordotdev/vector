@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Install Vector On Ubuntu
 sidebar_label: Ubuntu
 description: Install Vector on the Ubuntu operating system
@@ -35,7 +35,6 @@ This document will cover installing Vector on Ubuntu.
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
-
 Typically data is collected from a process manager, such as Journald via
 Vector's [`journald` source][docs.sources.journald], but can be collected
 through any of Vector's [sources][docs.sources].
@@ -93,7 +92,7 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -139,7 +138,7 @@ sudo dpkg -i vector-arm64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -185,7 +184,7 @@ sudo dpkg -i vector-armhf.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -222,7 +221,7 @@ sudo systemctl start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -252,7 +251,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -350,7 +349,7 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -396,7 +395,7 @@ sudo dpkg -i vector-arm64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -442,7 +441,7 @@ sudo dpkg -i vector-armhf.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -479,7 +478,7 @@ sudo systemctl start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -509,7 +508,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

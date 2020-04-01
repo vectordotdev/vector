@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to Datadog"
 description: "A simple guide to send logs from Journald to Datadog in just a few minutes."
@@ -50,10 +50,10 @@ your observability strategy.
 ### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
+is a [popular][urls.vector_stars] [open-source][urls.vector_repo] utility for
+building observability pipelines. It's written in [Rust][urls.rust], making it
+lightweight, [ultra-fast][urls.vector_performance] and highly reliable. And
+we'll be deploying Vector as a
 [daemon][docs.strategies#daemon].
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -111,7 +111,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"journald"}
   sinkName={"datadog_logs"} />
 
@@ -146,7 +146,7 @@ flexibility of Vector:
   <div className="sub-title">Go from zero to production in under 10 minutes!</div>
 </Jump>
 
-<Jump to="/guides/getting-started/" leftIcon="book">
+<Jump to="/docs/about/what-is-vector/" leftIcon="book">
   <div className="title">Vector documentation</div>
   <div className="sub-title">Thoughtful, detailed docs that respect your time.</div>
 </Jump>
@@ -159,5 +159,6 @@ flexibility of Vector:
 [urls.rust]: https://www.rust-lang.org/
 [urls.systemd]: https://systemd.io/
 [urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

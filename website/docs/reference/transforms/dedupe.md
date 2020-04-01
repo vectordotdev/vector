@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Dedupe events Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ duplicate Events from being outputted by using an LRU cache.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "dedupe" # required
@@ -53,9 +50,7 @@ duplicate Events from being outputted by using an LRU cache.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "dedupe" # required
@@ -73,8 +68,6 @@ duplicate Events from being outputted by using an LRU cache.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -97,8 +90,6 @@ Options controlling how we cache recent Events for future duplicate checking.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5000}
@@ -122,13 +113,9 @@ The number of recent Events to cache and compare new incoming Events against.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -151,8 +138,6 @@ Options controlling what fields to match against
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -177,8 +162,6 @@ Incompatible with the `fields.match` option.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={["timestamp","host","message"]}
@@ -205,13 +188,9 @@ options][docs.reference.global-options#log_schema].Incompatible with the
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

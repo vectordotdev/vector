@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -36,7 +35,7 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Kafka version `>= 0.8` is required.
+* [Kafka][urls.kafka] version `>= 0.8` is required.
 
 </Alert>
 
@@ -49,9 +48,7 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "kafka" # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
@@ -63,9 +60,7 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "kafka" # required
@@ -95,8 +90,6 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={"largest"}
@@ -122,8 +115,6 @@ option for explanation.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -149,8 +140,6 @@ initially to bootstrap itself.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={100}
@@ -174,8 +163,6 @@ Maximum time the broker may wait to fill the response.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -199,8 +186,6 @@ The consumer group name to be used to consume events from Kafka.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -226,8 +211,6 @@ not be added to the log event.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -251,8 +234,6 @@ details.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -276,13 +257,9 @@ The options and their values. Accepts `string` values.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10000}
@@ -306,8 +283,6 @@ The Kafka session timeout in milliseconds.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={60000}
@@ -331,8 +306,6 @@ Default timeout for network requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -355,8 +328,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -380,8 +351,6 @@ Enable TLS during connections to the remote.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -406,8 +375,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -433,8 +400,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -459,8 +424,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -485,13 +448,9 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -516,8 +475,6 @@ begins with `^`.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -535,8 +492,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -560,8 +515,6 @@ The raw event message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -585,8 +538,6 @@ The exact time the event was ingested.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

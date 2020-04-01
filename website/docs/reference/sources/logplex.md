@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Heroku Logplex"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ protocol][urls.logplex_protocol] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "logplex" # required
   address = "0.0.0.0:80" # required
@@ -61,9 +58,7 @@ protocol][urls.logplex_protocol] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "logplex" # required
@@ -82,8 +77,6 @@ protocol][urls.logplex_protocol] and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -107,8 +100,6 @@ The address to accept connections on. The address _must_ include a port.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -131,8 +122,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -157,8 +146,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -184,8 +171,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -210,8 +195,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -236,8 +219,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -262,8 +243,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -289,13 +268,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -313,8 +288,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -338,8 +311,6 @@ The message field, containing the plain text message.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -363,8 +334,6 @@ The time the event was ingested. Note this may be overridden by JSON payloads.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

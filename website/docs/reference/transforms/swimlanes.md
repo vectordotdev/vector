@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "beta"
 title: "Swimlanes Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -31,9 +30,7 @@ parallel streams using logical filters.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "swimlanes" # required
@@ -49,8 +46,6 @@ parallel streams using logical filters.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -75,8 +70,6 @@ components with the name `<transform_name>.<swimlane_id>`.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -99,8 +92,6 @@ The identifier of a swimlane.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={"check_fields"}
@@ -124,8 +115,6 @@ The type of the condition to execute.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -149,8 +138,6 @@ Check whether a fields contents exactly matches the value specified.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -168,15 +155,13 @@ Check whether a fields contents exactly matches the value specified.
 
 ##### `[field-name]`.exists
 
-Check whether a field exists or does not exist, depending on the provided
-valuebeing `true` or `false` respectively.
+Check whether a field exists or does not exist, depending on the provided value
+being `true` or `false` respectively.
 
 
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -200,8 +185,6 @@ Check whether a fields contents does not match the value specified.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -225,8 +208,6 @@ Checks whether a string field contains a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -250,8 +231,6 @@ Checks whether a string field ends with a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -275,18 +254,12 @@ Checks whether a string field starts with a string argument.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -304,9 +277,7 @@ For example:
 
 The `swimlanes` transform, in it's simplest form, can act as a simple if/else stream splitter. For example, we can route events from the host `gerry` to a sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.splitting_gerrys]
   inputs = [ "somewhere" ]
   type = "swimlanes"
@@ -336,9 +307,7 @@ This syntax makes it easy to create arbitrary numbers of swimlanes, each with th
 
 To follow up with the previous `If/Else` example, let's say we want to split a log stream based on all of the log `level` values:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.level_splitter]
   type = "swimlanes"
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -37,7 +36,7 @@ The Vector `prometheus` sink
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Prometheus version `>= 1.0` is required.
+* [Prometheus][urls.prometheus] version `>= 1.0` is required.
 
 </Alert>
 
@@ -50,9 +49,7 @@ The Vector `prometheus` sink
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "prometheus" # required
   inputs = ["my-source-id"] # required
@@ -63,9 +60,7 @@ The Vector `prometheus` sink
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "prometheus" # required
   inputs = ["my-source-id"] # required
@@ -79,8 +74,6 @@ The Vector `prometheus` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -104,8 +97,6 @@ The address to expose for scraping.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
@@ -130,8 +121,6 @@ Default buckets to use for aggregating
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={60}
@@ -155,8 +144,6 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -181,8 +168,6 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -200,7 +185,7 @@ For example:
 
 Given the following histogram metric events:
 
-```json
+```json title="Example histogram metrics"
 [
   {
     "name": "response_time_s",
@@ -225,7 +210,7 @@ Given the following histogram metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP response_time_s response_time_s
 # TYPE response_time_s histogram
 response_time_s_bucket{le="0.005"} 0
@@ -250,7 +235,7 @@ response_time_s_count 2
 
 Given the following counter metric events:
 
-```json
+```json title="Example counter metrics"
 [
   {
     "name": "logins",
@@ -272,7 +257,7 @@ Given the following counter metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP logins logins
 # TYPE logins counter
 logins 4
@@ -284,7 +269,7 @@ logins 4
 
 Given the following gauge metric events:
 
-```json
+```json title="Example gauge metrics"
 [
   {
     "name": "memory_rss",
@@ -307,7 +292,7 @@ Given the following gauge metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225

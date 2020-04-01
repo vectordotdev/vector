@@ -2,10 +2,10 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue},
     event::Event,
-    sinks::util::{BatchBytesConfig, BatchServiceSink, Buffer, SinkExt},
+    sinks::util::{BatchBytesConfig, BatchSink, Buffer},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{future, sink::Sink, Future, Poll};
+use futures01::{future, stream::iter_ok, Future, Poll, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
@@ -92,9 +92,9 @@ impl StatsdSvc {
 
         let svc = ServiceBuilder::new().service(service);
 
-        let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(Buffer::new(false), &batch)
-            .with(move |event| encode_event(event, &namespace));
+        let sink = BatchSink::new(svc, Buffer::new(false), batch, acker)
+            .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
+            .with_flat_map(move |event| iter_ok(encode_event(event, &namespace)));
 
         Ok(Box::new(sink))
     }
@@ -119,7 +119,7 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     parts.join(",")
 }
 
-fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -187,7 +187,7 @@ fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
 
-    Ok(body)
+    Some(body)
 }
 
 impl Service<Vec<u8>> for StatsdSvc {

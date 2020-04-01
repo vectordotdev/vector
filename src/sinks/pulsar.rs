@@ -2,7 +2,6 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     runtime::TaskExecutor,
-    sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::{
@@ -14,6 +13,8 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
+
+type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
 
 #[derive(Debug, Snafu)]
 enum BuildError {

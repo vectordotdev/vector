@@ -1,12 +1,11 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Steps from '@site/src/components/Steps';
 
 This page covers installing Vector from source using the native toolchain for
@@ -327,9 +326,7 @@ Make sure that this directory is writable by the `vector` process.
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 data_dir = "/var/lib/vector" # default
 ```
 
@@ -419,10 +416,11 @@ features one has to pass a comma-separated list of component features.
 | `transforms-coercer` | Enables building of [`coercer` transform][docs.transforms.coercer].  |
 | `transforms-concat` | Enables building of [`concat` transform][docs.transforms.concat].  |
 | `transforms-dedupe` | Enables building of [`dedupe` transform][docs.transforms.dedupe].  |
-| `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.field_filter].  |
+| `transforms-filter` | Enables building of [`filter` transform][docs.transforms.filter].  |
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
 | `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
+| `transforms-kubernetes_pod_metadata` | Enables building of [`kubernetes_pod_metadata` transform][docs.transforms.kubernetes_pod_metadata].  |
 | `transforms-log_to_metric` | Enables building of [`log_to_metric` transform][docs.transforms.log_to_metric].  |
 | `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
 | `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
@@ -531,10 +529,11 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [docs.transforms.concat]: /docs/reference/transforms/concat/
 [docs.transforms.dedupe]: /docs/reference/transforms/dedupe/
-[docs.transforms.field_filter]: /docs/reference/transforms/field_filter/
+[docs.transforms.filter]: /docs/reference/transforms/filter/
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
+[docs.transforms.kubernetes_pod_metadata]: /docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: /docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: /docs/reference/transforms/lua/

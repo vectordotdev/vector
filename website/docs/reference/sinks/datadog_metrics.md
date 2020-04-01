@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -14,7 +14,6 @@ title: "Datadog Metrics Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -42,24 +41,19 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
   api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
   healthcheck = true # optional, default
-  host = "https://api.datadoghq.com" # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required
@@ -87,8 +81,6 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -112,8 +104,6 @@ Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -136,8 +126,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={20}
@@ -161,8 +149,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -186,13 +172,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -216,10 +198,8 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={"https://api.datadoghq.com"}
   enumValues={null}
   examples={["https://api.datadoghq.com","https://api.datadoghq.eu"]}
@@ -241,8 +221,6 @@ Datadog endpoint to send metrics to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -266,8 +244,6 @@ A prefix that will be added to all metric names.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -290,8 +266,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -315,8 +289,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -340,8 +312,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -366,8 +336,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -391,8 +359,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -418,8 +384,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -443,8 +407,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -471,13 +433,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "beta"
 title: "GeoIP Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "geoip" # required
   inputs = ["my-source-id"] # required
@@ -41,8 +38,6 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -68,8 +63,6 @@ not supported.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -94,8 +87,6 @@ IPv4 or IPv6 address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"geoip"}
@@ -120,8 +111,6 @@ The default field to insert the resulting GeoIP data into. See
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -146,8 +135,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -170,8 +157,6 @@ The root field containing all geolocation data as sub-fields.
  See [Complex Processing](#complex-processing) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -195,8 +180,6 @@ The city name associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -220,8 +203,6 @@ The continent code associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -245,8 +226,6 @@ The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -270,8 +249,6 @@ The latitude associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -295,8 +272,6 @@ The longitude associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -320,8 +295,6 @@ The postal code associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -347,13 +320,9 @@ format][urls.iana_time_zone_format]. A full list of time zones can be found
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -380,9 +349,7 @@ The [`source`](#source) and [`target`](#target) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_geoip_transform_id]
   # ...
   source = "ip_address"

@@ -21,9 +21,10 @@
 
 ## What is Vector?
 
-Vector is a lightweight and ultra-fast tool for building observability
-pipelines. Compared to Logstash and friends, Vector [improves throughput by
-~10X while significanly reducing CPU and memory usage](#performance).
+Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
+building observability pipelines. Compared to Logstash and friends, Vector
+[improves throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance].
 
 ### Principles
 
@@ -66,7 +67,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 ### Reference
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [7 more...][docs.sources]
-* [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], and [18 more...][docs.transforms]
+* [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [kubernetes_pod_metadata][docs.transforms.kubernetes_pod_metadata], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], and [19 more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_bigquery][docs.sinks.gcp_bigquery], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [26 more...][docs.sinks]
 
 ### Administration
@@ -245,13 +246,14 @@ Or use your own [preferred method][docs.installation].
 [docs.strategies#sidecar]: https://vector.dev/docs/setup/deployment/strategies/#sidecar
 [docs.strategies]: https://vector.dev/docs/setup/deployment/strategies/
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
+[docs.transforms.filter]: https://vector.dev/docs/reference/transforms/filter/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
+[docs.transforms.kubernetes_pod_metadata]: https://vector.dev/docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
 [docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
-[docs.transforms.sampler]: https://vector.dev/docs/reference/transforms/sampler/
 [docs.transforms.swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes/
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [docs.updating]: https://vector.dev/docs/administration/updating/
@@ -271,8 +273,10 @@ Or use your own [preferred method][docs.installation].
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_enriching_transforms]: https://vector.dev/components?functions%5B%5D=enrich
 [urls.vector_parsing_transforms]: https://vector.dev/components?functions%5B%5D=parse
+[urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

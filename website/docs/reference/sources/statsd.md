@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -43,17 +42,13 @@ ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "statsd" # required
   address = "127.0.0.1:8126" # required
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -77,8 +72,6 @@ UDP socket address to bind to.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -96,13 +89,13 @@ For example:
 
 Given the following input:
 
-```text
+```text title="Example input"
 login.invocations:1|c
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "login.invocations",
   "kind": "incremental",
@@ -120,13 +113,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 gas_tank:0.50|g
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "gas_tank",
   "kind": "absolute",
@@ -144,13 +137,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 unique_users:foo|s
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "unique_users",
   "kind": "incremental",
@@ -168,13 +161,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 login.time:22|ms|@0.1
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "login.time",
   "kind": "incremental",

@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -43,9 +42,7 @@ vector test /etc/vector/*.toml
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
@@ -76,9 +73,7 @@ vector test /etc/vector/*.toml
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
@@ -136,8 +131,6 @@ For more information about unit tests check out [this guide][guides.advanced.uni
 ## Options
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -160,8 +153,6 @@ A table that defines a unit test input event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -186,8 +177,6 @@ order to begin the test.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -210,8 +199,6 @@ Specifies the log fields when the input type is 'log'.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -235,13 +222,9 @@ A key/value pair representing a field to be added to the input event.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -264,8 +247,6 @@ Specifies the metric type when the input type is 'metric'.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -289,8 +270,6 @@ The direction to increase or decrease the gauge value.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -315,8 +294,6 @@ for `gauge`.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -340,8 +317,6 @@ The bucket/distribution the metric is a part of.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -364,8 +339,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -389,13 +362,9 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -419,8 +388,6 @@ Time metric was created/ingested.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -444,8 +411,6 @@ The metric type.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -469,13 +434,9 @@ Amount to increment/decrement or gauge.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -499,8 +460,6 @@ The event type.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -524,13 +483,9 @@ Specifies the log message field contents when the input type is 'raw'.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -554,8 +509,6 @@ A unique identifier for this test.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -579,8 +532,6 @@ A list of transforms that must NOT output events in order for the test to pass.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -603,8 +554,6 @@ A table that defines a unit test expected output.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -631,8 +580,6 @@ target without checking its values.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={"check_fields"}
@@ -656,8 +603,6 @@ The type of the condition to execute.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -681,8 +626,6 @@ Check whether a fields contents exactly matches the value specified.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -700,15 +643,13 @@ Check whether a fields contents exactly matches the value specified.
 
 ##### `[field-name]`.exists
 
-Check whether a field exists or does not exist, depending on the provided
-valuebeing `true` or `false` respectively.
+Check whether a field exists or does not exist, depending on the provided value
+being `true` or `false` respectively.
 
 
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -732,8 +673,6 @@ Check whether a fields contents does not match the value specified.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -757,8 +696,6 @@ Checks whether a string field contains a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -782,8 +719,6 @@ Checks whether a string field ends with a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -807,13 +742,9 @@ Checks whether a string field starts with a string argument.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -838,13 +769,9 @@ transform will be checked against a table of conditions.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 

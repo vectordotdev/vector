@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -37,8 +36,8 @@ utility and [outputs `log` events](#output).
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See ["How it works"](#how-it-works) for more info.
-* The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See ["How it works"](#how-it-works) for more info.
+* The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][docs.sources.journald#communication-strategy] for more info.
+* The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.
 
 </Alert>
 
@@ -51,9 +50,7 @@ utility and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "journald" # required
   current_boot_only = true # optional, default
@@ -63,9 +60,7 @@ utility and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "journald" # required
   batch_size = 16 # optional, default
@@ -79,8 +74,6 @@ utility and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={16}
@@ -105,8 +98,6 @@ each batch. This option limits the size of the batch.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -130,8 +121,6 @@ Include only entries from the current boot.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -157,8 +146,6 @@ permissions to this dir.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"journalctl"}
@@ -183,8 +170,6 @@ the path for [`journalctl`](#journalctl).
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={[]}
@@ -210,8 +195,6 @@ them a valid service unit name.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -222,34 +205,13 @@ For example:
 
 Given the following input:
 
-```text
-__REALTIME_TIMESTAMP=1564173027000443
-__MONOTONIC_TIMESTAMP=98694000446
-_BOOT_ID=124c781146e841ae8d9b4590df8b9231
-SYSLOG_FACILITY=3
-_UID=0
-_GID=0
-_CAP_EFFECTIVE=3fffffffff
-_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
-_HOSTNAME=lorien.example.com
-PRIORITY=6
-_TRANSPORT=stdout
-_STREAM_ID=92c79f4b45c4457490ebdefece29995e
-SYSLOG_IDENTIFIER=ntpd
-_PID=2156
-_COMM=ntpd
-_EXE=/usr/sbin/ntpd
-_CMDLINE=ntpd: [priv]
-_SYSTEMD_CGROUP=/system.slice/ntpd.service
-_SYSTEMD_UNIT=ntpd.service
-_SYSTEMD_SLICE=system.slice
-_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
-MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
+```text title="Example input"
+reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>,
   "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",
@@ -281,8 +243,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -306,8 +266,6 @@ Additional Journald fields are passed through as log fields.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -331,8 +289,6 @@ The value of the journald `_HOSTNAME` field.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -356,8 +312,6 @@ The value of the journald `MESSAGE` field.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -381,8 +335,6 @@ The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -438,6 +390,8 @@ usermod -aG systemd-journal vector
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
+[docs.sources.journald#communication-strategy]: /docs/reference/sources/journald/#communication-strategy
+[docs.sources.journald#user-permissions]: /docs/reference/sources/journald/#user-permissions
 [urls.issue_1473]: https://github.com/timberio/vector/issues/1473
 [urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [urls.rust_subprocess]: https://docs.rs/subprocess

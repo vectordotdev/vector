@@ -21,7 +21,7 @@ healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
 requirements = {}
-service_providers = ["Google"]
+service_providers = ["GCP"]
 write_to_description = "[Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest]"
 
 <%= render("_partials/fields/_component_options.toml", type: "sink", name: "gcp_pubsub") %>

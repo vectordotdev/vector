@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "HTTP"
 description: "The Vector `http` sink batches `log` events to a generic HTTP endpoint."
@@ -14,7 +14,6 @@ title: "HTTP Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -42,9 +41,7 @@ The Vector `http` sink
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "http" # required
@@ -74,9 +71,7 @@ The Vector `http` sink
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "http" # required
@@ -133,8 +128,6 @@ The Vector `http` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -157,8 +150,6 @@ Options for the authentication strategy.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -182,8 +173,6 @@ The authentication strategy to use.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -207,8 +196,6 @@ The basic authentication password.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -232,13 +219,9 @@ The basic authentication user name.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -261,8 +244,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={1049000}
@@ -286,8 +267,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -311,13 +290,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -340,8 +315,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -365,8 +338,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -390,8 +361,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -415,8 +384,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -440,13 +407,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"none"}
@@ -471,8 +434,6 @@ outputting.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -495,8 +456,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -520,8 +479,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -545,8 +502,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -570,8 +525,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -595,13 +548,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -624,8 +573,6 @@ Options for custom headers.
  See [Authentication](#authentication) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -649,13 +596,9 @@ A custom header to be added to each outgoing HTTP request.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -679,8 +622,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -704,8 +645,6 @@ A URI that Vector can request in order to determine the service health.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -728,8 +667,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={10}
@@ -753,8 +690,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -778,8 +713,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1000}
@@ -804,8 +737,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -829,8 +760,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -856,8 +785,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -881,8 +808,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={30}
@@ -909,13 +834,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -938,8 +859,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -964,8 +883,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -991,8 +908,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1017,8 +932,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1043,8 +956,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1070,8 +981,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1097,13 +1006,9 @@ you understand the risks of not verifying the remote hostname.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1128,8 +1033,6 @@ host, but can also include the port, path, and any other valid part of a URI.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

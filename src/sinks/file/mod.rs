@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        SinkExt,
+        StreamSink,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -58,7 +58,7 @@ impl SinkConfig for FileSinkConfig {
     fn build(&self, mut cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = FileSink::new(&self);
         let sink = streaming_sink::compat::adapt_to_topology(&mut cx, sink);
-        let sink = sink.stream_ack(cx.acker());
+        let sink = StreamSink::new(sink, cx.acker());
         Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
     }
 

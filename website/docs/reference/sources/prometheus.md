@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
@@ -15,7 +15,6 @@ title: "Prometheus Source"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -36,9 +35,7 @@ events](#output).
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
@@ -46,8 +43,6 @@ events](#output).
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -71,8 +66,6 @@ Host addresses to scrape metrics from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={15}
@@ -96,8 +89,6 @@ The interval between scrapes, in seconds.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -115,14 +106,14 @@ For example:
 
 Given the following input:
 
-```text
+```text title="Example input"
 # TYPE promhttp_metric_handler_requests_total counter
 promhttp_metric_handler_requests_total{code="200"} 100
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "name": "promhttp_metric_handler_requests_total",
   "kind": "absolute",
@@ -143,13 +134,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 prometheus_remote_storage_samples_in_total 57011636
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```jsontitle="Example log event"
 {
   "name": "prometheus_remote_storage_samples_in_total",
   "kind": "absolute",

@@ -42,7 +42,7 @@ examples = [
 common = false
 relevant_when = {type = "check_fields"}
 description = """\
-Check whether a field exists or does not exist, depending on the provided value\
+Check whether a field exists or does not exist, depending on the provided value \
 being `true` or `false` respectively.\
 """
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "splunk_hec" # required
   address = "0.0.0.0:80" # optional, default
@@ -62,9 +59,7 @@ protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "splunk_hec" # required
@@ -84,8 +79,6 @@ protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={"0.0.0.0:80"}
@@ -109,8 +102,6 @@ The address to accept connections on.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -133,8 +124,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -159,8 +148,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -186,8 +173,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -212,8 +197,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -238,8 +221,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -264,8 +245,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -291,13 +270,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -324,8 +299,6 @@ ignored and requests will not be authenticated.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -336,13 +309,13 @@ For example:
 
 Given the following input:
 
-```text
+```text title="Example input"
 Hello world
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>, // time event was received,
   "host": "my.host.com", // value of the `Host` header
@@ -355,8 +328,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -380,8 +351,6 @@ The raw log message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -405,8 +374,6 @@ The Splunk channel, value of the `X-Splunk-Request-Channel` header.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -433,8 +400,6 @@ event was received will be used.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

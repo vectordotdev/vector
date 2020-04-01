@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-04-01"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -88,8 +89,6 @@ changed via the
 </Alert>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -116,8 +115,6 @@ or the source-level `host_key` option for relevant sources.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -143,8 +140,6 @@ source-level `message_key` option for relevant sources.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -171,8 +166,6 @@ option][docs.reference.global-options#message_key] or the source-level
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -197,8 +190,6 @@ additional fields. This includes nested fields.
 
 
 </Field>
-
-
 </Fields>
 
 ## Components

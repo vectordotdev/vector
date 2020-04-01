@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -14,7 +14,6 @@ title: "GCP Cloud Storage (GCS) Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -43,9 +42,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
@@ -68,9 +65,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
@@ -129,8 +124,6 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -155,8 +148,6 @@ Predefined ACL to apply to the created objects. For more information, see
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -179,8 +170,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={10485760}
@@ -204,8 +193,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={300}
@@ -229,13 +216,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -259,8 +242,6 @@ The GCS bucket name.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -283,8 +264,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -308,8 +287,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -333,8 +310,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -358,8 +333,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -383,13 +356,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -413,8 +382,6 @@ The compression mechanism to use.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -436,12 +403,10 @@ The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API. If this is unset, Vector checks
 the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -464,8 +429,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -489,8 +452,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -514,8 +475,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -539,8 +498,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -564,13 +521,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -595,8 +548,6 @@ there are no name collisions high volume use cases.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"log"}
@@ -620,8 +571,6 @@ The filename extension to use in the object name.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"%s"}
@@ -646,8 +595,6 @@ specifiers][urls.strptime_specifiers] are supported.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -671,8 +618,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"date=%F/"}
@@ -698,8 +643,6 @@ to be the root GCS "folder".
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -723,8 +666,6 @@ custom metadata][urls.gcs_custom_metadata] documentation for more details.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -748,13 +689,9 @@ A custom metadata item to be added to the created objects.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -777,8 +714,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -802,8 +737,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -827,8 +760,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1000}
@@ -853,8 +784,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -878,8 +807,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -905,8 +832,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -930,8 +855,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={60}
@@ -958,13 +881,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -989,8 +908,6 @@ classes][urls.gcs_storage_classes] for more details.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1013,8 +930,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1039,8 +954,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1066,8 +979,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1092,8 +1003,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1118,8 +1027,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1145,8 +1052,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1172,20 +1077,14 @@ you understand the risks of not verifying the remote hostname.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1206,12 +1105,10 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -1241,20 +1138,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
-### GCP Authentication
-
-GCP offers a [variety of authentication methods][urls.gcp_authentication] and
-Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
-and will find credentials in the following order:
-
-1. If the [`credentials_path`](#credentials_path) option is set.
-2. If the `api_key` option is set.
-3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
-
-If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring#logs].
-
 
 ### Health Checks
 
@@ -1384,9 +1267,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_gcp_cloud_storage_sink_id]
   # ...
   key_prefix = "date=%F/"
@@ -1404,10 +1285,7 @@ You can learn more about the complete syntax in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
-[docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.templating]: /docs/reference/templating/
-[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes

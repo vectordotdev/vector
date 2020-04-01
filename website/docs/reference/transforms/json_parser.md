@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "JSON Parser Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ value as JSON.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "json_parser" # required
   inputs = ["my-source-id"] # required
@@ -52,9 +49,7 @@ value as JSON.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "json_parser" # required
   inputs = ["my-source-id"] # required
@@ -69,8 +64,6 @@ value as JSON.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -95,8 +88,6 @@ fails, the field will not be removed, irrespective of this setting.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -121,8 +112,6 @@ kept and passed through.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -146,8 +135,6 @@ The log field to decode as JSON. Must be a `string` value type.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -172,8 +159,6 @@ target, it will only be overwritten if this is set to `true`.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -199,8 +184,6 @@ parser will fail and produce an error.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -319,9 +302,7 @@ The [`field`](#field) and [`target_field`](#target_field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_json_parser_transform_id]
   # ...
   field = "message"

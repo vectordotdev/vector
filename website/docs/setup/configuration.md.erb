@@ -15,9 +15,7 @@ vector --config /etc/vector/vector.toml
 
 ## Example
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 <%= File.read("#{Dir.pwd}/../config/examples/docs_example.toml") %>
 ```
 
@@ -56,9 +54,7 @@ found at `/etc/vector/vector.toml`.
 Vector will interpolate environment variables within your configuration file
 with the following syntax:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.add_host]
   type = "add_fields"
 
@@ -90,9 +86,7 @@ interpolation:
 
 For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.es_cluster]
   type  = "elasticsearch"
   index = "user-{{ user_id }}-%Y-%m-%d"

@@ -12,7 +12,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::Uri;
 use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
@@ -77,7 +77,8 @@ impl SinkConfig for PubsubConfig {
             batch_settings,
             Some(tls_settings),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
