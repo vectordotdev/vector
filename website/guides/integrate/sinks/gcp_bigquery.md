@@ -40,10 +40,7 @@ your observability strategy.
 
 ### What is GCP BigQuery?
 
-X
-X
-X
-
+[GCP BigQuery][urls.gcp_bigquery] is Google's fully managed analytics data warehouse that allows you to quickly analyze gigabytes to petabytes of data using ANSI SQL.
 
 ## Strategy
 

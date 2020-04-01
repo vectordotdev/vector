@@ -5,9 +5,9 @@ beta = true
 common = true
 delivery_guarantee = "best_effort"
 description = """\
-X
-X
-X
+[GCP BigQuery][urls.gcp_bigquery] is Google's fully managed analytics \
+data warehouse that allows you to quickly analyze gigabytes to petabytes \
+of data using ANSI SQL.\
 """
 features = [
   "Send logs to a GCP BigQuery table.",

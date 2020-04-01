@@ -24653,7 +24653,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"gcp_bigquery\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  dataset = \"example-dataset\" # required\n  project = \"vector-123456\" # required\n  table = \"example-table\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "X\nX\nX\n",
+      "description": "[GCP BigQuery][urls.gcp_bigquery] is Google's fully managed analytics data warehouse that allows you to quickly analyze gigabytes to petabytes of data using ANSI SQL.",
       "event_types": [
         "log"
       ],
