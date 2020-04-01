@@ -3,7 +3,7 @@ last_modified_on: "2020-03-31"
 id: unit-testing-vector-config-files
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
-author_github: https://github.com/Jeffail
+author_github: https://github.com/binarylogic
 tags: ["type: announcement", "domain: config"]
 ---
 
