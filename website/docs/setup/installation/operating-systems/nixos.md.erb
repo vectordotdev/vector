@@ -4,9 +4,12 @@ sidebar_label: NixOS
 description: Install Vector on NixOS
 ---
 
-Vector can be installed on NixOS through the `nix` package manager:
+<%- operating_system = metadata.installation.operating_systems.nixos -%>
+<%- interfaces = fetch_interfaces(operating_system.interfaces) -%>
+<%- strategies = fetch_strategies(operating_system.strategies) -%>
 
-<Jump to="[[[docs.package-managers.nix]]]">Nix</Jump>
+This document will cover installing Vector on NixOS.
 
+## Install
 
-
+<%= installation_tutorial(interfaces, strategies, heading_depth: 3) %>

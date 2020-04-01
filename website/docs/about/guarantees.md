@@ -1,7 +1,11 @@
 ---
+last_modified_on: "2020-04-01"
 title: Guarantees
 description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
 ---
+
+import Alert from '@site/src/components/Alert';
+import Jump from '@site/src/components/Jump';
 
 Faults in distributed systems are like green Skittles, we all wish they'd never
 happen but in reality the best we can do is understand and control the damage
@@ -39,18 +43,12 @@ once to the configured destination(s). While rare, it is possible for an event
 to be delivered more than once. See the [Does Vector support exactly once
 delivery](#does-vector-support-exactly-once-delivery) FAQ below).
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="warning">
 
 In order to achieve at least once delivery between restarts your source must
 be configured to use `disk` based buffers:
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # ...
 
@@ -64,8 +62,6 @@ Refer to each [sink's][docs.sinks] documentation for further guidance on its
 buffer options.
 
 </Alert>
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/components/?at-least-once=true">View all at-least-once components</Jump>
 

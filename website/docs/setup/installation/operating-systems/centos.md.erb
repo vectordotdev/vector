@@ -1,0 +1,15 @@
+---
+title: Install Vector On CentOS
+sidebar_label: CentOS
+description: Install Vector on CentOS
+---
+
+<%- operating_system = metadata.installation.operating_systems.centos -%>
+<%- interfaces = fetch_interfaces(operating_system.interfaces) -%>
+<%- strategies = fetch_strategies(operating_system.strategies) -%>
+
+This document will cover installing Vector on CentOS.
+
+## Install
+
+<%= installation_tutorial(interfaces, strategies, heading_depth: 3) %>

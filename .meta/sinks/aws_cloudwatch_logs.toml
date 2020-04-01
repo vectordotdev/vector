@@ -3,31 +3,41 @@ title = "AWS Cloudwatch Logs"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_aws_cloudwatch.toml") %>
 egress_method = "batching"
+features = [
+  "Send logs to AWS Cloudwatch.",
+  "Dynamically partition logs across CloudWatch groups and streams.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
+noun = "AWS Cloudwatch Logs"
 requirements = {}
-service_limits_short_link = "aws_cw_logs_service_limits"
+service_limits_short_link = "aws_cloudwatch_logs_service_limits"
 service_providers = ["AWS"]
-write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
+write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_cloudwatch_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
 
-<%= render("_partials/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_logs.env_vars") %>
 
-<%= render("_partials/_aws_options.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
+<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.aws_cloudwatch_logs.env_vars") %>
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "aws_cloudwatch_logs") %>
+<%= render("_partials/fields/_aws_options.toml", namespace: "sinks.aws_cloudwatch_logs.options") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.aws_cloudwatch_logs.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "aws_cloudwatch_logs") %>
+
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.aws_cloudwatch_logs.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
   common: false,
   in_flight_limit: 5,
@@ -39,7 +49,7 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
   timeout_secs: 30
 ) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
   encodings: ["json", "text"]
 ) %>
@@ -54,7 +64,7 @@ examples = [
 required = true
 partition_key = true
 templateable = true
-description = "The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream."
+description = "The [group name][urls.aws_cloudwatch_logs_group_name] of the target CloudWatch Logs stream."
 
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
@@ -67,14 +77,14 @@ examples = [
 required = true
 partition_key = true
 templateable = true
-description = "The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+description = "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target CloudWatch Logs stream."
 
 [sinks.aws_cloudwatch_logs.options.create_missing_group]
 type = "bool"
 common = true
 default = true
 description = """\
-Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not already exist. This will ignore \
+Dynamically create a [log group][urls.aws_cloudwatch_logs_group_name] if it does not already exist. This will ignore \
 `create_missing_stream` directly after creating the group and will create the first stream.\
 """
 
@@ -82,7 +92,7 @@ Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not alr
 type = "bool"
 common = true
 default = true
-description = "Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist."
+description = "Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it does not already exist."
 
 [[sinks.aws_cloudwatch_logs.output.examples]]
 label = "Generic"

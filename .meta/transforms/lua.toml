@@ -1,5 +1,5 @@
 [transforms.lua]
-title = "LUA"
+title = "Lua"
 allow_you_to_description = "transform events with a full embedded [Lua][urls.lua] engine"
 beta = true
 common = true
@@ -9,7 +9,7 @@ output_types = ["log", "metric"]
 requirements = {}
 
 <%= render(
-  "_partials/_component_options.toml",
+  "_partials/fields/_component_options.toml",
   groups: ["v1", "v2"],
   name: "lua",
   type: "transform"

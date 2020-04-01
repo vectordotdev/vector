@@ -1,0 +1,3 @@
+<%- source = metadata.sources.send("syslog") -%>
+<%- sink = metadata.sinks.send("aws_kinesis_firehose") -%>
+<%= integration_guide(source: source, sink: sink) %>

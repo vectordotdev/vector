@@ -24,14 +24,14 @@ class Field
     :unit
 
   def initialize(hash)
-    @children = (hash["children"] || {}).to_struct_with_name(self.class)
+    @children = (hash["children"] || {}).to_struct_with_name(constructor: self.class)
     @common = hash["common"]
     @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
-    @examples = hash["examples"] || []
+    @examples = (hash["examples"] || []).freeze
     @field_path_notation = hash["field_path_notation"] == true
-    @groups = hash["groups"] || []
+    @groups = (hash["groups"] || []).freeze
     @name = hash.fetch("name")
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]

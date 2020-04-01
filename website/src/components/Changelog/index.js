@@ -108,6 +108,7 @@ function Changelog(props) {
               type="text"
               onChange={(event) => setSearchTerm(event.currentTarget.value)}
               placeholder="🔍 Search..."
+              className="input--text"
               value={searchTerm || ''} />
           </div>
           <div className="filter">

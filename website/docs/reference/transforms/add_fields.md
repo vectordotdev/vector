@@ -1,16 +1,18 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events allowing you to add one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
-min_version: null
-service_name: "Add Fields"
 sidebar_label: "add_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
 status: "prod-ready"
 title: "Add Fields Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `add_fields` transform
 accepts and [outputs `log` events](#output) allowing you to add one or more log
@@ -26,11 +28,7 @@ fields.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "add_fields" # required
@@ -47,13 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   fields.list_field = ["first", "second", "third"] # example
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -76,8 +68,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -102,13 +92,9 @@ types][docs.configuration#types]. Use `.` for adding nested fields.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -119,9 +105,7 @@ For example:
 
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]

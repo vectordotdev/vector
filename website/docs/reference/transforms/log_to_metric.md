@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
 function_category: "convert"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-min_version: null
-service_name: "Log to Metric"
 sidebar_label: "log_to_metric|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
 status: "prod-ready"
 title: "Log to Metric Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `log_to_metric` transform
 accepts [`log`][docs.data-model.log] events but outputs
@@ -27,11 +31,7 @@ or more metrics.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.log_to_metric]
   type = "log_to_metric"
 
@@ -44,13 +44,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
     tags.env = "${ENV}" # optional
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -73,8 +67,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -98,8 +90,6 @@ The log field to use as the metric.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -124,8 +114,6 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -150,8 +138,6 @@ for `gauge`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -174,8 +160,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -200,13 +184,9 @@ Environment variables and field interpolation is allowed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -230,18 +210,12 @@ The metric type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
-
-import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
@@ -254,8 +228,6 @@ import Tabs from '@theme/Tabs';
     { label: 'Sets', value: 'sets', },
   ]
 }>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="timings">
 

@@ -1,26 +1,39 @@
 [sinks.influxdb_metrics]
 title = "InfluxDB Metrics"
+noun = "InfluxDB"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+description = """\
+[InfluxDB][urls.influxdb] is an open-source time series database developed by \
+InfluxData. It is written in Go and optimized for fast, high-availability \
+storage and retrieval of time series data in fields such as operations \
+monitoring, application metrics, Internet of Things sensor data, and \
+real-time analytics.\
+"""
 egress_method = "batching"
+features = [
+  "Send metrics to InfluxDB v1 or v2.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Automatically aggregate metrics at the edge for improved performance.",
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["metric"]
-min_version = "0"
 requirements = {}
 service_providers = ["InfluxData"]
 write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API"
 
 <%= render(
-  "_partials/_component_options.toml",
+  "_partials/fields/_component_options.toml",
   groups: ["v1", "v2"],
   name: "influxdb_metrics",
   type: "sink"
 ) %>
 
 <%= render(
-  "_partials/_batch_options.toml",
+  "_partials/fields/_batch_options.toml",
   common: false,
   groups: ["v1", "v2"],
   max_events: 20,
@@ -30,7 +43,7 @@ write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.influxdb_metrics.options",
   common: false,
   groups: ["v1", "v2"],
@@ -73,7 +86,7 @@ description = "The destination bucket for writes into InfluxDB 2."
 type = "string"
 category = "auth"
 common = true
-examples = ["${INFLUXDB_TOKEN_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+examples = ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 groups = ["v2"]
 required = true
 description = "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
@@ -117,7 +130,7 @@ description = "Sets the username for authentication if you’ve enabled authenti
 type = "string"
 category = "auth"
 common = true
-examples = ["${INFLUXDB_PASSWORD_ENV_VAR}", "influxdb4ever"]
+examples = ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 groups = ["v1"]
 required = false
 description = "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."

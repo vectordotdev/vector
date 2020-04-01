@@ -1,8 +1,13 @@
 ---
+last_modified_on: "2020-04-01"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 You can control Vector's behavior through select environment variables:
 
@@ -23,13 +28,7 @@ options][docs.global-options] as well.
 
 ## Special Variables
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -54,8 +53,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -80,8 +77,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"unix:///var/run/docker.sock"}
@@ -105,8 +100,6 @@ The docker host to connect to.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -132,8 +125,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -158,8 +149,6 @@ authenticate access to the Stackdriver Logging API.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -184,8 +173,6 @@ guide][docs.monitoring#levels] for more information on the available levels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -210,8 +197,31 @@ it can degrade performance.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["minikube"]}
+  groups={[]}
+  name={"VECTOR_NODE_NAME"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### VECTOR_NODE_NAME
+
+The name of the node whose Pod's log should be enriched. If you're using the
+[provided daemon set][urls.kubernetes_limit_resources] then this environment
+variable is set for you.
 
 
+
+
+</Field>
 </Fields>
 
 ## Custom Variables
@@ -222,8 +232,6 @@ Vector supports custom environment variables via the `${...}` syntax:
 ```toml
 option = "${ENV_VAR}"
 ```
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="info">
 
@@ -254,3 +262,4 @@ variable example.
 [docs.process-management#reloading]: /docs/administration/process-management/#reloading
 [docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/

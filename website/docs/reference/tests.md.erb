@@ -28,9 +28,7 @@ vector test /etc/vector/*.toml
 
 <TabItem value="common">
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
@@ -45,9 +43,7 @@ vector test /etc/vector/*.toml
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
@@ -59,7 +55,7 @@ vector test /etc/vector/*.toml
 
 </Tabs>
 
-For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
+For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
 ## Options
 

@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+concat%22
-min_version: null
-service_name: "Concat"
 sidebar_label: "concat|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/concat.rs
 status: "beta"
 title: "Concat Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `concat` transform
 accepts and [outputs `log` events](#output) allowing you to concat (substrings)
@@ -26,22 +30,14 @@ of other fields to a new one.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "concat" # required
   inputs = ["my-source-id"] # required
@@ -52,9 +48,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "concat" # required
   inputs = ["my-source-id"] # required
@@ -66,13 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -97,8 +85,6 @@ both start and end negative values are counted from the end of the string.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={" "}
@@ -122,8 +108,6 @@ The string that is used to join all items.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -147,8 +131,6 @@ The name for the new label.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -214,9 +196,7 @@ The [`target`](#target) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_concat_transform_id]
   # ...
   target = "root_field_name"

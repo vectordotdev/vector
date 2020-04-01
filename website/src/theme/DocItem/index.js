@@ -1,21 +1,14 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React from 'react';
 
 import Head from '@docusaurus/Head';
 import Link from '@docusaurus/Link';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-import DocPaginator from '@theme/DocPaginator';
-import useTOCHighlight from '@theme/hooks/useTOCHighlight';
+import PagePaginator from '@theme/PagePaginator';
 
 import _ from 'lodash';
 import styles from './styles.module.css';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useTOCHighlight from '@theme/hooks/useTOCHighlight';
 
 const LINK_CLASS_NAME = 'contents__link';
 const ACTIVE_LINK_CLASS_NAME = 'contents__link--active';
@@ -25,9 +18,15 @@ function Headings({headings, isChild}) {
   useTOCHighlight(LINK_CLASS_NAME, ACTIVE_LINK_CLASS_NAME, TOP_OFFSET);
 
   if (!headings.length) return null;
+
+  // We need to track shown headings because the markdown parser will
+  // extract duplicate headings if we're using tabs
+  let uniqHeadings = _.uniqBy(headings, (heading => heading.value));
+
+
   return (
     <ul className={isChild ? '' : 'contents'}>
-      {headings.map(heading => {
+      {uniqHeadings.map(heading => {
         let cleanValue = heading.value.replace('<code><', '<code>&lt;').replace('></code>', '&gt;</code>');
 
         return <li key={heading.id}>
@@ -56,7 +55,7 @@ function SupportedEventTypes({values}) {
     } else {
       els.push(<del key={eventType} className="text--warning">{_.capitalize(eventType)}</del>);
     }
-    els.push(<>, </>);
+    els.push(<span key={eventType + '-comma'}>, </span>);
   });
 
   els.pop();
@@ -69,12 +68,12 @@ function OperatingSystemsStatus({operatingSystems, unsupportedOperatingSystems})
 
   (operatingSystems || []).forEach(operatingSystem => {
     operatingSystemsEls.push(<span key={operatingSystem} className="text--primary">{operatingSystem}</span>);
-    operatingSystemsEls.push(<>, </>);
+    operatingSystemsEls.push(<span key={operatingSystem + '-comma'}>, </span>);
   });
 
   (unsupportedOperatingSystems || []).forEach(operatingSystem => {
     operatingSystemsEls.push(<del key={operatingSystem} className="text--warning">{operatingSystem}</del>);
-    operatingSystemsEls.push(<>, </>);
+    operatingSystemsEls.push(<span key={operatingSystem + '-comma'}>, </span>);
   });
 
   operatingSystemsEls.pop();
@@ -82,7 +81,7 @@ function OperatingSystemsStatus({operatingSystems, unsupportedOperatingSystems})
   return operatingSystemsEls;
 }
 
-function Statuses({deliveryGuarantee, eventTypes, minVersion, operatingSystems, serviceName, status, unsupportedOperatingSystems}) {
+function Statuses({deliveryGuarantee, eventTypes, operatingSystems, status, unsupportedOperatingSystems}) {
   if (!status && !deliveryGuarantee && !operatingSystems && !unsupportedOperatingSystems)
     return null;
 
@@ -125,10 +124,6 @@ function Statuses({deliveryGuarantee, eventTypes, minVersion, operatingSystems, 
             <i className="feather icon-cpu"></i> <OperatingSystemsStatus operatingSystems={operatingSystems} unsupportedOperatingSystems={unsupportedOperatingSystems} />
           </Link>
         </div>}
-      {minVersion &&
-        <div className="text--primary">
-          <i className="feather icon-box"></i> {minVersion == "0" ? <>All {serviceName} versions</> : <>{serviceName} >= {minVersion}</>}
-        </div>}
     </div>
   );
 }
@@ -159,10 +154,8 @@ function DocItem(props) {
       hide_title: hideTitle,
       hide_table_of_contents: hideTableOfContents,
       issues_url: issuesUrl,
-      min_version: minVersion,
       operating_systems: operatingSystems,
       posts_path: postsPath,
-      service_name: serviceName,
       source_url: sourceUrl,
       status,
       unsupported_operating_systems: unsupportedOperatingSystems,
@@ -219,7 +212,7 @@ function DocItem(props) {
               </div>
               {!metadata.hide_pagination && (
                 <div className={styles.paginator}>
-                  <DocPaginator metadata={metadata} />
+                  <PagePaginator metadata={metadata} />
                 </div>
               )}
             </div>
@@ -229,9 +222,7 @@ function DocItem(props) {
                   <Statuses
                     deliveryGuarantee={deliveryGuarantee}
                     eventTypes={eventTypes}
-                    minVersion={minVersion}
                     operatingSystems={operatingSystems}
-                    serviceName={serviceName}
                     status={status}
                     unsupportedOperatingSystems={unsupportedOperatingSystems} />
                   {DocContent.rightToc.length > 0 &&

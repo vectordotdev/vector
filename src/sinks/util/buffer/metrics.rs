@@ -266,15 +266,20 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::batch::BatchSink;
+    use crate::sinks::util::{BatchSettings, BatchSink};
     use crate::{
+        buffers::Acker,
         event::metric::{Metric, MetricValue},
+        runtime::Runtime,
+        test_util::runtime,
         Event,
     };
-    use futures01::{future::Future, stream, Sink};
+    use futures01::{future, Future, Sink};
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
+    use tokio01_test::clock::MockClock;
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -288,9 +293,43 @@ mod test {
         buffer
     }
 
+    fn sink() -> (
+        impl Sink<SinkItem = Event, SinkError = crate::Error>,
+        Runtime,
+        MockClock,
+        Arc<Mutex<Vec<Vec<Metric>>>>,
+    ) {
+        let rt = runtime();
+        let clock = MockClock::new();
+
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+        let sent_requests1 = sent_requests.clone();
+
+        let svc = tower::service_fn(move |req| {
+            let sent_requests = sent_requests1.clone();
+
+            sent_requests.lock().unwrap().push(req);
+
+            future::ok::<_, std::io::Error>(())
+        });
+        let buffered = BatchSink::with_executor(
+            svc,
+            MetricBuffer::new(),
+            BatchSettings {
+                timeout: Duration::from_secs(0),
+                size: 6,
+            },
+            acker,
+            rt.executor(),
+        );
+
+        (buffered, rt, clock, sent_requests)
+    }
+
     #[test]
     fn metric_buffer_counters() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -326,12 +365,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 2);
         assert_eq!(buffer[0].len(), 6);
         assert_eq!(buffer[1].len(), 2);
@@ -407,7 +450,7 @@ mod test {
 
     #[test]
     fn metric_buffer_aggregated_counters() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -434,12 +477,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 4);
 
@@ -480,7 +527,7 @@ mod test {
 
     #[test]
     fn metric_buffer_gauges() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 1..5 {
@@ -505,12 +552,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 4);
 
@@ -551,7 +602,7 @@ mod test {
 
     #[test]
     fn metric_buffer_aggregated_gauges() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 3..6 {
@@ -591,12 +642,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 5);
 
@@ -644,7 +699,7 @@ mod test {
 
     #[test]
     fn metric_buffer_sets() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -673,12 +728,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
@@ -699,7 +758,7 @@ mod test {
 
     #[test]
     fn metric_buffer_distributions() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 2..6 {
@@ -730,12 +789,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
@@ -798,7 +861,7 @@ mod test {
 
     #[test]
     fn metric_buffer_aggregated_histograms_absolute() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 2..5 {
@@ -833,12 +896,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
@@ -886,7 +953,7 @@ mod test {
 
     #[test]
     fn metric_buffer_aggregated_histograms_incremental() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 0..3 {
@@ -921,12 +988,16 @@ mod test {
             events.push(event);
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
@@ -962,7 +1033,7 @@ mod test {
 
     #[test]
     fn metric_buffer_aggregated_summaries() {
-        let sink = BatchSink::new_min(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+        let (sink, _rt, mut clock, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 0..10 {
@@ -983,12 +1054,16 @@ mod test {
             }
         }
 
-        let (buffer, _) = sink
-            .send_all(stream::iter_ok(events.into_iter()))
-            .wait()
-            .unwrap();
+        let (sink, _) = clock.enter(|_| {
+            sink.sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(events.into_iter()))
+                .wait()
+                .unwrap()
+        });
+        drop(sink);
 
-        let buffer = buffer.into_inner();
+        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(

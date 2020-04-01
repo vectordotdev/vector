@@ -8,7 +8,7 @@ use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
     api::{
         Api, DeleteParams, KubeObject, ListParams, Log, LogParams, Object, PostParams,
-        PropagationPolicy,
+        PropagationPolicy, RawApi,
     },
     client::APIClient,
     config,
@@ -81,7 +81,7 @@ data:
 "#;
 
 // TODO: use localy builded image of vector
-static VECTOR_YAML: &'static str = r#"
+pub static VECTOR_YAML: &'static str = r#"
 # Vector agent runned on each Node where it collects logs from pods.
 apiVersion: apps/v1
 kind: DaemonSet
@@ -123,6 +123,7 @@ spec:
         # This allows the caller to define imagePullPolicy with image tag:
         # - tag is 'latest' => imagePullPolicy: Always
         # - else => imagePullPolicy: IfNotPresent
+        args: ["-vv"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
@@ -134,6 +135,11 @@ spec:
           readOnly: true
         - name: tmp
           mountPath: /tmp/vector/
+        env:
+        - name: VECTOR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
 "#;
 
 static ECHO_YAML: &'static str = r#"
@@ -166,8 +172,8 @@ spec:
   restartPolicy: Never
 "#;
 
-type KubePod = Object<PodSpec, PodStatus>;
-type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
+pub type KubePod = Object<PodSpec, PodStatus>;
+pub type KubeDaemon = Object<DaemonSetSpec, DaemonSetStatus>;
 
 pub struct Kube {
     client: APIClient,
@@ -193,7 +199,7 @@ impl Kube {
     }
 
     /// Will substitute NAMESPACE_MARKER
-    fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
+    pub fn create<K, F: FnOnce(APIClient) -> Api<K>>(&self, f: F, yaml: &str) -> K
     where
         K: KubeObject + DeserializeOwned + Clone,
     {
@@ -210,6 +216,23 @@ impl Kube {
         let json = serde_json::to_vec(&map).unwrap();
         retry(|| {
             api.create(&PostParams::default(), json.clone())
+                .map_err(|error| {
+                    format!("Failed creating Kubernetes object with error: {:?}", error)
+                })
+        })
+    }
+
+    /// Will substitute NAMESPACE_MARKER
+    pub fn create_raw_with<K>(&self, api: &RawApi, yaml: &str) -> K
+    where
+        K: DeserializeOwned,
+    {
+        let yaml = yaml.replace(NAMESPACE_MARKER, self.namespace.as_str());
+        let map: serde_yaml::Value = serde_yaml::from_slice(yaml.as_bytes()).unwrap();
+        let json = serde_json::to_vec(&map).unwrap();
+        retry(|| {
+            api.create(&PostParams::default(), json.clone())
+                .and_then(|request| self.client.request(request))
                 .map_err(|error| {
                     format!("Failed creating Kubernetes object with error: {:?}", error)
                 })
@@ -247,7 +270,7 @@ impl Kube {
         .collect()
     }
 
-    fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
+    pub fn wait_for_running(&self, mut object: KubeDaemon) -> KubeDaemon {
         let api = self.api(Api::v1DaemonSet);
         retry(move || {
             object = api
@@ -259,14 +282,26 @@ impl Kube {
                     number_available: Some(number_available),
                     ..
                 } if number_available == desired_number_scheduled => Ok(object.clone()),
-                status => Err(format!(
-                    "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
-                    status,
-                    self.list(&object)
-                        .into_iter()
-                        .map(|pod| pod.status)
-                        .collect::<Vec<_>>()
-                )),
+                status => {
+                    // Try fetching Vectors logs for diagnostic purpose
+                    for daemon_instance in self.list(&object) {
+                        if let Ok(logs) = self.api(Api::v1Pod).log(
+                            daemon_instance.metadata.name.as_str(),
+                            &LogParams::default(),
+                        ) {
+                            info!("Deamon Vector's logs:\n{}", logs);
+                        }
+                    }
+
+                    Err(format!(
+                        "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
+                        status,
+                        self.list(&object)
+                            .into_iter()
+                            .map(|pod| pod.status)
+                            .collect::<Vec<_>>()
+                    ))
+                }
             }
         })
     }
@@ -297,6 +332,15 @@ impl Kube {
         })
     }
 
+    /// Deleter will delete given resource on drop.
+    pub fn deleter(&self, api: RawApi, name: &str) -> Deleter {
+        Deleter {
+            client: self.client.clone(),
+            api,
+            name: name.to_owned(),
+        }
+    }
+
     fn cleanup(&self) {
         let _ = Api::v1Namespace(self.client.clone()).delete(
             self.namespace.as_str(),
@@ -311,6 +355,28 @@ impl Kube {
 impl Drop for Kube {
     fn drop(&mut self) {
         self.cleanup();
+    }
+}
+
+pub struct Deleter {
+    client: APIClient,
+    name: String,
+    api: RawApi,
+}
+
+impl Drop for Deleter {
+    fn drop(&mut self) {
+        let _ = self
+            .api
+            .delete(
+                self.name.as_str(),
+                &DeleteParams {
+                    propagation_policy: Some(PropagationPolicy::Background),
+                    ..DeleteParams::default()
+                },
+            )
+            .and_then(|request| self.client.request_text(request))
+            .map_err(|error| error!(message = "Failed deleting Kubernetes object.",%error));
     }
 }
 
@@ -333,7 +399,7 @@ fn retry<F: FnMut() -> Result<R, E>, R, E: std::fmt::Debug>(mut f: F) -> R {
     panic!("Timed out while waiting. Last error: {:?}", last_error);
 }
 
-fn user_namespace<S: AsRef<str>>(namespace: S) -> String {
+pub fn user_namespace<S: AsRef<str>>(namespace: S) -> String {
     "user-".to_owned() + namespace.as_ref()
 }
 
@@ -363,6 +429,7 @@ fn create_vector<'a>(
     user_namespace: &str,
     container_name: impl Into<Option<&'a str>>,
     pod_uid: impl Into<Option<&'a str>>,
+    config: &str,
 ) -> KubeDaemon {
     let container_name = container_name
         .into()
@@ -385,7 +452,7 @@ fn create_vector<'a>(
     // Start vector
     kube.create(
         Api::v1ConfigMap,
-        CONFIG_MAP_YAML
+        config
             .replace(USER_NAMESPACE_MARKER, user_namespace)
             .replace(USER_CONTAINERS_MARKER, container_name.as_str())
             .replace(USER_POD_UID_MARKER, pod_uid.as_str())
@@ -400,12 +467,13 @@ fn create_vector<'a>(
     )
 }
 
-fn start_vector<'a>(
+pub fn start_vector<'a>(
     kube: &Kube,
     user_namespace: &str,
     container_name: impl Into<Option<&'a str>>,
+    config: &str,
 ) -> KubeDaemon {
-    let vector = create_vector(kube, user_namespace, container_name, None);
+    let vector = create_vector(kube, user_namespace, container_name, None, config);
 
     // Wait for running state
     kube.wait_for_running(vector.clone());
@@ -413,7 +481,7 @@ fn start_vector<'a>(
     vector
 }
 
-fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
+pub fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
     let mut logs = Vec::new();
     for daemon_instance in kube.list(&vector) {
         debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
@@ -436,7 +504,7 @@ fn kube_one_log() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo
     let _echo = echo(&user, "echo", &message);
@@ -470,7 +538,7 @@ fn kube_old_log() {
     let _echo_old = echo(&user, "echo-old", &message_old);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // echo new
     let _echo_new = echo(&user, "echo-new", &message_new);
@@ -507,7 +575,7 @@ fn kube_multi_log() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo
     let _echo = echo(&user, "echo", messages.join("\\n").as_str());
@@ -535,7 +603,7 @@ fn kube_object_uid() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo
     let _echo = echo(&user, "echo", &message);
@@ -565,7 +633,7 @@ fn kube_diff_container() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), "echo1");
+    let vector = start_vector(&kube, user_namespace.as_str(), "echo1", CONFIG_MAP_YAML);
 
     // Start echo0
     let _echo0 = echo(&user, "echo0", &message0);
@@ -600,7 +668,7 @@ fn kube_diff_namespace() {
     let user1 = Kube::new(&user_namespace1);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace1.as_str(), None);
+    let vector = start_vector(&kube, user_namespace1.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo0
     let _echo0 = echo(&user0, "echo", &message);
@@ -647,7 +715,13 @@ fn kube_diff_pod_uid() {
     }
 
     // Create vector
-    let vector = create_vector(&kube, user_namespace.as_str(), None, uid.as_str());
+    let vector = create_vector(
+        &kube,
+        user_namespace.as_str(),
+        None,
+        uid.as_str(),
+        CONFIG_MAP_YAML,
+    );
 
     // Wait for running state
     kube.wait_for_running(vector.clone());

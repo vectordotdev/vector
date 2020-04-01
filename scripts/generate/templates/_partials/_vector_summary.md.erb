@@ -1,6 +1,7 @@
-Vector is a lightweight and ultra-fast tool for building observability
-pipelines. Compared to Logstash and friends, Vector [improves throughput by
-~10X while significanly reducing CPU and memory usage](#performance).
+Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
+building observability pipelines. Compared to Logstash and friends, Vector
+[improves throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance].
 
 ### Principles
 
@@ -11,7 +12,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 ### Who should use Vector?
 
 * You _SHOULD_ use Vector to replace Logstash, Fluent*, Telegraf, Beats, or similar tools.
-* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector as a [daemon][docs.strategies#daemon] or [sidecar][docs.strategies#sidecar].
 * You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
 * You _SHOULD_ use Vector in resource constrained environments (such as devices).
 * You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.

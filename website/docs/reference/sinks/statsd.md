@@ -1,19 +1,21 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Statsd"
 sidebar_label: "statsd|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/statsd.rs
-status: "beta"
+status: "prod-ready"
 title: "Statsd Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `statsd` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to
@@ -29,11 +31,7 @@ The Vector `statsd` sink
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "statsd" # required
   inputs = ["my-source-id"] # required
@@ -42,13 +40,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # optional, default
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={"127.0.0.1:8125"}
@@ -72,8 +64,6 @@ The UDP socket address to send stats to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -97,8 +87,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -122,8 +110,6 @@ A prefix that will be added to all metric names.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

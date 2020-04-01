@@ -70,6 +70,25 @@ If you encounter limitations with the `<%= component.name %>`
 These transforms are designed for complex processing and give you the power of
 full programming runtime.
 <%- end -%>
+<%- if component.requirements.docker_api -%>
+
+### Connecting To The Docker Daemon
+
+Vector will automatically attempt to connect to the docker daemon for you. If
+the user that Vector is running under can run `docker ps` then Vector will be
+able to connect. Vector will also respect if `DOCKER_HOST` and
+`DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
+See the [Docker daemon docs][urls.docker_daemon_socket_option].
+<%- end -%>
+<%- if component.requirements.kubernetes -%>
+
+### Connecting To The Kubernetes API server
+
+Vector will automatically attempt to connect to the [Kubernetes API
+server][urls.kubernetes_api_server] for you. If Vector is running in a
+Kubernetes cluster then Vector will connect to that cluster using the
+[Kubernetes provided access information][urls.kubernetes_accessing_api_from_pod].
+<%- end -%>
 <%- if component.context_options.any? -%>
 
 ### Context
@@ -77,6 +96,18 @@ full programming runtime.
 By default, the `<%= component.name %>` <%= component.type %> will add context
 keys to your events via the <%= option_names(component.context_options).to_sentence %>
 options.
+<%- end -%>
+<%- if component.requirements.docker_api -%>
+
+### Docker Logging Drivers
+
+In order for the Vector `docker` source to work properly, you must configure
+the [`json-file`][urls.docker_logging_driver_json_file] (default) or
+[`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
+This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
+uses to integrate. See the
+[Docker Integration Strategy section](#docker-integration-strategy) for more
+info.
 <%- end -%>
 
 ### Environment Variables
@@ -104,9 +135,7 @@ The <%= option_names(component.field_path_notation_options).to_sentence %> optio
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
   <%- option = component.field_path_notation_options.fetch(0) -%>
@@ -162,6 +191,21 @@ vector --config /etc/vector/vector.toml --require-healthy
 If you'd like to disable health checks for this sink you can set the
 `healthcheck` option to `false`.
 <%- end -%>
+<%- if component.requirements.kubernetes_rbac -%>
+
+### Kubernetes RBAC
+
+Kubernetes [RBAC][urls.kubernetes_rbac] must be enabled for this component to
+work. This can be achieved by passing the appropriate flags when starting
+the [Kubernetes API server][urls.kubernetes_api_server]:
+
+```bash
+kube-apiserver --authorization-mode=RBAC ...
+```
+
+For specific permissions, please see the ["Permissions"
+section][<%= component_short_link(component) %>#permissions].
+<%- end -%>
 <%- if component.partition_options.any? -%>
 
 ### Partitioning
@@ -173,24 +217,22 @@ You'll notice that Vector's [template sytax][docs.reference.templating] is
 supported for these options, enabling you to use field values as partition keys.
 <%- end -%>
 <%- end -%>
-<%- if component.requirements.network -%>
+<%- if component.requirements.aws_imds_v2 -%>
 
-### Network Access
+### AWS IMDS v2
 
-The `<%= component.name %>` <%= component.type %> requires network access to
-operate correctly.
-
-#### Docker Network Access
-
-If you are running Vector within a Docker container then you should pass the
-`--net=host` flag when starting Docker:
+v2 of the [AWS IMDS service][urls.aws_ec2_instance_metadata] addresses [a number
+of very serious security issues][urls.aws_imds_v1_security_problems] with v1.
+As part of tighening security, Amazon limited the number of network hops allowed
+to communicate with this service to 1. Unfortunately, when running Vector within
+Docker this introduces an additional hop. Therefore, you _must_ configure your
+AWS instances to allow for 2 hops:
 
 ```bash
-docker run --net=host ...
+aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
 ```
 
-Otherwise Vector will not be able to communicate with EC2 metadata service.
-Learn more in the [Docker networking docs][urls.docker_networking].
+If you do not raise this limit the `aws_ec2_metadata` transform will not work.
 <%- end -%>
 <%- if component.options.respond_to?(:request) -%>
 
@@ -234,9 +276,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
   <%- option = component.templateable_options.fetch(0) -%>

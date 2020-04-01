@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
-min_version: null
-service_name: "Regex Parser"
 sidebar_label: "regex_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
 status: "prod-ready"
 title: "Regex Parser Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `regex_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -26,11 +30,14 @@ log field's value with a [Regular Expression][urls.regex].
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<TabItem value="common">
 
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "regex_parser" # required
@@ -48,13 +55,33 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-import Fields from '@site/src/components/Fields';
+</TabItem>
+<TabItem value="advanced">
 
-import Field from '@site/src/components/Field';
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "regex_parser" # required
+  inputs = ["my-source-id"] # required
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  overwrite_target = true # optional, default
+  target_field = "root_field" # optional, no default
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -78,8 +105,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -103,8 +128,30 @@ The log field to parse.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"overwrite_target"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### overwrite_target
+
+If [`target_field`](#target_field) is set and the log contains a field of the same name as the
+target, it will only be overwritten if this is set to `true`.
 
 
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -128,8 +175,31 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["root_field","parent.child"]}
+  groups={[]}
+  name={"target_field"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### target_field
+
+If this setting is present, the parsed fields will be inserted into the log as
+a sub-object with this name. If a field with the same name already exists, the
+parser will fail and produce an error.
+
+ See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -153,8 +223,6 @@ coerce log fields into their proper types.
  See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -180,13 +248,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -265,13 +329,11 @@ specified [`field`](#field).
 
 ### Field Notation Syntax
 
-The [`field`](#field) options
+The [`field`](#field) and [`target_field`](#target_field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_regex_parser_transform_id]
   # ...
   field = "message"
@@ -345,9 +407,9 @@ documentation][urls.regex_grouping_and_flags].
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
+[urls.regex_grouping_and_flags]: https://docs.rs/regex/1.3.6/regex/#grouping-and-flags
 [urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [urls.regex_tester]: https://rustexp.lpil.uk/
-[urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

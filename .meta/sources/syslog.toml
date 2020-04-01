@@ -1,19 +1,26 @@
 [sources.syslog]
 title = "Syslog"
+noun = "Syslog"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_syslog.toml") %>
+features = [
+  "Accept log data over the Syslog protocol via TCP, UDP, or Unix sockets.",
+  "Automatically parse Syslog 3164 and 5424 formats.",
+]
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
-through_description = "the Syslog protocol"
+requirements.network_port = "514"
+strategies = ["service"]
+through_description = "the [Syslog protocol][urls.syslog_5424]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "syslog") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "syslog") %>
 
 [sources.syslog.options.address]
 type = "string"
 common = true
-examples = ["0.0.0.0:9000", "systemd", "systemd#2"]
+examples = ["0.0.0.0:514", "systemd", "systemd#2"]
 relevant_when = {mode = ["tcp", "udp"]}
 required = true
 description = """\
@@ -60,7 +67,7 @@ description = """\
 The unix socket path. *This should be absolute path.*
 """
 
-<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.syslog.options", relevant: "") %>
+<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.syslog.options", relevant: "") %>
 
 [sources.syslog.output.log.fields.appname]
 type = "string"

@@ -8,7 +8,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "swimlanes") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "swimlanes") %>
 
 [transforms.swimlanes.options.lanes]
 type = "table"
@@ -27,7 +27,7 @@ required = true
 toml_display = "normal"
 description = "The identifier of a swimlane."
 
-<%= render("_partials/_conditions.toml", namespace: "transforms.swimlanes.options.lanes.children.\"`[swimlane-id]`\".children") %>
+<%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.swimlanes.options.lanes.children.\"`[swimlane-id]`\".children") %>
 
 [[transforms.swimlanes.output.log.examples]]
 label = "If/Else"
@@ -36,9 +36,7 @@ The `swimlanes` transform, in it's simplest form, can act as a simple if/else \
 stream splitter. For example, we can route events from the host `gerry` to a \
 sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.splitting_gerrys]
   inputs = [ "somewhere" ]
   type = "swimlanes"
@@ -70,9 +68,7 @@ body = """\
 To follow up with the previous `If/Else` example, let's say we want to split \
 a log stream based on all of the log `level` values:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.level_splitter]
   type = "swimlanes"
 

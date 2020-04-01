@@ -1,16 +1,21 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
-min_version: null
-service_name: "Rename Fields"
 sidebar_label: "rename_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/rename_fields.rs
 status: "prod-ready"
 title: "Rename Fields Transform"
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `rename_fields` transform
 accepts and [outputs `log` events](#output) allowing you to rename one or more
@@ -26,22 +31,14 @@ log fields.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "rename_fields" # required
@@ -55,9 +52,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "rename_fields" # required
@@ -72,13 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -103,8 +92,6 @@ field that are now empty.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -127,8 +114,6 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -152,13 +137,9 @@ Old-key/New-key pair reprsenting the key to be moved.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -182,9 +163,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "rename_fields"
   inputs = [...]
@@ -220,8 +199,6 @@ full programming runtime.
 #### Key Conflicts
 
 Keys specified in this transform will replace existing keys.
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 

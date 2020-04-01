@@ -1,16 +1,18 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+logfmt_parser%22
-min_version: null
-service_name: "Logfmt Parser"
 sidebar_label: "logfmt_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/logfmt_parser.rs
 status: "beta"
 title: "Logfmt Parser Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `logfmt_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to extract
@@ -26,11 +28,7 @@ data from a logfmt-formatted log field.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "logfmt_parser" # required
@@ -47,13 +45,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -77,8 +69,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -102,8 +92,6 @@ The log field to parse.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -127,8 +115,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -154,13 +140,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -187,9 +169,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_logfmt_parser_transform_id]
   # ...
   field = "message"

@@ -1,16 +1,18 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
-min_version: null
-service_name: "Grok Parser"
 sidebar_label: "grok_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 status: "prod-ready"
 title: "Grok Parser Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `grok_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -26,11 +28,7 @@ log field value with [Grok][urls.grok].
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "grok_parser" # required
@@ -48,13 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -78,8 +70,6 @@ If `true` will drop the specified [`field`](#field) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -103,8 +93,6 @@ The log field to execute the [`pattern`](#pattern) against. Must be a `string` v
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -128,8 +116,6 @@ The [Grok pattern][urls.grok_patterns]
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -153,8 +139,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -180,13 +164,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -224,9 +204,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_grok_parser_transform_id]
   # ...
   field = "message"

@@ -11,7 +11,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::{uri::InvalidUri, StatusCode, Uri};
 use hyper;
 use lazy_static::lazy_static;
@@ -126,7 +126,8 @@ impl SinkConfig for DatadogConfig {
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 
-        let sink = BatchedHttpSink::new(sink, MetricBuffer::new(), request, batch, None, &cx);
+        let sink = BatchedHttpSink::new(sink, MetricBuffer::new(), request, batch, None, &cx)
+            .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }

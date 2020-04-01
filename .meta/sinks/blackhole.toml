@@ -1,9 +1,14 @@
 [sinks.blackhole]
 title = "Blackhole"
+noun = "blackhole"
 beta = false
 common = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+features = [
+  "Test log throughput.",
+  "Print log totals on an interval.",
+]
 function_category = "test"
 healthcheck = true
 input_types = ["log", "metric"]
@@ -14,7 +19,7 @@ benchmarking purposes\
 """
 
 <%= render(
-  "_partials/_component_options.toml",
+  "_partials/fields/_component_options.toml",
   type: "sink",
   name: "blackhole",
   healthcheck: false

@@ -3,18 +3,16 @@
 delivery_guarantee: <%= component.delivery_guarantee.to_json %>
 <%- end -%>
 component_title: <%= component.title.to_json %>
-description: <%= "The Vector `#{component.name}` #{component.type} #{component_description(component).continuize}".remove_markdown_links.to_json %>
+description: <%= "The Vector `#{component.name}` #{component.type} #{component_short_description(component).continuize}".remove_markdown_links.to_json %>
 event_types: <%= component.event_types.to_json %>
 function_category: <%= component.function_category.to_json %>
 issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
-min_version: <%= component.min_version.to_json %>
 <%- if !component.transform? -%>
 operating_systems: <%= component.operating_systems.to_json %>
 <%- end -%>
 <%- if component.posts.any? -%>
 posts_path: /blog/tags/<%= "#{component.type}: #{component.name}".slugify %>
 <%- end -%>
-service_name: <%= component.service_name.to_json %>
 sidebar_label: <%= "#{component.name}|#{component.event_types.to_json}".to_json %>
 source_url: <%= metadata.links.fetch("urls.#{component.id}_source") %>
 status: <%= component.status.to_json %>
@@ -25,4 +23,4 @@ unsupported_operating_systems: <%= component.unsupported_operating_systems.to_js
 ---
 
 The Vector `<%= component.name %>` <%= component.type %>
-<%= component_description(component).continuize.wrap(80) %>
+<%= component_short_description(component).continuize.wrap(80) %>

@@ -10,7 +10,11 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "regex_parser") %>
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "transform",
+  name: "regex_parser"
+) %>
 
 [transforms.regex_parser.options.drop_field]
 type = "bool"
@@ -26,6 +30,14 @@ examples = ["message", "parent.child"]
 field_path_notation = true
 description = "The log field to parse."
 
+[transforms.regex_parser.options.overwrite_target]
+type = "bool"
+default = true
+description = """\
+If `target_field` is set and the log contains a field of the same name \
+as the target, it will only be overwritten if this is set to `true`.\
+"""
+
 [transforms.regex_parser.options.regex]
 type = "string"
 common = true
@@ -39,4 +51,19 @@ description = """\
 The Regular Expression to apply. Do not include the leading or trailing `/`.\
 """
 
-<%= render("_partials/_types.toml", namespace: "transforms.regex_parser", common: true) %>
+[transforms.regex_parser.options.target_field]
+type = "string"
+examples = ["root_field", "parent.child"]
+field_path_notation = true
+description = """\
+If this setting is present, the parsed fields will be inserted into the \
+log as a sub-object with this name. \
+If a field with the same name already exists, the parser will fail and \
+produce an error.\
+"""
+
+<%= render(
+  "_partials/fields/_types_options.toml",
+  namespace: "transforms.regex_parser.options",
+  common: true
+) %>

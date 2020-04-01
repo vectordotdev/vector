@@ -4,12 +4,18 @@
 
 .alert {
   background: var(--ifm-panel-background) !important;
-  border: 0px none;
-  border-left: 6px solid var(--ifm-alert-background-color);
+  border: 1px solid var(--ifm-panel-border-color) !important;
+  border-left: 6px solid var(--ifm-alert-background-color) !important;
   border-radius: 0;
+  box-shadow: var(--ifm-panel-box-shadow);
   font-size: 95%;
   font-weight: 500;
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 2 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+}
+
+.alert.alert--fill {
+  background: rgba( var(--ifm-color-primary-rgb), 0.15 ) !important;
+  color: var(--ifm-color-primary) !important;
 }
 
 .alert > i.feather {

@@ -11,9 +11,7 @@
 <TabItem value="<%= key.parameterize %>">
 
 <%- end -%>
-<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>"/ >
-
-```toml
+```toml title="vector.toml"
 <%=
   config_example(component.options_list, table_path: [component.type.pluralize, "my_#{component.type}_id"]) do |option|
     component.option_example_groups.fetch(key).call(option)

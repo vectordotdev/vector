@@ -30,14 +30,6 @@
 
 <%= component_sections(component) %>
 
-### Connecting To The Docker Daemon
-
-Vector will automatically attempt to connect to the docker daemon for you. If
-the user that Vector is running under can run `docker ps` then Vector will be
-able to connect. Vector will also respect if `DOCKER_HOST` and
-`DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
-See the [Docker daemon docs][urls.docker_daemon_socket_option].
-
 ### Docker Integration Strategy
 
 There are two primary ways through which you can integrate with Docker to
@@ -62,10 +54,9 @@ and you must determine which tradeoffs are appropriate. Docker is one of these
 circumstances.
 
 Second, if you have a large container-based deployment you should consider using
-a container orchestrator like Kubernetes. These platforms provide alternate log
-collection means that side-step the Docker logging problems. For supported
-platforms see Vector's
-[Containers installation section][docs.installation.containers].
+a platform Kubernetes. These platforms provide alternate log collection means
+that side-step the Docker logging problems. For supported platforms see Vector's
+[Platforms installation section][docs.installation.platforms].
 
 Finally, if you cannot use a container orchestrator then you can configure a
 compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
@@ -81,16 +72,6 @@ compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
 To our knowledge there is no discernable difference in performance or stability
 between any of these. If we had to recommend one, we would recommend the
 `syslog` combination.
-
-### Docker Logging Drivers
-
-In order for the Vector `docker` source to work properly, you must configure
-the [`json-file`][urls.docker_logging_driver_json_file] (default) or
-[`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
-This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
-uses to integrate. See the
-[Docker Integration Strategy section](#docker-integration-strategy) for more
-info.
 
 ### Message Splitting & Merging
 

@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
 function_category: "route"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+swimlanes%22
-min_version: null
-service_name: "Swimlanes"
 sidebar_label: "swimlanes|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/swimlanes.rs
 status: "beta"
 title: "Swimlanes Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `swimlanes` transform
 accepts and [outputs `log` events](#output) allowing you to route events across
@@ -26,11 +30,7 @@ parallel streams using logical filters.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "swimlanes" # required
@@ -41,16 +41,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
     type = "check_fields" # optional, default
     "message.eq" = "this is the content to match against" # example
     "message.contains" = "foo" # example
-    "environment.prefix" = "staging-" # example
+    "environment.ends_with" = "-staging" # example
+    "message.regex" = " (any|of|these|five|words) " # example
+    "environment.starts_with" = "staging-" # example
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -75,8 +71,6 @@ components with the name `<transform_name>.<swimlane_id>`.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -99,8 +93,6 @@ The identifier of a swimlane.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={"check_fields"}
@@ -124,8 +116,6 @@ The type of the condition to execute.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -149,8 +139,6 @@ Check whether a fields contents exactly matches the value specified.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -168,15 +156,13 @@ Check whether a fields contents exactly matches the value specified.
 
 ##### `[field-name]`.exists
 
-Check whether a field exists or does not exist, depending on the provided
-valuebeing `true` or `false` respectively.
+Check whether a field exists or does not exist, depending on the provided value
+being `true` or `false` respectively.
 
 
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -200,8 +186,6 @@ Check whether a fields contents does not match the value specified.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -225,15 +209,13 @@ Checks whether a string field contains a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"environment.ends_with":"-staging"}]}
   groups={[]}
-  name={"`[field_name]`.prefix"}
+  name={"`[field_name]`.ends_with"}
   path={"lanes.`[swimlane-id]`"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -242,26 +224,70 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-##### `[field_name]`.prefix
+##### `[field_name]`.ends_with
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field ends with a string argument.
 
 
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.regex":" (any|of|these|five|words) "}]}
+  groups={[]}
+  name={"`[field_name]`.regex"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.regex
+
+Checks whether a string field matches a [regular expression][urls.regex].
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note
+that this condition is considerably more expensive than a regular string match
+(such as `starts_with` or `contains`) so the use of those conditions are
+preferred where possible.
 
 
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.starts_with":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.starts_with"}
+  path={"lanes.`[swimlane-id]`"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.starts_with
+
+Checks whether a string field starts with a string argument.
+
+
+
+
+</Field>
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -270,22 +296,16 @@ The `swimlanes` transform accepts and [outputs `log` events](#output) allowing y
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="ifelse"
   values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="ifelse">
 
 The `swimlanes` transform, in it's simplest form, can act as a simple if/else stream splitter. For example, we can route events from the host `gerry` to a sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.splitting_gerrys]
   inputs = [ "somewhere" ]
   type = "swimlanes"
@@ -315,9 +335,7 @@ This syntax makes it easy to create arbitrary numbers of swimlanes, each with th
 
 To follow up with the previous `If/Else` example, let's say we want to split a log stream based on all of the log `level` values:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.level_splitter]
   type = "swimlanes"
 
@@ -376,4 +394,6 @@ You can learn more in the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -1,16 +1,20 @@
 ---
-component_title: "LUA"
+last_modified_on: "2020-04-01"
+component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
 function_category: "program"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
-min_version: null
-service_name: "LUA"
 sidebar_label: "lua|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua
 status: "beta"
-title: "LUA Transform"
+title: "Lua Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `lua` transform
 accepts and outputs [`log`][docs.data-model.log] and
@@ -27,22 +31,14 @@ a full embedded [Lua][urls.lua] engine.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="v2"
   values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="v2">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "lua" # required
@@ -71,9 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="v1">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "lua" # required
   inputs = ["my-source-id"] # required
@@ -94,13 +88,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -123,8 +111,6 @@ Configures hooks handlers.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -148,8 +134,6 @@ A function which is called when the trasnform is initialized.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -174,13 +158,9 @@ using `emit` function.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -204,8 +184,6 @@ A list of directories search when loading a Lua file via the `require` function.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -229,8 +207,6 @@ The inline Lua source to evaluate.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -254,8 +230,6 @@ Transform API version
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

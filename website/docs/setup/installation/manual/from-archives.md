@@ -1,21 +1,22 @@
 ---
+last_modified_on: "2020-04-01"
 title: Install Vector From Archives
 sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---
 
+import Alert from '@site/src/components/Alert';
+import Steps from '@site/src/components/Steps';
 
 This page covers installing Vector from a pre-built archive. These archives
 contain the `vector` binary as well as supporting configuration files.
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="warning">
 
-We recommend installing Vector through a supported [container
-platform][docs.containers] or [package manager][docs.package_managers], if
-possible. These handle permissions, directory creation, and other
-intricacies covered in the [Next Steps](#next-steps) section.
+We recommend installing Vector through a supported [platform][docs.platforms]
+or [package manager][docs.package_managers], if possible. These handle
+permissions, directory creation, and other intricacies covered in the
+[Next Steps](#next-steps) section.
 
 </Alert>
 
@@ -34,71 +35,16 @@ import TabItem from '@theme/TabItem';
 
 <Tabs
   block={true}
-  defaultValue="vector-x86_64-unknown-linux-musl.tar.gz"
+  defaultValue="aarch64-unknown-linux-musl-tar-gz"
   urlKey="file_name"
-  values={[{"label":"Linux (x86_64)","value":"vector-x86_64-unknown-linux-musl.tar.gz"},{"label":"Linux (ARM64)","value":"vector-aarch64-unknown-linux-musl.tar.gz"},{"label":"Linux (ARMv7)","value":"vector-armv7-unknown-linux-musleabihf.tar.gz"},{"label":"MacOS (x86_64)","value":"vector-x86_64-apple-darwin.tar.gz"},{"label":"Windows (x86_64, 7+)","value":"vector-x86_64-pc-windows-msvc.zip"}]}>
+  values={[{"label":"Linux (ARM64)","value":"aarch64-unknown-linux-musl-tar-gz"},{"label":"Linux (ARMv7)","value":"armv7-unknown-linux-musleabihf-tar-gz"},{"label":"MacOS (x86_64)","value":"x86_64-apple-darwin-tar-gz"},{"label":"Windows (x86_64, 7+)","value":"x86_64-pc-windows-msvc-zip"},{"label":"Linux (x86_64)","value":"x86_64-unknown-linux-musl-tar-gz"}]}>
 
 
-<TabItem value="vector-x86_64-unknown-linux-musl.tar.gz">
+<TabItem value="vector-aarch64-unknown-linux-musl-tar-gz">
+<Steps headingDepth={3}>
 
 
-1.  Download & unpack the archive
-
-    <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.8.2)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
-
-    <TabItem value="latest">
-
-    ```bash
-    mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.8.X/vector-x86_64-unknown-linux-musl.tar.gz | \
-      tar xzf - -C vector --strip-components=2
-    ```
-
-    </TabItem>
-    <TabItem value="nightly">
-
-    ```bash
-    mkdir -p vector && \
-      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
-      tar xzf - -C vector --strip-components=2
-    ```
-
-    </TabItem>
-    </Tabs>
-
-2.  Change into the `vector` directory
-
-    ```bash
-    cd vector
-    ```
-
-3.  Move `vector` into your $PATH
-
-    ```bash
-    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
-    source $HOME/.profile
-    ```
-
-4.  Start Vector
-
-    That's it! You can start vector with:
-
-    ```bash
-    vector --config config/vector.toml
-    ```
-
-</TabItem>
-
-<TabItem value="vector-aarch64-unknown-linux-musl.tar.gz">
-
-
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -128,20 +74,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -149,12 +95,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</Steps>
 </TabItem>
 
-<TabItem value="vector-armv7-unknown-linux-musleabihf.tar.gz">
+<TabItem value="vector-armv7-unknown-linux-musleabihf-tar-gz">
+<Steps headingDepth={3}>
 
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -184,20 +132,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -205,12 +153,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</Steps>
 </TabItem>
 
-<TabItem value="vector-x86_64-apple-darwin.tar.gz">
+<TabItem value="vector-x86_64-apple-darwin-tar-gz">
+<Steps headingDepth={3}>
 
 
-1.  Download & unpack the archive
+1.  ### Download & unpack the archive
 
     <Tabs
       className="mini"
@@ -240,20 +190,20 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Change into the `vector` directory
+2.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-3.  Move `vector` into your $PATH
+3.  ### Move `vector` into your $PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
     source $HOME/.profile
     ```
 
-4.  Start Vector
+4.  ### Start Vector
 
     That's it! You can start vector with:
 
@@ -261,12 +211,14 @@ import TabItem from '@theme/TabItem';
     vector --config config/vector.toml
     ```
 
+</Steps>
 </TabItem>
 
-<TabItem value="vector-x86_64-pc-windows-msvc.zip">
+<TabItem value="vector-x86_64-pc-windows-msvc-zip">
+<Steps headingDepth={3}>
 
 
-1.  Download Vector release archive (latest):
+1.  ### Download Vector release archive (latest)
 
     <Tabs
       className="mini"
@@ -292,24 +244,83 @@ import TabItem from '@theme/TabItem';
     </TabItem>
     </Tabs>
 
-2.  Extract files from the archive:
+2.  ### Extract files from the archive
 
     ```bat
     powershell Expand-Archive vector-x86_64-pc-windows-msvc.zip .
     ```
 
-3.  Navigate to the Vector directory:
+3.  ### Navigate to the Vector directory
 
     ```bat
     cd vector-x86_64-pc-windows-msvc
     ```
 
-4.  Start Vector:
+4.  ### Start Vector
 
     ```bat
     .\bin\vector --config config\vector.toml
     ```
 
+</Steps>
+</TabItem>
+
+<TabItem value="vector-x86_64-unknown-linux-musl-tar-gz">
+<Steps headingDepth={3}>
+
+
+1.  ### Download & unpack the archive
+
+    <Tabs
+      className="mini"
+      defaultValue="latest"
+      values={[
+        { label: 'Latest (0.8.2)', value: 'latest'},
+        { label: 'Nightly', value: 'nightly'},
+      ]}>
+
+    <TabItem value="latest">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/0.8.X/vector-x86_64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    <TabItem value="nightly">
+
+    ```bash
+    mkdir -p vector && \
+      curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz | \
+      tar xzf - -C vector --strip-components=2
+    ```
+
+    </TabItem>
+    </Tabs>
+
+2.  ### Change into the `vector` directory
+
+    ```bash
+    cd vector
+    ```
+
+3.  ### Move `vector` into your $PATH
+
+    ```bash
+    echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+    source $HOME/.profile
+    ```
+
+4.  ### Start Vector
+
+    That's it! You can start vector with:
+
+    ```bash
+    vector --config config/vector.toml
+    ```
+
+</Steps>
 </TabItem>
 </Tabs>
 
@@ -345,11 +356,7 @@ Make sure that this directory is writable by the `vector` process.
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 data_dir = "/var/lib/vector" # default
 ```
 
@@ -379,6 +386,6 @@ Simply follow the same [installation instructions above](#installation).
 
 
 [docs.configuration]: /docs/setup/configuration/
-[docs.containers]: /docs/setup/installation/containers/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.package_managers]: /docs/setup/installation/package-managers/
+[docs.platforms]: /docs/setup/installation/platforms/

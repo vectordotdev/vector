@@ -1,15 +1,19 @@
 ---
+last_modified_on: "2020-04-01"
 title: "What is Vector?"
 description: "High-level description of the Vector observability data collector and router."
 ---
+
+import Jump from '@site/src/components/Jump';
 
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/components.svg" />
 
-Vector is a lightweight and ultra-fast tool for building observability
-pipelines. Compared to Logstash and friends, Vector [improves throughput by
-~10X while significanly reducing CPU and memory usage](#performance).
+Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
+building observability pipelines. Compared to Logstash and friends, Vector
+[improves throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance].
 
 ### Principles
 
@@ -20,7 +24,7 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 ### Who should use Vector?
 
 * You _SHOULD_ use Vector to replace Logstash, Fluent*, Telegraf, Beats, or similar tools.
-* You _SHOULD_ use Vector as an [agent or sidecar][docs.roles.agent].
+* You _SHOULD_ use Vector as a [daemon][docs.strategies#daemon] or [sidecar][docs.strategies#sidecar].
 * You _SHOULD_ use Vector as a Kafka consumer/producer for observability data.
 * You _SHOULD_ use Vector in resource constrained environments (such as devices).
 * You _SHOULD NOT_ use Vector if you need an advanced distributed stream processing framework.
@@ -34,12 +38,13 @@ pipelines. Compared to Logstash and friends, Vector [improves throughput by
 * Vector is **used by multiple fortune 500 companies** with stringent production requirements.
 * Vector has **over 15 active contributors** and growing.
 
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/docs/setup/guides/getting-started/">Get started</Jump>
+<Jump to="/guides/getting-started/">Get started</Jump>
 
 
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
-[docs.roles.agent]: /docs/setup/deployment/roles/agent/
+[docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
+[docs.strategies#sidecar]: /docs/setup/deployment/strategies/#sidecar
 [urls.rust]: https://www.rust-lang.org/
+[urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_repo]: https://github.com/timberio/vector

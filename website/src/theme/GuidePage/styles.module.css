@@ -1,0 +1,40 @@
+.header {
+  margin-top: calc( var(--ifm-spacing-vertical) * 0.5 );
+}
+
+.container {
+  margin-top: calc( var(--ifm-spacing-vertical) * 4 );
+}
+
+.avatar {
+  background: var(--ifm-color-emphasis-50);
+  border: 0px none;
+  border-radius: var(--ifm-global-radius);
+  margin-top: 0;
+  margin-bottom: var(--ifm-spacing-vertical);
+  padding: calc( var(--ifm-spacing-vertical) * 1.5 ) calc( var(--ifm-spacing-horizontal) * 1 );
+}
+
+.avatar > div {
+  margin-top: calc( ( var(--ifm-spacing-vertical) * -1.5 ) - 32px );
+}
+
+.tableOfContents {
+  border-left: 0px none;
+  top: var(--ifm-spacing-vertical);
+}
+
+.rightCol {
+  padding-left: calc( var(--ifm-spacing-horizontal) * 2 ) !important;
+}
+
+.paginator {
+  margin: 0 0 calc( var(--ifm-spacing-vertical) * 2 ) 0;
+  padding-top: calc( var(--ifm-spacing-vertical) * 2 );
+}
+
+@media (max-width: 996px) {
+  .rightCol {
+    padding-left: var(--ifm-spacing-horizontal) !important;
+  }
+}
