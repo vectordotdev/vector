@@ -1,41 +1,66 @@
 mod interop;
+mod scripted_transform;
 
 use crate::{
     event::Event,
     topology::config::{DataType, TransformContext},
     transforms::Transform,
 };
-use futures01::{prelude::Async, sync::mpsc::Receiver, Stream};
+use scripted_transform::{ScriptedRuntime, Timer};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::VecDeque, mem};
-mod scripted_transform;
-use scripted_transform::ScriptedRuntime;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Invalid \"search_dirs\": {}", source))]
     InvalidSearchDirs { source: rlua::Error },
+    #[snafu(display("Cannot evaluate Lua code in \"source\": {}", source))]
+    InvalidSource { source: rlua::Error },
+
     #[snafu(display("Cannot evaluate Lua code defining \"hooks.init\": {}", source))]
     InvalidHooksInit { source: rlua::Error },
-    #[snafu(display("Runtime error in \"hooks.init\" function: {}", source))]
-    RuntimeErrorHooksInit { source: rlua::Error },
     #[snafu(display("Cannot evaluate Lua code defining \"hooks.process\": {}", source))]
     InvalidHooksProcess { source: rlua::Error },
+    #[snafu(display("Cannot evaluate Lua code defining \"hooks.shutdown\": {}", source))]
+    InvalidHooksShutdown { source: rlua::Error },
+    #[snafu(display("Cannot evaluate Lua code defining timer handler: {}", source))]
+    InvalidTimerHandler { source: rlua::Error },
+
+    #[snafu(display("Runtime error in \"hooks.init\" function: {}", source))]
+    RuntimeErrorHooksInit { source: rlua::Error },
+    #[snafu(display("Runtime error in \"hooks.process\" function: {}", source))]
+    RuntimeErrorHooksProcess { source: rlua::Error },
+    #[snafu(display("Runtime error in \"hooks.shutdown\" function: {}", source))]
+    RuntimeErrorHooksShutdown { source: rlua::Error },
+    #[snafu(display("Runtime error in timer handler: {}", source))]
+    RuntimeErrorTimerHandler { source: rlua::Error },
+
+    #[snafu(display("Cannot call GC in Lua runtime: {}", source))]
+    RuntimeErrorGC { source: rlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
     #[serde(default)]
     search_dirs: Vec<String>,
     hooks: HooksConfig,
+    #[serde(default)]
+    timers: Vec<TimerConfig>,
+    source: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug)]
 struct HooksConfig {
     init: Option<String>,
     process: String,
+    shutdown: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct TimerConfig {
+    interval_seconds: u64,
+    handler: String,
 }
 
 // Implementation of methods from `TransformConfig`
@@ -46,7 +71,7 @@ struct HooksConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Lua::new(self).map(|l| -> Box<dyn Transform> { Box::new(l) })
+        Lua::new(&self).map(|lua| Box::new(lua) as Box<dyn Transform>)
     }
 
     pub fn input_type(&self) -> DataType {
@@ -73,6 +98,7 @@ const GC_INTERVAL: usize = 16;
 pub struct Lua {
     lua: rlua::Lua,
     invocations_after_gc: usize,
+    timers: Vec<Timer>,
 }
 
 impl Lua {
@@ -86,6 +112,7 @@ impl Lua {
             .collect::<Vec<_>>()
             .join(";");
 
+        let mut timers = Vec::new();
         lua.context(|ctx| -> crate::Result<()> {
             if !additional_paths.is_empty() {
                 let package = ctx.globals().get::<_, rlua::Table<'_>>("package")?;
@@ -96,10 +123,14 @@ impl Lua {
                 package.set("path", paths)?;
             }
 
+            if let Some(source) = &config.source {
+                ctx.load(source).eval().context(InvalidSource)?;
+            }
+
             if let Some(hooks_init) = &config.hooks.init {
                 let hooks_init: rlua::Function<'_> =
                     ctx.load(hooks_init).eval().context(InvalidHooksInit)?;
-                hooks_init.call(()).context(RuntimeErrorHooksInit)?;
+                ctx.set_named_registry_value("hooks_init", Some(hooks_init))?;
             }
 
             let hooks_process: rlua::Function<'_> = ctx
@@ -108,23 +139,43 @@ impl Lua {
                 .context(InvalidHooksProcess)?;
             ctx.set_named_registry_value("hooks_process", hooks_process)?;
 
+            if let Some(hooks_shutdown) = &config.hooks.shutdown {
+                let hooks_shutdown: rlua::Function<'_> = ctx
+                    .load(hooks_shutdown)
+                    .eval()
+                    .context(InvalidHooksShutdown)?;
+                ctx.set_named_registry_value("hooks_shutdown", Some(hooks_shutdown))?;
+            }
+
+            for (id, timer) in config.timers.iter().enumerate() {
+                let handler: rlua::Function<'_> = ctx
+                    .load(&timer.handler)
+                    .eval()
+                    .context(InvalidTimerHandler)?;
+
+                ctx.set_named_registry_value(&format!("timer_handler_{}", id), handler)?;
+                timers.push(Timer {
+                    id: id as u32,
+                    interval_seconds: timer.interval_seconds,
+                });
+            }
+
             Ok(())
         })?;
 
         Ok(Self {
             lua,
             invocations_after_gc: 0,
+            timers,
         })
     }
 
-    fn process<F>(&mut self, event: Event, mut emit_fn: F) -> Result<(), rlua::Error>
-    where
-        F: FnMut(Event) -> (),
-    {
+    #[cfg(test)]
+    fn process(&mut self, event: Event, output: &mut Vec<Event>) -> Result<(), rlua::Error> {
         let result = self.lua.context(|ctx: rlua::Context<'_>| {
             ctx.scope(|scope| {
                 let emit = scope.create_function_mut(|_, event: Event| {
-                    emit_fn(event);
+                    output.push(event);
                     Ok(())
                 })?;
                 let process = ctx.named_registry_value::<_, rlua::Function<'_>>("hooks_process")?;
@@ -133,112 +184,147 @@ impl Lua {
             })
         });
 
-        self.invocations_after_gc += 1;
-        if self.invocations_after_gc % GC_INTERVAL == 0 {
-            self.lua.gc_collect()?;
-            self.invocations_after_gc = 0;
-        }
+        self.attempt_gc();
         result
     }
 
-    // Used only in tests.
+    #[cfg(test)]
     fn process_single(&mut self, event: Event) -> Result<Option<Event>, rlua::Error> {
         let mut out = Vec::new();
-        self.process(event, |event| out.push(event))?;
+        self.process(event, &mut out)?;
         assert!(out.len() <= 1);
         Ok(out.into_iter().next())
+    }
+
+    fn attempt_gc(&mut self) {
+        self.invocations_after_gc += 1;
+        if self.invocations_after_gc % GC_INTERVAL == 0 {
+            let _ = self
+                .lua
+                .gc_collect()
+                .context(RuntimeErrorGC)
+                .map_err(|e| error!(error = %e, rate_limit = 30));
+            self.invocations_after_gc = 0;
+        }
     }
 }
 
 impl ScriptedRuntime for Lua {
-    fn hook_process<F>(&mut self, event: Event, mut emit_fn: F)
+    // TODO: make code more DRY
+
+    fn hook_process<F>(self: &mut Self, event: Event, mut emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
-        self.lua
+        let _ = self
+            .lua
             .context(|ctx: rlua::Context<'_>| {
-                ctx.scope(|scope| {
-                    let emit = scope.create_function_mut(|_, event: Event| {
-                        emit_fn(event);
-                        Ok(())
-                    })?;
+                ctx.scope(|scope| -> rlua::Result<()> {
+                    let emit: rlua::Function<'_> =
+                        scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
+                            emit_fn(event);
+                            Ok(())
+                        })?;
                     let process =
                         ctx.named_registry_value::<_, rlua::Function<'_>>("hooks_process")?;
 
-                    process.call::<_, ()>((event, emit))
+                    process.call((event, emit))
                 })
             })
-            .unwrap();
+            .context(RuntimeErrorHooksProcess)
+            .map_err(|e| error!(error = %e, rate_limit = 30));
 
-        self.invocations_after_gc += 1;
-        if self.invocations_after_gc % GC_INTERVAL == 0 {
-            self.lua.gc_collect().unwrap();
-            self.invocations_after_gc = 0;
-        }
+        self.attempt_gc();
+    }
+
+    fn hook_init<F>(self: &mut Self, mut emit_fn: F)
+    where
+        F: FnMut(Event) -> (),
+    {
+        let _ = self
+            .lua
+            .context(|ctx: rlua::Context<'_>| {
+                ctx.scope(|scope| -> rlua::Result<()> {
+                    if let Some(init) =
+                        ctx.named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_init")?
+                    {
+                        let emit: rlua::Function<'_> =
+                            scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
+                                emit_fn(event);
+                                Ok(())
+                            })?;
+                        init.call((emit,))
+                    } else {
+                        Ok(())
+                    }
+                })
+            })
+            .context(RuntimeErrorHooksInit)
+            .map_err(|e| error!(error = %e, rate_limit = 30));
+
+        self.attempt_gc();
+    }
+
+    fn hook_shutdown<F>(self: &mut Self, mut emit_fn: F)
+    where
+        F: FnMut(Event) -> (),
+    {
+        let _ = self
+            .lua
+            .context(|ctx: rlua::Context<'_>| {
+                ctx.scope(|scope| -> rlua::Result<()> {
+                    if let Some(shutdown) =
+                        ctx.named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_shutdown")?
+                    {
+                        let emit: rlua::Function<'_> =
+                            scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
+                                emit_fn(event);
+                                Ok(())
+                            })?;
+                        shutdown.call((emit,))
+                    } else {
+                        Ok(())
+                    }
+                })
+            })
+            .context(RuntimeErrorHooksInit)
+            .map_err(|e| error!(error = %e, rate_limit = 30));
+
+        self.attempt_gc();
+    }
+
+    fn timer_handler<F>(self: &mut Self, timer: Timer, mut emit_fn: F)
+    where
+        F: FnMut(Event) -> (),
+    {
+        let _ = self
+            .lua
+            .context(|ctx: rlua::Context<'_>| {
+                ctx.scope(|scope| -> rlua::Result<()> {
+                    let emit: rlua::Function<'_> =
+                        scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
+                            emit_fn(event);
+                            Ok(())
+                        })?;
+                    let handler_name = format!("timer_handler_{}", timer.id);
+                    let handler =
+                        ctx.named_registry_value::<_, rlua::Function<'_>>(&handler_name)?;
+
+                    handler.call((emit,))
+                })
+            })
+            .context(RuntimeErrorTimerHandler)
+            .map_err(|e| error!(error = %e, rate_limit = 30));
+
+        self.attempt_gc();
+    }
+
+    fn timers(&self) -> Vec<Timer> {
+        self.timers.clone()
     }
 }
 
-// impl Transform for Lua {
-//     fn transform_into(&mut self, out: &mut Vec<Event>, event: Event) {
-//         if let Err(err) = self.process(event, |event| out.push(event)) {
-//             error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
-//         }
-//     }
-
-//     fn transform(&mut self, event: Event) -> Option<Event> {
-//         self.process_single(event).unwrap()
-//     }
-
-//     fn transform_stream(
-//         self: Box<Self>,
-//         input_rx: Receiver<Event>,
-//     ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
-//     where
-//         Self: 'static,
-//     {
-//         Box::new(LuaStream::new(self, input_rx))
-//     }
-// }
-
-struct LuaStream {
-    lua: Box<Lua>,
-    input_rx: Receiver<Event>,
-    output_buf: VecDeque<Event>,
-}
-
-impl LuaStream {
-    fn new(lua: Box<Lua>, input_rx: Receiver<Event>) -> LuaStream {
-        LuaStream {
-            lua,
-            input_rx,
-            output_buf: VecDeque::new(),
-        }
-    }
-}
-
-impl Stream for LuaStream {
-    type Item = Event;
-    type Error = ();
-
-    fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
-        if let Some(item) = self.output_buf.pop_front() {
-            return Ok(Async::Ready(Some(item)));
-        }
-        match self.input_rx.poll() {
-            Ok(Async::Ready(Some(event))) => {
-                let mut output_buf = mem::take(&mut self.output_buf);
-                let result = self.lua.process(event, |event| output_buf.push_back(event));
-                self.output_buf = output_buf;
-
-                result
-                    .map(|_| Async::Ready(self.output_buf.pop_front()))
-                    .map_err(|_| ())
-            }
-            other => other,
-        }
-    }
-}
-
+#[cfg(test)]
 fn format_error(error: &rlua::Error) -> String {
     match error {
         rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
@@ -248,7 +334,7 @@ fn format_error(error: &rlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{format_error, Lua};
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
@@ -258,8 +344,7 @@ mod tests {
     };
 
     fn from_config(config: &str) -> crate::Result<Lua> {
-        let config = config.to_owned();
-        Lua::new(&toml::from_str(&config).unwrap()).unwrap()
+        Lua::new(&toml::from_str(config).unwrap())
     }
 
     #[test]
@@ -454,78 +539,78 @@ mod tests {
         assert_eq!(event.as_log().get(&"junk".into()), None);
     }
 
-    // #[test]
-    // fn lua_non_string_key_write() {
-    //     let mut transform = from_config(
-    //         r#"
-    //         hooks.process = """function (event, emit)
-    //             event["log"][false] = "hello"
-    //             emit(event)
-    //         end
-    //         """
-    //         "#,
-    //     )
-    //     .unwrap();
+    #[test]
+    fn lua_non_string_key_write() {
+        let mut transform = from_config(
+            r#"
+            hooks.process = """function (event, emit)
+                event["log"][false] = "hello"
+                emit(event)
+            end
+            """
+            "#,
+        )
+        .unwrap();
 
-    //     let err = transform
-    //         .process_single(Event::new_empty_log())
-    //         .unwrap_err();
-    //     let err = format_error(&err);
-    //     assert!(err.contains("error converting Lua boolean to String"), err);
-    // }
+        let err = transform
+            .process_single(Event::new_empty_log())
+            .unwrap_err();
+        let err = format_error(&err);
+        assert!(err.contains("error converting Lua boolean to String"), err);
+    }
 
-    // #[test]
-    // fn lua_non_string_key_read() {
-    //     let mut transform = from_config(
-    //         r#"
-    //         hooks.process = """function (event, emit)
-    //             event.log.result = event.log[false]
-    //             emit(event)
-    //         end
-    //         """
-    //         "#,
-    //     )
-    //     .unwrap();
+    #[test]
+    fn lua_non_string_key_read() {
+        let mut transform = from_config(
+            r#"
+            hooks.process = """function (event, emit)
+                event.log.result = event.log[false]
+                emit(event)
+            end
+            """
+            "#,
+        )
+        .unwrap();
 
-    //     let event = transform.transform(Event::new_empty_log()).unwrap();
-    //     assert_eq!(event.as_log().get(&"result".into()), None);
-    // }
+        let event = transform.transform(Event::new_empty_log()).unwrap();
+        assert_eq!(event.as_log().get(&"result".into()), None);
+    }
 
-    // #[test]
-    // fn lua_script_error() {
-    //     let mut transform = from_config(
-    //         r#"
-    //         hooks.process = """function (event, emit)
-    //             error("this is an error")
-    //         end
-    //         """
-    //         "#,
-    //     )
-    //     .unwrap();
+    #[test]
+    fn lua_script_error() {
+        let mut transform = from_config(
+            r#"
+            hooks.process = """function (event, emit)
+                error("this is an error")
+            end
+            """
+            "#,
+        )
+        .unwrap();
 
-    //     let err = transform
-    //         .process_single(Event::new_empty_log())
-    //         .unwrap_err();
-    //     let err = format_error(&err);
-    //     assert!(err.contains("this is an error"), err);
-    // }
+        let err = transform
+            .process_single(Event::new_empty_log())
+            .unwrap_err();
+        let err = format_error(&err);
+        assert!(err.contains("this is an error"), err);
+    }
 
-    // #[test]
-    // fn lua_syntax_error() {
-    //     let err = from_config(
-    //         r#"
-    //         hooks.process = """function (event, emit)
-    //             1234 = sadf <>&*!#@
-    //         end
-    //         """
-    //         "#,
-    //     )
-    //     .map(|_| ())
-    //     .unwrap_err()
-    //     .to_string();
+    #[test]
+    fn lua_syntax_error() {
+        let err = from_config(
+            r#"
+            hooks.process = """function (event, emit)
+                1234 = sadf <>&*!#@
+            end
+            """
+            "#,
+        )
+        .map(|_| ())
+        .unwrap_err()
+        .to_string();
 
-    //     assert!(err.contains("syntax error:"), err);
-    // }
+        assert!(err.contains("syntax error:"), err);
+    }
 
     #[test]
     fn lua_load_file() {

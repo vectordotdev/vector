@@ -1,45 +1,44 @@
 use crate::{event::Event, transforms::Transform};
-use futures01::{
-    stream, sync::mpsc::Receiver as FutureReceiver, Async, Future, IntoFuture,
-    Stream as FutureStream,
-};
-use std::{
-    mem,
-    sync::mpsc::{self, Receiver, SyncSender},
-    thread,
-    time::Duration,
-};
+use futures01::{stream, sync::mpsc::Receiver as FutureReceiver, Future, Stream as FutureStream};
+use std::time::Duration;
 use tokio01::timer::Interval;
 
+/// A structure representing user-defined timer.
 #[derive(Clone, Copy, Debug)]
 pub struct Timer {
-    id: u32,
-    interval_seconds: u64,
+    pub id: u32,
+    pub interval_seconds: u64,
 }
 
+/// A trait representing a runtime running user-defined code.
 pub trait ScriptedRuntime {
+    /// Call user-defind "init" hook.
     fn hook_init<F>(&mut self, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
     }
 
+    /// Call user-defined "process" hook.
     fn hook_process<F>(&mut self, event: Event, emit_fn: F)
     where
         F: FnMut(Event) -> ();
 
+    /// Call user-defined "shutdown" hook.
     fn hook_shutdown<F>(&mut self, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
     }
 
+    /// Call user-defined timer handler.
     fn timer_handler<F>(&mut self, _timer: Timer, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
     }
 
+    /// Return (static) list of user-defined timers.
     fn timers(&self) -> Vec<Timer> {
         Vec::new()
     }
@@ -53,9 +52,9 @@ enum Message {
     Timer(Timer),
 }
 
-impl<R> Transform for R
+impl<Runtime> Transform for Runtime
 where
-    R: ScriptedRuntime + Send,
+    Runtime: ScriptedRuntime + Send,
 {
     // used only in config tests (cannot be put behind `#[cfg(test)`])
     fn transform(&mut self, event: Event) -> Option<Event> {
@@ -105,18 +104,26 @@ where
                 .flatten(),
         );
 
+        let mut is_shutdown: bool = false; // TODO: improve shutdown handling.
+                                           // It is used to prevent timers to emit messages after the source
+                                           // stream stopped.
         Box::new(
             input_rx
                 .map(move |msg| -> Vec<Event> {
                     let mut acc = Vec::new(); // TODO: create a stream adaptor to avoid buffering all events
+                    if is_shutdown {
+                        return acc;
+                    }
                     match msg {
                         Message::Init => self.hook_init(|event| acc.push(event)),
                         Message::Process(event) => {
                             self.hook_process(event, |event| acc.push(event))
                         }
-                        Message::Shutdown => self.hook_shutdown(|event| acc.push(event)),
+                        Message::Shutdown => {
+                            self.hook_shutdown(|event| acc.push(event));
+                            is_shutdown = true;
+                        }
                         Message::Timer(timer) => self.timer_handler(timer, |event| acc.push(event)),
-                        _ => (),
                     }
                     acc
                 })
