@@ -1,7 +1,7 @@
 use crate::{
     dns::Resolver,
     sinks::util::http::HttpClient,
-    tls::{TlsOptions, TlsSettings},
+    tls::{self, TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
 use futures01::{future::Future, stream::Stream};
@@ -290,7 +290,7 @@ pub enum BuildError {
     #[snafu(display("Kubernetes service account token is corrupted: {}.", source))]
     AccountTokenCorrupted { source: std::string::FromUtf8Error },
     #[snafu(display("TLS construction errored {}.", source))]
-    TlsError { source: crate::Error },
+    TlsError { source: tls::TlsError },
 }
 
 #[derive(Debug, Snafu)]

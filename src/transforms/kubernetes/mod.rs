@@ -21,7 +21,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, VecDeque};
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
-use tokio::timer::Delay;
+use tokio01::timer::Delay;
 
 /// Node name `spec.nodeName` of Vector pod passed down with Downward API.
 const NODE_NAME_ENV: &str = "VECTOR_NODE_NAME";
@@ -434,9 +434,9 @@ mod tests {
 mod integration_tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
-    use crate::sources::kubernetes::test::{echo, logs, user_namespace, Kube, VECTOR_YAML};
+    use crate::sources::kubernetes::test::{echo, logs, start_vector, user_namespace, Kube};
     use crate::test_util::{random_string, wait_for};
-    use kube::api::{Api, RawApi};
+    use kube::api::RawApi;
     use uuid::Uuid;
 
     static NAME_MARKER: &'static str = "$(NAME)";
@@ -478,6 +478,9 @@ data:
     # Ingest logs from Kubernetes
     [sources.kubernetes_logs]
       type = "kubernetes"
+      include_namespaces = ["$(USER_TEST_NAMESPACE)"]
+      include_container_names = [$(USER_CONTAINERS)]
+      include_pod_uids = [$(USER_POD_UIDS)]
 
     [transforms.kube_metadata]
       type = "kubernetes_pod_metadata"
@@ -546,17 +549,13 @@ data:
         );
         let _binding = kube.deleter(cluster_role_binding_api(), binding_name.as_str());
 
-        // Add Vector configuration
-        kube.create(
-            Api::v1ConfigMap,
+        // Start vector
+        let vector = start_vector(
+            &kube,
+            &user_namespace,
+            None,
             metadata_config_map(Some(vec![field])).as_str(),
         );
-
-        // Start vector
-        let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
-
-        // Wait for running state
-        kube.wait_for_running(vector.clone());
 
         // Start echo
         let _echo = echo(&user, "echo", &message);

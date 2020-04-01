@@ -123,6 +123,7 @@ spec:
         # This allows the caller to define imagePullPolicy with image tag:
         # - tag is 'latest' => imagePullPolicy: Always
         # - else => imagePullPolicy: IfNotPresent
+        args: ["-vv"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
@@ -281,14 +282,26 @@ impl Kube {
                     number_available: Some(number_available),
                     ..
                 } if number_available == desired_number_scheduled => Ok(object.clone()),
-                status => Err(format!(
-                    "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
-                    status,
-                    self.list(&object)
-                        .into_iter()
-                        .map(|pod| pod.status)
-                        .collect::<Vec<_>>()
-                )),
+                status => {
+                    // Try fetching Vectors logs for diagnostic purpose
+                    for daemon_instance in self.list(&object) {
+                        if let Ok(logs) = self.api(Api::v1Pod).log(
+                            daemon_instance.metadata.name.as_str(),
+                            &LogParams::default(),
+                        ) {
+                            info!("Deamon Vector's logs:\n{}", logs);
+                        }
+                    }
+
+                    Err(format!(
+                        "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
+                        status,
+                        self.list(&object)
+                            .into_iter()
+                            .map(|pod| pod.status)
+                            .collect::<Vec<_>>()
+                    ))
+                }
             }
         })
     }
@@ -416,6 +429,7 @@ fn create_vector<'a>(
     user_namespace: &str,
     container_name: impl Into<Option<&'a str>>,
     pod_uid: impl Into<Option<&'a str>>,
+    config: &str,
 ) -> KubeDaemon {
     let container_name = container_name
         .into()
@@ -438,7 +452,7 @@ fn create_vector<'a>(
     // Start vector
     kube.create(
         Api::v1ConfigMap,
-        CONFIG_MAP_YAML
+        config
             .replace(USER_NAMESPACE_MARKER, user_namespace)
             .replace(USER_CONTAINERS_MARKER, container_name.as_str())
             .replace(USER_POD_UID_MARKER, pod_uid.as_str())
@@ -453,12 +467,13 @@ fn create_vector<'a>(
     )
 }
 
-fn start_vector<'a>(
+pub fn start_vector<'a>(
     kube: &Kube,
     user_namespace: &str,
     container_name: impl Into<Option<&'a str>>,
+    config: &str,
 ) -> KubeDaemon {
-    let vector = create_vector(kube, user_namespace, container_name, None);
+    let vector = create_vector(kube, user_namespace, container_name, None, config);
 
     // Wait for running state
     kube.wait_for_running(vector.clone());
@@ -489,7 +504,7 @@ fn kube_one_log() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo
     let _echo = echo(&user, "echo", &message);
@@ -523,7 +538,7 @@ fn kube_old_log() {
     let _echo_old = echo(&user, "echo-old", &message_old);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // echo new
     let _echo_new = echo(&user, "echo-new", &message_new);
@@ -560,7 +575,7 @@ fn kube_multi_log() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo
     let _echo = echo(&user, "echo", messages.join("\\n").as_str());
@@ -588,7 +603,7 @@ fn kube_object_uid() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), None);
+    let vector = start_vector(&kube, user_namespace.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo
     let _echo = echo(&user, "echo", &message);
@@ -618,7 +633,7 @@ fn kube_diff_container() {
     let user = Kube::new(&user_namespace);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace.as_str(), "echo1");
+    let vector = start_vector(&kube, user_namespace.as_str(), "echo1", CONFIG_MAP_YAML);
 
     // Start echo0
     let _echo0 = echo(&user, "echo0", &message0);
@@ -653,7 +668,7 @@ fn kube_diff_namespace() {
     let user1 = Kube::new(&user_namespace1);
 
     // Start vector
-    let vector = start_vector(&kube, user_namespace1.as_str(), None);
+    let vector = start_vector(&kube, user_namespace1.as_str(), None, CONFIG_MAP_YAML);
 
     // Start echo0
     let _echo0 = echo(&user0, "echo", &message);
@@ -700,7 +715,13 @@ fn kube_diff_pod_uid() {
     }
 
     // Create vector
-    let vector = create_vector(&kube, user_namespace.as_str(), None, uid.as_str());
+    let vector = create_vector(
+        &kube,
+        user_namespace.as_str(),
+        None,
+        uid.as_str(),
+        CONFIG_MAP_YAML,
+    );
 
     // Wait for running state
     kube.wait_for_running(vector.clone());

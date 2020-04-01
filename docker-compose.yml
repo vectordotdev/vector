@@ -459,7 +459,7 @@ services:
       environment:
         CARGO_TERM_COLOR: always
         RUST_BACKTRACE: full
-        # TEST_LOG: debug
+        TEST_LOG: debug
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
