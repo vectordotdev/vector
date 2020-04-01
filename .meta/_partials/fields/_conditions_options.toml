@@ -78,3 +78,18 @@ relevant_when = {type = "check_fields"}
 description = """\
 Checks whether a string field starts with a string argument.\
 """
+
+[<%= namespace %>."`[field_name]`.regex"]
+type = "string"
+examples = [
+  { "message.regex" = " (any|of|these|five|words) " }
+]
+common = true
+relevant_when = {type = "check_fields"}
+description = """\
+Checks whether a string field matches a [regular expression][urls.regex]. \
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. \
+Note that this condition is considerably more expensive than \
+a regular string match (such as `starts_with` or `contains`) \
+so the use of those conditions are preferred where possible.\
+"""

@@ -67,6 +67,7 @@ vector test /etc/vector/*.toml
     conditions."message.eq" = "this is the content to match against" # example
     conditions."message.contains" = "foo" # example
     conditions."environment.ends_with" = "-staging" # example
+    conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
 ```
 
@@ -119,6 +120,7 @@ vector test /etc/vector/*.toml
     conditions."method.neq" = "POST" # example
     conditions."message.contains" = "foo" # example
     conditions."environment.ends_with" = "-staging" # example
+    conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
 ```
 
@@ -723,6 +725,35 @@ Checks whether a string field ends with a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={[{"message.regex":" (any|of|these|five|words) "}]}
+  groups={[]}
+  name={"`[field_name]`.regex"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.regex
+
+Checks whether a string field matches a [regular expression][urls.regex].
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note
+that this condition is considerably more expensive than a regular string match
+(such as `starts_with` or `contains`) so the use of those conditions are
+preferred where possible.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={[{"environment.starts_with":"staging-"}]}
   groups={[]}
   name={"`[field_name]`.starts_with"}
@@ -781,3 +812,5 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax

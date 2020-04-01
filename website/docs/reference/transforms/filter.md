@@ -39,6 +39,7 @@ on a set of logical conditions.
   condition."message.eq" = "this is the content to match against" # example
   condition."message.contains" = "foo" # example
   condition."environment.ends_with" = "-staging" # example
+  condition."message.regex" = " (any|of|these|five|words) " # example
   condition."environment.starts_with" = "staging-" # example
 ```
 
@@ -211,6 +212,35 @@ Checks whether a string field ends with a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={[{"message.regex":" (any|of|these|five|words) "}]}
+  groups={[]}
+  name={"`[field_name]`.regex"}
+  path={"condition"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### `[field_name]`.regex
+
+Checks whether a string field matches a [regular expression][urls.regex].
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note
+that this condition is considerably more expensive than a regular string match
+(such as `starts_with` or `contains`) so the use of those conditions are
+preferred where possible.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={[{"environment.starts_with":"staging-"}]}
   groups={[]}
   name={"`[field_name]`.starts_with"}
@@ -279,4 +309,6 @@ You can learn more in the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

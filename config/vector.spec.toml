@@ -1591,6 +1591,17 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "environment.ends_with" = "-staging"
 
+    # Checks whether a string field matches a regular expression. Vector uses the
+    # documented Rust Regex syntax. Note that this condition is considerably more
+    # expensive than a regular string match (such as `starts_with` or `contains`)
+    # so the use of those conditions are preferred where possible.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.regex" = " (any|of|these|five|words) "
+
     # Checks whether a string field starts with a string argument.
     #
     # * optional
@@ -2394,6 +2405,17 @@ end
       # * type: string
       # * relevant when type = "check_fields"
       "environment.ends_with" = "-staging"
+
+      # Checks whether a string field matches a regular expression. Vector uses the
+      # documented Rust Regex syntax. Note that this condition is considerably more
+      # expensive than a regular string match (such as `starts_with` or `contains`)
+      # so the use of those conditions are preferred where possible.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.regex" = " (any|of|these|five|words) "
 
       # Checks whether a string field starts with a string argument.
       #
