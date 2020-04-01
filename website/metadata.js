@@ -26373,7 +26373,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to enrich pod's logs with [Kubernetes][urls.kubernetes] Pod metadata.",
+      "short_description": "Accepts log events and allows you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.",
       "status": "beta",
       "title": "Kubernetes Pod Metadata",
       "type": "transform",

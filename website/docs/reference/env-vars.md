@@ -214,9 +214,9 @@ it can degrade performance.
 
 ### VECTOR_NODE_NAME
 
-Node's name whose pod's logs should be enriched. Either this or `node_name`
-field must be defined. Defined automatically when using [predefined Kubernetes
-config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
+The name of the node whose Pod's log should be enriched. If you're using the
+[provided daemon set][urls.kubernetes_limit_resources] then this environment
+variable is set for you.
 
 
 
@@ -262,3 +262,4 @@ variable example.
 [docs.process-management#reloading]: /docs/administration/process-management/#reloading
 [docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/

@@ -33,7 +33,7 @@ For example:
 <%- elsif fields -%>
 For example:
 
-<%= fields_example(fields) %>
+<%= fields_example(fields, root_key: output.global_log_schema_key) %>
 <%- end -%>
 <%- if fields.any? -%>
 

@@ -30,29 +30,39 @@
 <%- end -%>
 ## Output
 
-<%= component_output(component, component.output.log, heading_depth: 3) %>
+<%= component_output(component, component.output.log, root_key: "kubernetes", heading_depth: 3) %>
 
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
 
-### Retry Policy
+### Building & Maintaining The Metadata
 
-Vector will retry failed requests. Retries are done with a jitter with
-exponentionally increasing uniform distribution range whose upper limit
-You can control with `max_retry_timeout` option. Jitter, with maximal
-range size, is also applied when connecting to the Kubernetes API server
-for the first time.
+Vector leverages the [Rust `k8s-openapi` crate][urls.rust_k8s_openapi_crate]
+to communicate with the [Kubernetes API][urls.kubernetes_api] to build and
+maintaing the Pod metadata that this component enriches the log with.
 
-### Nesting fields
+This metadata is held in memory. The loading and maintenance of this data is
+performed asynchronously, in the background, as to not block log processing.
+Upon starting Vector the metadata is loaded and then Vector utilizes the
+[Kubernetes Watch API][urls.kubernetes_watch_api] to stream Pod updates in
+real-time, there is no polling involved.
 
-Fields defined with `fields` option will be nested under global key `kubernetes_key`
-whose value can be changed. See [Changing The Default Schema][docs.reference.global-options#log_schema]
-for more info.
+### Log Data Collection
 
-### Minimal Kubernetes version
+To collect Kubernetes logs please refer to the `kubernetes` source.
 
-Underlying requirement is the minimal Kubernetes API v1.15,
-which is supported since at least Kubernetes v1.13 .
+### Kubernetes API Communication Failures
 
+Vector will retry failed Kubernetes API requests indefinitely. Retries will
+exponentially backoff with jitter and across uniform distribution whose upper
+limit you can control via the `max_retry_timeout` option. This ensures that
+Vector does not effectively DDOS your Kubernetes API in the event of failure.
 
+### Nesting Metadata Fields
+
+Fields defined with `fields` option will be nested under the
+[global `kubernetes_key`][docs.reference.global-options#kubernetes_key]. You
+can change the name of this key or use the
+[`rename_fields`][docs.transforms.rename_fields] transform to move it to the
+root of the event.

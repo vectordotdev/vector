@@ -189,6 +189,10 @@
                 "type": "string",
                 "description": "The output exmaple body. Markdown syntax is supported."
               },
+              "global_log_schema_key": {
+                "type": "string",
+                "descripttion": "If these fields are inserted under a global log schema key, what is the name of that key?"
+              },
               "label": {
                 "type": "string",
                 "description": "The output label. This will be used in the tab name if multiple output examples are provided."
