@@ -2,7 +2,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     sinks::util::{
-        encoding::{skip_serializing_if_default, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
         retries::{RetryAction, RetryLogic},
         BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
@@ -26,7 +26,10 @@ pub struct ClickhouseConfig {
     pub table: String,
     pub database: Option<String>,
     pub compression: Option<Compression>,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchBytesConfig,
@@ -246,7 +249,7 @@ mod integration_tests {
     use futures01::Sink;
     use serde_json::Value;
     use std::time::Duration;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     #[test]
     fn insert_events() {
@@ -321,7 +324,7 @@ mod integration_tests {
         let client = ClickhouseClient::new(host);
         client.create_table(
             &table,
-            "host String, timestamp DateTime('Europe/London'), message String",
+            "host String, timestamp DateTime('UTC'), message String",
         );
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -379,7 +382,7 @@ compression = "none"
         let client = ClickhouseClient::new(host);
         client.create_table(
             &table,
-            "host String, timestamp DateTime('Europe/London'), message String",
+            "host String, timestamp DateTime('UTC'), message String",
         );
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();

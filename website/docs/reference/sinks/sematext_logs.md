@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "Sematext Logs"
 description: "The Vector `sematext_logs` sink batches `log` events to Sematext via the Elasticsearch API."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+sematext_logs%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Sematext Logs"
 sidebar_label: "sematext_logs|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/sematext_logs.rs
 status: "beta"
 title: "Sematext Logs Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `sematext_logs` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,40 +35,34 @@ The Vector `sematext_logs` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
   healthcheck = true # optional, default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
   # General
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN_ENV_VAR}" # required
+  token = "${SEMATEXT_TOKEN}" # required
   healthcheck = true # optional, default
   host = "http://127.0.0.1" # optional, no default
   region = "na" # optional, no default
@@ -94,10 +94,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -705,7 +701,7 @@ duplicate data downstream.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${SEMATEXT_TOKEN_ENV_VAR}","some-sematext-token"]}
+  examples={["${SEMATEXT_TOKEN}","some-sematext-token"]}
   groups={[]}
   name={"token"}
   path={null}
@@ -731,8 +727,6 @@ The token that will be used to write to Sematext.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

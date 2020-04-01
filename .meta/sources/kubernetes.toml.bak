@@ -1,11 +1,21 @@
 [sources.kubernetes]
 title = "Kubernetes"
+noun = "Kubernetes cluster"
 beta = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_kubernetes.toml") %>
+features = [
+  "Collect Kubernetes logs.",
+  "Automatically discover new containers and pods.",
+  "Filter by containers, pods, or namespaces."
+  "Merge multi-line logs into one event.",
+  "Enrich your logs with useful Kubernetes context."
+]
 function_category = "collect"
 output_types = ["log"]
 requirements = {}
-through_description = "kubernetes node's"
+strategies = ["daemon"]
+through_description = "[Kubernetes][urls.kubernetes]"
 
 [sources.kubernetes.options.include_container_names]
 type = "[string]"

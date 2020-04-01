@@ -159,7 +159,9 @@ impl Transform for Geoip {
             let e = event.as_mut_log();
             let d = e.get(&Atom::from(field.to_string()));
             match d {
-                None => e.insert(Atom::from(field.to_string()), Value::from("")),
+                None => {
+                    e.insert(Atom::from(field.to_string()), Value::from(""));
+                }
                 _ => (),
             }
         }

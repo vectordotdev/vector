@@ -1,16 +1,22 @@
 ---
+last_modified_on: "2020-03-31"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+rename_fields%22
-min_version: null
-service_name: "Rename Fields"
 sidebar_label: "rename_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/rename_fields.rs
 status: "prod-ready"
 title: "Rename Fields Transform"
 ---
+
+import Alert from '@site/src/components/Alert';
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `rename_fields` transform
 accepts and [outputs `log` events](#output) allowing you to rename one or more
@@ -26,9 +32,14 @@ log fields.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<TabItem value="common">
+
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [transforms.my_transform_id]
@@ -41,11 +52,53 @@ import CodeHeader from '@site/src/components/CodeHeader';
   fields.parent.old_child_name = "parent.new_child_name" # example
 ```
 
-import Fields from '@site/src/components/Fields';
+</TabItem>
+<TabItem value="advanced">
 
-import Field from '@site/src/components/Field';
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
+[transforms.my_transform_id]
+  # General
+  type = "rename_fields" # required
+  inputs = ["my-source-id"] # required
+  drop_empty = false # optional, default
+
+  # Fields
+  fields.old_field_name = "new_field_name" # example
+  fields.parent.old_child_name = "parent.new_child_name" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
+
+
+<Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"drop_empty"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### drop_empty
+
+If set to `true`, after renaming fields, remove any parent objects of the old
+field that are now empty.
+
+
+
+
+</Field>
 
 
 <Field
@@ -125,7 +178,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [transforms.my_transform]
@@ -163,8 +216,6 @@ full programming runtime.
 #### Key Conflicts
 
 Keys specified in this transform will replace existing keys.
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="warning">
 

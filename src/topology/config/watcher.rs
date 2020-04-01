@@ -116,7 +116,7 @@ mod tests {
     use futures01::{Future, Stream};
     use std::time::{Duration, Instant};
     use std::{fs::File, io::Write};
-    use tokio::timer::Delay;
+    use tokio01::timer::Delay;
     #[cfg(unix)]
     use tokio_signal::unix::{Signal, SIGHUP};
 

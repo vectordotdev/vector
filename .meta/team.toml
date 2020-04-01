@@ -6,18 +6,18 @@ keybase = "https://keybase.io/arodin"
 name = "Alexander"
 
 [[team]]
-id = "alexey"
-avatar = "https://github.com/loony-bean.png"
-github = "https://github.com/loony-bean"
-name = "Alexey"
-
-[[team]]
 id = "ana"
 avatar = "https://github.com/hoverbear.png"
 github = "https://github.com/hoverbear"
 keybase = "https://keybase.io/hoverbear"
 twitter = "https://twitter.com/a_hoverbear"
 name = "Ana"
+bio = """\
+Ana is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
+and member of the <a href="/community#team">core Vector team</a>. She is \
+actively invovled in the Rust community and contributing to project and \
+organizing meetups.\
+"""
 
 [[team]]
 id = "ashley"
@@ -26,6 +26,12 @@ github = "https://github.com/Jeffail"
 keybase = "https://keybase.io/jeffail"
 twitter = "https://twitter.com/jeffail"
 name = "Ashley"
+bio = """\
+Ashley is a Principal Engineer at <a href="https://timber.io">Timber.io</a> \
+and member of the <a href="/community#team">core Vector team</a>. He created \
+<a href="https://github.com/Jeffail/benthos">Benthos stream processor</a>, a \
+popular stream processor written Go.\
+"""
 
 [[team]]
 id = "ben"
@@ -34,6 +40,19 @@ github = "https://github.com/binarylogic"
 keybase = "https://keybase.io/binarylogic"
 twitter = "https://twitter.com/binarylogic"
 name = "Ben"
+bio = """\
+Ben is the CTO/Co-Founder at <a href="https://timber.io">Timber.io</a> and a \
+member of the <a href="/community#team">core Vector team</a>. He is an \
+open-source veteran, creating \
+<a href="https://github.com/binarylogic/authlogic">Authlogic</a> over 15 years \
+ago before helping to launch Vector.\
+"""
+
+[[team]]
+id = "brady"
+avatar = "https://github.com/timber-bradybot.png"
+github = "https://github.com/timber-bradybot"
+name = "Brady"
 
 [[team]]
 id = "bruce"
@@ -62,3 +81,23 @@ github = "https://github.com/lukesteensen"
 keybase = "https://keybase.io/lukesteensen"
 twitter = "https://twitter.com/lukesteensen"
 name = "Luke"
+bio = """\
+Luke is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
+and member of the <a href="/community#team">core Vector team</a>. Before \
+Timber Luke was an engineer at Braintree, working on parts of their \
+observability pipeline.\
+"""
+
+[[team]]
+id = "mike"
+avatar = "https://github.com/MOZGIII.png"
+github = "https://github.com/MOZGIII"
+keybase = "https://keybase.io/MOZGIII"
+twitter = "https://twitter.com/MOZGIII"
+name = "Mike"
+
+[[team]]
+id = "vic"
+avatar = "https://github.com/vector-vic.png"
+github = "https://github.com/vector-vic"
+name = "Vic"

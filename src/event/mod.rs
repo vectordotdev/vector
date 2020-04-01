@@ -47,9 +47,7 @@ pub struct LogEvent {
 
 impl Event {
     pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        })
+        Event::Log(LogEvent::new())
     }
 
     pub fn as_log(&self) -> &LogEvent {
@@ -96,6 +94,12 @@ impl Event {
 }
 
 impl LogEvent {
+    pub fn new() -> Self {
+        Self {
+            fields: BTreeMap::new(),
+        }
+    }
+
     pub fn get(&self, key: &Atom) -> Option<&Value> {
         util::log::get(&self.fields, key)
     }
@@ -120,7 +124,7 @@ impl LogEvent {
         self.fields.contains_key(key)
     }
 
-    pub fn insert<K, V>(&mut self, key: K, value: V)
+    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: AsRef<str>,
         V: Into<Value>,
@@ -137,7 +141,11 @@ impl LogEvent {
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key)
+        util::log::remove(&mut self.fields, &key, false)
+    }
+
+    pub fn remove_prune(&mut self, key: &Atom, prune: bool) -> Option<Value> {
+        util::log::remove(&mut self.fields, &key, prune)
     }
 
     pub fn remove_flat(&mut self, key: &Atom) -> Option<Value> {
@@ -180,7 +188,7 @@ impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = Event::new_empty_log().into_log();
+        let mut log_event = LogEvent::new();
         log_event.extend(iter);
         log_event
     }
@@ -212,10 +220,13 @@ pub fn log_schema() -> &'static LogSchema {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
 #[serde(default)]
 pub struct LogSchema {
+    #[serde(default = "LogSchema::default_message_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     message_key: Atom,
+    #[serde(default = "LogSchema::default_timestamp_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     timestamp_key: Atom,
+    #[serde(default = "LogSchema::default_host_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
     #[getset(get = "pub", set = "pub(crate)")]
@@ -230,6 +241,18 @@ impl Default for LogSchema {
             host_key: Atom::from("host"),
             kubernetes_key: Atom::from("kubernetes"),
         }
+    }
+}
+
+impl LogSchema {
+    fn default_message_key() -> Atom {
+        Atom::from("message")
+    }
+    fn default_timestamp_key() -> Atom {
+        Atom::from("timestamp")
+    }
+    fn default_host_key() -> Atom {
+        Atom::from("host")
     }
 }
 

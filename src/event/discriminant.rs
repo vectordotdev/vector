@@ -157,12 +157,8 @@ fn hash_null<H: Hasher>(hasher: &mut H) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::LogEvent;
     use std::collections::{hash_map::DefaultHasher, HashMap};
-
-    fn new_log_event() -> LogEvent {
-        Event::new_empty_log().into_log()
-    }
 
     fn hash<H: Hash>(hash: H) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -172,7 +168,7 @@ mod tests {
 
     #[test]
     fn equal() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("hostname", "localhost");
         event_1.insert("irrelevant", "not even used");
         let mut event_2 = event_1.clone();
@@ -189,7 +185,7 @@ mod tests {
 
     #[test]
     fn not_equal() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("hostname", "localhost");
         event_1.insert("container_id", "abc");
         let mut event_2 = event_1.clone();
@@ -206,10 +202,10 @@ mod tests {
 
     #[test]
     fn field_order() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("a", "a");
         event_1.insert("b", "b");
-        let mut event_2 = new_log_event();
+        let mut event_2 = LogEvent::new();
         event_2.insert("b", "b");
         event_2.insert("a", "a");
 
@@ -224,10 +220,10 @@ mod tests {
 
     #[test]
     fn map_values_key_order() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("nested.a", "a");
         event_1.insert("nested.b", "b");
-        let mut event_2 = new_log_event();
+        let mut event_2 = LogEvent::new();
         event_2.insert("nested.b", "b");
         event_2.insert("nested.a", "a");
 
@@ -242,10 +238,10 @@ mod tests {
 
     #[test]
     fn map_values_array() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("array[0]", "a");
         event_1.insert("array[1]", "b");
-        let mut event_2 = new_log_event();
+        let mut event_2 = LogEvent::new();
         event_2.insert("array[1]", "b");
         event_2.insert("array[0]", "a");
 
@@ -260,9 +256,9 @@ mod tests {
 
     #[test]
     fn map_values_matter_1() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
-        let event_2 = new_log_event(); // empty event
+        let event_2 = LogEvent::new(); // empty event
 
         let discriminant_fields = vec![Atom::from("nested")];
 
@@ -275,9 +271,9 @@ mod tests {
 
     #[test]
     fn map_values_matter_2() {
-        let mut event_1 = new_log_event();
+        let mut event_1 = LogEvent::new();
         event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
-        let mut event_2 = new_log_event();
+        let mut event_2 = LogEvent::new();
         event_2.insert("nested", "x"); // `nested` is a `Value::String`
 
         let discriminant_fields = vec![Atom::from("nested")];
@@ -294,21 +290,21 @@ mod tests {
         let mut map: HashMap<Discriminant, usize> = HashMap::new();
 
         let event_stream_1 = {
-            let mut event = new_log_event();
+            let mut event = LogEvent::new();
             event.insert("hostname", "a.test");
             event.insert("container_id", "abc");
             event
         };
 
         let event_stream_2 = {
-            let mut event = new_log_event();
+            let mut event = LogEvent::new();
             event.insert("hostname", "b.test");
             event.insert("container_id", "def");
             event
         };
 
         let event_stream_3 = {
-            let event = new_log_event();
+            let event = LogEvent::new();
             // no `hostname` or `container_id`
             event
         };

@@ -33,8 +33,8 @@ We can accomplish this with the
   key_prefix = "application_id={{ application_id }}/date=%F/"
 ```
 
-Notice that Vector allows direct field references as well as `strptime`
-modifiers. If we were to run the following [`log` event][docs.data-model.log]
+Notice that Vector allows direct field references as well as `strftime`
+specifiers. If we were to run the following [`log` event][docs.data-model.log]
 though Vector:
 
 ```json
@@ -69,10 +69,10 @@ Vector's [field notation][docs.reference.field-path-notation] is simple. It uses
 `.` to target nested fields and `[<index>]` to target array values. Learn more
 in the [field notation docs][docs.reference.field-path-notation].
 
-### Strptime Specifiers
+### Strftime Specifiers
 
 In addition to directly accessing fields, Vector offers a shortcut for injecting
-[strptime specifiers][urls.strptime_specifiers]:
+[strftime specifiers][urls.strptime_specifiers]:
 
 ```toml
 options = "year=%Y/month=%m/day=%d/"
@@ -151,4 +151,4 @@ option = "{{ parent.child }}"
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
 [docs.transforms.lua]: /docs/reference/transforms/lua/
 [urls.issue_1692]: https://github.com/timberio/vector/issues/1692
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

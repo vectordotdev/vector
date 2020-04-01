@@ -36,7 +36,7 @@ delivery](#does-vector-support-exactly-once-delivery) FAQ below).
 In order to achieve at least once delivery between restarts your source must
 be configured to use `disk` based buffers:
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>" />
+<CodeHeader text="vector.toml" learnMoreUrl="<%= metadata.links.fetch("docs.configuration") %>" />
 
 ```toml
 [sinks.my_sink_id]

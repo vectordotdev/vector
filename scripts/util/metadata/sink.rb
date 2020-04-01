@@ -8,6 +8,7 @@ class Sink < Component
     :egress_method,
     :input_types,
     :healthcheck,
+    :noun,
     :output,
     :service_limits_short_link,
     :tls,
@@ -21,6 +22,7 @@ class Sink < Component
     @egress_method = hash.fetch("egress_method")
     @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
+    @noun = hash.fetch("noun")
     @service_limits_short_link = hash["service_limits_short_link"]
     @write_to_description = hash.fetch("write_to_description")
 
@@ -39,8 +41,13 @@ class Sink < Component
     egress_method == "batching"
   end
 
-  def description
-    @description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
+  def can_receive_from?(component)
+    component.respond_to?(:output_types) &&
+      component.output_types.intersection(input_types).any?
+  end
+
+  def can_send_to?(component)
+    false
   end
 
   def exposing?
@@ -64,8 +71,20 @@ class Sink < Component
     end
   end
 
+  def short_description
+    @short_description ||= "#{plural_write_verb.humanize} #{input_types.to_sentence} events to #{write_to_description}."
+  end
+
   def streaming?
     egress_method == "streaming"
+  end
+
+  def to_h
+    super.merge(
+      input_types: input_types,
+      noun: noun,
+      write_to_description: write_to_description.remove_markdown_links
+    )
   end
 
   def write_verb

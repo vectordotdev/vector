@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+gcp_cloud_storage%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "GCP Cloud Storage (GCS)"
 sidebar_label: "gcp_cloud_storage|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/gcp/cloud_storage.rs
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/gcp/cloud_storage.rs
 status: "beta"
 title: "GCP Cloud Storage (GCS) Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `gcp_cloud_storage` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Google
@@ -30,20 +36,14 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -68,7 +68,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -127,10 +127,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -440,7 +436,7 @@ The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API. If this is unset, Vector checks
 the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
@@ -1210,7 +1206,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
@@ -1221,8 +1217,6 @@ authenticate access to the Cloud Storage API.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-partitioned.svg" />
 
@@ -1247,20 +1241,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
-### GCP Authentication
-
-GCP offers a [variety of authentication methods][urls.gcp_authentication] and
-Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
-and will find credentials in the following order:
-
-1. If the [`credentials_path`](#credentials_path) option is set.
-2. If the `api_key` option is set.
-3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
-
-If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring#logs].
-
 
 ### Health Checks
 
@@ -1390,7 +1370,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sinks.my_gcp_cloud_storage_sink_id]
@@ -1410,13 +1390,10 @@ You can learn more about the complete syntax in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
-[docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.templating]: /docs/reference/templating/
-[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 [urls.new_gcp_cloud_storage_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_cloud_storage
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)

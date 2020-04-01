@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "best_effort"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
-min_version: "0"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Elasticsearch"
 sidebar_label: "elasticsearch|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-status: "beta"
+status: "prod-ready"
 title: "Elasticsearch Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `elasticsearch` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -30,20 +36,14 @@ endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-b
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -57,7 +57,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -71,8 +71,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Auth
   auth.strategy = "aws" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${ELASTICSEARCH_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${ELASTICSEARCH_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
@@ -90,7 +90,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Headers
-  headers.Authorization = "${TOKEN_ENV_VAR}" # example
+  headers.Authorization = "${ELASTICSEARCH_TOKEN}" # example
   headers.X-Powered-By = "Vector" # example
 
   # Query
@@ -111,14 +111,11 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
+  tls.verify_hostname = true # optional, default
 ```
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -176,7 +173,7 @@ The authentication strategy to use.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${ELASTICSEARCH_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -201,7 +198,7 @@ The basic authentication password.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${ELASTICSEARCH_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}
@@ -594,7 +591,7 @@ Options for custom headers.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"Authorization":"${TOKEN_ENV_VAR}"},{"X-Powered-By":"Vector"}]}
+  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
   groups={[]}
   name={"`[header-name]`"}
   path={"headers"}
@@ -1116,6 +1113,33 @@ verifying the remote certificate.
 </Field>
 
 
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"verify_hostname"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_hostname
+
+If `true` (the default), Vector will validate the configured remote host name
+against the remote host's TLS certificate. Do NOT set this to `false` unless
+you understand the risks of not verifying the remote hostname.
+
+
+
+
+</Field>
+
+
 </Fields>
 
 </Field>
@@ -1228,8 +1252,6 @@ how to do this.
 
 ### Buffers & Batches
 
-import SVG from 'react-inlinesvg';
-
 <SVG src="/img/buffers-and-batches-serial.svg" />
 
 The `elasticsearch` sink buffers & batches data as
@@ -1313,7 +1335,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sinks.my_elasticsearch_sink_id]
@@ -1343,4 +1365,4 @@ You can learn more about the complete syntax in the
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

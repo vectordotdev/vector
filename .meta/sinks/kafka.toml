@@ -1,26 +1,34 @@
 [sinks.kafka]
 title = "Kafka"
+noun = "Kafka"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_kafka.toml") %>
 egress_method = "streaming"
+features = [
+  "Send logs to Kafka.",
+  "Leverage any of AWS' IAM strategies.",
+  "Optionally compress data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
-min_version = "0.8"
-requirements = {}
+requirements.kafka = ">= 0.8"
 service_providers = ["AWS", "Confluent"]
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "kafka") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "kafka") %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.kafka.options",
   common: false
 ) %>
 
-<%= render("_partials/_kafka_common.toml", namespace: "sinks.kafka") %>
+<%= render("_partials/fields/_kafka_options.toml", namespace: "sinks.kafka.options") %>
 
 [sinks.kafka.options.compression]
 type = "string"
@@ -36,7 +44,7 @@ lz4 = "High speed [LZ4 compression](https://lz4.github.io/lz4/)"
 snappy = "High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression."
 zstd = "[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.kafka.options",
   encodings: ["json", "text"]
 ) %>
@@ -52,7 +60,7 @@ randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
+<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
 
 [sinks.kafka.options.topic]
 type = "string"

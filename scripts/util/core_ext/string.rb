@@ -1,6 +1,10 @@
 require 'word_wrap/core_ext'
 
 class String
+  def capitalize_first
+    self[0].capitalize + self[1..-1]
+  end
+
   # Comments out a block of text
   def commentify
     "# " + self.gsub("\n", "\n# ")

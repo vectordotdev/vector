@@ -41,7 +41,10 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
-    #[serde(default)]
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
     pub log_schema: event::LogSchema,
 }
 

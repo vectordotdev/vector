@@ -2,6 +2,7 @@ import React from 'react';
 
 import Heading from '@theme/Heading';
 import Layout from '@theme/Layout';
+import Link from '@docusaurus/Link';
 import MailingListForm from '@site/src/components/MailingListForm';
 
 import styles from './community.module.css';
@@ -77,17 +78,17 @@ function Community() {
             <AnchoredH2 id="team">Meet The Team</AnchoredH2>
 
             <div className={styles.coreTeam}>
-               {team.map((member, idx) => (
-                  <div key={idx} className="avatar avatar--vertical">
-                    <img
-                      className="avatar__photo avatar__photo--xl"
-                      src={member.avatar}
-                    />
-                    <div className="avatar__intro">
-                      <h4 className="avatar__name">{member.name}</h4>
-                    </div>
+              {team.map((member, idx) => (
+                <Link key={idx} to={member.github} className="avatar avatar--vertical">
+                  <img
+                    className="avatar__photo avatar__photo--xl"
+                    src={member.avatar}
+                  />
+                  <div className="avatar__intro">
+                    <h4 className="avatar__name">{member.name}</h4>
                   </div>
-                ))}
+                </Link>
+              ))}
             </div>
           </div>
         </section>

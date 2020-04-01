@@ -1,0 +1,3 @@
+<%- platform = metadata.installation.platforms.send("docker") -%>
+<%- sink = metadata.sinks.send("loki") -%>
+<%= integration_guide(platform: platform, sink: sink) %>

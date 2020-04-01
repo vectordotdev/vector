@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-03-31"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "AWS S3"
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS S3 Sink"
 unsupported_operating_systems: []
 ---
+
+import CodeHeader from '@site/src/components/CodeHeader';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `aws_s3` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web
@@ -30,20 +36,14 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -73,7 +73,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
 [sinks.my_sink_id]
@@ -82,9 +82,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   inputs = ["my-source-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
   region = "us-east-1" # required, required when endpoint = ""
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
 
   # ACL
@@ -127,9 +127,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tags.Tag1 = "Value1" # example
 
   # Request
-  request.in_flight_limit = 5 # optional, default, requests
+  request.in_flight_limit = 50 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
-  request.rate_limit_num = 5 # optional, default
+  request.rate_limit_num = 250 # optional, default
   request.retry_attempts = -1 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
@@ -138,10 +138,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -593,7 +589,7 @@ How to format event timestamps.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -895,9 +891,9 @@ Configures the sink request behavior.
 
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={50}
   enumValues={null}
-  examples={[5]}
+  examples={[50]}
   groups={[]}
   name={"in_flight_limit"}
   path={"request"}
@@ -945,9 +941,9 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={250}
   enumValues={null}
-  examples={[5]}
+  examples={[250]}
   groups={[]}
   name={"rate_limit_num"}
   path={"request"}
@@ -1303,8 +1299,6 @@ account access.
 
 ### Buffers & Batches
 
-import SVG from 'react-inlinesvg';
-
 <SVG src="/img/buffers-and-batches-partitioned.svg" />
 
 The `aws_s3` sink buffers & batches data as
@@ -1485,7 +1479,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
+<CodeHeader text="vector.toml" />
 
 ```toml
 [sinks.my_aws_s3_sink_id]
@@ -1526,5 +1520,5 @@ You can learn more about the complete syntax in the
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.issue_1694]: https://github.com/timberio/vector/issues/1694
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
