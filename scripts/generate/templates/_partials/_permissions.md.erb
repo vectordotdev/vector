@@ -1,0 +1,15 @@
+<Fields>
+<%- permissions.each do |permission| -%>
+<Field
+  name={<%= permission.name.to_json %>}
+  required={true}
+  >
+
+<%= "#" * heading_depth %> <%= permission.name %>
+
+<%= permission.description.wrap(80) %>
+[[references:`<%= permission.name %>`]]
+
+</Field>
+<%- end -%>
+</Fields>
