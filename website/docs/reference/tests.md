@@ -881,4 +881,4 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [guides.advanced.unit-testing]: /guides/advanced/unit-testing/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax

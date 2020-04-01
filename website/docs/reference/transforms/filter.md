@@ -330,5 +330,5 @@ You can learn more in the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
