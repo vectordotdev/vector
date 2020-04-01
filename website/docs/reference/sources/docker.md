@@ -75,8 +75,6 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -100,8 +98,6 @@ Setting this to `false` will disable the automatic merging of partial events.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -127,8 +123,6 @@ container ID or name. If not provided, all containers will be included.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -153,8 +147,6 @@ included.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -180,8 +172,6 @@ labels docs][urls.docker_object_labels].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"_partial"}
@@ -207,15 +197,11 @@ partial event. This allows to opt-out of partial event detection.
 
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={"unix:///var/run/docker.sock"}
@@ -239,8 +225,6 @@ The docker host to connect to.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -266,8 +250,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -291,8 +273,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -316,8 +296,6 @@ A UTC timestamp representing when the container was created.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -341,8 +319,6 @@ The Docker container ID that the log was collected from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -366,8 +342,6 @@ The Docker container name that the log was collected from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -391,8 +365,6 @@ The image name that the container is based on.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -417,8 +389,6 @@ it's exact key/value pair.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -442,8 +412,6 @@ The raw log message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -467,8 +435,6 @@ The [standard stream][urls.standard_streams] that the log was collected from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -492,8 +458,6 @@ The UTC timestamp extracted from the Docker log event.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

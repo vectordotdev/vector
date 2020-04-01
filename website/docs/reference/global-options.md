@@ -36,8 +36,6 @@ log_schema.timestamp_key = "timestamp" # optional, default
 ## Options
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -63,8 +61,6 @@ permissions to this dir.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -91,8 +87,6 @@ system configuration.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -116,8 +110,6 @@ model page][docs.data-model.log] for more info.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -142,8 +134,6 @@ page][docs.data-model.log#host] for more info.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"kubernetes"}
@@ -167,8 +157,6 @@ The key under which Kubernetes related fields are nested.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"message"}
@@ -193,8 +181,6 @@ page][docs.data-model.log#message] for more info.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"timestamp"}
@@ -219,13 +205,9 @@ page][docs.data-model.log#timestamp] for more info.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

@@ -59,7 +59,7 @@
       "type": "object",
       "description": "A Vector field, such as a component option, environment variable, log schema field, etc.",
       "additionalProperties": false,
-      "required": ["description", "type"],
+      "required": ["description"],
       "properties": {
         "category": {
           "type": "string",
@@ -201,6 +201,31 @@
         }
       }
     },
+    "permissions": {
+      "type": "object",
+      "description": "An object of permissions keyed by the permission's name.",
+      "patternProperties": {
+        "^[a-z0-9_]+$": {
+          "$ref": "#/definitions/permission"
+        }
+      }
+    },
+    "permission": {
+      "type": "object",
+      "description": "A Vector permission, such as a AWS IAM, GCP IAM, or Kubernetes RBAC permission.",
+      "additionalProperties": false,
+      "required": ["description", "name"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "The permission description."
+        },
+        "name": {
+          "type": "string",
+          "description": "The permission name."
+        }
+      }
+    },
     "requirements": {
       "type": "object",
       "additionalProperties": false,
@@ -232,6 +257,10 @@
         "kafka": {
           "type": "string",
           "description": "The minimum Kafka version required."
+        },
+        "kubernetes": {
+          "type": "string",
+          "description": "The minimum Kubernetes version required."
         },
         "network_port": {
           "type": "string",
@@ -346,6 +375,10 @@
           "$ref": "#/definitions/output",
           "description": "Output examples of this sink."
         },
+        "permissions": {
+          "$ref": "#/definitions/permissions",
+          "description": "The permissions required for this sink to work."
+        },
         "requirements": {
           "$ref": "#/definitions/requirements",
           "description": "Component requirements"
@@ -456,6 +489,10 @@
         "options": {
           "$ref": "#/definitions/fields",
           "description": "Options provided by this source, keyed by the option name."
+        },
+        "permissions": {
+          "$ref": "#/definitions/permissions",
+          "description": "The permissions required for this source to work."
         },
         "output": {
           "type": "object",
@@ -594,6 +631,10 @@
         "output_types": {
           "$ref": "#/definitions/event_types",
           "description": "The types of events this transform outputs."
+        },
+        "permissions": {
+          "$ref": "#/definitions/permissions",
+          "description": "The permissions required for this transform to work."
         },
         "requirements": {
           "$ref": "#/definitions/requirements",

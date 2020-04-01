@@ -80,8 +80,6 @@ The Vector `vector` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -105,8 +103,6 @@ The downstream Vector address to connect to. The address _must_ include a port.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -129,8 +125,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -154,8 +148,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -179,8 +171,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -204,8 +194,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -229,13 +217,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -259,8 +243,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -283,8 +265,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -308,8 +288,6 @@ Enable TLS during connections to the remote.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -334,8 +312,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -361,8 +337,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -387,8 +361,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -413,8 +385,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -440,8 +410,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -467,13 +435,9 @@ you understand the risks of not verifying the remote hostname.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

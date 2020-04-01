@@ -85,8 +85,6 @@ events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -111,8 +109,6 @@ Nth socket passed by systemd socket activation.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -138,8 +134,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={102400}
@@ -163,8 +157,6 @@ The maximum bytes size of incoming messages before they are discarded.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -188,8 +180,6 @@ The input mode.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -213,8 +203,6 @@ The unix socket path. *This should be absolute path.*
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -237,8 +225,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -263,8 +249,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -290,8 +274,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -316,8 +298,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -342,8 +322,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -368,8 +346,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -395,13 +371,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -439,8 +411,6 @@ A `log` event will be produced with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -465,8 +435,6 @@ found, then the key will not be added.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -491,8 +459,6 @@ the key will not be added.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -518,8 +484,6 @@ socket path will be used. This key can be renamed via the [`host_key`](#host_key
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -543,8 +507,6 @@ The raw message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -569,8 +531,6 @@ will not be added.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -595,8 +555,6 @@ key will not be added.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -621,8 +579,6 @@ the key will not be added.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -647,8 +603,6 @@ then Vector will use the current time.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -673,8 +627,6 @@ key will not be added.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -699,8 +651,6 @@ and inserted as root level fields.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

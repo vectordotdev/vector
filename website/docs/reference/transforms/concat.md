@@ -61,8 +61,6 @@ of other fields to a new one.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -87,8 +85,6 @@ both start and end negative values are counted from the end of the string.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={" "}
@@ -112,8 +108,6 @@ The string that is used to join all items.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -137,8 +131,6 @@ The name for the new label.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

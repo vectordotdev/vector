@@ -40,8 +40,6 @@ data, designed for testing and benchmarking purposes.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -66,8 +64,6 @@ activity.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

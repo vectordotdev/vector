@@ -135,8 +135,6 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -161,8 +159,6 @@ ACL][urls.aws_s3_canned_acl].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -186,8 +182,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -210,8 +204,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={10490000}
@@ -235,8 +227,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={300}
@@ -260,13 +250,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -290,8 +276,6 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -314,8 +298,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -339,8 +321,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -364,8 +344,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -389,8 +367,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -414,13 +390,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -444,8 +416,6 @@ The compression mechanism to use.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -468,8 +438,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -493,8 +461,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -518,8 +484,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -543,8 +507,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -568,13 +530,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -599,8 +557,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -625,8 +581,6 @@ there are no name collisions high volume use cases.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"log"}
@@ -650,8 +604,6 @@ The filename extension to use in the object name.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"%s"}
@@ -676,8 +628,6 @@ specifiers][urls.strptime_specifiers] are supported.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -702,8 +652,6 @@ permissions on the created objects.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -728,8 +676,6 @@ their metadata.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -754,8 +700,6 @@ ACL.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -780,8 +724,6 @@ ACL.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -805,8 +747,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"date=%F/"}
@@ -832,8 +772,6 @@ to be the root S3 "folder".
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -858,8 +796,6 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -882,8 +818,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={50}
@@ -907,8 +841,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -932,8 +864,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={250}
@@ -958,8 +888,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -983,8 +911,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -1010,8 +936,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -1035,8 +959,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={30}
@@ -1063,13 +985,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1093,8 +1011,6 @@ The server-side encryption algorithm used when storing these objects.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1121,8 +1037,6 @@ Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1148,8 +1062,6 @@ for more details.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1172,8 +1084,6 @@ The tag-set for the object.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1197,20 +1107,14 @@ A custom tag to be added to the created objects.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1235,8 +1139,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1261,8 +1163,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

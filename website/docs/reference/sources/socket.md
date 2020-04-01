@@ -137,8 +137,6 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -164,8 +162,6 @@ port.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -191,8 +187,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={102400}
@@ -216,8 +210,6 @@ The maximum bytes size of incoming messages before they are discarded.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -241,8 +233,6 @@ The type of socket to use.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -266,8 +256,6 @@ The unix socket path. *This should be absolute path*.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={30}
@@ -291,8 +279,6 @@ The timeout before a connection is forcefully closed during shutdown.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -315,8 +301,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -341,8 +325,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -368,8 +350,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -394,8 +374,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -420,8 +398,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -446,8 +422,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -473,13 +447,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -508,8 +478,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -533,8 +501,6 @@ The upstream hostname.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -558,8 +524,6 @@ The raw message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -583,8 +547,6 @@ The exact time the event was ingested.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

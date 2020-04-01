@@ -74,8 +74,6 @@ utility and [outputs `log` events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={16}
@@ -100,8 +98,6 @@ each batch. This option limits the size of the batch.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -125,8 +121,6 @@ Include only entries from the current boot.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -152,8 +146,6 @@ permissions to this dir.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"journalctl"}
@@ -178,8 +170,6 @@ the path for [`journalctl`](#journalctl).
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={[]}
@@ -205,8 +195,6 @@ them a valid service unit name.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -276,8 +264,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -301,8 +287,6 @@ Additional Journald fields are passed through as log fields.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -326,8 +310,6 @@ The value of the journald `_HOSTNAME` field.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -351,8 +333,6 @@ The value of the journald `MESSAGE` field.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -376,8 +356,6 @@ The value of the journald `_SOURCE_REALTIME_TIMESTAMP` field.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

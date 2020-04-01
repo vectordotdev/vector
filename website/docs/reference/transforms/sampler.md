@@ -61,8 +61,6 @@ events with a configurable rate.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -88,8 +86,6 @@ option][docs.reference.global-options#message_key].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -115,8 +111,6 @@ _not_ be sampled.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -142,8 +136,6 @@ be dropped.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

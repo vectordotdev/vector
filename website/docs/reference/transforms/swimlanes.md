@@ -46,8 +46,6 @@ parallel streams using logical filters.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -72,8 +70,6 @@ components with the name `<transform_name>.<swimlane_id>`.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -96,8 +92,6 @@ The identifier of a swimlane.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={"check_fields"}
@@ -121,8 +115,6 @@ The type of the condition to execute.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -146,8 +138,6 @@ Check whether a fields contents exactly matches the value specified.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -172,8 +162,6 @@ being `true` or `false` respectively.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -197,8 +185,6 @@ Check whether a fields contents does not match the value specified.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -222,8 +208,6 @@ Checks whether a string field contains a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -247,8 +231,6 @@ Checks whether a string field ends with a string argument.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -272,18 +254,12 @@ Checks whether a string field starts with a string argument.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

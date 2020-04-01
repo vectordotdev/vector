@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-04-01"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -28,8 +29,6 @@ options][docs.global-options] as well.
 ## Special Variables
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -54,8 +53,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -80,8 +77,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"unix:///var/run/docker.sock"}
@@ -105,8 +100,6 @@ The docker host to connect to.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -132,8 +125,6 @@ verifying the remote certificate.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -158,8 +149,6 @@ authenticate access to the Stackdriver Logging API.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -184,8 +173,6 @@ guide][docs.monitoring#levels] for more information on the available levels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -210,8 +197,6 @@ it can degrade performance.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -237,8 +222,6 @@ config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-
 
 
 </Field>
-
-
 </Fields>
 
 ## Custom Variables

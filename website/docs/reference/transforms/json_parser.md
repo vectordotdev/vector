@@ -64,8 +64,6 @@ value as JSON.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -90,8 +88,6 @@ fails, the field will not be removed, irrespective of this setting.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -116,8 +112,6 @@ kept and passed through.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -141,8 +135,6 @@ The log field to decode as JSON. Must be a `string` value type.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -167,8 +159,6 @@ target, it will only be overwritten if this is set to `true`.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -194,8 +184,6 @@ parser will fail and produce an error.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

@@ -40,8 +40,6 @@ add one or more metric tags.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -64,8 +62,6 @@ A table of key/value pairs representing the tags to be added to the metric.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -90,13 +86,9 @@ a string.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

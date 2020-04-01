@@ -50,8 +50,6 @@ transform events with a full embedded [Lua][urls.lua] engine.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -75,8 +73,6 @@ A list of directories search when loading a Lua file via the `require` function.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -100,8 +96,6 @@ The inline Lua source to evaluate.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"1"}
@@ -125,8 +119,6 @@ transform API version
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

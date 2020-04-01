@@ -241,7 +241,8 @@ class Links
           [
             "#{name}.rs",
             "#{name_prefix}/#{suffixed_name}.rs",
-            "#{name}"
+            "#{name}",
+            "#{name_prefix}"
           ]
 
         paths =
@@ -260,11 +261,11 @@ class Links
           <<~EOF
           Unknown link!
 
-            urls.#{name}
+            urls.#{name}_source
 
           We tried the following paths:
 
-            * #{paths.join("\n   * ")}
+            * #{paths.join("\n  * ")}
 
           If the path to the source file is unique, please add it to the
           links.toml file.

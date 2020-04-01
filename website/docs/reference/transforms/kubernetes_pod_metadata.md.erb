@@ -2,16 +2,16 @@
 
 <%= component_header(component) %>
 
-## Configuration
-
-<%= component_config_example(component) %>
-
 <%- if component.requirements.any? -%>
 ## Requirements
 
 <%= component_requirements(component) %>
 
 <%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
 ## Options
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
@@ -22,6 +22,12 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
+<%- if component.permissions_list.any? -%>
+## Permissions
+
+<%= permissions(component.permissions_list, heading_depth: 3) %>
+
+<%- end -%>
 ## Output
 
 <%= component_output(component, component.output.log, heading_depth: 3) %>
@@ -29,12 +35,6 @@
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
-
-### Connecting To The Kubernetes API server
-
-Vector will automatically attempt to connect to the [Kubernetes API server][https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/]
-server for you. If Vector is running in Kubernetes cluster then Vector
-will be connect to that cluster using [Kubernetes provided access information][https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod].
 
 ### Retry Policy
 

@@ -75,8 +75,6 @@ into fixed types.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -103,8 +101,6 @@ other extraneous fields.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -128,8 +124,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -155,13 +149,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

@@ -38,8 +38,6 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -65,8 +63,6 @@ not supported.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -91,8 +87,6 @@ IPv4 or IPv6 address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"geoip"}
@@ -117,8 +111,6 @@ The default field to insert the resulting GeoIP data into. See
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -143,8 +135,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -167,8 +157,6 @@ The root field containing all geolocation data as sub-fields.
  See [Complex Processing](#complex-processing) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -192,8 +180,6 @@ The city name associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -217,8 +203,6 @@ The continent code associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -242,8 +226,6 @@ The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -267,8 +249,6 @@ The latitude associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -292,8 +272,6 @@ The longitude associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -317,8 +295,6 @@ The postal code associated with the IP address.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -344,13 +320,9 @@ format][urls.iana_time_zone_format]. A full list of time zones can be found
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

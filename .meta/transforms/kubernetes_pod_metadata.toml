@@ -1,12 +1,13 @@
 [transforms.kubernetes_pod_metadata]
 title = "Kubernetes Pod Metadata"
-allow_you_to_description = "enrich pod's logs with Kubernetes Pod metadata"
+allow_you_to_description = "enrich pod's logs with [Kubernetes][urls.kubernetes] Pod metadata"
 beta = true
-common = false
+common = true
 function_category = "enrich"
 input_types = ["log"]
 output_types = ["log"]
-requirements.network = true
+requirements.kubernetes = ">= 1.15"
+requirements.kubernetes_rbac = true
 requirements.additional = """\
 Vector must be run inside a Kubernetes cluster for this transform to work. \
 See [Connecting To The Kubernetes API server section](#connecting-to-the-kubernetes-api-server) for more info.
@@ -16,8 +17,15 @@ In the case of using [predefined Kubernetes config][https://github.com/timberio/
 [RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
 """
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "kubernetes_pod_metadata") %>
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "transform",
+  name: "kubernetes_pod_metadata"
+) %>
 
+#
+# env_vars
+#
 
 [transforms.kubernetes_pod_metadata.env_vars.VECTOR_NODE_NAME]
 type = "string"
@@ -28,6 +36,10 @@ Node's name whose pod's logs should be enriched. \
 Either this or `node_name` field must be defined. \
 Defined automatically when using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml].
 """
+
+#
+# options
+#
 
 [transforms.kubernetes_pod_metadata.options.fields]
 type = "[string]"
@@ -71,6 +83,19 @@ will the transform maximally wait before trying to connect. \
 See [Retry Policy section](#retry-policy) for more info.
 """
 
+#
+# permissions
+#
+
+[transforms.kubernetes_pod_metadata.permissions.watch]
+description = """\
+Vector requires the [`watch` request verb][urls.kubernetes_request_verbs] in \
+order to retrieve Kubernetes metadata.\
+"""
+
+#
+# output
+#
 
 [transforms.kubernetes_pod_metadata.output.log.fields.name]
 type = "string"

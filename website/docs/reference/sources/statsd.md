@@ -49,8 +49,6 @@ ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -74,8 +72,6 @@ UDP socket address to bind to.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

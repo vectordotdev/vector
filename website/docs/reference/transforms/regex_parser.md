@@ -47,8 +47,6 @@ log field's value with a [Regular Expression][urls.regex].
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -72,8 +70,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -97,8 +93,6 @@ The log field to parse.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -122,8 +116,6 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -147,8 +139,6 @@ coerce log fields into their proper types.
  See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -174,13 +164,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

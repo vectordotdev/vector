@@ -50,8 +50,6 @@ AWS EC2 instance metadata.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]}
@@ -75,8 +73,6 @@ A list of fields to include in each event.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"http://169.254.169.254"}
@@ -100,8 +96,6 @@ Override the default EC2 Metadata host.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={""}
@@ -125,8 +119,6 @@ Prepend a namespace to each field's key.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={10}
@@ -150,8 +142,6 @@ The interval in seconds at which the EC2 Metadata api will be called.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -178,8 +168,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -203,8 +191,6 @@ The `ami-id` that the current EC2 instance is using.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -228,8 +214,6 @@ The `availability-zone` that the current EC2 instance is running in.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -253,8 +237,6 @@ The `instance-id` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -278,8 +260,6 @@ The `local-hostname` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -303,8 +283,6 @@ The `local-ipv4` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -328,8 +306,6 @@ The `public-hostname` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -353,8 +329,6 @@ The `public-ipv4` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -378,8 +352,6 @@ The [`region`](#region) that the current EC2 instance is running in.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -403,8 +375,6 @@ The `role-name` that the current EC2 instance is using.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -428,8 +398,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -453,8 +421,6 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

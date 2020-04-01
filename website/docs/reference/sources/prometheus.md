@@ -43,8 +43,6 @@ events](#output).
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -68,8 +66,6 @@ Host addresses to scrape metrics from.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={15}
@@ -93,8 +89,6 @@ The interval between scrapes, in seconds.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

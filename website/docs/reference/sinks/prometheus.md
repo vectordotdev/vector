@@ -36,7 +36,7 @@ The Vector `prometheus` sink
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Prometheus version `>= 1.0` is required.
+* [Prometheus][urls.prometheus] version `>= 1.0` is required.
 
 </Alert>
 
@@ -74,8 +74,6 @@ The Vector `prometheus` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -99,8 +97,6 @@ The address to expose for scraping.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0]}
@@ -125,8 +121,6 @@ Default buckets to use for aggregating
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={60}
@@ -150,8 +144,6 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -176,8 +168,6 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
