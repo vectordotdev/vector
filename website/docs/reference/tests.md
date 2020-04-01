@@ -700,8 +700,8 @@ Check whether a fields contents exactly matches the value specified.
 
 ##### `[field-name]`.exists
 
-Check whether a field exists or does not exist, depending on the provided
-valuebeing `true` or `false` respectively.
+Check whether a field exists or does not exist, depending on the provided value
+being `true` or `false` respectively.
 
 
 

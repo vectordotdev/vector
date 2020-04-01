@@ -148,6 +148,8 @@ module.exports = {
             
               "reference/transforms/field_filter",
             
+              "reference/transforms/filter",
+            
               "reference/transforms/geoip",
             
               "reference/transforms/grok_parser",

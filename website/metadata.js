@@ -26494,6 +26494,43 @@ module.exports = {
 
       ]
     },
+    "filter": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  # General\n  type = \"filter\" # required\n  inputs = [\"in\"] # required\n\n  # Condition"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "filter",
+      "id": "filter_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "filter",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to select events based on a set of logical conditions.",
+      "status": "beta",
+      "title": "Filter",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "geoip": {
       "beta": true,
       "config_examples": {

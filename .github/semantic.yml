@@ -86,6 +86,7 @@ scopes:
   - concat transform
   - dedupe transform
   - field_filter transform
+  - filter transform
   - geoip transform
   - grok_parser transform
   - json_parser transform

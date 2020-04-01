@@ -420,6 +420,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-concat` | Enables building of [`concat` transform][docs.transforms.concat].  |
 | `transforms-dedupe` | Enables building of [`dedupe` transform][docs.transforms.dedupe].  |
 | `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.field_filter].  |
+| `transforms-filter` | Enables building of [`filter` transform][docs.transforms.filter].  |
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
 | `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
@@ -530,6 +531,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.concat]: /docs/reference/transforms/concat/
 [docs.transforms.dedupe]: /docs/reference/transforms/dedupe/
 [docs.transforms.field_filter]: /docs/reference/transforms/field_filter/
+[docs.transforms.filter]: /docs/reference/transforms/filter/
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
