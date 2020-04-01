@@ -55,7 +55,7 @@ function SupportedEventTypes({values}) {
     } else {
       els.push(<del key={eventType} className="text--warning">{_.capitalize(eventType)}</del>);
     }
-    els.push(<>, </>);
+    els.push(<span key={eventType + '-comma'}>, </span>);
   });
 
   els.pop();
@@ -68,12 +68,12 @@ function OperatingSystemsStatus({operatingSystems, unsupportedOperatingSystems})
 
   (operatingSystems || []).forEach(operatingSystem => {
     operatingSystemsEls.push(<span key={operatingSystem} className="text--primary">{operatingSystem}</span>);
-    operatingSystemsEls.push(<>, </>);
+    operatingSystemsEls.push(<span key={operatingSystem + '-comma'}>, </span>);
   });
 
   (unsupportedOperatingSystems || []).forEach(operatingSystem => {
     operatingSystemsEls.push(<del key={operatingSystem} className="text--warning">{operatingSystem}</del>);
-    operatingSystemsEls.push(<>, </>);
+    operatingSystemsEls.push(<span key={operatingSystem + '-comma'}>, </span>);
   });
 
   operatingSystemsEls.pop();

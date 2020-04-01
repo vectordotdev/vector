@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: Structuring Your Log Data
 description: How to parse log data in Vector
@@ -9,7 +9,6 @@ tags: ["type: tutorial", "domain: config"]
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -70,9 +69,7 @@ even test our config without connecting to sources or sinks (as you'll see).
 
 The basic source to sink version of our pipeline looks like this:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sources.foo]
   type = "socket"
   address = "0.0.0.0:9000"
@@ -126,9 +123,7 @@ Let's place our new transform in between our existing source and sink:
 
 <TabItem value="diff">
 
-<CodeHeader text="vector.toml" />
-
-```diff
+```diff title="vector.toml"
  [sources.foo]
    type = "socket"
    address = "0.0.0.0:9000"
@@ -152,9 +147,7 @@ Let's place our new transform in between our existing source and sink:
 </TabItem>
 <TabItem value="new_result">
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sources.foo]
   type = "socket"
   address = "0.0.0.0:9000"
@@ -203,9 +196,7 @@ config just like you would for regular code:
 
 <TabItem value="diff">
 
-<CodeHeader text="vector.toml" />
-
-```diff
+```diff title="vector.toml"
 # Write the data
 [sinks.bar]
   inputs = ["apache_parser"]
@@ -235,9 +226,7 @@ config just like you would for regular code:
 </TabItem>
 <TabItem value="new_result">
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 # Consume data
 [sources.foo]
   type = "socket"

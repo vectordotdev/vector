@@ -2,7 +2,6 @@ import React from 'react';
 
 import CodeBlock from '@theme/CodeBlock';
 import CodeExplanation from '@site/src/components/CodeExplanation';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Link from '@docusaurus/Link';
 import TabItem from '@theme/TabItem';
 import Tabs from '@theme/Tabs';
@@ -15,7 +14,6 @@ function Command({format, path, source, sink}) {
 
   return (
     <>
-      <CodeHeader icon="info" text="adjust the values as necessary" />
       <CodeBlock className="language-bash">
         {command}
       </CodeBlock>

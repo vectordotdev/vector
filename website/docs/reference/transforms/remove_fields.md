@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events allowing you to remove one or more log fields."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Remove Fields Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ one or more log fields.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
@@ -50,9 +47,7 @@ one or more log fields.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
@@ -143,9 +138,7 @@ The [`fields`](#fields) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_remove_fields_transform_id]
   # ...
   fields = ["field1", "field2", "parent.child"]

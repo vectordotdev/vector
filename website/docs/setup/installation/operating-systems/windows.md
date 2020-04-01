@@ -90,7 +90,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="config\vector.toml"
+      path={"config\\vector.toml"}
       sourceName={"file"}
       sinkName={null} />
 
@@ -122,7 +122,7 @@ The following diagram demonstrates how it works.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -152,7 +152,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -250,7 +250,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="config\vector.toml"
+      path={"config\\vector.toml"}
       sourceName={"vector"}
       sinkName={null} />
 
@@ -282,7 +282,7 @@ The following diagram demonstrates how it works.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -312,7 +312,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

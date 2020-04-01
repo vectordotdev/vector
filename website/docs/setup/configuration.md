@@ -1,11 +1,10 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Configuration
 description: Configuring Vector
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Jump from '@site/src/components/Jump';
 
 This section covers configuring Vector and creating pipelines like the
@@ -28,9 +27,7 @@ vector --config /etc/vector/vector.toml
 
 ## Example
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 # Set global options
 data_dir = "/var/lib/vector"
 
@@ -108,9 +105,7 @@ found at `/etc/vector/vector.toml`.
 Vector will interpolate environment variables within your configuration file
 with the following syntax:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.add_host]
   type = "add_fields"
 
@@ -162,9 +157,7 @@ interpolation:
 
 For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.es_cluster]
   type  = "elasticsearch"
   index = "user-{{ user_id }}-%Y-%m-%d"

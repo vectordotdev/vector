@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
 import classnames from 'classnames';
 import {MDXProvider} from '@mdx-js/react';
-import CodeHeader from '@site/src/components/CodeHeader';
 import CodeBlock from '@theme/CodeBlock';
 
 function isObject(a) {
@@ -76,8 +75,6 @@ function Examples({name, path, values}) {
 
   return (
     <div>
-      <CodeHeader text="vector.toml" />
-
       <CodeBlock className="language-toml">
         {code}
       </CodeBlock>

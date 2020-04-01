@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: Hello World. Your First Vector Pipeline.
 description: Building your very first Vector pipeline, the "Hello World" of Vector tutorials.
@@ -10,7 +10,6 @@ tags: ["type: tutorial", "domain: config"]
 
 import Alert from '@site/src/components/Alert';
 import CodeExplanation from '@site/src/components/CodeExplanation';
-import CodeHeader from '@site/src/components/CodeHeader';
 import InstallationCommand from '@site/src/components/InstallationCommand';
 import Steps from '@site/src/components/Steps';
 
@@ -49,9 +48,7 @@ Vector runs with a [configuration file][docs.configuration] that tells it which
 one that simply pipes a [`stdin` source][docs.sources.stdin] to a
 [`console` sink][docs.sinks.console]:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sources.foo]
   type = "stdin"
 

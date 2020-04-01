@@ -36,9 +36,7 @@ The `swimlanes` transform, in it's simplest form, can act as a simple if/else \
 stream splitter. For example, we can route events from the host `gerry` to a \
 sink `only_loves_gerry`, and all other events to a sink `hates_gerry`:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.splitting_gerrys]
   inputs = [ "somewhere" ]
   type = "swimlanes"
@@ -70,9 +68,7 @@ body = """\
 To follow up with the previous `If/Else` example, let's say we want to split \
 a log stream based on all of the log `level` values:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.level_splitter]
   type = "swimlanes"
 

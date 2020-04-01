@@ -11,7 +11,6 @@ status: "beta"
 title: "Filter Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ on a set of logical conditions.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "filter" # required
@@ -267,9 +264,7 @@ For example:
 The `filter` transform is a simple conditional match, forwarding only those messages that pass all the conditions.
 In this example, we drop all events that do not come from the host `gerry`:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.from_gerry]
   inputs = [ "somewhere" ]
   type = "filter"

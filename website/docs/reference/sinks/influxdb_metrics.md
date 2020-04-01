@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -14,7 +14,6 @@ title: "InfluxDB Metrics Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -42,9 +41,7 @@ The Vector `influxdb_metrics` sink
 
 <TabItem value="v2">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -62,9 +59,7 @@ The Vector `influxdb_metrics` sink
 </TabItem>
 <TabItem value="v1">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -86,9 +81,7 @@ The Vector `influxdb_metrics` sink
 </TabItem>
 <TabItem value="v2-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -119,9 +112,7 @@ The Vector `influxdb_metrics` sink
 </TabItem>
 <TabItem value="v1-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required

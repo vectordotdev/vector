@@ -33,15 +33,13 @@
 
     <ConfigExample
       format="toml"
-      path="config\vector.toml"
+      path={<%= interface.config_path.to_toml %>}
       sourceName={<%= (source && source.name).to_json %>}
       sinkName={<%= (sink && sink.name).to_json %>} />
 
 5.  ### Start Vector
 
-    ```bat
-    .\bin\vector --config config\vector.toml
-    ```
+<%= interface_start(interface, requirements: (source && source.requirements)).indent(4) %>
 
 </TabItem>
 <%- end -%>

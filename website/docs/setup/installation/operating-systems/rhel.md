@@ -84,7 +84,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"journald"}
       sinkName={null} />
 
@@ -115,7 +115,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"journald"}
       sinkName={null} />
 
@@ -146,7 +146,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"journald"}
       sinkName={null} />
 
@@ -178,7 +178,7 @@ The following diagram demonstrates how it works.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -208,7 +208,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -298,7 +298,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"vector"}
       sinkName={null} />
 
@@ -329,7 +329,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"vector"}
       sinkName={null} />
 
@@ -360,7 +360,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={"/etc/vector/vector.toml"}
       sourceName={"vector"}
       sinkName={null} />
 
@@ -392,7 +392,7 @@ The following diagram demonstrates how it works.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -422,7 +422,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

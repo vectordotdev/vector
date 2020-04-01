@@ -3128,7 +3128,7 @@ module.exports = {
       "title": "Windows Support Is Here!"
     },
     {
-      "author_github": "https://github.com/Jeffail",
+      "author_github": "https://github.com/binarylogic",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -15625,7 +15625,7 @@ module.exports = {
           "title": "Windows Support Is Here!"
         },
         {
-          "author_github": "https://github.com/Jeffail",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",

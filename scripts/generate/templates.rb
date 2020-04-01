@@ -5,7 +5,7 @@ require "active_support/core_ext/string/output_safety"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 require_relative "templates/integration_guide"
-require_relative "templates/interface_tutorials"
+require_relative "templates/interface_start"
 
 # Renders templates in the templates sub-dir
 #
@@ -242,23 +242,45 @@ class Templates
   end
 
   def interface_installation_tutorial(interface, sink: nil, source: nil, heading_depth: 3)
-    tutorial =
-      case (interface && interface.name)
-      when "docker-cli"
-        InterfaceTutorials::DockerCLI.new(source)
-      when "docker-compose"
-        InterfaceTutorials::DockerCLI.new(source)
-      end
-
-    render("#{partials_path}/interface_installation_tutorials/_#{interface.name}.md", binding).strip
+    render("#{partials_path}/interface_installation_tutorial/_#{interface.name}.md", binding).strip
   end
 
   def interface_logs(interface)
     render("#{partials_path}/interface_logs/_#{interface.name}.md", binding).strip
   end
 
+  def interface_reload(interface)
+    render("#{partials_path}/interface_reload/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_start(interface, requirements: nil)
+    interface_start =
+      case interface.name
+      when "docker-cli"
+        InterfaceStart::DockerCLI.new(interface, requirements)
+      end
+
+    render("#{partials_path}/interface_start/_#{interface.name}.md", binding).strip
+  end
+
+  def interface_stop(interface)
+    render("#{partials_path}/interface_stop/_#{interface.name}.md", binding).strip
+  end
+
   def interfaces_logs(interfaces, size: nil)
     render("#{partials_path}/_interfaces_logs.md", binding).strip
+  end
+
+  def interfaces_reload(interfaces, requirements: nil, size: nil)
+    render("#{partials_path}/_interfaces_reload.md", binding).strip
+  end
+
+  def interfaces_start(interfaces, requirements: nil, size: nil)
+    render("#{partials_path}/_interfaces_start.md", binding).strip
+  end
+
+  def interfaces_stop(interfaces, size: nil)
+    render("#{partials_path}/_interfaces_stop.md", binding).strip
   end
 
   def manual_installation_next_steps(type)

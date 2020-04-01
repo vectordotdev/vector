@@ -124,7 +124,7 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={null}
   sinkName={"aws_s3"} />
 
@@ -170,7 +170,7 @@ sudo dpkg -i vector-arm64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={null}
   sinkName={"aws_s3"} />
 
@@ -216,7 +216,7 @@ sudo dpkg -i vector-armhf.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={null}
   sinkName={"aws_s3"} />
 

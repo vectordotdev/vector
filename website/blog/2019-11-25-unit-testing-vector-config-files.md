@@ -3,7 +3,7 @@ last_modified_on: "2020-03-31"
 id: unit-testing-vector-config-files
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
-author_github: https://github.com/Jeffail
+author_github: https://github.com/binarylogic
 tags: ["type: announcement", "domain: config"]
 ---
 
@@ -21,11 +21,7 @@ mission-critical production pipelines that are collaborated on.
 Let's look at a basic example that uses the [`regex_parser`
 transform][docs.transforms.regex_parser] to parse log lines:
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sources.my_logs]
   type    = "file"
   include = ["/var/log/my-app.log"]

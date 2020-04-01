@@ -99,7 +99,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"file"}
   sinkName={"file"} />
 

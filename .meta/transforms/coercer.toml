@@ -43,9 +43,7 @@ Given the following input:
 
 And the following configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.<transform-id>]
   type = "coercer"
 
