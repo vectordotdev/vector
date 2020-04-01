@@ -2644,10 +2644,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "amazon-linux"
@@ -2665,10 +2661,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "centos"
@@ -2686,10 +2678,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "debian"
@@ -2707,10 +2695,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "file"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "macos"
@@ -2728,10 +2712,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "nixos"
@@ -2765,10 +2745,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "rhel"
@@ -2786,10 +2762,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "ubuntu"
@@ -2807,10 +2779,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "file"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "windows"
