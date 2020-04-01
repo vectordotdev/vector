@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -51,9 +50,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "docker" # required
   include_containers = ["serene_", "serene_leakey", "ad08cc418cf9"] # optional, no default
@@ -64,9 +61,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "docker" # required
   auto_partial_merge = true # optional, default

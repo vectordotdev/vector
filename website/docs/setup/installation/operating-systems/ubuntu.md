@@ -92,7 +92,7 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -138,7 +138,7 @@ sudo dpkg -i vector-arm64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -184,7 +184,7 @@ sudo dpkg -i vector-armhf.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -221,7 +221,7 @@ sudo systemctl start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -251,7 +251,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"journald"}
   sinkName={null} />
 
@@ -349,7 +349,7 @@ sudo dpkg -i vector-amd64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -395,7 +395,7 @@ sudo dpkg -i vector-arm64.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -441,7 +441,7 @@ sudo dpkg -i vector-armhf.deb
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -478,7 +478,7 @@ sudo systemctl start vector
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 
@@ -508,7 +508,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

@@ -35,7 +35,7 @@ sudo dpkg -i <%= download.file_name %>
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={<%= interface.config_path.to_json %>}
   sourceName={<%= (source && source.name).to_json %>}
   sinkName={<%= (sink && sink.name).to_json %>} />
 
@@ -44,9 +44,7 @@ sudo dpkg -i <%= download.file_name %>
 
 ### Start Vector
 
-```bash
-sudo systemctl start vector
-```
+<%= interface_start(interface, requirements: (source && source.requirements)) %>
 
 </li>
 </ol>

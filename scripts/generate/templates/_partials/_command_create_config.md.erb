@@ -7,7 +7,6 @@
   values={<%= sinks.collect { |sink| {label: sink.title, value: sink.name } }.to_json %>}>
 <%- sinks.each do |sink| -%>
 <TabItem value=<%= sink.name.to_json %>>
-<CodeHeader icon="info" text="adjust the values as necessary" />
 
 ```bash
 echo '

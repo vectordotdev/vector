@@ -20,22 +20,12 @@
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={<%= interface.config_path.to_json %>}
       sourceName={<%= (source && source.name).to_json %>}
       sinkName={<%= (sink && sink.name).to_json %>} />
 
 3.  ### Start Vector
 
-    ```bash
-    vector --config /etc/vector/vector.toml
-    ```
-
-    <CodeExplanation>
-
-    * `vector` is placed in your `$PATH`.
-    * You must create a [Vector configuration file][docs.configuration] to
-      successfully start Vector.
-
-    </CodeExplanation>
+<%= interface_start(interface, requirements: (source && source.requirements)).indent(4) %>
 
 </Steps>

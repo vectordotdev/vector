@@ -6,7 +6,6 @@ description: Install Vector from the Vector source code
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Steps from '@site/src/components/Steps';
 
 This page covers installing Vector from source using the native toolchain for
@@ -327,9 +326,7 @@ Make sure that this directory is writable by the `vector` process.
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 data_dir = "/var/lib/vector" # default
 ```
 

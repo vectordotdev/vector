@@ -17,7 +17,7 @@ brew tap timberio/brew && brew install vector
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={<%= interface.config_path.to_json %>}
   sourceName={<%= (source && source.name).to_json %>}
   sinkName={<%= (sink && sink.name).to_json %>} />
 
@@ -26,9 +26,7 @@ brew tap timberio/brew && brew install vector
 
 ### Start Vector
 
-```bash
-brew services start vector
-```
+<%= interface_start(interface, requirements: (source && source.requirements)) %>
 
 </li>
 </ol>

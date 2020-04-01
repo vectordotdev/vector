@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Monitoring
 description: How to monitor and observe Vector with logs, metrics, and more.
 ---
@@ -25,6 +25,7 @@ This document will cover monitoring Vector.
 <Tabs
   block={false}
   centered={true}
+  groupId="interfaces"
   placeholder="How did you install Vector?"
   select={true}
   size={null}

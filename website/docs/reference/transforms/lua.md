@@ -11,7 +11,6 @@ status: "beta"
 title: "Lua Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -31,9 +30,7 @@ transform events with a full embedded [Lua][urls.lua] engine.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "lua" # required
   inputs = ["my-source-id"] # required

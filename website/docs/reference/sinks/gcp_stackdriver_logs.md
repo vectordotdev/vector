@@ -14,7 +14,6 @@ title: "GCP Stackdriver Logs Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -43,9 +42,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "gcp_stackdriver_logs" # required
   inputs = ["my-source-id"] # required
@@ -56,9 +53,7 @@ the [REST Interface][urls.gcp_stackdriver_logging_rest].
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "gcp_stackdriver_logs" # required

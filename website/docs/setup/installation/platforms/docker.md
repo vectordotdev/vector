@@ -70,7 +70,7 @@ The following diagram demonstrates how it works.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={null} />
 
@@ -141,7 +141,7 @@ each service. Typically data is collected by tailing local files via Vector's
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -214,7 +214,7 @@ The following diagram demonstrates how it works.
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

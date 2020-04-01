@@ -105,7 +105,7 @@ To be clear, here's everything we'll accomplish in this short guide:
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"docker"}
   sinkName={"splunk_hec"} />
 

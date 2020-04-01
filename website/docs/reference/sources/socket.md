@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 
 <TabItem value="unix">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "socket" # required
   mode = "tcp" # required
@@ -63,9 +60,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 </TabItem>
 <TabItem value="udp">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "socket" # required
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
@@ -76,9 +71,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 </TabItem>
 <TabItem value="tcp">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "socket" # required
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
@@ -89,9 +82,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 </TabItem>
 <TabItem value="unix-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "socket" # required
@@ -106,9 +97,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 </TabItem>
 <TabItem value="udp-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "socket" # required
@@ -123,9 +112,7 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 </TabItem>
 <TabItem value="tcp-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "socket" # required

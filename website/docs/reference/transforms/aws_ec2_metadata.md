@@ -12,7 +12,6 @@ title: "AWS EC2 Metadata Transform"
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -40,9 +39,7 @@ AWS EC2 instance metadata.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
   inputs = ["my-source-id"] # required

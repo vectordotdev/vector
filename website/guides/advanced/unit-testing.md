@@ -1,13 +1,11 @@
 ---
-last_modified_on: "2020-03-27"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: Unit Testing Your Configs
 description: Learn how to write and execute unit tests for your Vector configs
 author_github: https://github.com/Jeffail
 tags: ["type: guide", "domain: config"]
 ---
-
-import CodeHeader from '@site/src/components/CodeHeader';
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The purpose of these tests is to
@@ -17,9 +15,7 @@ topologies, and improve their maintainability.
 The full spec can be found [here][docs.reference.tests]. This guide will cover
 writing and executing a unit test for the following config:
 
-<CodeHeader text="example.toml" />
-
-```toml
+```toml title="vector.toml"
 [sources.over_tcp]
   type = "socket"
   mode = "tcp"

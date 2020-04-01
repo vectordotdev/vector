@@ -72,9 +72,7 @@ configured `value_limit`.
 
 For example, given this configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.cardinality_protection]
   type = "tag_cardinality_limit"
   inputs = [...]

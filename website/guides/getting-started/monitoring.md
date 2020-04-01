@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: Monitoring Vector
 description: How to monitoring and observe Vector in production
@@ -42,6 +42,7 @@ you installed Vector.
 <Tabs
   block={false}
   centered={true}
+  groupId="interfaces"
   placeholder="How did you install Vector?"
   select={true}
   size={"lg"}

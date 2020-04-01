@@ -76,7 +76,7 @@ brew tap timberio/brew && brew install vector
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"file"}
   sinkName={null} />
 
@@ -142,7 +142,7 @@ brew tap timberio/brew && brew install vector
 
 <ConfigExample
   format="toml"
-  path="/etc/vector/vector.toml"
+  path={"/etc/vector/vector.toml"}
   sourceName={"vector"}
   sinkName={null} />
 

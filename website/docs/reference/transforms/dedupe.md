@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Dedupe events Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ duplicate Events from being outputted by using an LRU cache.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "dedupe" # required
@@ -53,9 +50,7 @@ duplicate Events from being outputted by using an LRU cache.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "dedupe" # required
