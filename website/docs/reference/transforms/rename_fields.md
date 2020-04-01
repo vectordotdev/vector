@@ -68,8 +68,6 @@ log fields.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -94,8 +92,6 @@ field that are now empty.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -118,8 +114,6 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -143,13 +137,9 @@ Old-key/New-key pair reprsenting the key to be moved.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

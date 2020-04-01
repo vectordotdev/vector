@@ -74,8 +74,6 @@ The Vector `file` sink
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -98,8 +96,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -123,8 +119,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -148,8 +142,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -173,8 +165,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -198,13 +188,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -228,8 +214,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"30"}
@@ -254,8 +238,6 @@ events for this timeout, the file will be flushed and closed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -279,8 +261,6 @@ File name to write events to.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

@@ -96,6 +96,7 @@ scopes:
   - geoip transform
   - grok_parser transform
   - json_parser transform
+  - kubernetes_pod_metadata transform
   - log_to_metric transform
   - logfmt_parser transform
   - lua transform

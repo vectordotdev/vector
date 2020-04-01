@@ -68,7 +68,7 @@ class Templates
     render("#{partials_path}/_component_header.md", binding).strip
   end
 
-  def component_output(component, output, breakout_top_keys: false, heading_depth: 1)
+  def component_output(component, output, breakout_top_keys: false, heading_depth: 3, root_key: nil)
     examples = output.examples
     fields = output.fields ? output.fields.to_h.values.sort : []
     render("#{partials_path}/_component_output.md", binding).strip
@@ -197,7 +197,7 @@ class Templates
     fetch_strategies([strategy_reference]).first
   end
 
-  def fields(fields, filters: true, heading_depth: 1, level: 1, path: nil)
+  def fields(fields, filters: true, heading_depth: 3, path: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -205,7 +205,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields)
+  def fields_example(fields, root_key: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -213,7 +213,7 @@ class Templates
     render("#{partials_path}/_fields_example.md", binding).strip
   end
 
-  def fields_hash(fields)
+  def fields_hash(fields, root_key: nil)
     hash = {}
 
     fields.each do |field|
@@ -230,7 +230,11 @@ class Templates
       end
     end
 
-    hash
+    if root_key
+      {root_key => hash}
+    else
+      hash
+    end
   end
 
   def full_config_spec
@@ -389,6 +393,14 @@ class Templates
     else
       "outputs #{event_type_links(component.output_types).to_sentence} events"
     end
+  end
+
+  def permissions(permissions, heading_depth: nil)
+    if !permissions.is_a?(Array)
+      raise ArgumentError.new("Permissions must be an Array")
+    end
+
+    render("#{partials_path}/_permissions.md", binding).strip
   end
 
   def partial?(template_path)

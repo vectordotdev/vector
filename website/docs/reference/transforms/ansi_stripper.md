@@ -36,8 +36,6 @@ ANSI escape sequences from the specified field.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -61,8 +59,6 @@ The target field to strip ANSI escape sequences from.
 
 
 </Field>
-
-
 </Fields>
 
 

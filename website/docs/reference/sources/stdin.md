@@ -62,8 +62,6 @@ events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -89,8 +87,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={102400}
@@ -114,8 +110,6 @@ The maxiumum bytes size of a message before it is discarded.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -144,8 +138,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -169,8 +161,6 @@ The local hostname.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -194,8 +184,6 @@ The raw message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -219,8 +207,6 @@ The exact time the event was ingested.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

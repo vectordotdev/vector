@@ -46,8 +46,6 @@ fields.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -70,8 +68,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -96,13 +92,9 @@ types][docs.configuration#types]. Use `.` for adding nested fields.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

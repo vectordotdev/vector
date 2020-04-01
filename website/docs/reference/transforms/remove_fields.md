@@ -59,8 +59,6 @@ one or more log fields.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -85,8 +83,6 @@ empty.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -110,8 +106,6 @@ The log field names to drop.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

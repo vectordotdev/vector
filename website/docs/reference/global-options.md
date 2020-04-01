@@ -28,6 +28,7 @@ dns_servers = ["0.0.0.0:53"] # optional, no default
 
 # Log schema
 log_schema.host_key = "host" # optional, default
+log_schema.kubernetes_key = "kubernetes" # optional, default
 log_schema.message_key = "message" # optional, default
 log_schema.timestamp_key = "timestamp" # optional, default
 ```
@@ -35,8 +36,6 @@ log_schema.timestamp_key = "timestamp" # optional, default
 ## Options
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -62,8 +61,6 @@ permissions to this dir.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -90,8 +87,6 @@ system configuration.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -115,8 +110,6 @@ model page][docs.data-model.log] for more info.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -141,8 +134,29 @@ page][docs.data-model.log#host] for more info.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={"kubernetes"}
+  enumValues={null}
+  examples={["kubernetes","kube","k8s"]}
+  groups={[]}
+  name={"kubernetes_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### kubernetes_key
+
+The key under which Kubernetes related fields are nested.
 
 
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"message"}
@@ -167,8 +181,6 @@ page][docs.data-model.log#message] for more info.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"timestamp"}
@@ -193,13 +205,9 @@ page][docs.data-model.log#timestamp] for more info.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

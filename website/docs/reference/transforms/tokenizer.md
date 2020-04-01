@@ -48,8 +48,6 @@ characters, and zip the tokens into ordered field names.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -73,8 +71,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -98,8 +94,6 @@ The log field to tokenize.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -123,8 +117,6 @@ The log field names assigned to the resulting tokens, in order.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -148,8 +140,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -175,13 +165,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

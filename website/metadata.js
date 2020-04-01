@@ -26344,6 +26344,43 @@ module.exports = {
 
       ]
     },
+    "kubernetes_pod_metadata": {
+      "beta": true,
+      "config_examples": {
+        "toml": "[transforms.out]\n  type = \"kubernetes_pod_metadata\" # required\n  inputs = [\"in\"] # required"
+      },
+      "delivery_guarantee": null,
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+
+      ],
+      "function_category": "enrich",
+      "id": "kubernetes_pod_metadata_transform",
+      "inpuut_types": [
+        "log"
+      ],
+      "logo_path": null,
+      "name": "kubernetes_pod_metadata",
+      "operating_systems": [
+
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Accepts log events and allows you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.",
+      "status": "beta",
+      "title": "Kubernetes Pod Metadata",
+      "type": "transform",
+      "unsupported_operating_systems": [
+
+      ]
+    },
     "log_to_metric": {
       "beta": false,
       "config_examples": {

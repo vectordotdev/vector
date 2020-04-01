@@ -63,8 +63,6 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={5120000}
@@ -90,8 +88,6 @@ a new value for tag even after we have reached the configured limits.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"drop_tag"}
@@ -116,8 +112,6 @@ the configured limit on cardinality.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -142,8 +136,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -167,8 +159,6 @@ How many distinct values to accept for any given key.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

@@ -74,8 +74,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -99,8 +97,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -123,8 +119,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={20}
@@ -148,8 +142,6 @@ The maximum size of a batch, in events, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -173,13 +165,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -204,8 +192,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -229,8 +215,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -256,8 +240,6 @@ that will isolate different metrics from each other.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -282,15 +264,11 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -315,8 +293,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -341,8 +317,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

@@ -47,8 +47,6 @@ log field value with [Grok][urls.grok].
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -72,8 +70,6 @@ If `true` will drop the specified [`field`](#field) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -97,8 +93,6 @@ The log field to execute the [`pattern`](#pattern) against. Must be a `string` v
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -122,8 +116,6 @@ The [Grok pattern][urls.grok_patterns]
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -147,8 +139,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -174,13 +164,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

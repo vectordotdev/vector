@@ -41,8 +41,6 @@ The Vector `statsd` sink
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={"127.0.0.1:8125"}
@@ -66,8 +64,6 @@ The UDP socket address to send stats to.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -91,8 +87,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -116,8 +110,6 @@ A prefix that will be added to all metric names.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output

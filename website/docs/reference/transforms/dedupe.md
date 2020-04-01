@@ -68,8 +68,6 @@ duplicate Events from being outputted by using an LRU cache.
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -92,8 +90,6 @@ Options controlling how we cache recent Events for future duplicate checking.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5000}
@@ -117,13 +113,9 @@ The number of recent Events to cache and compare new incoming Events against.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -146,8 +138,6 @@ Options controlling what fields to match against
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -172,8 +162,6 @@ Incompatible with the `fields.match` option.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={["timestamp","host","message"]}
@@ -200,13 +188,9 @@ options][docs.reference.global-options#log_schema].Incompatible with the
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

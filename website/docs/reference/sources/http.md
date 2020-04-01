@@ -81,8 +81,6 @@ events](#output).
 </Tabs>
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -106,8 +104,6 @@ The address to listen for connections on
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"text"}
@@ -132,8 +128,6 @@ encodings, the fields of the JSON objects are output as separate fields.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -160,8 +154,6 @@ missing.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -184,8 +176,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -210,8 +200,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -237,8 +225,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -263,8 +249,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -289,8 +273,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -315,8 +297,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -342,13 +322,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -366,8 +342,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -391,8 +365,6 @@ The message field, containing the plain text message.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -416,8 +388,6 @@ The time the event was ingested. Note this may be overridden by JSON payloads.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

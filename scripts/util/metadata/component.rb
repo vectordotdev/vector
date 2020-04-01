@@ -2,6 +2,7 @@
 
 require_relative "config_writers"
 require_relative "field"
+require_relative "permission"
 
 class Component
   include Comparable
@@ -16,6 +17,7 @@ class Component
     :name,
     :operating_systems,
     :options,
+    :permissions,
     :posts,
     :requirements,
     :service_name,
@@ -32,6 +34,7 @@ class Component
     @features = hash["features"] || []
     @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")
+    @permissions = (hash["permissions"] || {}).to_struct_with_name(constructor: Permission)
     @posts = hash.fetch("posts")
     @requirements = OpenStruct.new(hash["requirements"] || {})
     @service_name = hash["service_name"] || hash.fetch("title")
@@ -197,6 +200,10 @@ class Component
 
   def partition_options
     options_list.select(&:partition_key?)
+  end
+
+  def permissions_list
+    @permissions_list ||= permissions.to_h.values.sort
   end
 
   def service_provider?(provider_name)

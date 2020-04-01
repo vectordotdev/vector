@@ -36,8 +36,6 @@ remove one or more metric tags.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -61,8 +59,6 @@ The tag names to drop.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

@@ -45,8 +45,6 @@ or more metrics.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -69,8 +67,6 @@ A table of key/value pairs representing the keys to be added to the event.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -94,8 +90,6 @@ The log field to use as the metric.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -120,8 +114,6 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -146,8 +138,6 @@ for `gauge`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -170,8 +160,6 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -196,13 +184,9 @@ Environment variables and field interpolation is allowed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -226,13 +210,9 @@ The metric type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output

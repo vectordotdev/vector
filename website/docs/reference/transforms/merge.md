@@ -40,8 +40,6 @@ events into a single event.
 ```
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={["message"]}
@@ -69,8 +67,6 @@ non-partial event fields are merged in, producing the resulting merged event.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"_partial"}
@@ -95,8 +91,6 @@ partial events along with the first non-partial event will be merged together.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={[]}
@@ -122,8 +116,6 @@ sources from mixing together, as this affects partial event processing.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
