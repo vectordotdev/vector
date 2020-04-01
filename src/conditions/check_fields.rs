@@ -1,12 +1,12 @@
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
-
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     event::Value,
     Event,
 };
+use indexmap::IndexMap;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -81,6 +81,108 @@ impl CheckFieldsPredicate for EqualsPredicate {
 //------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
+struct ContainsPredicate {
+    target: Atom,
+    arg: String,
+}
+
+impl ContainsPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
+                target: target.into(),
+                arg: s.clone(),
+            })),
+            _ => Err("contains predicate requires a string argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for ContainsPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l
+                .get(&self.target)
+                .map_or(false, |v| v.to_string_lossy().contains(&self.arg)),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct StartsWithPredicate {
+    target: Atom,
+    arg: String,
+}
+
+impl StartsWithPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
+                target: target.into(),
+                arg: s.clone(),
+            })),
+            _ => Err("starts_with predicate requires a string argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for StartsWithPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l
+                .get(&self.target)
+                .map_or(false, |v| v.to_string_lossy().starts_with(&self.arg)),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct EndsWithPredicate {
+    target: Atom,
+    arg: String,
+}
+
+impl EndsWithPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
+                target: target.into(),
+                arg: s.clone(),
+            })),
+            _ => Err("ends_with predicate requires a string argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for EndsWithPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l
+                .get(&self.target)
+                .map_or(false, |v| v.to_string_lossy().ends_with(&self.arg)),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
 struct NotEqualsPredicate {
     target: Atom,
     arg: String,
@@ -115,6 +217,46 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
                 .as_ref()
                 .and_then(|t| t.get(self.target.as_ref()))
                 .map_or(false, |v| v.as_bytes() != self.arg.as_bytes()),
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct RegexPredicate {
+    target: Atom,
+    regex: Regex,
+}
+
+impl RegexPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        let pattern = match arg {
+            CheckFieldsPredicateArg::String(s) => s.clone(),
+            _ => return Err("regex predicate requires a string argument".to_owned()),
+        };
+        let regex = Regex::new(&pattern)
+            .map_err(|error| format!("Invalid regex \"{}\": {}", pattern, error))?;
+        let target = target.into();
+        Ok(Box::new(Self { target, regex }))
+    }
+}
+
+impl CheckFieldsPredicate for RegexPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(log) => log
+                .get(&self.target)
+                .map(|field| field.to_string_lossy())
+                .map_or(false, |field| self.regex.is_match(&field)),
+            Event::Metric(metric) => metric
+                .tags
+                .as_ref()
+                .and_then(|tags| tags.get(self.target.as_ref()))
+                .map_or(false, |field| self.regex.is_match(field)),
         }
     }
 }
@@ -164,7 +306,18 @@ fn build_predicate(
     match predicate {
         "eq" | "equals" => EqualsPredicate::new(target, arg),
         "neq" | "not_equals" => NotEqualsPredicate::new(target, arg),
+        "contains" => ContainsPredicate::new(target, arg),
+        "prefix" => {
+            warn!(
+                message = "The \"prefix\" comparison predicate is deprecated, use \"starts_with\" instead",
+                %target,
+            );
+            StartsWithPredicate::new(target, arg)
+        }
+        "starts_with" => StartsWithPredicate::new(target, arg),
+        "ends_with" => EndsWithPredicate::new(target, arg),
         "exists" => ExistsPredicate::new(target, arg),
+        "regex" => RegexPredicate::new(target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
 }
@@ -364,6 +517,178 @@ mod test {
     }
 
     #[test]
+    fn check_field_contains() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.contains".into(),
+            CheckFieldsPredicateArg::String("foo".into()),
+        );
+        preds.insert(
+            "other_thing.contains".into(),
+            CheckFieldsPredicateArg::String("bar".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("neither");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.contains: \"foo\", other_thing.contains: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "hello foo world");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.contains: \"bar\" ]".to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "hello bar world");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("message", "not fo0");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.contains: \"foo\" ]".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_field_prefix() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.prefix".into(),
+            CheckFieldsPredicateArg::String("foo".into()),
+        );
+        preds.insert(
+            "other_thing.prefix".into(),
+            CheckFieldsPredicateArg::String("bar".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("neither");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.prefix: \"foo\", other_thing.prefix: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "foo hello world");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.prefix: \"bar\" ]".to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "bar hello world");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("message", "not prefixed");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.prefix: \"foo\" ]".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_field_starts_with() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.starts_with".into(),
+            CheckFieldsPredicateArg::String("foo".into()),
+        );
+        preds.insert(
+            "other_thing.starts_with".into(),
+            CheckFieldsPredicateArg::String("bar".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("neither");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.starts_with: \"foo\", other_thing.starts_with: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "foo hello world");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.starts_with: \"bar\" ]".to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "bar hello world");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("message", "not prefixed");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.starts_with: \"foo\" ]".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_field_ends_with() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.ends_with".into(),
+            CheckFieldsPredicateArg::String("foo".into()),
+        );
+        preds.insert(
+            "other_thing.ends_with".into(),
+            CheckFieldsPredicateArg::String("bar".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("neither");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                "predicates failed: [ message.ends_with: \"foo\", other_thing.ends_with: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+
+        event.as_mut_log().insert("message", "hello world foo");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ other_thing.ends_with: \"bar\" ]".to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "hello world bar");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("message", "not suffixed");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ message.ends_with: \"foo\" ]".to_owned())
+        );
+    }
+
+    #[test]
     fn check_field_not_equals() {
         let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
         preds.insert(
@@ -401,6 +726,49 @@ mod test {
             cond.check_with_context(&event),
             Err(
                 "predicates failed: [ message.not_equals: \"foo\", other_thing.neq: \"bar\" ]"
+                    .to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn check_field_regex() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert(
+            "message.regex".into(),
+            CheckFieldsPredicateArg::String("^start".into()),
+        );
+        preds.insert(
+            "other_thing.regex".into(),
+            CheckFieldsPredicateArg::String("end$".into()),
+        );
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("starts with a bang");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
+        );
+
+        event.as_mut_log().insert("other_thing", "at the end");
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
+
+        event.as_mut_log().insert("other_thing", "end up here");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
+        );
+
+        event.as_mut_log().insert("message", "foo");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err(
+                r#"predicates failed: [ message.regex: "^start", other_thing.regex: "end$" ]"#
                     .to_owned()
             )
         );

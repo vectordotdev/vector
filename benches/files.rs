@@ -3,8 +3,8 @@ use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures01::{sink::Sink, stream::Stream, Future};
 use std::path::PathBuf;
 use tempfile::tempdir;
-use tokio::codec::{BytesCodec, FramedWrite};
-use tokio::fs::OpenOptions;
+use tokio01::codec::{BytesCodec, FramedWrite};
+use tokio01::fs::OpenOptions;
 use vector::test_util::random_lines;
 use vector::{
     runtime, sinks, sources,
@@ -50,7 +50,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     sinks::file::FileSinkConfig {
                         path: output.into(),
                         idle_timeout_secs: None,
-                        encoding: sinks::file::Encoding::Text,
+                        encoding: sinks::file::Encoding::Text.into(),
                     },
                 );
 

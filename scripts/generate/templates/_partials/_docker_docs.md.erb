@@ -1,33 +1,34 @@
-## Running
-
-```bash
-docker run timberio/vector:<%= metadata.latest_version %>-alpine
-```
-
-* The `vector` binary is located at `/usr/local/bin/vector`, which should be in your `$PATH`.
-* The default [configuration file][docs.configuration] is located at `/etc/vector/vector.toml`.
-
 ## Configuring
 
-The Vector Docker images ship with a [default `/etc/vector/vector.toml` configuration file][urls.default_configuration].
-To use your own configuration file:
+As shown above, you can pass a custom
+[Vector configuration file][docs.configuration] via the `-v` flag. You'll want
+to do this since the
+[default `/etc/vector/vector.toml` configuration file][urls.default_configuration]
+doesn't do anything.
 
-1. Create your own [Vector configuration file][docs.configuration] and save it
-   as `vector.toml`.
+## Deploying
 
-2. Run the Vector Docker image with the following command:
+How you deploy Vector is largely dependent on your use case and environment.
+Please see the [deployment section][docs.deployment] for more info on how to
+deploy Vector.
 
-   ```bash
-   docker run \
-    -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-    timberio/vector:<%= metadata.latest_version %>-alpine
-   ```
+## Updating
 
-   Modify `$PWD` to the directory where you store your local `vector.toml` file.
+Simply run with newer version in the tag:
 
-## Image Variants
+```bash
+docker pull timberio/vector:X.X.X-alpine && \
+  docker run timberio/vector:X.X.X-alpine
+```
 
-### alpine
+See the [variants](#variants) and [versions](#versions) sections to choose
+the appropriate image for your use case.
+
+## Images
+
+### Variants
+
+#### alpine
 
 This image is based on the [`alpine` Docker image][urls.docker_alpine], which is
 a Linux distribution built around musl libc and BusyBox. It is considerably
@@ -38,7 +39,7 @@ is the image we recommend due to it's small size and reliability.
 docker run timberio/vector:<%= metadata.latest_version %>-alpine
 ```
 
-### debian
+#### debian
 
 This image is based on the [`debian-slim` image][urls.docker_debian],
 which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
@@ -47,67 +48,28 @@ which is a smaller, more compact variant of the [`debian` image][urls.docker_deb
 docker run timberio/vector:<%= metadata.latest_version %>-debian
 ```
 
-## Versions
+### Architectures
 
-### Latest Version
+Vector's images are multi-arch and support the
+<%= metadata.installation.platforms.docker.archs.to_sentence %> architectures.
+Docker handles this transparently for you.
 
-Vector's Docker images include a special `latest` version that will be updated
-whenever Vector is [released][urls.vector_releases]:
+### Versions
 
-```bash
-docker run timberio/vector:latest-alpine
-```
+Vector's Docker images can be downloaded with the following tags. Note that
+Vector maintains special tags that are automatically updated whenever Vector is
+[released][urls.vector_releases]:
 
-### Previous Versions
+| Version          | URL                                                      |
+|:-----------------|:---------------------------------------------------------|
+| Latest major     | `timberio/vector:latest-alpine`               |
+| Latest minor     | `timberio/vector:<MAJOR>.X-alpine`            |
+| Latest patch     | `timberio/vector:<MAJOR.MINOR>.X-alpine`      |
+| Specific version | `timberio/vector:<MAJOR.MINOR.PATCH>-alpine`  |
+| Latest nightly   | `timberio/vector:nightly-alpine`              |
+| Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-alpine` |
 
-Previous versions can be accessed by their direct tag:
+### Source Files
 
-```bash
-docker run timberio/vector:<X.X.X>-alpine
-```
-
-### Nightlies
-
-Vector's releases nightly versions that contain the latest changes.
-
-```bash
-docker run timberio/vector:nightly-alpine
-```
-
-Historical nightly versions are also available:
-
-```bash
-docker run timberio/vector:nightly-<YYYY-MM-DD>-alpine
-```
-
-## Updating
-
-Simply run with newer version in the tag:
-
-```bash
-docker run timberio/vector:X.X.X-alpine
-```
-
-Or pull the newest latest version:
-
-```bash
-docker pull timberio/vector:latest-alpine && \
-  docker run timberio/vector:latest-alpine
-```
-
-Or run with newer nightly date in the tag:
-
-```bash
-docker run timberio/vector:nightly-<YYYY-MM-DD>-alpine
-```
-
-Or pull the newest nightly version:
-
-```bash
-docker pull timberio/vector:nightly-alpine && \
-  docker run timberio/vector:nightly-alpine
-```
-
-## Source Files
-
-Vector's Docker source files are located [in it's Github repo][urls.vector_docker_source_files].
+Vector's Docker source files are located
+[in it's Github repo][urls.vector_docker_source_files].

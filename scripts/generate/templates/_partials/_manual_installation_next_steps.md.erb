@@ -2,7 +2,7 @@
 
 The Vector configuration file is located at:
 
-```
+```text
 config/vector.toml
 ```
 
@@ -15,7 +15,7 @@ Vector in the [Configuration][docs.configuration] section.
 We highly recommend creating a [data directory][docs.global-options#data_dir]
 that Vector can use:
 
-```
+```bash
 mkdir /var/lib/vector
 ```
 
@@ -28,9 +28,7 @@ Make sure that this directory is writable by the `vector` process.
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 data_dir = "/var/lib/vector" # default
 ```
 

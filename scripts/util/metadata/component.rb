@@ -1,24 +1,23 @@
 #encoding: utf-8
 
+require_relative "config_writers"
 require_relative "field"
-require_relative "requirements"
+require_relative "permission"
 
 class Component
-  DELIVERY_GUARANTEES = ["at_least_once", "best_effort"].freeze
-  EVENT_TYPES = ["log", "metric"].freeze
-  OPERATING_SYSTEMS = ["Linux", "MacOS", "Windows"].freeze
-
   include Comparable
 
   attr_reader :beta,
     :common,
+    :description,
     :env_vars,
+    :features,
     :function_category,
     :id,
-    :min_version,
     :name,
     :operating_systems,
     :options,
+    :permissions,
     :posts,
     :requirements,
     :service_name,
@@ -31,25 +30,21 @@ class Component
   def initialize(hash)
     @beta = hash["beta"] == true
     @common = hash["common"] == true
-    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(Field)
+    @description = hash["description"]
+    @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
+    @features = hash["features"] || []
     @function_category = hash.fetch("function_category").downcase
-    @min_version = hash["min_version"]
     @name = hash.fetch("name")
+    @permissions = (hash["permissions"] || {}).to_struct_with_name(constructor: Permission)
     @posts = hash.fetch("posts")
-    @requirements = Requirements.new(hash["requirements"] || {})
+    @requirements = OpenStruct.new(hash["requirements"] || {})
     @service_name = hash["service_name"] || hash.fetch("title")
     @service_providers = hash["service_providers"] || []
     @title = hash.fetch("title")
     @test_examples = hash["test_examples"] || []
     @type ||= self.class.name.downcase
     @id = "#{@name}_#{@type}"
-    @options = (hash["options"] || {}).to_struct_with_name(Field)
-
-    # Requirements
-
-    if @min_version && @min_version != "0" && (!@requirements.additional || !@requirements.additional.include?(@min_version))
-      @requirements.additional = "* #{@service_name} version >= #{@min_version} is required.\n#{@requirements.additional}"
-    end
+    @options = (hash["options"] || {}).to_struct_with_name(constructor: Field)
 
     # Operating Systems
 
@@ -68,12 +63,28 @@ class Component
     name <=> other.name
   end
 
-  def advanced_relevant?
-    options_list.any?(&:advanced?)
-  end
-
   def beta?
     beta == true
+  end
+
+  def config_example(format)
+    id = type == "source" ? "in" : "out"
+
+    writer =
+      ConfigWriters::ExampleWriter.new(
+        options_list,
+        table_path: [type.pluralize, id],
+        values: {inputs: ["in"]}
+      ) do |option|
+        option.required?
+      end
+
+    case format
+    when :toml
+      writer.to_toml
+    else
+      raise ArgumentError.new("Unknown format: #{format}")
+    end
   end
 
   def common?
@@ -89,17 +100,53 @@ class Component
   end
 
   def event_types
-    types = []
+    @event_types ||=
+      begin
+        types = []
 
-    if respond_to?(:input_types)
-      types += input_types
+        if respond_to?(:input_types)
+          types += input_types
+        end
+
+        if respond_to?(:output_types)
+          types += output_types
+        end
+
+        types.uniq
+      end
+  end
+
+  def for_platform?
+    !requirements.docker_api.nil? || requirements.heroku == true
+  end
+
+  def field_path_notation_options
+    options_list.select(&:field_path_notation?)
+  end
+
+  def function_category?(name)
+    function_category == name
+  end
+
+  def logo_path
+    return @logo_path if defined?(@logo_path)
+
+    variations = Set.new([name, name.sub(/_logging/, "")])
+
+    event_types.each do |event_name|
+      variations << name.sub(/_#{event_name.pluralize}$/, "")
     end
 
-    if respond_to?(:output_types)
-      types += output_types
+    variations.each do |name|
+      path = "/img/logos/#{name}.svg"
+
+      if File.exists?("#{STATIC_ROOT}#{path}")
+        @logo_path = path
+        break
+      end
     end
 
-    types.uniq
+    @logo_path
   end
 
   def only_service_provider?(provider_name)
@@ -121,23 +168,31 @@ class Component
 
         if option_groups.any?
           option_groups.each do |group|
-            groups[group] = options_list.select do |option|
-              option.group?(group) && option.common?
-            end
+            groups[group] =
+              lambda do |option|
+                option.group?(group) && option.common?
+              end
           end
 
-          if advanced_relevant?
-            option_groups.each do |group|
-              groups["#{group} (advanced)"] = options_list.select do |option|
-                option.group?(group)
-              end
+          option_groups.each do |group|
+            if options_list.any? { |option| option.group?(group) && !option.common? }
+              groups["#{group} (adv)"] =
+                lambda do |option|
+                  option.group?(group)
+                end
             end
           end
         else
-          groups["Common"] = options_list.select(&:common?)
+          groups["Common"] =
+            lambda do |option|
+              option.common?
+            end
 
-          if advanced_relevant?
-            groups["Advanced"] = options_list
+          if options_list.any? { |option| !option.common? }
+            groups["Advanced"] =
+              lambda do |option|
+                true
+              end
           end
         end
 
@@ -147,6 +202,10 @@ class Component
 
   def partition_options
     options_list.select(&:partition_key?)
+  end
+
+  def permissions_list
+    @permissions_list ||= permissions.to_h.values.sort
   end
 
   def service_provider?(provider_name)
@@ -159,7 +218,7 @@ class Component
 
   def sorted_option_group_keys
     option_example_groups.keys.sort_by do |key|
-      if key.downcase.include?("advanced")
+      if key.downcase.include?("adv")
         -1
       else
         1
@@ -188,18 +247,40 @@ class Component
   def to_h
     {
       beta: beta?,
+      config_examples: {
+        toml: config_example(:toml)
+      },
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
       description: description,
       event_types: event_types,
+      features: features,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
       id: id,
+      logo_path: logo_path,
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
       service_providers: service_providers,
+      short_description: short_description,
       status: status,
+      title: title,
       type: type,
       unsupported_operating_systems: unsupported_operating_systems
     }
+  end
+
+  def to_toml_example(common: true)
+    example_options = options_list.sort_by(&:config_file_sort_token)
+    example_options = common ? example_options.select(&:common?) : example_options
+
+    option_examples =
+      included_options.collect do |option|
+        option.to_toml_example(common: common)
+      end
+
+    <<~EOF
+    [#{type.pluralize}.my_#{type}_id]
+    #{option_examples.join}
+    EOF
   end
 
   def transform?

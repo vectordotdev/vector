@@ -1,0 +1,31 @@
+<Steps headingDepth={<%= heading_depth.to_json %>}>
+<ol>
+<li>
+
+### Install Vector
+
+<InstallationCommand />
+
+</li>
+<li>
+
+### Configure Vector
+
+<ConfigExample
+  format="toml"
+  path={<%= interface.config_path.to_json %>}
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
+
+</li>
+<li>
+
+### Start Vector
+
+<%= interface_start(interface, requirements: (source && source.requirements)) %>
+
+That's it! Simple and to the point. Hit `ctrl+c` to exit.
+
+</li>
+</ol>
+</Steps>

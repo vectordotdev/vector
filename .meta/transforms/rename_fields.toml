@@ -8,7 +8,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "rename_fields") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "rename_fields") %>
 
 [transforms.rename_fields.options.fields]
 type = "table"
@@ -21,29 +21,60 @@ event.\
 
 [transforms.rename_fields.options.fields.children."`[field-name]`"]
 type = "*"
+field_path_notation = true
 required = true
 examples = [
-  {"old field name" = "new field name"},
+  {old_field_name = "new_field_name"},
+  {parent.old_child_name = "parent.new_child_name"},
 ]
 description = """\
-The name of the field to move. Use `.` for adding nested fields.\
+Old-key/New-key pair reprsenting the key to be moved.
 """
+
+[transforms.rename_fields.options.drop_empty]
+type = "bool"
+required = false
+default = false
+description = "If set to `true`, after renaming fields, remove any parent objects of the old field that are now empty."
 
 
 [[transforms.rename_fields.output.log.examples]]
 label = "Generic"
 body = """\
-Given the following configuration:
+Given the following `log` event:
 
-<CodeHeader fileName="vector.toml" />
+```js
+{
+  // ...
+  "old_field": "root_value",
+  "old_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
+```
 
-```toml
+And a Vector configuration like:
+
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "rename_fields"
   inputs = [...]
 
-  [transforms.my_transform.fields]
-    old_field = "new_field"
-    old_nested.nested = "new_nested.nested",
+  fields.old_field = "new_field"
+  fields.old_nested.nested = "new_nested.nested",
+```
+
+Will result in the following `log` event:
+
+```js
+{
+  // ...
+  "new_field": "root_value",
+  "new_nested": {
+    "nested": "nested_value"
+  }
+  // ...
+}
 ```
 """

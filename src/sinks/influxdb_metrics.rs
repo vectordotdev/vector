@@ -1,16 +1,16 @@
 use crate::{
     event::metric::{Metric, MetricValue},
     sinks::util::{
-        http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
+        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures01::{Future, Poll};
+use futures01::{Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper;
-use hyper_tls::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -45,7 +45,7 @@ enum ConfigError {
 #[derive(Clone)]
 struct InfluxDBSvc {
     config: InfluxDBConfig,
-    inner: HttpService,
+    inner: HttpBatchService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -177,7 +177,8 @@ impl InfluxDBSvc {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;
-        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
+
+        let build_request = move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
@@ -185,7 +186,9 @@ impl InfluxDBSvc {
             builder.header("Content-Type", "text/plain");
             builder.header("Authorization", format!("Token {}", token));
             builder.body(body).unwrap()
-        });
+        };
+
+        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
 
         let influxdb_http_service = InfluxDBSvc {
             config,
@@ -193,8 +196,14 @@ impl InfluxDBSvc {
         };
 
         let sink = request
-            .batch_sink(HttpRetryLogic, influxdb_http_service, cx.acker())
-            .batched_with_min(MetricBuffer::new(), &batch);
+            .batch_sink(
+                HttpRetryLogic,
+                influxdb_http_service,
+                MetricBuffer::new(),
+                batch,
+                cx.acker(),
+            )
+            .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
 
         Ok(Box::new(sink))
     }

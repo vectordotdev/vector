@@ -2,17 +2,15 @@
 
 <%= component_header(component) %>
 
-## Configuration
-
-<%= component_config_example(component) %>
-
 <%- if component.requirements.any? -%>
 ## Requirements
 
 <%= component_requirements(component) %>
 
 <%- end -%>
-## Options
+## Configuration
+
+<%= component_config_example(component) %>
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
@@ -32,4 +30,36 @@
 
 <%= component_sections(component) %>
 
+### Nested Field Removal
 
+Nested fields are removed in a _deep_ fashion. They will not remove any
+ancestor object. For example, given the following `log` event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+And the following configuration:
+
+```toml
+[transforms.remove_nested_field]
+  type = "remove_fields"
+  fields = ["parent.child2"]
+```
+
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.

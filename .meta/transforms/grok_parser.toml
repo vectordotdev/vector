@@ -8,13 +8,12 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "grok_parser") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "grok_parser") %>
 
 [transforms.grok_parser.options.drop_field]
 type = "bool"
 common = true
 default = true
-required = true
 description = """\
 If `true` will drop the specified `field` after parsing.\
 """
@@ -23,7 +22,8 @@ If `true` will drop the specified `field` after parsing.\
 type = "string"
 common = true
 default = "message"
-required = true
+examples = ["message", "parent.child", "array[0]"]
+field_path_notation = true
 description = """\
 The log field to execute the `pattern` against. Must be a `string` value.\
 """
@@ -35,7 +35,7 @@ examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:messa
 required = true
 description = "The [Grok pattern][urls.grok_patterns]"
 
-<%= render("_partials/_types.toml", namespace: "transforms.grok_parser", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.grok_parser.options", common: true) %>
 
 [[transforms.grok_parser.test_examples]]
 label = "Basic"

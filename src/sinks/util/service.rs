@@ -1,23 +1,24 @@
 use super::{
     retries::{FixedRetryPolicy, RetryLogic},
-    Batch, BatchServiceSink,
+    Batch, BatchSettings, BatchSink,
 };
 use crate::buffers::Acker;
-use futures01::Poll;
+use futures01::{Async, Future, Poll};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::{error, fmt};
+use tokio01::timer::Delay;
 use tower::{
     layer::{util::Stack, Layer},
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,
-    timeout::Timeout,
     util::BoxService,
     Service, ServiceBuilder,
 };
 
-pub type TowerBatchedSink<T, L, B, S> =
-    BatchServiceSink<T, ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B>;
+pub type TowerBatchedSink<S, B, L, Request> =
+    BatchSink<ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -117,33 +118,38 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn batch_sink<B, L, S, T>(
+    pub fn batch_sink<B, L, S, Request>(
         &self,
         retry_logic: L,
         service: S,
+        batch: B,
+        batch_settings: BatchSettings,
         acker: Acker,
-    ) -> TowerBatchedSink<T, L, B, S>
+    ) -> TowerBatchedSink<S, B, L, Request>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
     // `trait SinkExt` above), as it is missing a bound on the
     // associated types that cannot be expressed in stable Rust.
     where
-        L: RetryLogic<Error = S::Error, Response = S::Response>,
-        S: Clone + Service<T>,
-        S::Error: 'static + std::error::Error + Send + Sync,
-        S::Response: std::fmt::Debug,
-        T: Clone,
-        B: Batch<Output = T>,
+        L: RetryLogic<Response = S::Response> + Send + 'static,
+        S: Service<Request> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send + std::fmt::Debug,
+        S::Future: Send + 'static,
+        B: Batch<Output = Request>,
+        Request: Send + Clone + 'static,
     {
         let policy = self.retry_policy(retry_logic);
         let service = ServiceBuilder::new()
             .concurrency_limit(self.in_flight_limit)
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .timeout(self.timeout)
+            .layer(TimeoutLayer {
+                timeout: self.timeout,
+            })
             .service(service);
 
-        BatchServiceSink::new(service, acker)
+        BatchSink::new(service, batch, batch_settings, acker)
     }
 }
 
@@ -158,9 +164,9 @@ impl<S, L, Request> tower::layer::Layer<S> for TowerRequestLayer<L, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
     S::Response: Send + 'static,
-    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
-    L: RetryLogic<Response = S::Response, Error = S::Error> + Send + 'static,
+    L: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
     type Service = BoxService<Request, S::Response, crate::Error>;
@@ -175,12 +181,16 @@ where
                 self.settings.rate_limit_duration,
             )
             .retry(policy)
-            .timeout(self.settings.timeout)
+            .layer(TimeoutLayer {
+                timeout: self.settings.timeout,
+            })
             .service(inner);
 
         BoxService::new(l)
     }
 }
+
+// === map ===
 
 pub struct MapLayer<R1, R2> {
     f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
@@ -220,7 +230,6 @@ where
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        use futures01::Future;
         self.inner.call(req).map_err(|e| e.into())
     }
 }
@@ -233,6 +242,115 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
         }
     }
 }
+
+// === timeout ===
+
+/// Applies a timeout to requests.
+///
+/// We require our own timeout layer because the current
+/// 0.1 version uses From intead of Into bounds for errors
+/// this casues the whole stack to not align and not compile.
+/// In future versions of tower this should be fixed.
+#[derive(Debug, Clone)]
+pub struct Timeout<T> {
+    inner: T,
+    timeout: Duration,
+}
+
+// ===== impl Timeout =====
+
+impl<S, Request> Service<Request> for Timeout<S>
+where
+    S: Service<Request>,
+    S::Error: Into<crate::Error>,
+{
+    type Response = S::Response;
+    type Error = crate::Error;
+    type Future = ResponseFuture<S::Future>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        self.inner.poll_ready().map_err(Into::into)
+    }
+
+    fn call(&mut self, request: Request) -> Self::Future {
+        let response = self.inner.call(request);
+        let sleep = Delay::new(Instant::now() + self.timeout);
+
+        ResponseFuture { response, sleep }
+    }
+}
+
+/// Applies a timeout to requests via the supplied inner service.
+#[derive(Debug)]
+pub struct TimeoutLayer {
+    timeout: Duration,
+}
+
+impl TimeoutLayer {
+    /// Create a timeout from a duration
+    pub fn new(timeout: Duration) -> Self {
+        TimeoutLayer { timeout }
+    }
+}
+
+impl<S> Layer<S> for TimeoutLayer {
+    type Service = Timeout<S>;
+
+    fn layer(&self, service: S) -> Self::Service {
+        Timeout {
+            inner: service,
+            timeout: self.timeout,
+        }
+    }
+}
+
+/// `Timeout` response future
+#[derive(Debug)]
+pub struct ResponseFuture<T> {
+    response: T,
+    sleep: Delay,
+}
+
+impl<T> Future for ResponseFuture<T>
+where
+    T: Future,
+    T::Error: Into<crate::Error>,
+{
+    type Item = T::Item;
+    type Error = crate::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        // First, try polling the future
+        match self.response.poll().map_err(Into::into)? {
+            Async::Ready(v) => return Ok(Async::Ready(v)),
+            Async::NotReady => {}
+        }
+
+        // Now check the sleep
+        match self.sleep.poll()? {
+            Async::NotReady => Ok(Async::NotReady),
+            Async::Ready(_) => Err(Elapsed(()).into()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Elapsed(pub(super) ());
+
+impl Elapsed {
+    /// Construct a new elapsed error
+    pub fn new() -> Self {
+        Elapsed(())
+    }
+}
+
+impl fmt::Display for Elapsed {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("request timed out")
+    }
+}
+
+impl error::Error for Elapsed {}
 
 #[cfg(test)]
 mod tests {

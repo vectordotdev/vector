@@ -1,6 +1,8 @@
+const path = require('path');
+
 module.exports = {
   title: 'Vector',
-  tagline: 'A High-Performance, Logs, Metrics, & Events Router',
+  tagline: 'A lightweight and ultra-fast tool for building observability pipelines',
   url: 'https://vector.dev',
   baseUrl: '/',
   favicon: 'img/favicon.ico',
@@ -18,10 +20,10 @@ module.exports = {
       },
       links: [
         {to: 'components/', label: 'Components', position: 'left'},
+        {to: 'guides/', label: 'Guides', position: 'left'},
         {to: 'docs/', label: 'Docs', position: 'left'},
         {to: 'blog/', label: 'Blog', position: 'left'},
-        {to: 'community/', label: 'Community', position: 'left'},
-        {href: 'https://chat.vector.dev', label: 'Chat', position: 'right'},
+        {to: 'community/', label: 'Community', position: 'right'},
         {to: 'releases/', label: 'Download', position: 'right'},
         {href: 'https://github.com/timberio/vector', label: "GitHub", position: 'right'},
       ],
@@ -125,9 +127,6 @@ module.exports = {
       },
       copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
     },
-    googleAnalytics: {
-      trackingID: 'UA-79173230-9',
-    },
     algolia: {
       apiKey: '2356c5cb76b57b43624c6450b0a031cc',
       indexName: 'timberio_vector',
@@ -153,6 +152,9 @@ module.exports = {
         },
       },
     ],
+  ],
+  plugins: [
+    path.resolve(__dirname, './plugins/guides'),
   ],
   scripts: [],
   stylesheets: [

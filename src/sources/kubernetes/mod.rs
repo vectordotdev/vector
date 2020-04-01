@@ -8,6 +8,7 @@ mod message_parser;
 use self::applicable_transform::ApplicableTransform;
 use crate::{
     event::{self, Event, Value},
+    shutdown::ShutdownSignal,
     sources::Source,
     topology::config::{DataType, GlobalOptions, SourceConfig},
     transforms::{
@@ -17,8 +18,10 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use futures01::{sync::mpsc, Future, Sink, Stream};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use string_cache::DefaultAtom as Atom;
 
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
@@ -29,6 +32,10 @@ use snafu::Snafu;
 
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &str = r"/var/log/pods/";
+
+lazy_static! {
+    pub static ref POD_UID: Atom = Atom::from("object_uid");
+}
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -52,6 +59,7 @@ impl SourceConfig for KubernetesConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<Source> {
         // Kubernetes source uses 'file source' and various transforms to implement
@@ -64,7 +72,7 @@ impl SourceConfig for KubernetesConfig {
         let now = TimeFilter::new();
 
         let (file_recv, file_source) =
-            file_source_builder::FileSourceBuilder::new(self).build(name, globals)?;
+            file_source_builder::FileSourceBuilder::new(self).build(name, globals, shutdown)?;
 
         let mut transform_file = transform_file()?;
         let mut transform_pod_uid = transform_pod_uid()?;

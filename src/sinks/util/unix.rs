@@ -1,6 +1,5 @@
-use crate::sinks::util::SinkExt;
 use crate::{
-    sinks::util::{encode_event, Encoding},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
     topology::config::SinkContext,
 };
@@ -13,8 +12,8 @@ use snafu::Snafu;
 use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use tokio::codec::{BytesCodec, FramedWrite};
-use tokio::timer::Delay;
+use tokio01::codec::{BytesCodec, FramedWrite};
+use tokio01::timer::Delay;
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_uds::UnixStream;
 use tracing::field;
@@ -23,25 +22,21 @@ use tracing::field;
 #[serde(deny_unknown_fields)]
 pub struct UnixSinkConfig {
     pub path: PathBuf,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 impl UnixSinkConfig {
-    pub fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            encoding: Encoding::Text,
-        }
+    pub fn new(path: PathBuf, encoding: EncodingConfig<Encoding>) -> Self {
+        Self { path, encoding }
     }
 
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let encoding = self.encoding.clone();
+        let unix = UnixSink::new(self.path.clone());
+        let sink = StreamSink::new(unix, cx.acker());
 
-        let sink = Box::new(
-            UnixSink::new(self.path.clone())
-                .stream_ack(cx.acker())
-                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-        );
+        let sink =
+            Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
         let healthcheck = unix_healthcheck(self.path.clone());
 
         Ok((sink, healthcheck))
@@ -200,7 +195,7 @@ mod tests {
     use crate::test_util::{random_lines_with_stream, shutdown_on_idle};
     use futures01::{sync::mpsc, Sink, Stream};
     use stream_cancel::{StreamExt, Tripwire};
-    use tokio::codec::{FramedRead, LinesCodec};
+    use tokio01::codec::{FramedRead, LinesCodec};
     use tokio_uds::UnixListener;
 
     fn temp_uds_path(name: &str) -> PathBuf {
@@ -225,7 +220,7 @@ mod tests {
         let out_path = temp_uds_path("unix_test");
 
         // Set up Sink
-        let config = UnixSinkConfig::new(out_path.clone());
+        let config = UnixSinkConfig::new(out_path.clone(), Encoding::Text.into());
         let mut rt = Runtime::new().unwrap();
         let cx = SinkContext::new_test(rt.executor());
         let (sink, _healthcheck) = config.build(cx).unwrap();

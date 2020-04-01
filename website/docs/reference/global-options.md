@@ -1,7 +1,11 @@
 ---
+last_modified_on: "2020-04-01"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 In addition to [sources][docs.sources], [transforms][docs.transforms], and
 [sinks][docs.sinks], Vector accepts global options that serve to configure
@@ -17,31 +21,21 @@ Vector as a whole and set defaults for component options.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+```toml title="vector.toml"
+# General
+data_dir = "/var/lib/vector" # optional, no default
+dns_servers = ["0.0.0.0:53"] # optional, no default
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
-# OPTIONAL - General
-  data_dir = "/var/lib/vector" # example, no default
-  dns_servers = ["0.0.0.0:53"] # example, no default
-
-  # OPTIONAL - Log schema
-  [log_schema]
-    host_key = "host" # default
-    message_key = "message" # default
-    timestamp_key = "timestamp" # default
+# Log schema
+log_schema.host_key = "host" # optional, default
+log_schema.kubernetes_key = "kubernetes" # optional, default
+log_schema.message_key = "message" # optional, default
+log_schema.timestamp_key = "timestamp" # optional, default
 ```
 
 ## Options
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -59,12 +53,14 @@ import Field from '@site/src/components/Field';
 
 ### data_dir
 
-The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
+The directory used for persisting Vector state, such as on-disk buffers, file
+checkpoints, and more. Please make sure the Vector project has write
+permissions to this dir.
+
+ See [Data Directory](#data-directory) for more info.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -82,12 +78,15 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
 
 ### dns_servers
 
-The list of DNS servers Vector will use to resolve DNS requests. When set Vector will ignore the system configuration and use only the list of DNS servers provided. If this option is not set then Vector will attempt to use the system configuration.
+The list of DNS servers Vector will use to resolve DNS requests. When set
+Vector will ignore the system configuration and use only the list of DNS
+servers provided. If this option is not set then Vector will attempt to use the
+system configuration.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -105,12 +104,12 @@ The list of DNS servers Vector will use to resolve DNS requests. When set Vector
 
 ### log_schema
 
-The default log schema that all Vector components operate on. See the [log data model page][docs.data-model.log] for more info.
+The default log schema that all Vector components operate on. See the [log data
+model page][docs.data-model.log] for more info.
+
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -128,12 +127,36 @@ The default log schema that all Vector components operate on. See the [log data 
 
 #### host_key
 
-The key used to hold the log host. See the [log data model page][docs.data-model.log#host] for more info.
+The key used to hold the log host. See the [log data model
+page][docs.data-model.log#host] for more info.
+
+
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={"kubernetes"}
+  enumValues={null}
+  examples={["kubernetes","kube","k8s"]}
+  groups={[]}
+  name={"kubernetes_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### kubernetes_key
+
+The key under which Kubernetes related fields are nested.
 
 
+
+
+</Field>
 <Field
   common={false}
   defaultValue={"message"}
@@ -151,12 +174,13 @@ The key used to hold the log host. See the [log data model page][docs.data-model
 
 #### message_key
 
-The key used to hold the log message. See the [log data model page][docs.data-model.log#message] for more info.
+The key used to hold the log message. See the [log data model
+page][docs.data-model.log#message] for more info.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"timestamp"}
@@ -174,17 +198,16 @@ The key used to hold the log message. See the [log data model page][docs.data-mo
 
 #### timestamp_key
 
-The key used to represent when the log was generated. See the [log data model page][docs.data-model.log#timestamp] for more info.
+The key used to represent when the log was generated. See the [log data model
+page][docs.data-model.log#timestamp] for more info.
+
+
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

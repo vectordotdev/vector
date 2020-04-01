@@ -12,10 +12,12 @@ fn add_fields(c: &mut Criterion) {
     let key = "the key";
     let value = "this is the value";
 
-    let key_atom = key.into();
-    let value_bytes = value.into();
-    let key_atom2 = key.into();
-    let value_bytes2 = value.into();
+    let key_atom_native = key.into();
+    let value_bytes_native = value.into();
+    let key_atom_v1 = key.into();
+    let value_bytes_v1 = value.into();
+    let key_atom_v2 = key.into();
+    let value_bytes_v2 = value.into();
 
     c.bench(
         "lua_add_fields",
@@ -30,22 +32,37 @@ fn add_fields(c: &mut Criterion) {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom], value_bytes);
+                        assert_eq!(event.as_log()[&key_atom_native], value_bytes_native);
                     }
                 },
             )
         })
-        .with_function("lua", move |b| {
+        .with_function("v1", move |b| {
             b.iter_with_setup(
                 || {
                     let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom2], value_bytes2);
+                        assert_eq!(event.as_log()[&key_atom_v1], value_bytes_v1);
+                    }
+                },
+            )
+        })
+        .with_function("v2", move |b| {
+            b.iter_with_setup(
+                || {
+                    let source = format!("event['{}'] = '{}'", key, value);
+                    transforms::lua::v2::Lua::new(&source, vec![]).unwrap()
+                },
+                |mut transform| {
+                    for _ in 0..num_events {
+                        let event = Event::new_empty_log();
+                        let event = transform.transform(event).unwrap();
+                        assert_eq!(event.as_log()[&key_atom_v2], value_bytes_v2);
                     }
                 },
             )
@@ -83,7 +100,7 @@ fn field_filter(c: &mut Criterion) {
                 },
             )
         })
-        .with_function("lua", move |b| {
+        .with_function("v1", move |b| {
             b.iter_with_setup(
                 || {
                     let source = r#"
@@ -91,7 +108,30 @@ fn field_filter(c: &mut Criterion) {
                         event = nil
                       end
                     "#;
-                    transforms::lua::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                },
+                |mut transform| {
+                    let num = (0..num_events)
+                        .map(|i| {
+                            let mut event = Event::new_empty_log();
+                            event.as_mut_log().insert("the_field", (i % 10).to_string());
+                            event
+                        })
+                        .filter_map(|r| transform.transform(r))
+                        .count();
+                    assert_eq!(num, num_events / 10);
+                },
+            )
+        })
+        .with_function("v2", move |b| {
+            b.iter_with_setup(
+                || {
+                    let source = r#"
+                      if event["the_field"] ~= "0" then
+                        event = nil
+                      end
+                    "#;
+                    transforms::lua::v2::Lua::new(&source, vec![]).unwrap()
                 },
                 |mut transform| {
                     let num = (0..num_events)

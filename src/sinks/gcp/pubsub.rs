@@ -3,7 +3,8 @@ use crate::{
     event::Event,
     sinks::{
         util::{
-            http::{https_client, BatchedHttpSink, HttpSink},
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink, UriParseError,
@@ -11,12 +12,13 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::Uri;
 use hyper::{Body, Method, Request};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
+use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -37,8 +39,21 @@ pub struct PubsubConfig {
     pub batch: BatchBytesConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 inventory::submit! {
@@ -62,7 +77,8 @@ impl SinkConfig for PubsubConfig {
             batch_settings,
             Some(tls_settings),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
@@ -80,6 +96,7 @@ struct PubsubSink {
     api_key: Option<String>,
     creds: Option<GcpCredentials>,
     uri_base: String,
+    encoding: EncodingConfigWithDefault<Encoding>,
 }
 
 impl PubsubSink {
@@ -101,6 +118,7 @@ impl PubsubSink {
 
         Ok(Self {
             api_key: config.auth.api_key.clone(),
+            encoding: config.encoding.clone(),
             creds,
             uri_base,
         })
@@ -113,16 +131,15 @@ impl PubsubSink {
             creds.apply(&mut request);
         }
 
-        let client = https_client(cx.resolver(), tls.clone())?;
+        let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
         let creds = self.creds.clone();
-        let healthcheck =
-            client
-                .request(request)
-                .map_err(Into::into)
-                .and_then(healthcheck_response(
-                    creds,
-                    HealthcheckError::TopicNotFound.into(),
-                ));
+        let healthcheck = client
+            .call(request)
+            .map_err(Into::into)
+            .and_then(healthcheck_response(
+                creds,
+                HealthcheckError::TopicNotFound.into(),
+            ));
         Ok(Box::new(healthcheck))
     }
 
@@ -141,7 +158,8 @@ impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
         let json = serde_json::to_string(&event.into_log()).unwrap();

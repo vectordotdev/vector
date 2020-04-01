@@ -1,6 +1,8 @@
 use crate::{
-    sinks::elasticsearch::ElasticSearchConfig,
-    sinks::util::{BatchBytesConfig, Compression, TowerRequestConfig},
+    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
+    sinks::util::{
+        encoding::EncodingConfigWithDefault, BatchBytesConfig, Compression, TowerRequestConfig,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
@@ -13,6 +15,12 @@ pub struct SematextLogsConfig {
     // TODO: replace this with `UriEncode` once that is on master.
     host: Option<String>,
     token: String,
+
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -54,6 +62,7 @@ impl SinkConfig for SematextLogsConfig {
             index: Some(self.token.clone()),
             batch: self.batch.clone(),
             request: self.request.clone(),
+            encoding: self.encoding.clone(),
             ..Default::default()
         }
         .build(cx)?;

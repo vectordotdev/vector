@@ -1,22 +1,23 @@
 use super::Transform;
 use crate::{
     event::Event,
+    serde::Fields,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use string_cache::DefaultAtom as Atom;
-use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
-    pub fields: IndexMap<String, TomlValue>,
+    pub fields: Fields<String>,
+    drop_empty: Option<bool>,
 }
 
 pub struct RenameFields {
     fields: IndexMap<Atom, Atom>,
+    drop_empty: bool,
 }
 
 inventory::submit! {
@@ -26,7 +27,14 @@ inventory::submit! {
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
     fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RenameFields::new(self.fields.clone())?))
+        Ok(Box::new(RenameFields::new(
+            self.fields
+                .clone()
+                .all_fields()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+            self.drop_empty.unwrap_or(false),
+        )?))
     }
 
     fn input_type(&self) -> DataType {
@@ -43,49 +51,8 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<String, TomlValue>) -> crate::Result<Self> {
-        Ok(RenameFields {
-            fields: fields
-                .into_iter()
-                .map(|kv| flatten(kv, None))
-                .collect::<crate::Result<_>>()?,
-        })
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Snafu)]
-enum FlattenError {
-    #[snafu(display(
-        "The key {:?} cannot be flattened. Is it a plain string or a `a.b.c` style map?",
-        key
-    ))]
-    CannotFlatten { key: String },
-}
-
-fn flatten(kv: (String, TomlValue), prequel: Option<String>) -> crate::Result<(Atom, Atom)> {
-    let (k, v) = kv;
-    match v {
-        TomlValue::String(s) => match prequel {
-            Some(prequel) => Ok((format!("{}.{}", prequel, k).into(), s.into())),
-            None => Ok((k.into(), s.into())),
-        },
-        TomlValue::Table(map) => {
-            if map.len() > 1 {
-                Err(Box::new(FlattenError::CannotFlatten { key: k }))
-            } else {
-                let sub_kv = map.into_iter().next().expect("Map of len 1 has no values");
-                let key = match prequel {
-                    Some(prequel) => format!("{}.{}", prequel, k),
-                    None => k,
-                };
-                flatten(sub_kv, Some(key))
-            }
-        }
-        TomlValue::Integer(_)
-        | TomlValue::Float(_)
-        | TomlValue::Boolean(_)
-        | TomlValue::Datetime(_)
-        | TomlValue::Array(_) => Err(Box::new(FlattenError::CannotFlatten { key: k })),
+    pub fn new(fields: IndexMap<Atom, Atom>, drop_empty: bool) -> crate::Result<Self> {
+        Ok(RenameFields { fields, drop_empty })
     }
 }
 
@@ -93,8 +60,23 @@ impl Transform for RenameFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            if let Some(v) = log.remove(&old_key) {
-                log.insert(new_key.clone(), v)
+            match log.remove_prune(&old_key, self.drop_empty) {
+                Some(v) => {
+                    if let Some(_) = event.as_mut_log().insert(&new_key.clone(), v) {
+                        debug!(
+                            message = "Field overwritten",
+                            field = old_key.as_ref(),
+                            rate_limit_secs = 30,
+                        )
+                    }
+                }
+                None => {
+                    debug!(
+                        message = "Field did not exist",
+                        field = old_key.as_ref(),
+                        rate_limit_secs = 30,
+                    );
+                }
             }
         }
 
@@ -117,7 +99,7 @@ mod tests {
         fields.insert("to_move".into(), "moved".into());
         fields.insert("not_present".into(), "should_not_exist".into());
 
-        let mut transform = RenameFields::new(fields).unwrap();
+        let mut transform = RenameFields::new(fields, false).unwrap();
 
         let new_event = transform.transform(event).unwrap();
 

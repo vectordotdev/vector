@@ -1,9 +1,9 @@
-use crate::{topology::config::GlobalOptions, Event};
+use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tokio::{
+use tokio01::{
     self,
     codec::BytesCodec,
     net::{UdpFramed, UdpSocket},
@@ -23,6 +23,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         Ok(statsd(self.address, out))
@@ -72,6 +73,7 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
     )
 }
 
+#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use super::StatsdConfig;

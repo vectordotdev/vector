@@ -11,19 +11,21 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "split") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "split") %>
 
 [transforms.split.options.field]
 type = "string"
 common = true
 default = "message"
-required = true
+examples = ["message", "parent.child"]
+field_path_notation = true
 description = "The field to apply the split on."
 
 [transforms.split.options.field_names]
 type = "[string]"
 common = true
-examples = [["timestamp", "level", "message"]]
+examples = [["timestamp", "level", "message", "parent.child"]]
+field_path_notation = true
 required = true
 description = "The field names assigned to the resulting tokens, in order."
 
@@ -32,7 +34,6 @@ type = "[string]"
 common = true
 default = "[whitespace]"
 examples = [","]
-required = true
 description = """\
 The separator to split the field on. If no separator is given, it will split \
 on all whitespace. 'Whitespace' is defined according to the terms of the \
@@ -43,10 +44,9 @@ on all whitespace. 'Whitespace' is defined according to the terms of the \
 type = "bool"
 common = true
 default = true
-required = true
 description = "If `true` the `field` will be dropped after parsing."
 
-<%= render("_partials/_types.toml", namespace: "transforms.split", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.split.options", common: true) %>
 
 [[transforms.split.output.log.examples]]
 label = "CSV"
@@ -68,9 +68,8 @@ And the following configuration:
   separator = ","
   fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 
-  [transforms.<transform-id>.types]
-    status = "int"
-    bytes = "int"
+  types.status = "int"
+  types.bytes = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:

@@ -2,24 +2,22 @@
 
 <%= component_header(component) %>
 
-## Configuration
-
-<%= component_config_example(component) %>
-
 <%- if component.requirements.any? -%>
 ## Requirements
 
 <%= component_requirements(component) %>
 
 <%- end -%>
-## Options
+## Configuration
+
+<%= component_config_example(component) %>
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
 ## Env Vars
 
-<%= fields(component.env_vars_list) %>
+<%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
 <%- if component.output.log -%>

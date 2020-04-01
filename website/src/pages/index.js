@@ -1,15 +1,8 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React, { useState, useEffect } from 'react';
 
-import CodeBlock from '@theme/CodeBlock';
 import Diagram from '@site/src/components/Diagram';
 import Heading from '@theme/Heading';
+import InstallationCommand from '@site/src/components/InstallationCommand';
 import Jump from '@site/src/components/Jump';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
@@ -248,6 +241,7 @@ function Integrations() {
   const classes = {
     'aws_s3_sink': 'large',
     'clickhouse_sink': 'medium',
+    'dedupe': 'medium',
     'docker_source': 'large',
     'elasticsearch_sink': 'large',
     'file_source': 'medium',
@@ -260,6 +254,7 @@ function Integrations() {
     'regex_parser': 'medium',
     'socket_sink': 'medium',
     'syslog_source': 'medium',
+    'tag_cardinality_limit': 'large',
   }
 
   return (
@@ -349,7 +344,7 @@ function Topologies() {
   )
 }
 
-function Installation() {
+function InstallationSection() {
   return (
     <section className={styles.installation}>
       <div className="container">
@@ -381,25 +376,7 @@ function Installation() {
 
         <h3 className={styles.installSubTitle}>Install with a one-liner:</h3>
 
-        <Tabs
-          className="mini"
-          defaultValue="humans"
-          values={[
-            { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
-            { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
-          ]
-        }>
-          <TabItem value="humans">
-            <CodeBlock className="language-bash">
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
-            </CodeBlock>
-          </TabItem>
-          <TabItem value="machines">
-            <CodeBlock className="language-bash">
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y
-            </CodeBlock>
-          </TabItem>
-        </Tabs>
+        <InstallationCommand />
 
         <h3 className={styles.installSubTitle}>Or choose your preferred method:</h3>
 
@@ -434,7 +411,7 @@ function Home() {
   }, []);
 
   return (
-    <Layout description={siteConfig.description}>
+    <Layout title={`${siteConfig.title} - ${siteConfig.tagline}`} description={siteConfig.tagline}>
       <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
         <div className="container">
           {newRelease && (
@@ -454,7 +431,7 @@ function Home() {
             <Link to="/components/">Collect, transform, &amp; route</Link> <i>all</i> observability data with <i>one</i> simple tool.
           </p>
           <div className="hero--buttons">
-            <Link to="/docs/setup/guides/getting-started" className="button button--primary">Get Started</Link>
+            <Link to="https://github.com/timberio/vector/" className="button button--primary"><i className="feather icon-github"></i> View on Github</Link>
             <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
@@ -470,7 +447,7 @@ function Home() {
         <Configuration />
         <Integrations />
         <Topologies />
-        <Installation />
+        <InstallationSection />
       </main>
     </Layout>
   );

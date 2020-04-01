@@ -46,8 +46,9 @@ function Fields({children, filters}) {
       {childrenArray.length > 1 && filters !== false ?
         (<div className="filters">
           <span className="result-count">{filteredChildren.length} items</span>
-          <div className=" search">
+          <div className="search">
             <input
+              className="input--text input--lg"
               type="text"
               onChange={(event) => setSearchTerm(event.currentTarget.value)}
               placeholder="🔍 Search..." />

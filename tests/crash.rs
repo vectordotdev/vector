@@ -1,6 +1,9 @@
+#![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
+
 use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
+    shutdown::ShutdownSignal,
     test_util::{
         block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
@@ -184,6 +187,7 @@ impl config::SourceConfig for ErrorSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         _out: mpsc::Sender<Event>,
     ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::err(())))
@@ -251,6 +255,7 @@ impl config::SourceConfig for PanicSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         _out: mpsc::Sender<Event>,
     ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(

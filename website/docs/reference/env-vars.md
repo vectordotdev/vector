@@ -1,8 +1,13 @@
 ---
+last_modified_on: "2020-04-01"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 You can control Vector's behavior through select environment variables:
 
@@ -23,13 +28,7 @@ options][docs.global-options] as well.
 
 ## Special Variables
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -47,12 +46,13 @@ import Field from '@site/src/components/Field';
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+Used for AWS authentication when communicating with AWS services. See relevant
+[AWS components][pages.aws_components] for more info.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -70,14 +70,15 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+Used for AWS authentication when communicating with AWS services. See relevant
+[AWS components][pages.aws_components] for more info.
+
+
 
 
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
@@ -85,7 +86,7 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -96,11 +97,11 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 The docker host to connect to.
 
 
+
+
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -108,7 +109,7 @@ The docker host to connect to.
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
@@ -116,12 +117,14 @@ The docker host to connect to.
 
 ### DOCKER_VERIFY_TLS
 
-If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+If `true` (the default), Vector will validate the TLS certificate of the remote
+host. Do NOT set this to `false` unless you understand the risks of not
+verifying the remote certificate.
+
+
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -139,12 +142,13 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API.
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the Stackdriver Logging API.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -162,12 +166,13 @@ The filename for a Google Cloud service account credentials JSON file used to au
 
 ### LOG
 
-Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#levels] for more information on the available levels.
+Sets Vector's log level. See the [log section in the monitoring
+guide][docs.monitoring#levels] for more information on the available levels.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -185,12 +190,38 @@ Sets Vector's log level. See the [log section in the monitoring guide][docs.moni
 
 ### RUST_BACKTRACE
 
-Enables backtraces when errors are logged. Use this when debugging only since it can degrade performance.
+Enables backtraces when errors are logged. Use this when debugging only since
+it can degrade performance.
+
+
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["minikube"]}
+  groups={[]}
+  name={"VECTOR_NODE_NAME"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### VECTOR_NODE_NAME
+
+The name of the node whose Pod's log should be enriched. If you're using the
+[provided daemon set][urls.kubernetes_limit_resources] then this environment
+variable is set for you.
 
 
+
+
+</Field>
 </Fields>
 
 ## Custom Variables
@@ -201,8 +232,6 @@ Vector supports custom environment variables via the `${...}` syntax:
 ```toml
 option = "${ENV_VAR}"
 ```
-
-import Alert from '@site/src/components/Alert';
 
 <Alert type="info">
 
@@ -233,3 +262,4 @@ variable example.
 [docs.process-management#reloading]: /docs/administration/process-management/#reloading
 [docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components?providers%5B%5D=aws/
+[urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/

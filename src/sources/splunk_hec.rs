@@ -1,5 +1,7 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::{Buf, Bytes};
@@ -37,6 +39,7 @@ pub struct SplunkConfig {
     address: SocketAddr,
     /// Splunk HEC token
     token: Option<String>,
+    tls: Option<TlsConfig>,
 }
 
 impl Default for SplunkConfig {
@@ -44,6 +47,7 @@ impl Default for SplunkConfig {
         SplunkConfig {
             address: default_socket_address(),
             token: None,
+            tls: None,
         }
     }
 }
@@ -58,6 +62,7 @@ impl SourceConfig for SplunkConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
+        _: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let (trigger, tripwire) = Tripwire::new();
@@ -81,8 +86,11 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        // Build server
-        let (_, server) = warp::serve(services).bind_with_graceful_shutdown(self.address, tripwire);
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let incoming = tls.bind(&self.address)?.incoming();
+
+        let server =
+            warp::serve(services).serve_incoming_with_graceful_shutdown(incoming, tripwire);
 
         Ok(Box::new(server))
     }
@@ -379,7 +387,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(event::log_schema().message_key().clone(), string)
+                    log.insert(event::log_schema().message_key().clone(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -390,8 +398,12 @@ impl<R: Read> Stream for EventStream<R> {
                     if let Some(line) = object.remove("line") {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
-                            JsonValue::Array(_) | JsonValue::Object(_) => log.insert("line", line),
-                            _ => log.insert(event::log_schema().message_key(), line),
+                            JsonValue::Array(_) | JsonValue::Object(_) => {
+                                log.insert("line", line);
+                            }
+                            _ => {
+                                log.insert(event::log_schema().message_key(), line);
+                            }
                         }
                     }
 
@@ -445,7 +457,7 @@ impl<R: Read> Stream for EventStream<R> {
         match self.time.clone() {
             Time::Provided(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
             Time::Now(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
-        }
+        };
 
         // Extract default extracted fields
         for de in self.extractors.iter_mut() {
@@ -674,15 +686,19 @@ fn event_error(text: &str, code: u16, event: usize) -> Response<Body> {
     }
 }
 
+#[cfg(features = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
     use super::SplunkConfig;
     use crate::runtime::{Runtime, TaskExecutor};
-    use crate::sinks::splunk_hec::{Encoding, HecSinkConfig};
-    use crate::sinks::{util::Compression, Healthcheck, RouterSink};
     use crate::test_util::{self, collect_n};
     use crate::{
         event::{self, Event},
+        sinks::{
+            splunk_hec::{Encoding, HecSinkConfig},
+            util::{encoding::EncodingConfigWithDefault, Compression},
+            Healthcheck, RouterSink,
+        },
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     };
     use futures01::{stream, sync::mpsc, Sink};
@@ -712,14 +728,14 @@ mod tests {
 
     fn sink(
         address: SocketAddr,
-        encoding: Encoding,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
         exec: TaskExecutor,
     ) -> (RouterSink, Healthcheck) {
         HecSinkConfig {
             host: format!("http://{}", address),
             token: TOKEN.to_owned(),
-            encoding,
+            encoding: encoding.into(),
             compression: Some(compression),
             ..HecSinkConfig::default()
         }
@@ -728,7 +744,7 @@ mod tests {
     }
 
     fn start(
-        encoding: Encoding,
+        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
     ) -> (Runtime, RouterSink, mpsc::Receiver<Event>) {
         let mut rt = test_util::runtime();

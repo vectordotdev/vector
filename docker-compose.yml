@@ -84,6 +84,21 @@ services:
       working_dir: $PWD
       command: cargo check --all --all-targets
 
+    check-component-features:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/checker-component-features/Dockerfile
+      environment:
+        RUSTFLAGS: "-D warnings"
+        CARGO_TERM_COLOR: always
+      volumes:
+        - $PWD:$PWD
+        - ./target/cargo/registry:/root/.cargo/registry
+        - ./target/cargo/git:/root/.cargo/git
+        - ./target/rustup/tmp:/root/.rustup/tmp
+      working_dir: $PWD
+      command: ./scripts/check-component-features.sh
+
     check-fmt:
       build:
         context: .
@@ -107,6 +122,16 @@ services:
       working_dir: $PWD
       user: $USER
       command: ./scripts/check-style.sh
+
+    check-markdown:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/checker-markdown/Dockerfile
+      volumes:
+        - $PWD:$PWD
+      working_dir: $PWD
+      user: $USER
+      command: markdownlint .
 
     check-generate:
       build:
@@ -387,6 +412,8 @@ services:
         dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
       environment:
         CARGO_TERM_COLOR: always
+        TEST_LOG: debug
+        RUST_BACKTRACE: full
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
@@ -403,6 +430,8 @@ services:
         CARGO_TERM_COLOR: always
         AWS_ACCESS_KEY_ID: dummy
         AWS_SECRET_ACCESS_KEY: dummy
+        TEST_LOG: debug
+        RUST_BACKTRACE: full
       volumes:
         - $PWD:$PWD
         - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
@@ -413,7 +442,7 @@ services:
         - test-runtime-deps
       network_mode: host
       working_dir: $PWD
-      command: cargo test --all --no-default-features --features docker,default-musl --target x86_64-unknown-linux-musl -- --test-threads 4
+      command: cargo test --all --no-default-features --features default-musl,docker,kubernetes --target x86_64-unknown-linux-musl -- --test-threads 4
 
     test-behavior:
       image: ubuntu:18.04
@@ -422,6 +451,24 @@ services:
       working_dir: $PWD
       user: $USER
       command: ["sh", "-c", "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml"]
+
+    test-kubernetes:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-kubernetes/Dockerfile
+      environment:
+        CARGO_TERM_COLOR: always
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+      volumes:
+        - $PWD:$PWD
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+        - /var/run/docker.sock:/var/run/docker.sock
+      network_mode: host
+      working_dir: $PWD
+      command: ["sh", "-ec", "./scripts/kubernetes-test.sh"]
 
     # test dependencies
 
@@ -436,6 +483,7 @@ services:
         - zookeeper
         - kafka
         - splunk
+        - pulsar
         - elasticsearch
         - elasticsearch-tls
         - clickhouse
@@ -489,12 +537,18 @@ services:
         KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
       volumes:
         - ./tests/data/localhost.p12:/certs/localhost.p12:ro
+    pulsar:
+      image: apachepulsar/pulsar
+      command: bin/pulsar standalone
+      ports:
+        - "6650:6650"
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:
         - "8088:8088"
         - "8000:8000"
         - "8089:8089"
+      entrypoint: ["sh", "-c", "./bin/splunk add index custom_index && ./entrypoint.sh"]
     elasticsearch:
       image: elasticsearch:6.6.2
       ports:
@@ -531,7 +585,7 @@ services:
       environment:
         - PUBSUB_PROJECT1=testproject,topic1:subscription1
     loki:
-      image: grafana/loki
+      image: grafana/loki:master-89263b0-amd64
       ports:
         - "3100:3100"
       command: -config.file=/etc/loki/loki-config.yaml

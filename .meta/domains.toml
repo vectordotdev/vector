@@ -1,7 +1,4 @@
 [[domains]]
-name = "blog"
-
-[[domains]]
 name = "buffers"
 
 [[domains]]
@@ -12,15 +9,6 @@ name = "config"
 
 [[domains]]
 name = "dependencies"
-
-[[domains]]
-name = "docs"
-
-[[domains]]
-name = "guides"
-
-[[domains]]
-name = "marketing"
 
 [[domains]]
 name = "networking"
@@ -38,25 +26,22 @@ name = "platforms"
 name = "security"
 
 [[domains]]
-name = "setup"
-
-[[domains]]
 name = "sinks"
 
 [[domains]]
 name = "sources"
 
 [[domains]]
-name = "templating"
-
-[[domains]]
-name = "testing"
+name = "tests"
 
 [[domains]]
 name = "topology"
 
 [[domains]]
 name = "transforms"
+
+[[domains]]
+name = "ux"
 
 [[domains]]
 name = "website"

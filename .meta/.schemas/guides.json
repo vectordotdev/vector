@@ -1,0 +1,63 @@
+{
+  "$id": "https://raw.githubusercontent.com/timberio/vector/master/.meta/schemas/guides.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vector Guides Front Matter Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "author_github",
+    "description",
+    "last_modified_on",
+    "tags",
+    "title"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The path to this schema.",
+      "enum": ["/.meta/.schemas/guides.json"]
+    },
+    "author_github": {
+      "type": "string",
+      "description": "Github URL of the author."
+    },
+    "cover_label": {
+      "type": "string",
+      "description": "Optional label for the cover of the guide"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the guide."
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "Draft mode ensure this guide is not included in releases."
+    },
+    "hide_pagination": {
+      "type": "boolean",
+      "description": "Hides the pagination nav"
+    },
+    "last_modified_on": {
+      "type": "string",
+      "description": "When the guide was last modified."
+    },
+    "series_position": {
+      "type": "number",
+      "description": "If this guide is part of a series, this should specify the position in that series.",
+      "minimum": 1
+    },
+    "tags": {
+      "type": "array",
+      "description": "Array of tags",
+      "items": {
+        "type": "string",
+        "enum": ["type: guide","type: post","type: tutorial","domain: buffers","domain: cli","domain: config","domain: dependencies","domain: networking","domain: observability","domain: operations","domain: platforms","domain: security","domain: sinks","domain: sources","domain: tests","domain: topology","domain: transforms","domain: ux","domain: website","platform: docker","source: docker","source: file","source: http","source: journald","source: kafka","source: logplex","source: prometheus","source: socket","source: splunk_hec","source: statsd","source: stdin","source: syslog","source: vector","source: add_fields","source: add_tags","source: ansi_stripper","source: aws_ec2_metadata","source: coercer","source: concat","source: dedupe","source: filter","source: geoip","source: grok_parser","source: json_parser","source: kubernetes_pod_metadata","source: log_to_metric","source: logfmt_parser","source: lua","source: merge","source: regex_parser","source: remove_fields","source: remove_tags","source: rename_fields","source: sampler","source: split","source: swimlanes","source: tag_cardinality_limit","source: tokenizer","sink: aws_cloudwatch_logs","sink: aws_cloudwatch_metrics","sink: aws_kinesis_firehose","sink: aws_kinesis_streams","sink: aws_s3","sink: blackhole","sink: clickhouse","sink: console","sink: datadog_logs","sink: datadog_metrics","sink: elasticsearch","sink: file","sink: gcp_cloud_storage","sink: gcp_pubsub","sink: gcp_stackdriver_logs","sink: honeycomb","sink: http","sink: humio_logs","sink: influxdb_metrics","sink: kafka","sink: logdna","sink: loki","sink: new_relic_logs","sink: papertrail","sink: prometheus","sink: pulsar","sink: sematext_logs","sink: socket","sink: splunk_hec","sink: statsd","sink: vector"]
+      }
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the guide."
+    }
+  }
+}

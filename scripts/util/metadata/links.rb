@@ -29,12 +29,13 @@ class Links
   VECTOR_ROOT = "https://github.com/timberio/vector".freeze
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit".freeze
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues".freeze
+  VECTOR_MILESTONES_ROOT = "#{VECTOR_ROOT}/milestone".freeze
   VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull".freeze
   TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness".freeze
 
   attr_reader :values
 
-  def initialize(links, docs_root, pages_root)
+  def initialize(links, docs_root, guides_root, pages_root)
     @links = links
     @values = {}
 
@@ -43,6 +44,12 @@ class Links
       to_a.
       reject { |p| File.directory?(p) }.
       collect { |f| f.gsub(docs_root, "").split(".").first }
+
+    @guides =
+      Dir.glob("#{guides_root}/**/*.md").
+      to_a.
+      reject { |p| File.directory?(p) }.
+      collect { |f| f.gsub(guides_root, "").split(".").first }
 
     @pages =
       Dir.glob("#{pages_root}/**/*.js").
@@ -86,6 +93,8 @@ class Links
         fetch_asset_path(name)
       when "docs"
         fetch_doc_path(name)
+      when "guides"
+        fetch_guide_path(name)
       when "pages"
         fetch_page_path(name)
       when "urls"
@@ -97,7 +106,7 @@ class Links
 
             #{category.inspect}
 
-          Links must start with `docs.`, `assets.`, `.pages`, or `urls.`
+          Links must start with `assets.`, `docs.`, `guides.`, `.pages`, or `urls.`
           EOF
         )
       end
@@ -178,6 +187,26 @@ class Links
       DOCS_BASE_PATH + fetch!("docs", available_docs, name) + "/"
     end
 
+    def fetch_guide_path(name)
+      case name
+      when "advanced"
+        return "#{GUIDES_BASE_PATH}/advanced/"
+      when "getting-started"
+        return "#{GUIDES_BASE_PATH}/getting-started/"
+      when "index"
+        return GUIDES_BASE_PATH
+      end
+
+      available_guides =
+        if name.end_with?(".readme")
+          @guides
+        else
+          @guides.select { |guide| !guide.end_with?("/README.md") }
+        end
+
+      GUIDES_BASE_PATH + fetch!("guides", available_guides, name) + "/"
+    end
+
     def fetch_page_path(name)
       if name == "index"
         "/"
@@ -203,8 +232,45 @@ class Links
 
       when /^(.*)_(sink|source|transform)_source$/
         name = $1
+        name_parts = name.split("_")
+        name_prefix = name_parts.first
+        suffixed_name = name_parts[1..-1].join("_")
         type = $2
-        source_file_url = "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}.rs"
+
+        variations =
+          [
+            "#{name}.rs",
+            "#{name_prefix}/#{suffixed_name}.rs",
+            "#{name}",
+            "#{name_prefix}"
+          ]
+
+        paths =
+          variations.collect do |variation|
+            "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{variation}"
+          end
+
+        variations.each do |variation|
+          path = "#{ROOT_DIR}/src/#{type.pluralize}/#{variation}"
+          if File.exists?(path) || File.directory?(path)
+            return "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{variation}"
+          end
+        end
+
+        raise KeyError.new(
+          <<~EOF
+          Unknown link!
+
+            urls.#{name}_source
+
+          We tried the following paths:
+
+            * #{paths.join("\n  * ")}
+
+          If the path to the source file is unique, please add it to the
+          links.toml file.
+          EOF
+        )
 
       when /^(.*)_test$/
         "#{TEST_HARNESS_ROOT}/tree/master/cases/#{$1}"
@@ -217,6 +283,9 @@ class Links
 
       when /^issue_([0-9]+)$/
         "#{VECTOR_ISSUES_ROOT}/#{$1}"
+
+      when /^milestone_([0-9]+)$/
+        "#{VECTOR_MILESTONES_ROOT}/#{$1}"
 
       when /^new_(.*)_(sink|source|transform)_issue$/
         name = $1

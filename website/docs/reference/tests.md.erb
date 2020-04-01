@@ -28,34 +28,34 @@ vector test /etc/vector/*.toml
 
 <TabItem value="common">
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[transforms.bar]
+```toml title="vector.toml"
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.tests.children_list.select(&:common?), path: "tests", array: true) %>
+<%=
+  config_example(metadata.tests.children_list, table_path: ["tests"], array: true) do |option|
+    option.common?
+  end
+%>
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
-[transforms.bar]
+```toml title="vector.toml"
+[transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
 
-<%= config_example(metadata.tests.children_list, path: "tests", array: true) %>
+<%= config_example(metadata.tests.children_list, table_path: ["tests"], array: true) %>
 ```
 
 </TabItem>
 
 </Tabs>
 
-For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
+For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
 ## Options
 
