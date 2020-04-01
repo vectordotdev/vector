@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::VecDeque, mem};
 mod scripted_transform;
-use scripted_transform::{ScriptedRuntime, ScriptedTransform};
+use scripted_transform::ScriptedRuntime;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -46,10 +46,7 @@ struct HooksConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let cloned: LuaConfig = (*self).clone();
-        Ok(Box::new(ScriptedTransform::new(move || {
-            Lua::new(&cloned).unwrap()
-        })))
+        Lua::new(self).map(|l| -> Box<dyn Transform> { Box::new(l) })
     }
 
     pub fn input_type(&self) -> DataType {
@@ -260,11 +257,9 @@ mod tests {
         transforms::Transform,
     };
 
-    fn from_config(config: &str) -> crate::Result<ScriptedTransform> {
+    fn from_config(config: &str) -> crate::Result<Lua> {
         let config = config.to_owned();
-        Ok(ScriptedTransform::new(move || {
-            Lua::new(&toml::from_str(&config).unwrap()).unwrap()
-        }))
+        Lua::new(&toml::from_str(&config).unwrap()).unwrap()
     }
 
     #[test]
