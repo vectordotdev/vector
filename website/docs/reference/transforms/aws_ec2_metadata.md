@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -33,8 +33,8 @@ AWS EC2 instance metadata.
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 
-* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on
-* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See ["How it works"](#how-it-works) for more info.
+* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
+* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See the ["AWS imDS v2" section][docs.transforms.aws_ec2_metadata#aws-imds-v2] for more info.
 
 </Alert>
 
@@ -495,6 +495,7 @@ You can learn more in the
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.transforms.aws_ec2_metadata#aws-imds-v2]: /docs/reference/transforms/aws_ec2_metadata/#aws-imds-v2
 [urls.aws_ec2_instance_metadata]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
 [urls.aws_imds_v1_security_problems]: https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

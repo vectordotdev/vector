@@ -44,7 +44,7 @@ class Templates
 
     links =
       components.select(&:common?)[0..limit].collect do |component|
-        "[#{component.name}][docs.#{type.to_s.pluralize}.#{component.name}]"
+        "[#{component.name}][#{component_short_link(component)}]"
       end
 
     num_leftover = components.size - links.size
@@ -84,6 +84,10 @@ class Templates
 
   def component_short_description(component)
     send("#{component.type}_short_description", component)
+  end
+
+  def component_short_link(component)
+    "docs.#{component.type.to_s.pluralize}.#{component.name}"
   end
 
   def components_table(components)

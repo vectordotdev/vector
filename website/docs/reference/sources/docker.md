@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -38,7 +38,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 * Docker API `>= 1.24` is required.
-* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See ["How it works"](#how-it-works) for more info.
+* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See the ["Docker Logging Drivers" section][docs.sources.docker#docker-logging-drivers] for more info.
 
 </Alert>
 
@@ -586,6 +586,7 @@ that we use to determine if an event is partial via the
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.installation.platforms]: /docs/setup/installation/platforms/
+[docs.sources.docker#docker-logging-drivers]: /docs/reference/sources/docker/#docker-logging-drivers
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
 [docs.sources.syslog]: /docs/reference/sources/syslog/

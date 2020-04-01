@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Install Vector via Window Installer
 sidebar_label: MSI
 description: Install Vector through the Windows Installer
@@ -34,7 +34,6 @@ Vector can be installed from an MSI package through the Windows Installer.
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
-
 Typically data is collected from a process manager, such as Journald via
 Vector's [`journald` source][docs.sources.journald], but can be collected
 through any of Vector's [sources][docs.sources].

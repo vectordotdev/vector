@@ -40,10 +40,10 @@ your observability strategy.
 ### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
+is a [popular][urls.vector_stars] [open-source][urls.vector_repo] utility for
+building observability pipelines. It's written in [Rust][urls.rust], making it
+lightweight, [ultra-fast][urls.vector_performance] and highly reliable. And
+we'll be deploying Vector as a
 [sidecar][docs.strategies#sidecar].
 
 The [sidecar deployment strategy][docs.strategies#sidecar] is designed to
@@ -138,5 +138,6 @@ flexibility of Vector:
 [urls.rust]: https://www.rust-lang.org/
 [urls.stdin]: https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin)
 [urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

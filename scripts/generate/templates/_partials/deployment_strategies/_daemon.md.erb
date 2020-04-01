@@ -6,7 +6,7 @@ collecting _all_ data for that host.
 For this guide, Vector will <%= source.function_category %> data from
 <%= source.noun %> via Vector's
 [`<%= source.name %>`][docs.sources.<%= source.name %>].
-<% else %>
+<%- else -%>
 Typically data is collected from a process manager, such as Journald via
 Vector's [`journald` source][docs.sources.journald], but can be collected
 through any of Vector's [sources][docs.sources].

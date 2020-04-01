@@ -21,9 +21,10 @@
 
 ## What is Vector?
 
-Vector is a lightweight and ultra-fast tool for building observability
-pipelines. Compared to Logstash and friends, Vector [improves throughput by
-~10X while significanly reducing CPU and memory usage](#performance).
+Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
+building observability pipelines. Compared to Logstash and friends, Vector
+[improves throughput by ~10X while significanly reducing CPU and memory
+usage][urls.vector_performance].
 
 ### Principles
 
@@ -271,8 +272,10 @@ Or use your own [preferred method][docs.installation].
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_enriching_transforms]: https://vector.dev/components?functions%5B%5D=enrich
 [urls.vector_parsing_transforms]: https://vector.dev/components?functions%5B%5D=parse
+[urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

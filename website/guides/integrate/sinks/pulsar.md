@@ -47,16 +47,15 @@ your observability strategy.
 ### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
+is a [popular][urls.vector_stars] [open-source][urls.vector_repo] utility for
+building observability pipelines. It's written in [Rust][urls.rust], making it
+lightweight, [ultra-fast][urls.vector_performance] and highly reliable. And
+we'll be deploying Vector as a
 [daemon][docs.strategies#daemon].
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
-
 Typically data is collected from a process manager, such as Journald via
 Vector's [`journald` source][docs.sources.journald], but can be collected
 through any of Vector's [sources][docs.sources].
@@ -262,5 +261,6 @@ flexibility of Vector:
 [urls.pulsar]: https://pulsar.apache.org/
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

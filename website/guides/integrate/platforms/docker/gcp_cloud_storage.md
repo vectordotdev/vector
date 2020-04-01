@@ -51,10 +51,10 @@ applications and services. Docker enables you to separate your services from you
 ### How This Guide Works
 
 We'll be using [Vector][urls.vector_website] to accomplish this task. Vector
-is a [popular][urls.vector_stars], lightweight, and
-[ultra-fast][urls.vector_performance] utility for building observability
-pipelines. It's written in [Rust][urls.rust], making it memory safe and
-reliable. We'll be deploying Vector as a
+is a [popular][urls.vector_stars] [open-source][urls.vector_repo] utility for
+building observability pipelines. It's written in [Rust][urls.rust], making it
+lightweight, [ultra-fast][urls.vector_performance] and highly reliable. And
+we'll be deploying Vector as a
 [daemon][docs.strategies#daemon].
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -168,5 +168,6 @@ flexibility of Vector:
 [urls.gcp_cloud_storage]: https://cloud.google.com/storage
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_performance]: https://vector.dev/#performance
+[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_stars]: https://github.com/timberio/vector/stargazers
 [urls.vector_website]: https://vector.dev

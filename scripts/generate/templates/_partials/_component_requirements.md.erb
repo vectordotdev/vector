@@ -2,22 +2,22 @@
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 <%- if component.requirements.aws_imds_v2 %>
-* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on
-* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See ["How it works"](#how-it-works) for more info.
+* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
+* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See the ["AWS imDS v2" section][<%= component_short_link(component) %>#aws-imds-v2] for more info.
 <%- end -%>
 <%- if requirements.clickhouse -%>
 * Clickhouse version `<%= requirements.clickhouse %>` is required.
 <%- end -%>
 <%- if requirements.docker_api -%>
 * Docker API `<%= requirements.docker_api %>` is required.
-* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See ["How it works"](#how-it-works) for more info.
+* In order for the Docker API to work properly, the [`json-file`][urls.docker_logging_driver_json_file] (default) or [`journald`][urls.docker_logging_driver_journald] Docker logging driver must be enabled for this component to work. See the ["Docker Logging Drivers" section][<%= component_short_link(component) %>#docker-logging-drivers] for more info.
 <%- end -%>
 <%- if requirements.file_system -%>
 * This component must be provided access to the configured file system.
 <%- end -%>
 <%- if requirements.journalctl -%>
-* The `journalctl` binary is required, this is the interface Vector uses to retrieve JournalD logs. See ["How it works"](#how-it-works) for more info.
-* The Vector user must be part of the `systemd-journal` group in order to execute the `journalctl` binary. See ["How it works"](#how-it-works) for more info.
+* The `journalctl` binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][<%= component_short_link(component) %>#communication-strategy] for more info.
+* The Vector user must be part of the `systemd-journal` group in order to execute the `journalctl` binary. See the ["User Permissions" section][<%= component_short_link(component) %>#user-permissions] for more info.
 <%- end -%>
 <%- if requirements.kafka -%>
 * Kafka version `<%= requirements.kafka %>` is required.

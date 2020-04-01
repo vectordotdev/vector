@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -37,8 +37,8 @@ utility and [outputs `log` events](#output).
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See ["How it works"](#how-it-works) for more info.
-* The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See ["How it works"](#how-it-works) for more info.
+* The [`journalctl`](#journalctl) binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][docs.sources.journald#communication-strategy] for more info.
+* The Vector user must be part of the `systemd-journal` group in order to execute the [`journalctl`](#journalctl) binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.
 
 </Alert>
 
@@ -438,6 +438,8 @@ usermod -aG systemd-journal vector
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
+[docs.sources.journald#communication-strategy]: /docs/reference/sources/journald/#communication-strategy
+[docs.sources.journald#user-permissions]: /docs/reference/sources/journald/#user-permissions
 [urls.issue_1473]: https://github.com/timberio/vector/issues/1473
 [urls.journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [urls.rust_subprocess]: https://docs.rs/subprocess

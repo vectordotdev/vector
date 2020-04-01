@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 title: Install Vector On Amazon Linux
 sidebar_label: Amazon Linux
 description: Install Vector on Amazon Linux
@@ -36,7 +36,6 @@ will cover how to install Vector on this operating system.
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
 collecting _all_ data for that host.
-
 Typically data is collected from a process manager, such as Journald via
 Vector's [`journald` source][docs.sources.journald], but can be collected
 through any of Vector's [sources][docs.sources].
