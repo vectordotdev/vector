@@ -1,8 +1,14 @@
 ---
+last_modified_on: "2020-04-01"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 It's possible to define unit tests within a Vector configuration file that cover
 a network of transforms within the topology. The intention of these tests is to
@@ -25,8 +31,6 @@ vector test /etc/vector/*.toml
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
@@ -36,15 +40,9 @@ import Tabs from '@theme/Tabs';
   ]
 }>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
@@ -68,15 +66,14 @@ import CodeHeader from '@site/src/components/CodeHeader';
     conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
     conditions."message.contains" = "foo" # example
-    conditions."environment.prefix" = "staging-" # example
+    conditions."environment.ends_with" = "-staging" # example
+    conditions."environment.starts_with" = "staging-" # example
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.foo]
   type = "regex_parser"
   regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$"
@@ -121,20 +118,17 @@ import CodeHeader from '@site/src/components/CodeHeader';
     conditions."host.exists" = true # example
     conditions."method.neq" = "POST" # example
     conditions."message.contains" = "foo" # example
-    conditions."environment.prefix" = "staging-" # example
+    conditions."environment.ends_with" = "-staging" # example
+    conditions."environment.starts_with" = "staging-" # example
 ```
 
 </TabItem>
 
 </Tabs>
 
-For more information about unit tests check out [this guide][docs.setup.guides.unit-testing].
+For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
 ## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -701,8 +695,8 @@ Check whether a fields contents exactly matches the value specified.
 
 ##### `[field-name]`.exists
 
-Check whether a field exists or does not exist, depending on the provided
-valuebeing `true` or `false` respectively.
+Check whether a field exists or does not exist, depending on the provided value
+being `true` or `false` respectively.
 
 
 
@@ -764,9 +758,9 @@ Checks whether a string field contains a string argument.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={[{"environment.prefix":"staging-"}]}
+  examples={[{"environment.ends_with":"-staging"}]}
   groups={[]}
-  name={"`[field_name]`.prefix"}
+  name={"`[field_name]`.ends_with"}
   path={"outputs.conditions"}
   relevantWhen={{"type":"check_fields"}}
   required={false}
@@ -775,9 +769,34 @@ Checks whether a string field contains a string argument.
   unit={null}
   >
 
-##### `[field_name]`.prefix
+##### `[field_name]`.ends_with
 
-Checks whether a string field has a string argument prefix.
+Checks whether a string field ends with a string argument.
+
+
+
+
+</Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"environment.starts_with":"staging-"}]}
+  groups={[]}
+  name={"`[field_name]`.starts_with"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+##### `[field_name]`.starts_with
+
+Checks whether a string field starts with a string argument.
 
 
 
@@ -829,4 +848,4 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#gauge]: /docs/about/data-model/metric/#gauge
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
-[docs.setup.guides.unit-testing]: /docs/setup/guides/unit-testing/
+[guides.advanced.unit-testing]: /guides/advanced/unit-testing/

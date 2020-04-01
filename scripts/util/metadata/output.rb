@@ -6,6 +6,6 @@ class Output
 
   def initialize(hash)
     @examples = (hash["examples"] || []).collect { |e| Example.new(e) }
-    @fields = (hash["fields"] || {}).to_struct_with_name(Field)
+    @fields = (hash["fields"] || {}).to_struct_with_name(constructor: Field)
   end
 end

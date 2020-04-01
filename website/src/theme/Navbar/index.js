@@ -1,10 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React, {useCallback, useState} from 'react';
 
 import GitHubButton from 'react-github-btn'
@@ -21,6 +14,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useHideableNavbar from '@theme/hooks/useHideableNavbar';
 import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
+import useLogo from '@theme/hooks/useLogo';
 import useThemeContext from '@theme/hooks/useThemeContext';
 
 import styles from './styles.module.css';
@@ -44,6 +38,11 @@ function navLinkAttributes(label, right) {
       attrs.icon = 'message-circle';
       return attrs;
 
+    case 'community':
+      attrs.hideText = right == true;
+      attrs.icon = 'users';
+      return attrs;
+
     case 'download':
       const newRelease = fetchNewRelease();
 
@@ -58,8 +57,8 @@ function navLinkAttributes(label, right) {
       return attrs;
 
     case 'github':
-      attrs.badge = '3.5k';
-      attrs.hideText = right == true;
+      attrs.badge = '4k';
+      attrs.hideText = false;
       attrs.icon = 'github';
       return attrs;
 
@@ -95,15 +94,20 @@ function NavLink({href, hideIcon, label, onClick, position, right, to}) {
 }
 
 function Navbar() {
-  const context = useDocusaurusContext();
-  const {siteConfig = {}} = context;
-  const {baseUrl, themeConfig = {}} = siteConfig;
-  const {navbar = {}, disableDarkMode = false} = themeConfig;
-  const {title, logo = {}, links = [], hideOnScroll = false} = navbar;
+  const {
+    siteConfig: {
+      themeConfig: {
+        navbar: {title, links = [], hideOnScroll = false} = {},
+        disableDarkMode = false,
+      },
+    },
+    isClient,
+  } = useDocusaurusContext();
   const [sidebarShown, setSidebarShown] = useState(false);
   const [isSearchBarExpanded, setIsSearchBarExpanded] = useState(false);
   const {isDarkTheme, setLightTheme, setDarkTheme} = useThemeContext();
   const {navbarRef, isNavbarVisible} = useHideableNavbar(hideOnScroll);
+  const {logoLink, logoLinkProps, logoImageUrl, logoAlt} = useLogo();
 
   useLockBodyScroll(sidebarShown);
 
@@ -118,17 +122,6 @@ function Navbar() {
     e => (e.target.checked ? setDarkTheme() : setLightTheme()),
     [setLightTheme, setDarkTheme],
   );
-
-  const logoLink = logo.href || baseUrl;
-  const isExternalLogoLink = /http/.test(logoLink);
-  const logoLinkProps = isExternalLogoLink
-    ? {
-        rel: 'noopener noreferrer',
-        target: '_blank',
-      }
-    : null;
-  const logoSrc = logo.srcDark && isDarkTheme ? logo.srcDark : logo.src;
-  const logoImageUrl = useBaseUrl(logoSrc);
 
   return (
     <nav
@@ -165,8 +158,8 @@ function Navbar() {
             </svg>
           </div>
           <Link className="navbar__brand" to={logoLink} {...logoLinkProps}>
-            {logo != null && (
-              <SVG className="navbar__logo" src={logoImageUrl} alt={logo.alt} />
+            {logoImageUrl != null && (
+              <SVG className="navbar__logo" src={logoImageUrl} alt={logoAlt} />
             )}
             {title != null && (
               <strong
@@ -213,8 +206,8 @@ function Navbar() {
             onClick={hideSidebar}
             to={logoLink}
             {...logoLinkProps}>
-            {logo != null && (
-              <SVG className="navbar__logo" src={logoImageUrl} alt={logo.alt} />
+            {logoImageUrl != null && (
+              <SVG className="navbar__logo" src={logoImageUrl} alt={logoAlt} />
             )}
             {title != null && <strong>{title}</strong>}
           </Link>

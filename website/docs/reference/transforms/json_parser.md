@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
-min_version: null
-service_name: "JSON Parser"
 sidebar_label: "json_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
 status: "prod-ready"
 title: "JSON Parser Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `json_parser` transform
 accepts and [outputs `log` events](#output) allowing you to parse a log field
@@ -26,22 +30,14 @@ value as JSON.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "json_parser" # required
   inputs = ["my-source-id"] # required
@@ -53,9 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "json_parser" # required
   inputs = ["my-source-id"] # required
@@ -68,10 +62,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -324,9 +314,7 @@ The [`field`](#field) and [`target_field`](#target_field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_json_parser_transform_id]
   # ...
   field = "message"

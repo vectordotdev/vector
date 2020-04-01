@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
-component_title: "loki"
+component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+loki%22
-min_version: "0"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "loki"
 sidebar_label: "loki|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/loki.rs
 status: "beta"
-title: "loki Sink"
+title: "Loki Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `loki` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,22 +34,14 @@ The Vector `loki` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "loki" # required
@@ -63,9 +60,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "loki" # required
@@ -78,8 +73,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Auth
   auth.strategy = "basic" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${LOKI_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${LOKI_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
@@ -121,10 +116,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -182,7 +173,7 @@ The authentication strategy to use.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${LOKI_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -208,7 +199,7 @@ must be setto your `instanceId`.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${LOKI_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}
@@ -1164,8 +1155,6 @@ you understand the risks of not verifying the remote hostname.
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
 event_types: ["log"]
 function_category: "aggregate"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+merge%22
-min_version: null
-service_name: "Merge"
 sidebar_label: "merge|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/merge.rs
 status: "beta"
 title: "Merge Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector [`merge`](#merge) transform
 accepts and [outputs `log` events](#output) allowing you to merge partial log
@@ -26,11 +30,7 @@ events into a single event.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "merge" # required
   inputs = ["my-source-id"] # required
@@ -38,10 +38,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   partial_event_marker_field = "_partial" # optional, default
   stream_discriminant_fields = [] # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -136,22 +132,16 @@ The [`merge`](#merge) transform accepts and [outputs `log` events](#output) allo
 For example:
 
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="default"
   values={[{"label":"Default","value":"default"},{"label":"With Merge Fields","value":"with-merge-fields"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="default">
 
 Given the following _default_ configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
@@ -159,9 +149,7 @@ Given the following _default_ configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
-
-```javascript
+```javascript title="first log event"
 {
   "message": "First",
   "_partial": true,
@@ -172,9 +160,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
-
-```javascript
+```javascript title="second log event"
 {
   "message": "Second",
   "_partial": true,
@@ -185,9 +171,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
-
-```javascript
+```javascript title="third log event"
 {
   "message": "Third",
   "custom_string_field": "value3",
@@ -213,9 +197,7 @@ Notice that `custom_string_field` and `custom_int_field` were not overridden. Th
 
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
@@ -224,9 +206,7 @@ Given the following configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
-
-```javascript
+```javascript title="first log event"
 {
   "message": "First",
   "_partial": true,
@@ -237,9 +217,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
-
-```javascript
+```javascript title="second log event"
 {
   "message": "Second",
   "_partial": true,
@@ -250,9 +228,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
-
-```javascript
+```javascript title="third log event"
 {
   "message": "Third",
   "custom_string_field": "value3",
@@ -299,9 +275,7 @@ The [`merge_fields`](#merge_fields), [`partial_event_marker_field`](#partial_eve
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_merge_transform_id]
   # ...
   merge_fields = ["message"]

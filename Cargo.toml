@@ -249,6 +249,7 @@ transforms = [
   "transforms-concat",
   "transforms-dedupe",
   "transforms-field_filter",
+  "transforms-filter",
   "transforms-geoip",
   "transforms-grok_parser",
   "transforms-json_parser",
@@ -274,6 +275,7 @@ transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
 transforms-dedupe = []
+transforms-filter = []
 transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]

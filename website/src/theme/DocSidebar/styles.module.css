@@ -1,10 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 @media (min-width: 997px) {
   .sidebar {
     height: 100vh;
@@ -40,6 +33,8 @@
     margin: 0 var(--ifm-navbar-padding-horizontal);
     height: var(--ifm-navbar-height);
     max-width: 155px;
+    color: inherit !important;
+    text-decoration: none !important;
   }
 
   .sidebarLogo img {

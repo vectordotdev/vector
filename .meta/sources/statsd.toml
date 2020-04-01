@@ -1,14 +1,21 @@
 [sources.statsd]
 title = "Statsd"
-beta = true
+noun = "Statsd"
+beta = false
 common = false
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_statsd.toml") %>
+features = [
+  "Accept metrics data over the Statsd UDP protocol.",
+  "Automatically parse metrics into a lossless interoperable data model.",
+]
 function_category = "receive"
 output_types = ["metric"]
-requirements = {}
-through_description = "the StatsD UDP protocol"
+requirements.network_port = "8126"
+strategies = ["service"]
+through_description = "the [StatsD UDP protocol][urls.statsd_udp_protocol]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "statsd") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "statsd") %>
 
 [sources.statsd.options.address]
 type = "string"

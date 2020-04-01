@@ -8,7 +8,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "add_fields") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "add_fields") %>
 
 [transforms.add_fields.options.fields]
 type = "table"
@@ -46,9 +46,7 @@ label = "Generic"
 body = """\
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]

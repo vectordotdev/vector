@@ -1,19 +1,23 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
 event_types: ["metric"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+influxdb_metrics%22
-min_version: "0"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "InfluxDB Metrics"
 sidebar_label: "influxdb_metrics|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/influxdb_metrics.rs
 status: "beta"
 title: "InfluxDB Metrics Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `influxdb_metrics` sink
 [batches](#buffers--batches) [`metric`][docs.data-model.metric] events to
@@ -30,22 +34,14 @@ The Vector `influxdb_metrics` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="v2"
   values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="v2">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -57,15 +53,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # auth
   org = "Organization" # required
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
+  token = "${INFLUXDB_TOKEN}" # required
 ```
 
 </TabItem>
 <TabItem value="v1">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -76,7 +70,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # optional, default
 
   # auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  password = "${INFLUXDB_PASSWORD}" # optional, no default
   username = "todd" # optional, no default
 
   # persistence
@@ -87,9 +81,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="v2-adv">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -101,7 +93,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # auth
   org = "Organization" # required
-  token = "${INFLUXDB_TOKEN_ENV_VAR}" # required
+  token = "${INFLUXDB_TOKEN}" # required
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -120,9 +112,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="v1-adv">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
@@ -133,7 +123,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   healthcheck = true # optional, default
 
   # auth
-  password = "${INFLUXDB_PASSWORD_ENV_VAR}" # optional, no default
+  password = "${INFLUXDB_PASSWORD}" # optional, no default
   username = "todd" # optional, no default
 
   # persistence
@@ -156,10 +146,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -422,7 +408,7 @@ Specifies the destination organization for writes into InfluxDB 2.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${INFLUXDB_PASSWORD_ENV_VAR}","influxdb4ever"]}
+  examples={["${INFLUXDB_PASSWORD}","influxdb4ever"]}
   groups={["v1"]}
   name={"password"}
   path={null}
@@ -683,7 +669,7 @@ Sets the target retention policy for the write into InfluxDB 1.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${INFLUXDB_TOKEN_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  examples={["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]}
   groups={["v2"]}
   name={"token"}
   path={null}

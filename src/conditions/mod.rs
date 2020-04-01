@@ -1,6 +1,7 @@
 use crate::topology::config::component::ComponentDescription;
 use crate::Event;
 use inventory;
+use serde::{Deserialize, Serialize};
 
 pub mod check_fields;
 pub mod is_log;
@@ -30,3 +31,19 @@ pub trait ConditionConfig: std::fmt::Debug {
 pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum AnyCondition {
+    FromType(Box<dyn ConditionConfig>),
+    NoTypeCondition(CheckFieldsConfig),
+}
+
+impl AnyCondition {
+    pub fn build(&self) -> crate::Result<Box<dyn Condition>> {
+        match self {
+            Self::FromType(c) => c.build(),
+            Self::NoTypeCondition(c) => c.build(),
+        }
+    }
+}

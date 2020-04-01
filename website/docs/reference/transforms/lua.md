@@ -1,16 +1,20 @@
 ---
-component_title: "LUA"
+last_modified_on: "2020-04-01"
+component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log"]
 function_category: "program"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
-min_version: null
-service_name: "LUA"
 sidebar_label: "lua|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua
 status: "beta"
-title: "LUA Transform"
+title: "Lua Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `lua` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to
@@ -26,11 +30,7 @@ transform events with a full embedded [Lua][urls.lua] engine.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "lua" # required
   inputs = ["my-source-id"] # required
@@ -48,10 +48,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
   search_dirs = ["/etc/vector/lua"] # optional, no default
   version = "1" # optional, default
 ```
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -135,8 +131,6 @@ transform API version
 
 ## Output
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="timings"
@@ -146,8 +140,6 @@ import Tabs from '@theme/Tabs';
     { label: 'Drop Event', value: 'drop_event', },
   ]
 }>
-
-import TabItem from '@theme/TabItem';
 
 <TabItem value="add_fields">
 

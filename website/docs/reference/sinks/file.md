@@ -1,19 +1,23 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "File"
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sinks/file/
+source_url: https://github.com/timberio/vector/tree/master/src/sinks/file
 status: "prod-ready"
 title: "File Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `file` sink
 [streams](#streaming) [`log`][docs.data-model.log] events to a file.
@@ -28,22 +32,14 @@ The Vector `file` sink
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "file" # required
@@ -58,9 +54,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "file" # required
@@ -78,10 +72,6 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
 </TabItem>
 </Tabs>
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
 
 <Fields filters={true}>
 
@@ -323,9 +313,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_file_sink_id]
   # ...
   path = "vector-%Y-%m-%d.log"
