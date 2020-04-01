@@ -185,7 +185,7 @@ For example:
 
 Given the following histogram metric events:
 
-```json
+```json title="Example histogram metrics"
 [
   {
     "name": "response_time_s",
@@ -210,7 +210,7 @@ Given the following histogram metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP response_time_s response_time_s
 # TYPE response_time_s histogram
 response_time_s_bucket{le="0.005"} 0
@@ -235,7 +235,7 @@ response_time_s_count 2
 
 Given the following counter metric events:
 
-```json
+```json title="Example counter metrics"
 [
   {
     "name": "logins",
@@ -257,7 +257,7 @@ Given the following counter metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP logins logins
 # TYPE logins counter
 logins 4
@@ -269,7 +269,7 @@ logins 4
 
 Given the following gauge metric events:
 
-```json
+```json title="Example gauge metrics"
 [
   {
     "name": "memory_rss",
@@ -292,7 +292,7 @@ Given the following gauge metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225

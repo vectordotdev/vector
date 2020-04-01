@@ -106,14 +106,14 @@ For example:
 
 Given the following input:
 
-```text
+```text title="Example input"
 # TYPE promhttp_metric_handler_requests_total counter
 promhttp_metric_handler_requests_total{code="200"} 100
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "name": "promhttp_metric_handler_requests_total",
   "kind": "absolute",
@@ -134,13 +134,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 prometheus_remote_storage_samples_in_total 57011636
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```jsontitle="Example log event"
 {
   "name": "prometheus_remote_storage_samples_in_total",
   "kind": "absolute",

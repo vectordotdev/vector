@@ -460,13 +460,13 @@ For example:
 
 Given the following input line:
 
-```text
+```text title="Example input"
 2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <current_timestamp>,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",

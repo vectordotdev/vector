@@ -43,13 +43,13 @@ label = "Text"
 body = """\
 Given the following input:
 
-```text
+```text title="Example input"
 Hello world
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>, // time event was received,
   "host": "my.host.com", // value of the `Host` header

@@ -89,13 +89,13 @@ For example:
 
 Given the following input:
 
-```text
+```text title="Example input"
 login.invocations:1|c
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "login.invocations",
   "kind": "incremental",
@@ -113,13 +113,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 gas_tank:0.50|g
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "gas_tank",
   "kind": "absolute",
@@ -137,13 +137,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 unique_users:foo|s
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "unique_users",
   "kind": "incremental",
@@ -161,13 +161,13 @@ A metric event will be output with the following structure:
 
 Given the following input:
 
-```text
+```text title="Example input"
 login.time:22|ms|@0.1
 ```
 
 A metric event will be output with the following structure:
 
-```json
+```json title="Example metric event"
 {
   "name": "login.time",
   "kind": "incremental",
