@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from STDIN and send them anywhere"
 description: "A simple guide to collect logs from STDIN and send them anywhere in just a few minutes."
@@ -126,7 +126,7 @@ flexibility of Vector:
   <div className="sub-title">Go from zero to production in under 10 minutes!</div>
 </Jump>
 
-<Jump to="/guides/getting-started/" leftIcon="book">
+<Jump to="/docs/about/what-is-vector/" leftIcon="book">
   <div className="title">Vector documentation</div>
   <div className="sub-title">Thoughtful, detailed docs that respect your time.</div>
 </Jump>

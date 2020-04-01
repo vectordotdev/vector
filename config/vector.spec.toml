@@ -6814,6 +6814,7 @@ end
   #
   # * required
   # * type: string
+  hostname = "${HOSTNAME}"
   hostname = "my-local-machine"
 
   # The default app that will be set for events that do not contain a `file` or

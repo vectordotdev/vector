@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
@@ -49,7 +49,7 @@ The Vector `logdna` sink
   type = "logdna" # required
   inputs = ["my-source-id"] # required
   api_key = "${LOGDNA_API_KEY}" # required
-  hostname = "my-local-machine" # required
+  hostname = "${HOSTNAME}" # required
   healthcheck = true # optional, default
 ```
 
@@ -64,7 +64,7 @@ The Vector `logdna` sink
   type = "logdna" # required
   inputs = ["my-source-id"] # required
   api_key = "${LOGDNA_API_KEY}" # required
-  hostname = "my-local-machine" # required
+  hostname = "${HOSTNAME}" # required
   default_app = "vector" # optional, default
   healthcheck = true # optional, default
   host = "http://127.0.0.1" # optional, no default
@@ -520,7 +520,7 @@ An optional host that will override the default one.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["my-local-machine"]}
+  examples={["${HOSTNAME}","my-local-machine"]}
   groups={[]}
   name={"hostname"}
   path={null}

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -51,7 +51,6 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
   api_key = "${DATADOG_API_KEY}" # required
   namespace = "service" # required
   healthcheck = true # optional, default
-  host = "https://api.datadoghq.com" # optional, default
 ```
 
 </TabItem>
@@ -219,7 +218,7 @@ Enables/disables the sink healthcheck upon start.
 
 
 <Field
-  common={true}
+  common={false}
   defaultValue={"https://api.datadoghq.com"}
   enumValues={null}
   examples={["https://api.datadoghq.com","https://api.datadoghq.eu"]}

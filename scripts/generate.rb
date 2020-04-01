@@ -235,7 +235,7 @@ end
 #
 
 metadata.sources_list.
-  select { |s| !s.for_platform? }.
+  select { |s| !s.for_platform? && !BLACKLISTED_SOURCES.include?(s.name) }.
   each do |source|
     template_path = "#{GUIDES_ROOT}/integrate/sources/#{source.name}.md.erb"
 

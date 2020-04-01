@@ -104,15 +104,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/integrate/sources/vector",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector.md",
-          "series_position": null,
-          "title": "Collect logs and metrics from Vector and send them anywhere"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/integrate/platforms/docker",
           "last_modified_on": null,
           "path": "website/guides/integrate/platforms/docker.md",
@@ -1715,213 +1706,6 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
-          "id": "/integrate/sources/vector/aws_cloudwatch_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_logs.md",
-          "series_position": null,
-          "title": "Send logs from Vector to AWS Cloudwatch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/aws_kinesis_streams",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_kinesis_streams.md",
-          "series_position": null,
-          "title": "Send logs from Vector to AWS Kinesis Data Streams"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/aws_kinesis_firehose",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_kinesis_firehose.md",
-          "series_position": null,
-          "title": "Send logs from Vector to AWS Kinesis Firehose"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/aws_s3",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_s3.md",
-          "series_position": null,
-          "title": "Send logs from Vector to AWS S3"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/pulsar",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/pulsar.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Apache Pulsar"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/clickhouse",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/clickhouse.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Clickhouse"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/datadog_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/datadog_logs.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Datadog"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/elasticsearch",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/elasticsearch.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Elasticsearch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/gcp_cloud_storage",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/gcp_cloud_storage.md",
-          "series_position": null,
-          "title": "Send logs from Vector to GCP Cloud Storage (GCS)"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/gcp_pubsub",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/gcp_pubsub.md",
-          "series_position": null,
-          "title": "Send logs from Vector to GCP PubSub"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/gcp_stackdriver_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/gcp_stackdriver_logs.md",
-          "series_position": null,
-          "title": "Send logs from Vector to GCP Stackdriver"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/honeycomb",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/honeycomb.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Honeycomb"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/humio_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/humio_logs.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Humio"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/kafka",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/kafka.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Kafka"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/logdna",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/logdna.md",
-          "series_position": null,
-          "title": "Send logs from Vector to LogDNA"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/loki",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/loki.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Loki"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/new_relic_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/new_relic_logs.md",
-          "series_position": null,
-          "title": "Send logs from Vector to New Relic"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/papertrail",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/papertrail.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Papertrail"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/sematext_logs",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/sematext_logs.md",
-          "series_position": null,
-          "title": "Send logs from Vector to Sematext"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/splunk_hec",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/splunk_hec.md",
-          "series_position": null,
-          "title": "Send logs from Vector to a Splunk HEC"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/socket",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/socket.md",
-          "series_position": null,
-          "title": "Send logs from Vector to a TCP, UDP, or UDS socket"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/file",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/file.md",
-          "series_position": null,
-          "title": "Send logs from Vector to a file"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/http",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/http.md",
-          "series_position": null,
-          "title": "Send logs from Vector to an HTTP endpoint"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
           "id": "/integrate/sources/socket/aws_cloudwatch_logs",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/socket/aws_cloudwatch_logs.md",
@@ -2647,51 +2431,6 @@ module.exports = {
           "path": "website/guides/integrate/sources/statsd/statsd.md",
           "series_position": null,
           "title": "Send metrics from Statsd to Statsd"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/aws_cloudwatch_metrics",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/aws_cloudwatch_metrics.md",
-          "series_position": null,
-          "title": "Send metrics from Vector to AWS Cloudwatch"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/datadog_metrics",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/datadog_metrics.md",
-          "series_position": null,
-          "title": "Send metrics from Vector to Datadog"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/influxdb_metrics",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/influxdb_metrics.md",
-          "series_position": null,
-          "title": "Send metrics from Vector to InfluxDB"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/prometheus",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/prometheus.md",
-          "series_position": null,
-          "title": "Send metrics from Vector to Prometheus"
-        },
-        {
-          "author_github": "https://github.com/binarylogic",
-          "description": null,
-          "id": "/integrate/sources/vector/statsd",
-          "last_modified_on": null,
-          "path": "website/guides/integrate/sources/vector/statsd.md",
-          "series_position": null,
-          "title": "Send metrics from Vector to Statsd"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -25150,7 +24889,7 @@ module.exports = {
     "logdna": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"logdna\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"my-local-machine\" # required"
+        "toml": "[sinks.out]\n  type = \"logdna\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"${HOSTNAME}\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface.",
@@ -26748,7 +26487,7 @@ module.exports = {
       ],
       "short_description": "Accepts log events and allows you to transform events with a full embedded [Lua][urls.lua] engine.",
       "status": "beta",
-      "title": "LUA",
+      "title": "Lua",
       "type": "transform",
       "unsupported_operating_systems": [
 

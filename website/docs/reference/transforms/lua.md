@@ -1,6 +1,6 @@
 ---
-last_modified_on: "2020-03-31"
-component_title: "LUA"
+last_modified_on: "2020-04-01"
+component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log"]
 function_category: "program"
@@ -8,7 +8,7 @@ issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+lab
 sidebar_label: "lua|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/lua
 status: "beta"
-title: "LUA Transform"
+title: "Lua Transform"
 ---
 
 import CodeHeader from '@site/src/components/CodeHeader';

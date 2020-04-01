@@ -61,7 +61,7 @@ description = "An optional host that will override the default one."
 [sinks.logdna.options.hostname]
 type = "string"
 required = true
-examples = ["my-local-machine"]
+examples = ["${HOSTNAME}", "my-local-machine"]
 description = "The hostname that will be attached to each batch of events."
 
 [sinks.logdna.options.mac]

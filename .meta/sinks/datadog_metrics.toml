@@ -45,7 +45,6 @@ description = "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authe
 
 [sinks.datadog_metrics.options.host]
 type = "string"
-common = true
 examples = ["https://api.datadoghq.com", "https://api.datadoghq.eu"]
 default = "https://api.datadoghq.com"
 description = "Datadog endpoint to send metrics to."
