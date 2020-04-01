@@ -452,6 +452,24 @@ services:
       user: $USER
       command: ["sh", "-c", "./target/x86_64-unknown-linux-musl/debug/vector test tests/behavior/**/*.toml"]
 
+    test-kubernetes:
+      build:
+        context: .
+        dockerfile: scripts/ci-docker-images/builder-kubernetes/Dockerfile
+      environment:
+        CARGO_TERM_COLOR: always
+        RUST_BACKTRACE: full
+        TEST_LOG: debug
+      volumes:
+        - $PWD:$PWD
+        - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
+        - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
+        - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
+        - /var/run/docker.sock:/var/run/docker.sock
+      network_mode: host
+      working_dir: $PWD
+      command: ["sh", "-ec", "./scripts/kubernetes-test.sh"]
+
     # test dependencies
 
     # dummy service which runs all dependencies

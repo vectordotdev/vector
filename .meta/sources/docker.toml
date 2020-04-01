@@ -1,22 +1,23 @@
 [sources.docker]
 title = "Docker"
+noun = "Docker"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_docker.toml") %>
+features = [
+  "Collect Docker container logs.",
+  "Filter which containers you collect them from.",
+  "Automatically merge logs that Docker splits.",
+  "Enrich your logs with useful Docker context.",
+]
 function_category = "collect"
-min_version = "1.24"
 output_types = ["log"]
-requirements.additional = """\
-* The [`json-file`][urls.docker_logging_driver_json_file] (default) or \
-[`journald`][urls.docker_logging_driver_journald] Docker logging driver \
-must be enabled for this source to work. See the \
-[Docker Integration Strategy section](#docker-integration-strategy) \
-for more info.
-"""
-service_name = "Docker API"
-through_description = "the [Docker engine daemon][urls.docker_daemon]"
+requirements.docker_api = ">= 1.24"
+strategies = ["daemon"]
+through_description = "the [Docker][urls.docker] [engine daemon][urls.docker_daemon]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "docker") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "docker") %>
 
 [sources.docker.env_vars.DOCKER_HOST]
 type = "string"

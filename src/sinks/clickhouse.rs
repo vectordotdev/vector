@@ -10,7 +10,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Request};
@@ -78,7 +78,8 @@ impl SinkConfig for ClickhouseConfig {
             batch,
             tls_settings,
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
         Ok((Box::new(sink), healthcheck))
     }
@@ -324,7 +325,7 @@ mod integration_tests {
         let client = ClickhouseClient::new(host);
         client.create_table(
             &table,
-            "host String, timestamp DateTime('Europe/London'), message String",
+            "host String, timestamp DateTime('UTC'), message String",
         );
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
@@ -382,7 +383,7 @@ compression = "none"
         let client = ClickhouseClient::new(host);
         client.create_table(
             &table,
-            "host String, timestamp DateTime('Europe/London'), message String",
+            "host String, timestamp DateTime('UTC'), message String",
         );
 
         let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();

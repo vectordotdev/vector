@@ -1,8 +1,13 @@
 ---
+last_modified_on: "2020-04-01"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
 
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Jump from '@site/src/components/Jump';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/data-model-log.svg" />
@@ -75,8 +80,6 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="info">
 
 The following fields are the _default_ schema. All of these field names can be
@@ -85,13 +88,7 @@ changed via the
 
 </Alert>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -118,8 +115,6 @@ or the source-level `host_key` option for relevant sources.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -145,8 +140,6 @@ source-level `message_key` option for relevant sources.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -173,8 +166,6 @@ option][docs.reference.global-options#message_key] or the source-level
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -199,13 +190,9 @@ additional fields. This includes nested fields.
 
 
 </Field>
-
-
 </Fields>
 
 ## Components
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/components/?event-types[]=log">View all log compatible components</Jump>
 

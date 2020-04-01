@@ -23,7 +23,7 @@
   margin-bottom: -1em;
   margin-right: var(--ifm-spacing-horizontal);
   position: relative;
-  top: 0.75em;
+  top: 1em;
 }
 
 .fields .filters .search input {

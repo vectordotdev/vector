@@ -5,8 +5,6 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 
 import animatedGraph from '@site/src/exports/animatedGraph';
-import classnames from 'classnames';
-import styles from './components.module.css';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 function Components(props) {
@@ -22,10 +20,10 @@ function Components(props) {
 
   return (
     <Layout title="Components - Sources, Transforms, & Sinks" description="Browse and search all of Vector's components: sources, transforms, and sinks. Filter by event type, guarantee, function, operating system, and provider.">
-      <header className={classnames('hero', styles.componentsHero)}>
+      <header className="hero hero--animated-graph">
         <div className="container container--fluid container--flush">
-          <canvas width="2000" height="300"></canvas>
-          <div className={styles.componentsHeroOverlay}>
+          <canvas width="2000" height="200"></canvas>
+          <div className="overlay">
             <h1>Vector Components</h1>
             <div className="hero--subtitle">
               Components allow you to collect, transform, and route data with ease. <Link to="/docs/about/concepts/">Learn more</Link>.
@@ -33,7 +31,7 @@ function Components(props) {
           </div>
         </div>
       </header>
-      <main className="container container--fluid">
+      <main className="container">
         <VectorComponents filterColumn={true} headingLevel={2} location={props.location} />
       </main>
     </Layout>

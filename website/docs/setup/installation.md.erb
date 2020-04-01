@@ -13,35 +13,7 @@ simple to install.
 This light-weight script will perform platform detection and determine the best
 method to install Vector:
 
-
-<Tabs
-  className="mini"
-  defaultValue="humans"
-  values={[
-    { label: <><i className="feather icon-user-check"></i> For Humans</>, value: 'humans', },
-    { label: <><i className="feather icon-cpu"></i> For Machines</>, value: 'machines', },
-  ]
-}>
-
-<TabItem value="humans">
-
-```bash
-<%= install_command %>
-```
-
-Enables prompts for a human to answer and confirm.
-
-</TabItem>
-<TabItem value="machines">
-
-```bash
-<%= install_command(prompts: false) %>
-```
-
-Disables prompts and installs without input.
-
-</TabItem>
-</Tabs>
+<InstallationCommand />
 
 ## Other methods
 

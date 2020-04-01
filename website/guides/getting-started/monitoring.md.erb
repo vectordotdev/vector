@@ -1,0 +1,57 @@
+---
+$schema: "/.meta/.schemas/guides.json"
+title: Monitoring Vector
+description: How to monitoring and observe Vector in production
+series_position: 4
+author_github: https://github.com/binarylogic
+tags: ["type: guide", "domain: observability"]
+---
+
+Now that you've deployed Vector you'll want to make sure it's healthy and
+performing. This guide will cover how to monitor and observe Vector.
+
+## Metrics
+
+<Alert type="info">
+
+Internal observability of Vector is being _actively_ developed and is on our
+[1.0 roadmap][urls.vector_roadmap]. You can expect a new `internal_metrics`
+[source][docs.sources] that will allow you to run internal Vector metrics
+through a Vector pipeline.
+
+</Alert>
+
+## Logs
+
+Vector writes all logs to `STDOUT`, accessing these logs is dependent on how
+you installed Vector.
+
+<%= interfaces_logs(metadata.installation.interfaces_list, size: "lg") %>
+
+## What To Expect
+
+How Vector performs is largely dependent on your configuration, hardware,
+data shape, and volume. No two deployments perform the same! With that said,
+Vector should perform well in most cases. The following sections provide general
+references points for what you can expect in production.
+
+### Benchmarks
+
+Our [performance benchmarks][urls.vector_performance] are the best point of
+reference when understanding how Vector performs. This data should give you a
+general idea of Vector's performance under different scenarios.
+
+### Throughput
+
+Vector should be relatively high throughput. One a 4 core machine should produce
+throughput between 20mb/s to 100mb/s depending on your data and configuration.
+
+### CPU
+
+Vector is mostly CPU bound and benefits from more cores and CPU efficient
+machines.
+
+### Memory
+
+Vector should use very little memory. For average pipelines Vector uses around
+200mb, but this can vary widely dependind on your configuraton.

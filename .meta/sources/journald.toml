@@ -1,22 +1,28 @@
 [sources.journald]
 title = "Journald"
+noun = "Journald"
 beta = true
 common = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
+description = """\
+[Journald][urls.journald] is a utility for accessing log data across a variety \
+of system services. It was introduce with [Systemd][urls.systemd] to help \
+system administrator collect, access, and route log data.\
+"""
+features = [
+  "Collect Journald/Systemd logs.",
+  "Filter which Systemd units you collect them from.",
+  "Checkpoint your position to ensure data is not lost between restarts.",
+  "Enrich your logs with useful Systemd context.",
+]
 function_category = "collect"
 only_operating_systems = ["Linux"]
 output_types = ["log"]
-requirements.additional = """\
-* The `journald` source requires the presence of the `journalctl` binary. \
-This ensures that this source works across all platforms. Please see the \
-["Communication strategy"](#communication-strategy) section for more info.
-* If you run Vector from a non-root user, you need to add that user to the \
-`systemd-journal` group. Please see the ["User permissions"](#user-permissions) \
-section for more info.\
-"""
-through_description = "log records from journald"
+requirements.journalctl = true
+strategies = ["daemon"]
+through_description = "[Systemd's][urls.systemd] [Journald][urls.journald] utility"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "journald") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "journald") %>
 
 [sources.journald.options.current_boot_only]
 type = "bool"
@@ -66,34 +72,13 @@ label = "Generic"
 body = """\
 Given the following input:
 
-```text
-__REALTIME_TIMESTAMP=1564173027000443
-__MONOTONIC_TIMESTAMP=98694000446
-_BOOT_ID=124c781146e841ae8d9b4590df8b9231
-SYSLOG_FACILITY=3
-_UID=0
-_GID=0
-_CAP_EFFECTIVE=3fffffffff
-_MACHINE_ID=c36e9ea52800a19d214cb71b53263a28
-_HOSTNAME=lorien.example.com
-PRIORITY=6
-_TRANSPORT=stdout
-_STREAM_ID=92c79f4b45c4457490ebdefece29995e
-SYSLOG_IDENTIFIER=ntpd
-_PID=2156
-_COMM=ntpd
-_EXE=/usr/sbin/ntpd
-_CMDLINE=ntpd: [priv]
-_SYSTEMD_CGROUP=/system.slice/ntpd.service
-_SYSTEMD_UNIT=ntpd.service
-_SYSTEMD_SLICE=system.slice
-_SYSTEMD_INVOCATION_ID=496ad5cd046d48e29f37f559a6d176f8
-MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
+```text title="Example input"
+reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>,
   "message": "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s",

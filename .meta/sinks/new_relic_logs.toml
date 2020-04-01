@@ -1,9 +1,21 @@
 [sinks.new_relic_logs]
 title = "New Relic Logs"
+noun = "New Relic"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+description = """\
+[New Relic][urls.new_relic] is a San Francisco, California-based technology \
+company which develops cloud-based software to help website and application \
+owners track the performances of their services.\
+"""
 egress_method = "batching"
+features = [
+  "Send logs to the New Relic logging service.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 input_types = ["log"]
 healthcheck = true
@@ -11,18 +23,18 @@ requirements = {}
 service_providers = ["New Relic"]
 write_to_description = "[New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "new_relic_logs") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "new_relic_logs") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.new_relic_logs.options", common: false, max_events: nil, max_size: 524000, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.new_relic_logs.options", common: false, max_events: nil, max_size: 524000, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.new_relic_logs.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.new_relic_logs.options",
   common: false,
   in_flight_limit: 5,
@@ -37,13 +49,13 @@ write_to_description = "[New Relic's log service][urls.new_relic] via their [log
 [sinks.new_relic_logs.options.license_key]
 type = "string"
 common = true
-examples = ["xxxx", "${LICENSE_KEY_ENV_VAR}"]
+examples = ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
 description = "Your New Relic license key (if applicable)."
 
 [sinks.new_relic_logs.options.insert_key]
 type = "string"
 common = true
-examples = ["xxxx", "${INSERT_KEY_ENV_VAR}"]
+examples = ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
 description = "Your New Relic insert key (if applicable)."
 
 [sinks.new_relic_logs.options.region]
@@ -56,7 +68,7 @@ description = "The API region to send logs to."
 us = "The US region"
 eu = "The EU region"
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.new_relic_logs.options",
   encodings: ["json"],
   default: "json"

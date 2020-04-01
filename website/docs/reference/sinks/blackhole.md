@@ -1,19 +1,21 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Blackhole"
 description: "The Vector `blackhole` sink streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
 event_types: ["log","metric"]
 function_category: "test"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Blackhole"
 sidebar_label: "blackhole|[\"log\",\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
 status: "prod-ready"
 title: "Blackhole Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `blackhole` sink
 [streams](#streaming) [`log`][docs.data-model.log] and
@@ -30,24 +32,14 @@ data, designed for testing and benchmarking purposes.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "blackhole" # required
   inputs = ["my-source-id"] # required
   print_amount = 1000 # required
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -72,8 +64,6 @@ activity.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

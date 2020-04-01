@@ -1,16 +1,18 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22
-min_version: null
-service_name: "Split"
 sidebar_label: "split|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/split.rs
 status: "prod-ready"
 title: "Split Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `split` transform
 accepts and [outputs `log` events](#output) allowing you to split a field's
@@ -26,11 +28,7 @@ value on a _literal_ separator and zip the tokens into ordered field names.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "split" # required
@@ -49,13 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -79,8 +71,6 @@ If `true` the [`field`](#field) will be dropped after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -104,8 +94,6 @@ The field to apply the split on.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -129,8 +117,6 @@ The field names assigned to the resulting tokens, in order.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"[whitespace]"}
@@ -156,8 +142,6 @@ Derived Core Property `White_Space`][urls.unicode_whitespace].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -181,8 +165,6 @@ coerce log fields into their proper types.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -208,13 +190,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -287,9 +265,7 @@ The [`field`](#field) and [`field_names`](#field_names) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_split_transform_id]
   # ...
   field = "message"

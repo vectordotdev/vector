@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
 function_category: "filter"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+tag_cardinality_limit%22
-min_version: null
-service_name: "Tag Cardinality Limit"
 sidebar_label: "tag_cardinality_limit|[\"metric\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/tag_cardinality_limit.rs
 status: "beta"
 title: "Tag Cardinality Limit Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `tag_cardinality_limit` transform
 accepts and [outputs `metric` events](#output) allowing you to limit the
@@ -26,22 +30,14 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
   inputs = ["my-source-id"] # required
@@ -53,9 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
   inputs = ["my-source-id"] # required
@@ -68,13 +62,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={5120000}
@@ -100,8 +88,6 @@ a new value for tag even after we have reached the configured limits.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"drop_tag"}
@@ -126,8 +112,6 @@ the configured limit on cardinality.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -152,8 +136,6 @@ and deterime when a tag on an incoming metric exceeds the limit.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -177,8 +159,6 @@ How many distinct values to accept for any given key.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -192,9 +172,7 @@ configured [`value_limit`](#value_limit).
 
 For example, given this configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.cardinality_protection]
   type = "tag_cardinality_limit"
   inputs = [...]

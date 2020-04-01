@@ -1,8 +1,12 @@
 ---
+last_modified_on: "2020-04-01"
 title: Install Vector From Source
 sidebar_label: From Source
 description: Install Vector from the Vector source code
 ---
+
+import Alert from '@site/src/components/Alert';
+import Steps from '@site/src/components/Steps';
 
 This page covers installing Vector from source using the native toolchain for
 the host.
@@ -14,15 +18,13 @@ for details.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-import Alert from '@site/src/components/Alert';
-
 <Alert type="warning">
 
-We recommend installing Vector through a supported [container
-platform][docs.containers], [package manager][docs.package_managers], or
-pre-built [archive][docs.from_archives], if possible. These handle permissions,
-directory creation, and other intricacies covered in the [Next
-Steps](#next-steps) section.
+We recommend installing Vector through a supported [platform][docs.platforms],
+[package manager][docs.package_managers], or pre-built
+[archive][docs.from_archives], if possible. These handle permissions, directory
+creation, and other intricacies covered in the [Next Steps](#next-steps)
+section.
 
 </Alert>
 
@@ -49,16 +51,20 @@ Steps](#next-steps) section.
 
 The following steps should be used to compile Vector directly on Linux based systems.
 
-1.  Install Rust
+<Steps headingDepth={3}>
+
+1.  ### Install Rust
 
     ```bash
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     ```
 
-2.  Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not pre-installed
-    on your system.
+2.  ### Install compilation dependencies
 
-3.  Download Vector's Source
+    Install C and C++ compilers (GCC or Clang) and GNU `make` if they are not
+    pre-installed on your system.
+
+3.  ### Download Vector's Source
 
     <Tabs
       className="mini"
@@ -88,13 +94,13 @@ The following steps should be used to compile Vector directly on Linux based sys
     </TabItem>
     </Tabs>
 
-4.  Change into the `vector` directory
+4.  ### Change into the `vector` directory
 
     ```bash
     cd vector
     ```
 
-5.  Compile Vector
+5.  ### Compile Vector
 
     ```bash
     [FEATURES="<flag1>,<flag2>,..."] make build
@@ -109,7 +115,7 @@ The following steps should be used to compile Vector directly on Linux based sys
     on your Mac, your target triple is `x86_64-apple-darwin`, and the Vector
     binary will be located at `target/x86_64-apple-darwin/release/vector`.
 
-6.  Start Vector
+6.  ### Start Vector
 
     Finally, start vector:
 
@@ -117,18 +123,27 @@ The following steps should be used to compile Vector directly on Linux based sys
     target/<target>/release/vector --config config/vector.toml
     ```
 
+</Steps>
 </TabItem>
 <TabItem value="windows">
 
 The steps to compile Vector on Windows are different from the ones for other
 operating systems.
 
-1. Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build
+<Steps headingDepth={3}>
+
+1. ### Install Rust
+
+   Install Rust using [`rustup`][urls.rustup]. If you don't have VC++ build
    tools, the installer would prompt you to install them.
 
-2. Install [Perl for Windows][urls.perl_windows].
+2. ### Install Perl
 
-3. In a Rust/MSVC environment (for example, using
+   Install [Perl for Windows][urls.perl_windows].
+
+3. ### Add Perl to your `PATH`
+
+   In a Rust/MSVC environment (for example, using
    `x64 Native Tools Command Prompt`) add the binary directory of Perl
    installed on the previous step to `PATH`. For example, for default
    installation of Strawberry Perl it is
@@ -137,7 +152,7 @@ operating systems.
     set PATH=%PATH%;C:\Strawberry\perl\bin
     ```
 
-4. Get Vector's source using `git`:
+4. ### Get Vector's source using `git`
 
     <Tabs
       className="mini"
@@ -166,20 +181,23 @@ operating systems.
     </TabItem>
     </Tabs>
 
-5.  Build Vector in release mode:
+5.  ### Build Vector in release mode
 
     ```bat
     set RUSTFLAGS=-Ctarget-feature=+crt-static
     cargo build --no-default-features --features default-msvc --release
     ```
 
-6.  After these steps a binary `vector.exe` in `target\release` would be
+6.  ### Start Vector
+
+    After these steps a binary `vector.exe` in `target\release` would be
     created. It can be started by running
 
     ```bat
     .\target\release\vector --config config\vector.toml
     ```
 
+</Steps>
 </TabItem>
 <TabItem value="docker">
 
@@ -191,7 +209,9 @@ needed, as all of them would be automatically pulled by Docker.
 
 Building steps:
 
-1.  Download Vector's Source
+<Steps headingDepth={3}>
+
+1.  ### Download Vector's Source
 
     <Tabs
       className="mini"
@@ -221,7 +241,7 @@ Building steps:
     </TabItem>
     </Tabs>
 
-2.  Build Vector using Docker
+2.  ### Build Vector using Docker
 
     <Tabs
       defaultValue="x86_64-unknown-linux-musl"
@@ -270,6 +290,7 @@ Building steps:
     Container. The target binary is located in
     `target/<target triple>/release/vector` like in the previous case.
 
+</Steps>
 </TabItem>
 </Tabs>
 
@@ -305,11 +326,7 @@ Make sure that this directory is writable by the `vector` process.
 Vector offers a global [`data_dir` option][docs.global-options#data_dir] that
 you can use to specify the path of your directory.
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 data_dir = "/var/lib/vector" # default
 ```
 
@@ -399,10 +416,11 @@ features one has to pass a comma-separated list of component features.
 | `transforms-coercer` | Enables building of [`coercer` transform][docs.transforms.coercer].  |
 | `transforms-concat` | Enables building of [`concat` transform][docs.transforms.concat].  |
 | `transforms-dedupe` | Enables building of [`dedupe` transform][docs.transforms.dedupe].  |
-| `transforms-field_filter` | Enables building of [`field_filter` transform][docs.transforms.field_filter].  |
+| `transforms-filter` | Enables building of [`filter` transform][docs.transforms.filter].  |
 | `transforms-geoip` | Enables building of [`geoip` transform][docs.transforms.geoip].  |
 | `transforms-grok_parser` | Enables building of [`grok_parser` transform][docs.transforms.grok_parser].  |
 | `transforms-json_parser` | Enables building of [`json_parser` transform][docs.transforms.json_parser].  |
+| `transforms-kubernetes_pod_metadata` | Enables building of [`kubernetes_pod_metadata` transform][docs.transforms.kubernetes_pod_metadata].  |
 | `transforms-log_to_metric` | Enables building of [`log_to_metric` transform][docs.transforms.log_to_metric].  |
 | `transforms-logfmt_parser` | Enables building of [`logfmt_parser` transform][docs.transforms.logfmt_parser].  |
 | `transforms-lua` | Enables building of [`lua` transform][docs.transforms.lua].  |
@@ -453,11 +471,11 @@ features one has to pass a comma-separated list of component features.
 
 
 [docs.configuration]: /docs/setup/configuration/
-[docs.containers]: /docs/setup/installation/containers/
 [docs.from_archives]: /docs/setup/installation/manual/from-archives/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary/#buffer
 [docs.package_managers]: /docs/setup/installation/package-managers/
+[docs.platforms]: /docs/setup/installation/platforms/
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sinks.aws_cloudwatch_metrics]: /docs/reference/sinks/aws_cloudwatch_metrics/
 [docs.sinks.aws_kinesis_firehose]: /docs/reference/sinks/aws_kinesis_firehose/
@@ -509,10 +527,11 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [docs.transforms.concat]: /docs/reference/transforms/concat/
 [docs.transforms.dedupe]: /docs/reference/transforms/dedupe/
-[docs.transforms.field_filter]: /docs/reference/transforms/field_filter/
+[docs.transforms.filter]: /docs/reference/transforms/filter/
 [docs.transforms.geoip]: /docs/reference/transforms/geoip/
 [docs.transforms.grok_parser]: /docs/reference/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/transforms/json_parser/
+[docs.transforms.kubernetes_pod_metadata]: /docs/reference/transforms/kubernetes_pod_metadata/
 [docs.transforms.log_to_metric]: /docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: /docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: /docs/reference/transforms/lua/

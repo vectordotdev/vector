@@ -4,7 +4,7 @@ class Log
   attr_reader :schema
 
   def initialize(hash)
-    @schema = hash.fetch("schema").to_struct_with_name(Field)
+    @schema = hash.fetch("schema").to_struct_with_name(constructor: Field)
   end
 
   def schema_list

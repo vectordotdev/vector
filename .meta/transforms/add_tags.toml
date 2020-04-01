@@ -8,7 +8,7 @@ input_types = ["metric"]
 output_types = ["metric"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "add_tags") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "add_tags") %>
 
 [transforms.add_tags.options.tags]
 type = "table"

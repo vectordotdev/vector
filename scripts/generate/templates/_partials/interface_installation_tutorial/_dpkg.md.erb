@@ -1,0 +1,54 @@
+<%- downloads = metadata.installation.select_downloads(package_manager: :dpkg) -%>
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= downloads.first.arch.parameterize %>"
+  values={<%= downloads.collect { |download| {label: download.arch, value: download.arch.parameterize} }.to_json %>}>
+
+<%- downloads.each do |download| -%>
+<TabItem value="<%= download.arch.parameterize %>">
+<Steps headingDepth={<%= heading_depth.to_json %>}>
+<ol>
+<li>
+
+### Download the Vector `.deb` package
+
+```bash
+curl --proto '=https' --tlsv1.2 -O <%= metadata.links.fetch("urls.vector_downloads.#{metadata.latest_version.minor_x}/#{download.file_name}") %>
+```
+
+[Looking for a different version?][docs.package_managers.dpkg#versions]
+
+</li>
+<li>
+
+### Install the downloaded package
+
+```bash
+sudo dpkg -i <%= download.file_name %>
+```
+
+</li>
+<li>
+
+### Configure Vector
+
+<ConfigExample
+  format="toml"
+  path={<%= interface.config_path.to_json %>}
+  sourceName={<%= (source && source.name).to_json %>}
+  sinkName={<%= (sink && sink.name).to_json %>} />
+
+</li>
+<li>
+
+### Start Vector
+
+<%= interface_start(interface, requirements: (source && source.requirements)) %>
+
+</li>
+</ol>
+</Steps>
+</TabItem>
+<%- end -%>
+</Tabs>

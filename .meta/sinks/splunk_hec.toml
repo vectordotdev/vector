@@ -1,9 +1,18 @@
 [sinks.splunk_hec]
 title = "Splunk HEC"
+noun = "a Splunk HEC"
 beta = false
 common = true
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_splunk_hec.toml") %>
 egress_method = "batching"
+features = [
+  "Send logs to a Splunk HTTP event collector.",
+  "Customize which fields should be added to the Splunk index.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 input_types = ["log"]
@@ -11,18 +20,18 @@ requirements = {}
 service_providers = ["Splunk"]
 write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "splunk_hec") %>
+<%= render("_partials/fields/_component_options.toml", type: "sink", name: "splunk_hec") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.splunk_hec.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.splunk_hec.options", common: false, max_events: nil, max_size: 1049000, timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.splunk_hec.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.splunk_hec.options",
   common: false,
   in_flight_limit: 10,
@@ -34,7 +43,7 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.splunk_hec.options",
   encodings: ["json", "text"]
 ) %>
@@ -68,7 +77,7 @@ The name of the index where send the events to. If not specified, the default in
 [sinks.splunk_hec.options.token]
 type = "string"
 common = true
-examples = ["${TOKEN_ENV_VAR}", "A94A8FE5CCB19BA61C4C08"]
+examples = ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 required = true
 description = "Your Splunk HEC token."
 
@@ -80,4 +89,10 @@ relevant_when = {encoding = "json"}
 required = false
 description = "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.splunk_hec.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render(
+  "_partials/fields/_tls_connector_options.toml",
+  namespace: "sinks.splunk_hec.options",
+  can_enable: false,
+  can_verify_certificate: true,
+  can_verify_hostname: true
+) %>

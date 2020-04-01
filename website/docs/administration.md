@@ -5,11 +5,11 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
+import Jump from '@site/src/components/Jump';
+
 This section will cover adminsitrating and operating Vector.
 
 ---
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/docs/administration/monitoring/">Monitoring</Jump>
 <Jump to="/docs/administration/process-management/">Process management</Jump>

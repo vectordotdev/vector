@@ -5,12 +5,12 @@ use crate::{
     sinks::util::{
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
-        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures01::{Future, Poll};
+use futures01::{Future, Poll, Sink};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -86,8 +86,14 @@ impl CloudWatchMetricsSvc {
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
         let sink = request
-            .batch_sink(CloudWatchMetricsRetryLogic, cloudwatch_metrics, cx.acker())
-            .batched_with_min(MetricBuffer::new(), &batch);
+            .batch_sink(
+                CloudWatchMetricsRetryLogic,
+                cloudwatch_metrics,
+                MetricBuffer::new(),
+                batch,
+                cx.acker(),
+            )
+            .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
 
         Ok(Box::new(sink))
     }

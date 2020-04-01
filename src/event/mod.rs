@@ -30,6 +30,7 @@ lazy_static! {
         message_key: Atom::from("message"),
         timestamp_key: Atom::from("timestamp"),
         host_key: Atom::from("host"),
+        kubernetes_key: Atom::from("kubernetes"),
     };
 }
 
@@ -228,6 +229,8 @@ pub struct LogSchema {
     #[serde(default = "LogSchema::default_host_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
+    #[getset(get = "pub", set = "pub(crate)")]
+    kubernetes_key: Atom,
 }
 
 impl Default for LogSchema {
@@ -236,6 +239,7 @@ impl Default for LogSchema {
             message_key: Atom::from("message"),
             timestamp_key: Atom::from("timestamp"),
             host_key: Atom::from("host"),
+            kubernetes_key: Atom::from("kubernetes"),
         }
     }
 }
@@ -304,6 +308,12 @@ impl From<&[u8]> for Value {
 impl From<String> for Value {
     fn from(string: String) -> Self {
         Value::Bytes(string.into())
+    }
+}
+
+impl From<&String> for Value {
+    fn from(string: &String) -> Self {
+        string.as_str().into()
     }
 }
 

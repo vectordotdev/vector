@@ -10,7 +10,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "logfmt_parser") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "logfmt_parser") %>
 
 [transforms.logfmt_parser.options.field]
 type = "string"
@@ -26,4 +26,4 @@ common = true
 default = true
 description = "If the specified `field` should be dropped (removed) after parsing."
 
-<%= render("_partials/_types.toml", namespace: "transforms.logfmt_parser", common: true) %>
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.logfmt_parser.options", common: true) %>

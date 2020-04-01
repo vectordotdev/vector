@@ -7,33 +7,33 @@ module Printer
   extend self
 
   def error!(message)
-    say(message, color: :red)
+    Printer.say(message, color: :red)
     exit(1)
   end
 
-  def get(words, choices = nil)
+  def Printer.get(words, choices = nil)
     question = "#{words.strip}"
 
     if !choices.nil?
       question += " (" + choices.join("/") + ")"
     end
 
-    say(question)
+    Printer.say(question)
 
     print INDENT
 
     input = gets().chomp
 
     if choices && !choices.include?(input)
-      say("You must enter one of #{choices.join(", ")}", color: :red)
-      get(words, choices)
+      Printer.say("You must enter one of #{choices.join(", ")}", color: :red)
+      Printer.get(words, choices)
     else
       input
     end
   end
 
   def invalid(words)
-    say(words, color: :yellow)
+    Printer.say(words, color: :yellow)
   end
 
   def say(words, color: nil, new: true, prompt: PROMPT)
@@ -60,11 +60,11 @@ module Printer
   end
 
   def success(words)
-    say(words, color: :green)
+    Printer.say(words, color: :green)
   end
 
   def title(words)
     separate(color: :cyan)
-    say(words, color: :cyan, prompt: TITLE_PROMPT)
+    Printer.say(words, color: :cyan, prompt: TITLE_PROMPT)
   end
 end

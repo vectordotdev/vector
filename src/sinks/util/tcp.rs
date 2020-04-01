@@ -1,6 +1,6 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkExt},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, RouterSink},
     tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
@@ -20,14 +20,6 @@ use tokio01::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
-
-#[derive(Debug, Snafu)]
-enum TcpBuildError {
-    #[snafu(display("Missing host in address field"))]
-    MissingHost,
-    #[snafu(display("Missing port in address field"))]
-    MissingPort,
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -49,8 +41,8 @@ impl TcpSinkConfig {
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
-        let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
-        let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
+        let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
+        let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
@@ -228,11 +220,9 @@ pub fn raw_tcp(
     encoding: EncodingConfig<Encoding>,
     tls: MaybeTlsSettings,
 ) -> RouterSink {
-    Box::new(
-        TcpSink::new(host, port, cx.resolver(), tls)
-            .stream_ack(cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-    )
+    let tcp = TcpSink::new(host, port, cx.resolver(), tls);
+    let sink = StreamSink::new(tcp, cx.acker());
+    Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))))
 }
 
 #[derive(Debug, Snafu)]
