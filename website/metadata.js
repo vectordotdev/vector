@@ -24331,7 +24331,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "Yandex"
       ],
       "short_description": "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].",
       "status": "beta",
@@ -24583,7 +24583,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
       "short_description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
       "status": "beta",
@@ -24625,7 +24625,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
       "short_description": "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
       "status": "beta",
@@ -24667,7 +24667,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
       "short_description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
       "status": "beta",
@@ -24708,7 +24708,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "Honeycomb"
       ],
       "short_description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
       "status": "beta",
@@ -24791,7 +24791,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "Humio"
       ],
       "short_description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
       "status": "beta",
@@ -24916,7 +24916,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "LogDNA"
       ],
       "short_description": "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API.",
       "status": "beta",
@@ -24958,7 +24958,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "Grafana"
       ],
       "short_description": "Batches log events to [Loki][urls.loki].",
       "status": "beta",
@@ -25040,7 +25040,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "Papertrail"
       ],
       "short_description": "Streams log events to [Papertrail][urls.papertrail] via [Syslog][urls.papertrail_syslog].",
       "status": "beta",
@@ -25160,7 +25160,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-
+        "Sematext"
       ],
       "short_description": "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es].",
       "status": "beta",

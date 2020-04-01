@@ -17,7 +17,7 @@ healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
 requirements = {}
-service_providers = ["Google"]
+service_providers = ["GCP"]
 write_to_description = "[Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]"
 
 <%= render("_partials/fields/_component_options.toml",

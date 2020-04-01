@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -436,7 +436,7 @@ The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API. If this is unset, Vector checks
 the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
@@ -1206,7 +1206,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Cloud Storage API.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
@@ -1241,20 +1241,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
-### GCP Authentication
-
-GCP offers a [variety of authentication methods][urls.gcp_authentication] and
-Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
-and will find credentials in the following order:
-
-1. If the [`credentials_path`](#credentials_path) option is set.
-2. If the `api_key` option is set.
-3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
-
-If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring#logs].
-
 
 ### Health Checks
 
@@ -1404,10 +1390,7 @@ You can learn more about the complete syntax in the
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
-[docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.templating]: /docs/reference/templating/
-[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcs_custom_metadata]: https://cloud.google.com/storage/docs/metadata#custom-metadata
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes

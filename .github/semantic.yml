@@ -56,11 +56,18 @@ scopes:
   - confluent provider
   - heroku provider
   - splunk provider
+  - yandex provider
   - datadog provider
   - elastic provider
-  - google provider
+  - gcp provider
+  - honeycomb provider
+  - humio provider
   - influxdata provider
+  - logdna provider
+  - grafana provider
   - new relic provider
+  - papertrail provider
+  - sematext provider
 
   # sources
   - docker source

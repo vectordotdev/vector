@@ -200,20 +200,41 @@
 - name: "provider: splunk"
   description: Anything Splunk related
   color: ff9f43
+- name: "provider: yandex"
+  description: Anything Yandex related
+  color: ff9f43
 - name: "provider: datadog"
   description: Anything Datadog related
   color: ff9f43
 - name: "provider: elastic"
   description: Anything Elastic related
   color: ff9f43
-- name: "provider: google"
-  description: Anything Google related
+- name: "provider: gcp"
+  description: Anything GCP related
+  color: ff9f43
+- name: "provider: honeycomb"
+  description: Anything Honeycomb related
+  color: ff9f43
+- name: "provider: humio"
+  description: Anything Humio related
   color: ff9f43
 - name: "provider: influxdata"
   description: Anything InfluxData related
   color: ff9f43
+- name: "provider: logdna"
+  description: Anything LogDNA related
+  color: ff9f43
+- name: "provider: grafana"
+  description: Anything Grafana related
+  color: ff9f43
 - name: "provider: new relic"
   description: Anything New Relic related
+  color: ff9f43
+- name: "provider: papertrail"
+  description: Anything Papertrail related
+  color: ff9f43
+- name: "provider: sematext"
+  description: Anything Sematext related
   color: ff9f43
 
 #

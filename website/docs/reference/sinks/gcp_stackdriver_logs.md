@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "GCP Stackdriver Logs"
 description: "The Vector `gcp_stackdriver_logs` sink batches [`log`](#log) events to Google Cloud Platform's Stackdriver Logging service via the REST Interface."
@@ -373,7 +373,7 @@ authenticate access to the Stackdriver Logging API. If this is unset, Vector
 checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
 filename.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
@@ -1134,7 +1134,7 @@ you understand the risks of not verifying the remote hostname.
 The filename for a Google Cloud service account credentials JSON file used to
 authenticate access to the Stackdriver Logging API.
 
- See [GCP Authentication](#gcp-authentication) for more info.
+
 
 
 </Field>
@@ -1169,20 +1169,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
-### GCP Authentication
-
-GCP offers a [variety of authentication methods][urls.gcp_authentication] and
-Vector is concerned with the [server to server methods][urls.gcp_authentication_server_to_server]
-and will find credentials in the following order:
-
-1. If the [`credentials_path`](#credentials_path) option is set.
-2. If the `api_key` option is set.
-3. Finally, if the `GOOGLE_APPLICATION_CREDENTIALS` envrionment variable is set.
-
-If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring#logs].
-
 
 ### Health Checks
 
@@ -1231,9 +1217,6 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
 [docs.guarantees]: /docs/about/guarantees/
-[docs.monitoring#logs]: /docs/administration/monitoring/#logs
-[urls.gcp_authentication]: https://cloud.google.com/docs/authentication/
-[urls.gcp_authentication_server_to_server]: https://cloud.google.com/docs/authentication/production
 [urls.gcp_folders]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
 [urls.gcp_projects]: https://cloud.google.com/resource-manager/docs/creating-managing-projects
 [urls.gcp_resources]: https://cloud.google.com/monitoring/api/resources
