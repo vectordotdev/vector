@@ -13,6 +13,8 @@ title: "Regex Parser Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `regex_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -27,6 +29,13 @@ log field's value with a [Regular Expression][urls.regex].
 -->
 
 ## Configuration
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+
+<TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
@@ -45,6 +54,32 @@ log field's value with a [Regular Expression][urls.regex].
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "regex_parser" # required
+  inputs = ["my-source-id"] # required
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  overwrite_target = true # optional, default
+  target_field = "root_field" # optional, no default
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field
@@ -94,6 +129,30 @@ The log field to parse.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"overwrite_target"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+### overwrite_target
+
+If [`target_field`](#target_field) is set and the log contains a field of the same name as the
+target, it will only be overwritten if this is set to `true`.
+
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -113,6 +172,31 @@ The log field to parse.
 The Regular Expression to apply. Do not include the leading or trailing `/`.
 
  See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["root_field","parent.child"]}
+  groups={[]}
+  name={"target_field"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+### target_field
+
+If this setting is present, the parsed fields will be inserted into the log as
+a sub-object with this name. If a field with the same name already exists, the
+parser will fail and produce an error.
+
+ See [Field Notation Syntax](#field-notation-syntax) for more info.
 
 
 </Field>
@@ -245,7 +329,7 @@ specified [`field`](#field).
 
 ### Field Notation Syntax
 
-The [`field`](#field) options
+The [`field`](#field) and [`target_field`](#target_field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
