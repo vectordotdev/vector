@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings, BatchSink,
+    Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -53,11 +53,11 @@ pub trait HttpSink: Send + Sync + 'static {
 pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone,
-    L: RetryLogic<Response = hyper::Response<Bytes>>,
+    B::Output: Clone + Send + 'static,
+    L: RetryLogic<Response = hyper::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
-    inner: BatchSink<B, TowerBatchedSink<B::Output, L, B, HttpBatchService<B::Output>>>,
+    inner: TowerBatchedSink<HttpBatchService<B::Output>, B, L, B::Output>,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
@@ -67,7 +67,7 @@ where
 impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone,
+    B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -93,8 +93,8 @@ where
 impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
-    B::Output: Clone,
-    L: RetryLogic<Response = hyper::Response<Bytes>, Error = hyper::Error>,
+    B::Output: Clone + Send + 'static,
+    L: RetryLogic<Response = hyper::Response<Bytes>, Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -111,8 +111,7 @@ where
         let svc =
             HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
-        let service_sink = request_settings.batch_sink(logic, svc, cx.acker());
-        let inner = BatchSink::from_settings(service_sink, batch, batch_settings);
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker());
 
         Self {
             sink,
@@ -125,12 +124,12 @@ where
 impl<T, B, L> Sink for BatchedHttpSink<T, B, L>
 where
     B: Batch,
-    B::Output: Clone,
+    B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    L: RetryLogic<Response = hyper::Response<Bytes>>,
+    L: RetryLogic<Response = hyper::Response<Bytes>> + Send + 'static,
 {
     type SinkItem = crate::Event;
-    type SinkError = ();
+    type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         if self.slot.is_some() {
@@ -152,7 +151,6 @@ where
         if let Some(item) = self.slot.take() {
             if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
                 self.slot = Some(item);
-                self.inner.poll_complete()?;
                 return Ok(Async::NotReady);
             }
         }

@@ -10,6 +10,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::TryFutureExt;
+use futures01::Sink;
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -71,7 +72,8 @@ impl SinkConfig for LogdnaConfig {
             batch_settings,
             None,
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
         let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
 
@@ -253,6 +255,7 @@ mod tests {
 
     #[test]
     fn smoke() {
+        crate::test_util::trace_init();
         let (mut config, cx, mut rt) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"

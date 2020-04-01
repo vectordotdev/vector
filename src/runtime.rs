@@ -94,6 +94,15 @@ where
     }
 }
 
+impl tokio01::executor::Executor for TaskExecutor {
+    fn spawn(
+        &mut self,
+        fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
+    ) -> Result<(), tokio01::executor::SpawnError> {
+        Ok(self.inner.spawn(fut))
+    }
+}
+
 pub trait FutureExt: futures::TryFuture {
     /// Used to compat a `!Unpin` type from 0.3 futures to 0.1
     fn boxed_compat(self) -> futures::compat::Compat<Pin<Box<Self>>>

@@ -2,12 +2,12 @@ use crate::{
     event::metric::{Metric, MetricValue},
     sinks::util::{
         http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
-        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures01::{Future, Poll};
+use futures01::{Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper;
 use hyper_openssl::HttpsConnector;
@@ -196,8 +196,14 @@ impl InfluxDBSvc {
         };
 
         let sink = request
-            .batch_sink(HttpRetryLogic, influxdb_http_service, cx.acker())
-            .batched_with_min(MetricBuffer::new(), &batch);
+            .batch_sink(
+                HttpRetryLogic,
+                influxdb_http_service,
+                MetricBuffer::new(),
+                batch,
+                cx.acker(),
+            )
+            .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
 
         Ok(Box::new(sink))
     }

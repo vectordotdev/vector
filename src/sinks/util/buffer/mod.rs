@@ -1,12 +1,13 @@
 use super::batch::Batch;
 use flate2::write::GzEncoder;
-use partition::Partition;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 pub mod json;
 pub mod metrics;
 pub mod partition;
+
+pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -112,111 +113,67 @@ impl Batch for Buffer {
     }
 }
 
-#[derive(Debug)]
-pub struct PartitionBuffer<T, K> {
-    inner: T,
-    key: Option<K>,
-}
-
-#[derive(Debug, Clone)]
-pub struct PartitionInnerBuffer<T, K> {
-    pub(self) inner: T,
-    key: K,
-}
-
-impl<T, K> PartitionBuffer<T, K> {
-    pub fn new(inner: T) -> Self {
-        Self { inner, key: None }
-    }
-}
-
-impl<T, K> Batch for PartitionBuffer<T, K>
-where
-    T: Batch,
-    K: Clone,
-{
-    type Input = PartitionInnerBuffer<T::Input, K>;
-    type Output = PartitionInnerBuffer<T::Output, K>;
-
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(item.inner)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self {
-            inner: self.inner.fresh(),
-            key: None,
-        }
-    }
-
-    fn finish(mut self) -> Self::Output {
-        let key = self.key.take().unwrap();
-        let inner = self.inner.finish();
-        PartitionInnerBuffer { inner, key }
-    }
-
-    fn num_items(&self) -> usize {
-        self.inner.num_items()
-    }
-}
-
-impl<T, K> PartitionInnerBuffer<T, K> {
-    pub fn new(inner: T, key: K) -> Self {
-        Self { inner, key }
-    }
-
-    pub fn into_parts(self) -> (T, K) {
-        (self.inner, self.key)
-    }
-}
-
-impl<T, K> Partition<K> for PartitionInnerBuffer<T, K>
-where
-    K: Clone,
-{
-    fn partition(&self) -> K {
-        self.key.clone()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::Buffer;
-    use crate::sinks::util::batch::{Batch, BatchSink};
-    use futures01::{Future, Sink};
+    use crate::buffers::Acker;
+    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::test_util::runtime;
+    use futures01::{future, Future, Sink};
     use std::io::Read;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use tokio01_test::clock::MockClock;
 
     #[test]
     fn gzip() {
         use flate2::read::GzDecoder;
 
-        let buffered = BatchSink::new(vec![], Buffer::new(true), 1000);
+        let rt = runtime();
+        let mut clock = MockClock::new();
+
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = tower::service_fn(|req| {
+            let sent_requests = sent_requests.clone();
+
+            sent_requests.lock().unwrap().push(req);
+
+            future::ok::<_, std::io::Error>(())
+        });
+        let buffered = BatchSink::with_executor(
+            svc,
+            Buffer::new(true),
+            BatchSettings {
+                timeout: Duration::from_secs(0),
+                size: 1000,
+            },
+            acker,
+            rt.executor(),
+        );
 
         let input = std::iter::repeat(
             b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
         )
         .take(100_000);
 
-        let (buffered, _) = buffered
-            .send_all(futures01::stream::iter_ok(input))
-            .wait()
+        let (sink, _) = clock.enter(|_| {
+            buffered
+                .sink_map_err(drop)
+                .send_all(futures01::stream::iter_ok(input))
+                .wait()
+                .unwrap()
+        });
+
+        drop(sink);
+
+        let output = Arc::try_unwrap(sent_requests)
+            .unwrap()
+            .into_inner()
             .unwrap();
 
-        let output = buffered
-            .into_inner()
-            .into_iter()
-            .map(|buf| buf.finish())
-            .collect::<Vec<Vec<u8>>>();
+        let output = output.into_iter().collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
         assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 51_000);
