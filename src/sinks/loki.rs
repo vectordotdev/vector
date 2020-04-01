@@ -26,6 +26,7 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -88,7 +89,8 @@ impl SinkConfig for LokiConfig {
             batch_settings,
             Some(tls),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
         let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
 

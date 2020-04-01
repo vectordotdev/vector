@@ -1,19 +1,25 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
-min_version: "1.1.54378"
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Clickhouse"
 sidebar_label: "clickhouse|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
 status: "beta"
 title: "Clickhouse Sink"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `clickhouse` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to
@@ -29,33 +35,22 @@ The Vector `clickhouse` sink
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* Clickhouse version >= 1.1.54378 is required.
-
+* [Clickhouse][urls.clickhouse] version `>= 1.1.54378` is required.
 
 </Alert>
 
 ## Configuration
-
-import Tabs from '@theme/Tabs';
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "clickhouse" # required
@@ -72,9 +67,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "clickhouse" # required
@@ -89,8 +82,8 @@ import CodeHeader from '@site/src/components/CodeHeader';
 
   # Auth
   auth.strategy = "basic" # required
-  auth.password = "${PASSWORD_ENV_VAR}" # required, required when strategy = "basic"
-  auth.user = "${USERNAME_ENV_VAR}" # required, required when strategy = "basic"
+  auth.password = "${CLICKHOUSE_PASSWORD}" # required, required when strategy = "basic"
+  auth.user = "${CLICKHOUSE_USERNAME}" # required, required when strategy = "basic"
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
@@ -122,18 +115,13 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
+  tls.verify_hostname = true # optional, default
 ```
 
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -156,8 +144,6 @@ Options for the authentication strategy.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -181,13 +167,11 @@ The authentication strategy to use.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${PASSWORD_ENV_VAR}","password"]}
+  examples={["${CLICKHOUSE_PASSWORD}","password"]}
   groups={[]}
   name={"password"}
   path={"auth"}
@@ -206,13 +190,11 @@ The basic authentication password.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["${USERNAME_ENV_VAR}","username"]}
+  examples={["${CLICKHOUSE_USERNAME}","username"]}
   groups={[]}
   name={"user"}
   path={"auth"}
@@ -231,13 +213,9 @@ The basic authentication user name.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -260,8 +238,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={1049000}
@@ -285,8 +261,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -310,13 +284,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -339,8 +309,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -364,8 +332,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -389,8 +355,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -414,8 +378,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -439,13 +401,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"none"}
@@ -470,8 +428,6 @@ outputting.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -495,8 +451,6 @@ The database that contains the stable that data will be inserted into.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -519,8 +473,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -544,8 +496,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -569,8 +519,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"rfc3339"}
@@ -594,13 +542,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -624,8 +568,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -649,8 +591,6 @@ The host url of the [Clickhouse][urls.clickhouse] server.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -673,8 +613,6 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -698,8 +636,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -723,8 +659,6 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={5}
@@ -749,8 +683,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -774,8 +706,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -801,8 +731,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -826,8 +754,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={30}
@@ -854,13 +780,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -884,8 +806,6 @@ The table that data will be inserted into.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -908,8 +828,6 @@ Configures the TLS options for connections from this sink.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -934,8 +852,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -961,8 +877,6 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -987,8 +901,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -1013,8 +925,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -1040,20 +950,39 @@ verifying the remote certificate.
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"verify_hostname"}
+  path={"tls"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  >
+
+#### verify_hostname
+
+If `true` (the default), Vector will validate the configured remote host name
+against the remote host's TLS certificate. Do NOT set this to `false` unless
+you understand the risks of not verifying the remote hostname.
 
 
+
+
+</Field>
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-serial.svg" />
 

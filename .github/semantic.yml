@@ -17,54 +17,57 @@ scopes:
   - new sink
 
   # domains
-  - blog
   - buffers
   - cli
   - config
   - dependencies
-  - docs
-  - guides
-  - marketing
   - networking
   - observability
   - operations
   - platforms
   - security
-  - setup
   - sinks
   - sources
-  - templating
-  - testing
+  - tests
   - topology
   - transforms
+  - ux
   - website
 
   # platforms
-  - docker platform
-  - amazon linux platform
+  - amazon-linux platform
   - centos platform
   - debian platform
   - macos platform
   - nixos platform
-  - raspbian platform
   - rhel platform
+  - raspbian platform
   - ubuntu platform
   - windows platform
   - dpkg platform
   - homebrew platform
+  - msi platform
   - nix platform
   - rpm platform
-  - msi platform
+  - docker platform
 
   # providers
   - aws provider
+  - confluent provider
+  - heroku provider
+  - splunk provider
+  - yandex provider
   - datadog provider
   - elastic provider
-  - google provider
+  - gcp provider
+  - honeycomb provider
+  - humio provider
   - influxdata provider
-  - confluent provider
+  - logdna provider
+  - grafana provider
   - new relic provider
-  - splunk provider
+  - papertrail provider
+  - sematext provider
 
   # sources
   - docker source
@@ -89,10 +92,11 @@ scopes:
   - coercer transform
   - concat transform
   - dedupe transform
-  - field_filter transform
+  - filter transform
   - geoip transform
   - grok_parser transform
   - json_parser transform
+  - kubernetes_pod_metadata transform
   - log_to_metric transform
   - logfmt_parser transform
   - lua transform

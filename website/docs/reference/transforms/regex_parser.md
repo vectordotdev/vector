@@ -1,16 +1,18 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
 function_category: "parse"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
-min_version: null
-service_name: "Regex Parser"
 sidebar_label: "regex_parser|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
 status: "prod-ready"
 title: "Regex Parser Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `regex_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -26,11 +28,7 @@ log field's value with a [Regular Expression][urls.regex].
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "regex_parser" # required
@@ -48,13 +46,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   types.parent.child = "int" # example
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -78,8 +70,6 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"message"}
@@ -103,8 +93,6 @@ The log field to parse.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -128,8 +116,6 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -153,8 +139,6 @@ coerce log fields into their proper types.
  See [Regex Syntax](#regex-syntax) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -180,13 +164,9 @@ supported for the `timestamp` type.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -269,9 +249,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_regex_parser_transform_id]
   # ...
   field = "message"

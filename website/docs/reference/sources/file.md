@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
 event_types: ["log"]
 function_category: "collect"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "File"
 sidebar_label: "file|[\"log\"]"
-source_url: https://github.com/timberio/vector/blob/master/src/sources/file/
+source_url: https://github.com/timberio/vector/tree/master/src/sources/file
 status: "prod-ready"
 title: "File Source"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector [`file`](#file) source
 ingests data through one or more local files and [outputs `log`
@@ -27,24 +32,24 @@ events](#output).
      website/docs/reference/sources/file.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* This component must be provided access to the configured file system.
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "file" # required
@@ -59,9 +64,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "file" # required
@@ -96,13 +99,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -128,8 +125,6 @@ sure the Vector project has write permissions to this dir.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -154,8 +149,6 @@ precedence over the [`include` option](#include).*
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"file"}
@@ -179,8 +172,6 @@ The key name added to each event with the full path of the file.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -203,8 +194,6 @@ Configuration for how the file source should identify files.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={"checksum"}
@@ -229,8 +218,6 @@ The strategy used to uniquely identify files. This is important for
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={256}
@@ -255,8 +242,6 @@ fingerprint.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={0}
@@ -281,13 +266,9 @@ fingerprint. This is helpful if all files share a common header.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1000}
@@ -312,8 +293,6 @@ searches for files.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"host"}
@@ -339,8 +318,6 @@ option][docs.reference.global-options#host_key].
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -364,8 +341,6 @@ Ignore files with a data modification date that does not exceed this age.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -389,8 +364,6 @@ Array of file patterns to include. [Globbing](#globbing) is supported.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={102400}
@@ -415,8 +388,6 @@ protects against malformed lines or tailing incorrect files.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={2048}
@@ -441,8 +412,6 @@ time.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -466,8 +435,6 @@ If not speicified, multiline parsing is disabled.
  See [Multi-Line Messages](#multi-line-messages) for more info.
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -491,8 +458,6 @@ Start regex pattern to look for as a beginning of the message.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -516,8 +481,6 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -541,8 +504,6 @@ Condition regex pattern to look for. Exact behavior is configured via [`mode`](#
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -567,13 +528,9 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -598,8 +555,6 @@ draining the oldest files before moving on to read data from younger files.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -625,8 +580,6 @@ checkpoint.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -646,8 +599,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -672,8 +623,6 @@ via the [`file_key`](#file_key) option.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -698,8 +647,6 @@ renamed via the [`host_key`](#host_key) option.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -724,8 +671,6 @@ The raw log message, unaltered. This can be renamed via the [global
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -750,8 +695,6 @@ The exact time the event was ingested. This can be renamed via the [global
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

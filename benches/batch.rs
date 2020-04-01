@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures01::sync::mpsc;
-use futures01::{Future, Sink, Stream};
-use vector::sinks::util::{Batch, BatchSink, Buffer, Partition, PartitionedBatchSink};
+use futures01::{future, Sink, Stream};
+use std::convert::Infallible;
+use std::time::Duration;
+use vector::buffers::Acker;
+use vector::sinks::util::{Batch, BatchSettings, BatchSink, Buffer, Partition, PartitionBatchSink};
 use vector::test_util::random_lines;
 
 fn batching(
@@ -22,11 +24,20 @@ fn batching(
                 futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
-                let (tx, _rx) = mpsc::unbounded();
-                let batch_sink =
-                    BatchSink::new(tx.sink_map_err(|_| ()), Buffer::new(gzip), max_size);
+                let mut rt = vector::test_util::runtime();
+                let (acker, _) = Acker::new_for_testing();
+                let batch_sink = BatchSink::new(
+                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                    Buffer::new(gzip),
+                    BatchSettings {
+                        size: max_size,
+                        timeout: Duration::from_secs(1),
+                    },
+                    acker,
+                )
+                .sink_map_err(|e| panic!(e));
 
-                input.forward(batch_sink).wait().unwrap()
+                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
             },
         )
     })
@@ -57,14 +68,20 @@ fn partitioned_batching(
                 futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
-                let (tx, _rx) = mpsc::unbounded();
-                let batch_sink = PartitionedBatchSink::new(
-                    tx.sink_map_err(|_| ()),
+                let mut rt = vector::test_util::runtime();
+                let (acker, _) = Acker::new_for_testing();
+                let batch_sink = PartitionBatchSink::new(
+                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     PartitionedBuffer::new(gzip),
-                    max_size,
-                );
+                    BatchSettings {
+                        size: max_size,
+                        timeout: Duration::from_secs(1),
+                    },
+                    acker,
+                )
+                .sink_map_err(|e| panic!(e));
 
-                input.forward(batch_sink).wait().unwrap()
+                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
             },
         )
     })

@@ -1,4 +1,8 @@
-use crate::{dns::Resolver, sinks::util::http::HttpClient, tls::TlsSettings};
+use crate::{
+    dns::Resolver,
+    sinks::util::http::HttpClient,
+    tls::{self, TlsOptions, TlsSettings},
+};
 use bytes::Bytes;
 use futures01::{future::Future, stream::Stream};
 use http::{header, status::StatusCode, uri, Request, Uri};
@@ -8,7 +12,21 @@ use k8s_openapi::{
     RequestError, Response, ResponseError, WatchOptional,
 };
 use snafu::{futures01::future::FutureExt, ResultExt, Snafu};
+use std::{fs, io};
 use tower::Service;
+
+// ************************ Defined by Kubernetes *********************** //
+// API access is defined with
+// https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
+
+/// File in which Kubernetes stores service account token.
+const TOKEN_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+
+/// Kuberentes API should be reachable at this address
+const KUBERNETES_SERVICE_ADDRESS: &str = "https://kubernetes.default.svc";
+
+/// Path to certificate authority certificate
+const CA_PATH: &str = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
 /// Config which could be loaded from kubeconfig or local kubernetes cluster.
 /// Used to build WatchClient which is in turn used to build Stream of metadata.
@@ -22,6 +40,33 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
+    /// Loads Kubernetes API access information available to Pods of cluster.
+    pub fn in_cluster(node: String, resolver: Resolver) -> Result<Self, BuildError> {
+        let server = Uri::from_static(KUBERNETES_SERVICE_ADDRESS);
+
+        let token = fs::read(TOKEN_PATH)
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::NotFound {
+                    BuildError::MissingAccountToken
+                } else {
+                    BuildError::FailedReadingAccountToken { source: error }
+                }
+            })
+            .and_then(|bytes| String::from_utf8(bytes).context(AccountTokenCorrupted))?;
+
+        let mut options = TlsOptions::default();
+        options.ca_path = Some(CA_PATH.into());
+        let tls_settings = TlsSettings::from_options(&Some(options)).context(TlsError)?;
+
+        Ok(Self {
+            resolver,
+            token: Some(token),
+            server,
+            tls_settings,
+            node_name: Some(node),
+        })
+    }
+
     pub fn build(&self) -> Result<WatchClient, BuildError> {
         let client =
             HttpClient::new(self.resolver.clone(), self.tls_settings.clone()).context(HttpError)?;
@@ -88,7 +133,7 @@ impl WatchClient {
         &mut self,
         mut version: Option<Version>,
         error: Option<RuntimeError>,
-    ) -> Result<impl Stream<Item = Pod, Error = RuntimeError>, BuildError> {
+    ) -> Result<impl Stream<Item = (Pod, PodEvent), Error = RuntimeError>, BuildError> {
         match error {
             None => (),
             Some(RuntimeError::WatchEventError { status }) if status.code == Some(410) => {
@@ -111,7 +156,7 @@ impl WatchClient {
     fn build_watch_stream(
         &mut self,
         request: Request<hyper::Body>,
-    ) -> impl Stream<Item = Pod, Error = RuntimeError> {
+    ) -> impl Stream<Item = (Pod, PodEvent), Error = RuntimeError> {
         let mut decoder = Decoder::default();
 
         self.client
@@ -148,8 +193,8 @@ impl WatchClient {
             .and_then(|event| match event {
                 WatchEvent::Added(data)
                 | WatchEvent::Modified(data)
-                | WatchEvent::Bookmark(data)
-                | WatchEvent::Deleted(data) => Ok(data),
+                | WatchEvent::Bookmark(data) => Ok((data, PodEvent::Changed)),
+                WatchEvent::Deleted(data) => Ok((data, PodEvent::Deleted)),
                 WatchEvent::ErrorStatus(status) => Err(RuntimeError::WatchEventError { status }),
                 WatchEvent::ErrorOther(other) => {
                     Err(RuntimeError::UnknownWatchEventError { other })
@@ -207,9 +252,24 @@ impl Decoder {
     }
 }
 
+/// Event that changed the metadata.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PodEvent {
+    Changed,
+    Deleted,
+}
+
 /// Version of Kubernetes resource
 #[derive(Clone, Debug)]
 pub struct Version(String);
+
+impl Version {
+    pub fn from_pod(pod: &Pod) -> Option<Self> {
+        pod.metadata
+            .as_ref()
+            .and_then(|metadata| metadata.resource_version.clone().map(Version))
+    }
+}
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -223,6 +283,14 @@ pub enum BuildError {
     InvalidUriParts { source: uri::InvalidUriParts },
     #[snafu(display("Authorization token is invalid: {}.", source))]
     InvalidToken { source: header::InvalidHeaderValue },
+    #[snafu(display("Missing Kubernetes service account token file. Probably because Vector isn't in Kubernetes Pod."))]
+    MissingAccountToken,
+    #[snafu(display("Failed reading Kubernetes service account token: {}.", source))]
+    FailedReadingAccountToken { source: io::Error },
+    #[snafu(display("Kubernetes service account token is corrupted: {}.", source))]
+    AccountTokenCorrupted { source: std::string::FromUtf8Error },
+    #[snafu(display("TLS construction errored {}.", source))]
+    TlsError { source: tls::TlsError },
 }
 
 #[derive(Debug, Snafu)]
@@ -418,6 +486,7 @@ mod kube_tests {
     }
 
     #[test]
+    #[ignore]
     fn watch_pod() {
         let namespace = format!("watch-pod-{}", Uuid::new_v4());
         let kube = Kube::new(namespace.as_str());

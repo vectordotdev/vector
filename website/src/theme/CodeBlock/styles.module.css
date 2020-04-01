@@ -1,15 +1,27 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+.codeBlockContent {
+  position: relative;
+}
+
+.codeBlockTitle {
+  border-top-left-radius: var(--ifm-global-radius);
+  border-top-right-radius: var(--ifm-global-radius);
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  color: var(--ifm-color-emphasis-400);
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: calc( var(--ifm-pre-padding) / 2 ) var(--ifm-pre-padding);
+}
 
 .codeBlock {
   overflow: auto;
   display: block;
   padding: 0;
   margin: 0;
+}
+
+.codeBlockWithTitle {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .copyButton {
@@ -38,7 +50,12 @@
   text-decoration: none;
 }
 
-.codeBlock:hover > .copyButton {
+.copyButtonWithTitle {
+  top: calc(var(--ifm-pre-padding));
+}
+
+.codeBlockTitle:hover + .codeBlockContent .copyButton,
+.codeBlockContent:hover > .copyButton {
   visibility: visible;
   opacity: 1;
 }

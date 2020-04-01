@@ -30,6 +30,7 @@ lazy_static! {
         message_key: Atom::from("message"),
         timestamp_key: Atom::from("timestamp"),
         host_key: Atom::from("host"),
+        kubernetes_key: Atom::from("kubernetes"),
     };
 }
 
@@ -46,9 +47,7 @@ pub struct LogEvent {
 
 impl Event {
     pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        })
+        Event::Log(LogEvent::new())
     }
 
     pub fn as_log(&self) -> &LogEvent {
@@ -95,6 +94,12 @@ impl Event {
 }
 
 impl LogEvent {
+    pub fn new() -> Self {
+        Self {
+            fields: BTreeMap::new(),
+        }
+    }
+
     pub fn get(&self, key: &Atom) -> Option<&Value> {
         util::log::get(&self.fields, key)
     }
@@ -183,7 +188,7 @@ impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = Event::new_empty_log().into_log();
+        let mut log_event = LogEvent::new();
         log_event.extend(iter);
         log_event
     }
@@ -224,6 +229,8 @@ pub struct LogSchema {
     #[serde(default = "LogSchema::default_host_key")]
     #[getset(get = "pub", set = "pub(crate)")]
     host_key: Atom,
+    #[getset(get = "pub", set = "pub(crate)")]
+    kubernetes_key: Atom,
 }
 
 impl Default for LogSchema {
@@ -232,6 +239,7 @@ impl Default for LogSchema {
             message_key: Atom::from("message"),
             timestamp_key: Atom::from("timestamp"),
             host_key: Atom::from("host"),
+            kubernetes_key: Atom::from("kubernetes"),
         }
     }
 }
@@ -300,6 +308,12 @@ impl From<&[u8]> for Value {
 impl From<String> for Value {
     fn from(string: String) -> Self {
         Value::Bytes(string.into())
+    }
+}
+
+impl From<&String> for Value {
+    fn from(string: &String) -> Self {
+        string.as_str().into()
     }
 }
 

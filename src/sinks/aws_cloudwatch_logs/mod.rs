@@ -8,7 +8,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
         rusoto::{self, AwsCredentialsProvider},
-        BatchEventsConfig, BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt,
+        BatchEventsConfig, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig, TowerRequestSettings,
     },
     template::Template,
@@ -151,8 +151,9 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             )?);
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc, cx.acker())
-                .partitioned_batched_with_min(PartitionBuffer::new(Vec::new()), &batch)
+            let buffer = PartitionBuffer::new(Vec::new());
+            let svc_sink = PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+                .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
                 .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
         };
@@ -924,6 +925,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_partitioned() {
+        crate::test_util::trace_init();
         let mut rt = Runtime::single_threaded().unwrap();
         let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
 
@@ -969,6 +971,7 @@ mod integration_tests {
 
         let pump = sink.send_all(iter_ok(events));
         let (sink, _) = rt.block_on(pump).unwrap();
+        let sink = rt.block_on(sink.flush()).unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 

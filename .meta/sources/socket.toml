@@ -1,15 +1,21 @@
 [sources.socket]
 title = "Socket"
+noun = "a TCP, UDP, or UDS socket"
 beta = false
 common = true
 delivery_guarantee = "best_effort"
+features = [
+  "Accept log data over a TCP, UDP, or UDS socket.",
+  "Automatically enrich logs with host-level context.",
+]
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
-through_description = "a socket, such as a TCP, UDP, or Unix socket"
+requirements.network_port = "9000"
+strategies = ["service"]
+through_description = "a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket"
 
 <%= render(
-  "_partials/_component_options.toml",
+  "_partials/fields/_component_options.toml",
   type: "source",
   name: "socket",
   groups: ["tcp", "udp", "unix"]
@@ -82,7 +88,7 @@ The timeout before a connection is forcefully closed during shutdown.\
 """
 
 <%= render(
-  "_partials/_tls_acceptor_options.toml",
+  "_partials/fields/_tls_acceptor_options.toml",
   namespace: "sources.socket.options",
   relevant: "relevant_when = {mode = \"tcp\"}",
   groups: ["tcp"]
@@ -93,13 +99,13 @@ label = "Generic"
 body = """\
 Given the following input line:
 
-```text
+```text title="Example input"
 2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <current_timestamp>,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",

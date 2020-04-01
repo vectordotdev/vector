@@ -1,0 +1,19 @@
+<Tabs
+  className="mini"
+  defaultValue=<%= downloads.first.arch.to_json %>
+  values={<%= downloads.collect { |d| {label: d.arch, value: d.arch } }.to_json %>}>
+<%- downloads.each do |download| -%>
+<TabItem value=<%= download.arch.to_json %>>
+
+| Version          | URL                                                                                               |
+|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Latest major     | `<%= metadata.links.fetch("urls.vector_downloads.latest/#{download.file_name}") %>`               |
+| Latest minor     | `<%= metadata.links.fetch("urls.vector_downloads.<MAJOR>.X/#{download.file_name}") %>`            |
+| Latest patch     | `<%= metadata.links.fetch("urls.vector_downloads.<MAJOR.MINOR>.X/#{download.file_name}") %>`      |
+| Specific version | `<%= metadata.links.fetch("urls.vector_downloads.<MAJOR.MINOR.PATCH>/#{download.file_name}") %>`  |
+| Latest nightly   | `<%= metadata.links.fetch("urls.vector_downloads.nightly/latest/#{download.file_name}") %>`       |
+| Specific nightly | `<%= metadata.links.fetch("urls.vector_downloads.nightly/<YYYY-MM-DD>/#{download.file_name}") %>` |
+
+</TabItem>
+<%- end -%>
+</Tabs>

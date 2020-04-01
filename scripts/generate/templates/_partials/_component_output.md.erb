@@ -1,4 +1,4 @@
-The `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
+The `<%= component.name %>` <%= component.type %> <%= component_short_description(component).continuize %>
 <% if component.sink? && component.batching? -%>
 Batches are flushed via the [`batch_size`](#batch_size) or
 [`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
@@ -33,7 +33,7 @@ For example:
 <%- elsif fields -%>
 For example:
 
-<%= fields_example(fields) %>
+<%= fields_example(fields, root_key: output.global_log_schema_key) %>
 <%- end -%>
 <%- if fields.any? -%>
 

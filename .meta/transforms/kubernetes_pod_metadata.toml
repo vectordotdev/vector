@@ -1,0 +1,224 @@
+[transforms.kubernetes_pod_metadata]
+title = "Kubernetes Pod Metadata"
+allow_you_to_description = "enrich [Kubernetes][urls.kubernetes] logs with Pod metadata"
+beta = true
+common = true
+function_category = "enrich"
+input_types = ["log"]
+output_types = ["log"]
+requirements.kubernetes = ">= 1.15"
+requirements.kubernetes_rbac = true
+requirements.additional = """\
+Vector must be run inside a Kubernetes cluster for this transform to work. \
+See [Connecting To The Kubernetes API server section](#connecting-to-the-kubernetes-api-server) for more info.
+
+Vector must be given authorization to `watch` resource `pods`. \
+In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] \
+[RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
+"""
+
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "transform",
+  name: "kubernetes_pod_metadata"
+) %>
+
+#
+# env_vars
+#
+
+[transforms.kubernetes_pod_metadata.env_vars.VECTOR_NODE_NAME]
+type = "string"
+examples = ["minikube"]
+required = true
+description = """\
+The name of the node whose Pod's log should be enriched. If you're using the \
+[provided daemon set][urls.kubernetes_limit_resources] then this environment \
+variable is set for you.\
+"""
+
+#
+# options
+#
+
+[transforms.kubernetes_pod_metadata.options.fields]
+type = "[string]"
+common = true
+default = ["name","namespace","labels","annotations","node_name"]
+description = """\
+A list of fields to include in each event. By default, these fields are placed \
+under the global [`kubernetes_key` \
+option][docs.reference.global-options#kubernetes_key]. See \
+[Nesting](#nesting-metadata-fields) for more info. \
+"""
+
+[transforms.kubernetes_pod_metadata.options.cache_ttl]
+type = "int"
+common = false
+default = 3600
+unit = "seconds"
+description = """\
+How many seconds will the metadata be available after its Pod has been deleted.\
+"""
+
+[transforms.kubernetes_pod_metadata.options.node_name]
+type = "string"
+common = false
+default = "${VECTOR_NODE_NAME}"
+examples = ["${VECTOR_NODE_NAME}", "minikube"]
+description = """\
+The name of the node whose Pod's log should be enriched. This field defaults \
+to the `VECTOR_NODE_NAME` env var. If you're using the \
+[provided daemon set][urls.kubernetes_limit_resources] then this environment \
+variable is set for you. Setting this to a static value will take priority \
+over `VECTOR_NODE_NAME`.
+"""
+
+[transforms.kubernetes_pod_metadata.options.pod_uid]
+type = "string"
+common = false
+default = "object_uid"
+description = "Field containg Pod UID to which log belongs."
+
+[transforms.kubernetes_pod_metadata.options.max_retry_timeout]
+type = "int"
+common = false
+default = 1
+description = """\
+In the case of Kubernetes API communication failures Vector will indefinitely \
+retry with an exponenetial backoff. This option defines that maximum backoff \
+allowed.\
+"""
+
+#
+# permissions
+#
+
+[transforms.kubernetes_pod_metadata.permissions.watch]
+description = """\
+Vector requires the [`watch` request verb][urls.kubernetes_request_verbs] in \
+order to retrieve Kubernetes metadata.\
+"""
+
+#
+# output
+#
+
+[transforms.kubernetes_pod_metadata.output.log]
+global_log_schema_key = "kubernetes"
+
+[transforms.kubernetes_pod_metadata.output.log.fields.name]
+type = "string"
+examples = ["nginx"]
+description = "[Name][http://kubernetes.io/docs/user-guide/identifiers#names] of the Pod where the log originated."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.namespace]
+type = "string"
+examples = ["default","telemetry","kube-system"]
+description = "[Namespace][http://kubernetes.io/docs/user-guide/namespaces] of the Pod where the log originated."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.creation_timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47+00:00"]
+description = "Timestamp representing when the Pod was created."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.deletion_timestamp]
+type = "timestamp"
+examples = ["2019-11-01T21:15:47+00:00"]
+description = "Timestamp representing when the Pod was deleted."
+
+[transforms.kubernetes_pod_metadata.output.log.fields.labels]
+type = "table"
+description = """\
+[Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) \
+of the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.labels.children."`[label-key]`"]
+type = "*"
+examples = [
+  {release = "stable"},
+  {tier = "frontend"}
+]
+description = """\
+Each individual label will be added as a key. If you need to remove or alter \
+these labels then we recommend the [`remove_felds` \
+transform][docs.transforms.remove_fields].
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.annotations]
+type = "table"
+description = """\
+[Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) \
+of the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.annotations.children."`[annotation-key]`"]
+type = "*"
+examples = [
+  {"kubectl.kubernetes.io/last-applied-configuration" = "..."},
+]
+description = """\
+Each individual annotation will be added as a key. If you need to remove or \
+alter these labels then we recommend the [`remove_felds` \
+transform][docs.transforms.remove_fields].
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.node_name]
+type = "string"
+examples = ["minikube"]
+description = """\
+The name of the node where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.hostname]
+type = "string"
+examples = ["host"]
+description = """\
+The hostname of the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.priority]
+type = "int"
+examples = [0]
+description = """\
+The [priority](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/) \
+of the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.priority_class_name]
+type = "string"
+examples = ["system-node-critical","system-cluster-critical"]
+description = """\
+The [priority class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass) \
+of the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.service_account_name]
+type = "string"
+examples = ["default"]
+description = """\
+The name of the [ServiceAccount][https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/] \
+used to run the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.subdomain]
+type = "string"
+examples = ["net"]
+description = """\
+The subdomain of the Pod where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.host_ip]
+type = "string"
+examples = ["192.168.99.106"]
+description = """\
+The IP address of the host that the Pod is assigned where the log originated.\
+"""
+
+[transforms.kubernetes_pod_metadata.output.log.fields.ip]
+type = "string"
+examples = ["172.17.0.5"]
+description = """\
+The IP address allocated to the Pod where the log originated.\
+"""

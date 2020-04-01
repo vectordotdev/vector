@@ -1,16 +1,20 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events allowing you to remove one or more log fields."
 event_types: ["log"]
 function_category: "shape"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_fields%22
-min_version: null
-service_name: "Remove Fields"
 sidebar_label: "remove_fields|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/remove_fields.rs
 status: "prod-ready"
 title: "Remove Fields Transform"
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `remove_fields` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to remove
@@ -26,22 +30,14 @@ one or more log fields.
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
@@ -51,9 +47,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
@@ -64,13 +58,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -95,8 +83,6 @@ empty.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -120,8 +106,6 @@ The log field names to drop.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -148,9 +132,7 @@ The [`fields`](#fields) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_remove_fields_transform_id]
   # ...
   fields = ["field1", "field2", "parent.child"]

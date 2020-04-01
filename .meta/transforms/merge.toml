@@ -8,7 +8,7 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "merge") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "merge") %>
 
 [transforms.merge.options.merge_fields]
 type = "[string]"
@@ -55,9 +55,7 @@ label = "Default"
 body = """\
 Given the following _default_ configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
@@ -65,9 +63,7 @@ Given the following _default_ configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
-
-```javascript
+```javascript title="first log event"
 {
   "message": "First",
   "_partial": true,
@@ -78,9 +74,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
-
-```javascript
+```javascript title="second log event"
 {
   "message": "Second",
   "_partial": true,
@@ -91,9 +85,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
-
-```javascript
+```javascript title="third log event"
 {
   "message": "Third",
   "custom_string_field": "value3",
@@ -120,9 +112,7 @@ label = "With Merge Fields"
 body = """\
 Given the following configuration:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
@@ -131,9 +121,7 @@ Given the following configuration:
 
 And these three partial [`log` events][docs.data-model.log]:
 
-<CodeHeader fileName="first log event" />
-
-```javascript
+```javascript title="first log event"
 {
   "message": "First",
   "_partial": true,
@@ -144,9 +132,7 @@ And these three partial [`log` events][docs.data-model.log]:
 
 and
 
-<CodeHeader fileName="second log event" />
-
-```javascript
+```javascript title="second log event"
 {
   "message": "Second",
   "_partial": true,
@@ -157,9 +143,7 @@ and
 
 and
 
-<CodeHeader fileName="third log event" />
-
-```javascript
+```javascript title="third log event"
 {
   "message": "Third",
   "custom_string_field": "value3",

@@ -81,8 +81,8 @@ def create_release_meta_file!(current_commits, new_version)
         Done? Ready to proceed?
         EOF
 
-      if get(words, ["y", "n"]) == "n"
-        error!("Ok, re-run this command when you're ready.")
+      if Printer.get(words, ["y", "n"]) == "n"
+        Printer.error!("Ok, re-run this command when you're ready.")
       end
     else
       File.open(release_meta_path, 'w+') do |file|
@@ -106,8 +106,8 @@ def create_release_meta_file!(current_commits, new_version)
         Ready to proceed?
         EOF
 
-      if get(words, ["y", "n"]) == "n"
-        error!("Ok, re-run this command when you're ready.")
+      if Printer.get(words, ["y", "n"]) == "n"
+        Printer.error!("Ok, re-run this command when you're ready.")
       end
     end
   end
@@ -142,7 +142,7 @@ def get_new_version(last_version, commits)
         "Would you like to use the recommended version #{next_version} for " +
         "this release?"
 
-      if get(words, ["y", "n"]) == "y"
+      if Printer.get(words, ["y", "n"]) == "y"
         next_version
       else
         nil
@@ -154,7 +154,7 @@ def get_new_version(last_version, commits)
         "Would you like to use the recommended version #{next_version} for " +
         "this release?"
 
-      if get(words, ["y", "n"]) == "y"
+      if Printer.get(words, ["y", "n"]) == "y"
         next_version
       else
         nil
@@ -166,25 +166,25 @@ def get_new_version(last_version, commits)
         "Would you like to use the recommended version #{next_version} for " +
         "this release?"
 
-      if get(words, ["y", "n"]) == "y"
+      if Printer.get(words, ["y", "n"]) == "y"
         next_version
       else
         nil
       end
     end
 
-  version_string = next_version || get("What is the next version you are releasing? (current version is #{last_version})")
+  version_string = next_version || Printer.get("What is the next version you are releasing? (current version is #{last_version})")
 
   version =
     begin
       Version.new(version_string)
     rescue ArgumentError => e
-      invalid("It looks like the version you entered is invalid: #{e.message}")
+      Printer.invalid("It looks like the version you entered is invalid: #{e.message}")
       get_new_version(last_version, commits)
     end
 
   if last_version.bump_type(version).nil?
-    invalid("The version you entered must be a single patch, minor, or major bump")
+    Printer.invalid("The version you entered must be a single patch, minor, or major bump")
     get_new_version(last_version, commits)
   else
     version

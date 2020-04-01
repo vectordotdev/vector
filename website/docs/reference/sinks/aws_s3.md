@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
 event_types: ["log"]
 function_category: "transmit"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "AWS S3"
 sidebar_label: "aws_s3|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-status: "beta"
+status: "prod-ready"
 title: "AWS S3 Sink"
 unsupported_operating_systems: []
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import SVG from 'react-inlinesvg';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `aws_s3` sink
 [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web
@@ -30,22 +35,14 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ## Configuration
 
-import Tabs from '@theme/Tabs';
-
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_s3" # required
@@ -73,18 +70,16 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "aws_s3" # required
   inputs = ["my-source-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  endpoint = "127.0.0.0:5000/path/to/service" # required, required when region = ""
   region = "us-east-1" # required, required when endpoint = ""
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
 
   # ACL
@@ -127,9 +122,9 @@ import CodeHeader from '@site/src/components/CodeHeader';
   tags.Tag1 = "Value1" # example
 
   # Request
-  request.in_flight_limit = 5 # optional, default, requests
+  request.in_flight_limit = 50 # optional, default, requests
   request.rate_limit_duration_secs = 1 # optional, default, seconds
-  request.rate_limit_num = 5 # optional, default
+  request.rate_limit_num = 250 # optional, default
   request.retry_attempts = -1 # optional, default
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
@@ -139,13 +134,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -170,8 +159,6 @@ ACL][urls.aws_s3_canned_acl].
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -195,8 +182,6 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -219,8 +204,6 @@ Configures the sink batching behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={10490000}
@@ -244,8 +227,6 @@ The maximum size of a batch, in bytes, before it is flushed.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={300}
@@ -269,13 +250,9 @@ The maximum age of a batch before it is flushed.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -299,8 +276,6 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -323,8 +298,6 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={500}
@@ -348,8 +321,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -373,8 +344,6 @@ The maximum size of the buffer on the disk.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"memory"}
@@ -398,8 +367,6 @@ The buffer's type and storage mechanism.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"block"}
@@ -423,13 +390,9 @@ The behavior when the buffer becomes full.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -453,8 +416,6 @@ The compression mechanism to use.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -477,8 +438,6 @@ Configures the encoding specific sink behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -502,8 +461,6 @@ The encoding codec used to serialize the events before outputting.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -527,8 +484,6 @@ Prevent the sink from encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -552,8 +507,6 @@ Limit the sink to only encoding the specified labels.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"rfc3339"}
@@ -577,13 +530,9 @@ How to format event timestamps.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -593,7 +542,7 @@ How to format event timestamps.
   name={"endpoint"}
   path={null}
   relevantWhen={{"region":""}}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -608,8 +557,6 @@ this option will make [`region`](#region) moot.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={true}
@@ -634,8 +581,6 @@ there are no name collisions high volume use cases.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"log"}
@@ -659,8 +604,6 @@ The filename extension to use in the object name.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={"%s"}
@@ -685,8 +628,6 @@ specifiers][urls.strptime_specifiers] are supported.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -711,8 +652,6 @@ permissions on the created objects.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -737,8 +676,6 @@ their metadata.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -763,8 +700,6 @@ ACL.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -789,8 +724,6 @@ ACL.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={true}
@@ -814,8 +747,6 @@ Enables/disables the sink healthcheck upon start.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"date=%F/"}
@@ -841,8 +772,6 @@ to be the root S3 "folder".
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -867,8 +796,6 @@ provided it will override this value since the endpoint includes the region.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -891,13 +818,11 @@ Configures the sink request behavior.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={50}
   enumValues={null}
-  examples={[5]}
+  examples={[50]}
   groups={[]}
   name={"in_flight_limit"}
   path={"request"}
@@ -916,8 +841,6 @@ The maximum number of in-flight requests allowed at any given time.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={1}
@@ -941,13 +864,11 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
 
 
 </Field>
-
-
 <Field
   common={true}
-  defaultValue={5}
+  defaultValue={250}
   enumValues={null}
-  examples={[5]}
+  examples={[250]}
   groups={[]}
   name={"rate_limit_num"}
   path={"request"}
@@ -967,8 +888,6 @@ time window.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={-1}
@@ -992,8 +911,6 @@ The maximum number of retries to make for failed requests.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={1}
@@ -1019,8 +936,6 @@ to select future backoffs.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={10}
@@ -1044,8 +959,6 @@ The maximum amount of time, in seconds, to wait between retries.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={30}
@@ -1072,13 +985,9 @@ duplicate data downstream.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1102,8 +1011,6 @@ The server-side encryption algorithm used when storing these objects.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1130,8 +1037,6 @@ Amazon S3 uses the AWS managed CMK in AWS to protect the data.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1157,8 +1062,6 @@ for more details.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1181,8 +1084,6 @@ The tag-set for the object.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1206,20 +1107,14 @@ A custom tag to be added to the created objects.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Env Vars
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1244,8 +1139,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -1270,8 +1163,6 @@ Used for AWS authentication when communicating with AWS services. See relevant
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
@@ -1302,8 +1193,6 @@ optional setting that is helpful for a variety of use cases, such as cross
 account access.
 
 ### Buffers & Batches
-
-import SVG from 'react-inlinesvg';
 
 <SVG src="/img/buffers-and-batches-partitioned.svg" />
 
@@ -1485,9 +1374,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_aws_s3_sink_id]
   # ...
   key_prefix = "date=%F/"

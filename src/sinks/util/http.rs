@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     service::{TowerBatchedSink, TowerRequestSettings},
-    Batch, BatchSettings, BatchSink,
+    Batch, BatchSettings,
 };
 use crate::{
     dns::Resolver,
@@ -50,23 +50,24 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_complete` returns ready.
-pub struct BatchedHttpSink<T, B: Batch>
+pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
 where
-    B::Output: Clone,
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    L: RetryLogic<Response = hyper::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
-    inner:
-        BatchSink<B, TowerBatchedSink<B::Output, HttpRetryLogic, B, HttpBatchService<B::Output>>>,
+    inner: TowerBatchedSink<HttpBatchService<B::Output>, B, L, B::Output>,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
     slot: Option<B::Input>,
 }
 
-impl<T, B> BatchedHttpSink<T, B>
+impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone,
+    B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -77,13 +78,40 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         cx: &SinkContext,
     ) -> Self {
+        Self::with_retry_logic(
+            sink,
+            batch,
+            HttpRetryLogic,
+            request_settings,
+            batch_settings,
+            tls_settings,
+            cx,
+        )
+    }
+}
+
+impl<T, B, L> BatchedHttpSink<T, B, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    L: RetryLogic<Response = hyper::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn with_retry_logic(
+        sink: T,
+        batch: B,
+        logic: L,
+        request_settings: TowerRequestSettings,
+        batch_settings: BatchSettings,
+        tls_settings: impl Into<MaybeTlsSettings>,
+        cx: &SinkContext,
+    ) -> Self {
         let sink = Arc::new(sink);
         let sink1 = sink.clone();
         let svc =
             HttpBatchService::new(cx.resolver(), tls_settings, move |b| sink1.build_request(b));
 
-        let service_sink = request_settings.batch_sink(HttpRetryLogic, svc, cx.acker());
-        let inner = BatchSink::from_settings(service_sink, batch, batch_settings);
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_settings, cx.acker());
 
         Self {
             sink,
@@ -93,14 +121,15 @@ where
     }
 }
 
-impl<T, B> Sink for BatchedHttpSink<T, B>
+impl<T, B, L> Sink for BatchedHttpSink<T, B, L>
 where
     B: Batch,
-    B::Output: Clone,
+    B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    L: RetryLogic<Response = hyper::Response<Bytes>> + Send + 'static,
 {
     type SinkItem = crate::Event;
-    type SinkError = ();
+    type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         if self.slot.is_some() {
@@ -122,7 +151,6 @@ where
         if let Some(item) = self.slot.take() {
             if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
                 self.slot = Some(item);
-                self.inner.poll_complete()?;
                 return Ok(Async::NotReady);
             }
         }
@@ -149,8 +177,18 @@ where
         let mut http = HttpConnector::new_with_resolver(resolver.clone());
         http.enforce_http(false);
 
-        let tls = tls_connector_builder(&tls_settings.into())?;
-        let https = HttpsConnector::with_connector(http, tls)?;
+        let settings = tls_settings.into();
+        let tls = tls_connector_builder(&settings)?;
+        let mut https = HttpsConnector::with_connector(http, tls)?;
+
+        let settings = settings.tls().cloned();
+        https.set_callback(move |c, _uri| {
+            if let Some(settings) = &settings {
+                settings.apply_connect_configuration(c);
+            }
+
+            Ok(())
+        });
 
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())

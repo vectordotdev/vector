@@ -1,16 +1,19 @@
 ---
+last_modified_on: "2020-04-01"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
 function_category: "enrich"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+aws_ec2_metadata%22
-min_version: null
-service_name: "AWS EC2 Metadata"
 sidebar_label: "aws_ec2_metadata|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/transforms/aws_ec2_metadata.rs
 status: "beta"
 title: "AWS EC2 Metadata Transform"
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 The Vector `aws_ec2_metadata` transform
 accepts and [outputs `log` events](#output) allowing you to enrich logs with
@@ -26,24 +29,17 @@ AWS EC2 instance metadata.
 
 ## Requirements
 
-import Alert from '@site/src/components/Alert';
-
 <Alert icon={false} type="danger" classNames="list--warnings">
 
 
-
-* Network access is required for this component to function correctly. See the
-  [Network Access section](#network-access) for more info.
+* [AWS IMDS v2][urls.aws_ec2_instance_metadata] is required. This is available by default on EC2.
+* Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit. See the ["AWS imDS v2" section][docs.transforms.aws_ec2_metadata#aws-imds-v2] for more info.
 
 </Alert>
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
   inputs = ["my-source-id"] # required
@@ -53,13 +49,7 @@ import CodeHeader from '@site/src/components/CodeHeader';
   refresh_interval_secs = 10 # optional, default
 ```
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={["instance-id","local-hostname","local-ipv4","public-hostname","public-ipv4","ami-id","availability-zone","vpc-id","subnet-id","region"]}
@@ -83,8 +73,6 @@ A list of fields to include in each event.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={"http://169.254.169.254"}
@@ -108,8 +96,6 @@ Override the default EC2 Metadata host.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={""}
@@ -133,8 +119,6 @@ Prepend a namespace to each field's key.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={10}
@@ -158,8 +142,6 @@ The interval in seconds at which the EC2 Metadata api will be called.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -186,8 +168,6 @@ For example:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -211,8 +191,6 @@ The `ami-id` that the current EC2 instance is using.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -236,8 +214,6 @@ The `availability-zone` that the current EC2 instance is running in.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -261,8 +237,6 @@ The `instance-id` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -286,8 +260,6 @@ The `local-hostname` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -311,8 +283,6 @@ The `local-ipv4` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -336,8 +306,6 @@ The `public-hostname` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -361,8 +329,6 @@ The `public-ipv4` of the current EC2 instance.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -386,8 +352,6 @@ The [`region`](#region) that the current EC2 instance is running in.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -411,8 +375,6 @@ The `role-name` that the current EC2 instance is using.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -436,8 +398,6 @@ The `subnet-id` of the current EC2 instance's default network interface.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -461,11 +421,24 @@ The `vpc-id` of the current EC2 instance's default network interface.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works
+
+### AWS IMDS v2
+
+v2 of the [AWS IMDS service][urls.aws_ec2_instance_metadata] addresses [a number
+of very serious security issues][urls.aws_imds_v1_security_problems] with v1.
+As part of tighening security, Amazon limited the number of network hops allowed
+to communicate with this service to 1. Unfortunately, when running Vector within
+Docker this introduces an additional hop. Therefore, you _must_ configure your
+AWS instances to allow for 2 hops:
+
+```bash
+aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
+```
+
+If you do not raise this limit the `aws_ec2_metadata` transform will not work.
 
 ### Complex Processing
 
@@ -483,24 +456,9 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
-### Network Access
-
-The `aws_ec2_metadata` transform requires network access to
-operate correctly.
-
-#### Docker Network Access
-
-If you are running Vector within a Docker container then you should pass the
-`--net=host` flag when starting Docker:
-
-```bash
-docker run --net=host ...
-```
-
-Otherwise Vector will not be able to communicate with EC2 metadata service.
-Learn more in the [Docker networking docs][urls.docker_networking].
-
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
-[urls.docker_networking]: https://docs.docker.com/network/network-tutorial-host/
+[docs.transforms.aws_ec2_metadata#aws-imds-v2]: /docs/reference/transforms/aws_ec2_metadata/#aws-imds-v2
+[urls.aws_ec2_instance_metadata]: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
+[urls.aws_imds_v1_security_problems]: https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program

@@ -1,19 +1,28 @@
 [sources.splunk_hec]
 title = "Splunk HEC"
+noun = "Splunk HEC"
 beta = true
 common = false
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_splunk_hec.toml") %>
+features = [
+  "Accept log data just like the Splunk HTTP event collector.",
+  "Automatically parse incoming data into structured events.",
+  "Optionally require authentication on all requests.",
+]
 function_category = "receive"
 output_types = ["log"]
-requirements = {}
+requirements.network_port = "80"
+service_providers = ["Splunk"]
+strategies = ["service"]
 through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "splunk_hec") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "splunk_hec") %>
 
 [sources.splunk_hec.options.address]
 type = "string"
 common = true
-default = "0.0.0.0:8088"
+default = "0.0.0.0:80"
 description = """\
 The address to accept connections on.\
 """
@@ -34,13 +43,13 @@ label = "Text"
 body = """\
 Given the following input:
 
-```text
+```text title="Example input"
 Hello world
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>, // time event was received,
   "host": "my.host.com", // value of the `Host` header
@@ -77,4 +86,4 @@ then the value of the `time` field will be used. If the \
 current time the event was received will be used.\
 """
 
-<%= render("_partials/_tls_acceptor_options.toml", namespace: "sources.splunk_hec.options", relevant: "") %>
+<%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.splunk_hec.options", relevant: "") %>

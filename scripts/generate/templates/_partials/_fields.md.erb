@@ -1,8 +1,6 @@
 <Fields filters={<%= filters.to_json %>}>
-
 <%- fields.each do |field| -%>
 <%- full_path = [path, field.name].compact.join(".") -%>
-
 <Field
   common={<%= field.common? %>}
   defaultValue={<%= field.default.to_json %>}
@@ -21,14 +19,12 @@
 <%= "#" * heading_depth %> <%= field.name %>
 
 <%= field.description.wrap(80) %>
-[[references:<%= field.name %>]]
+[[references:`<%= field.name %>`]]
 
 <%- if field.children_list.any? -%>
-<%= fields(field.children_list, filters: false, heading_depth: heading_depth + 1, level: level + 1, path: full_path) %>
+<%= fields(field.children_list, filters: false, heading_depth: heading_depth + 1, path: full_path) %>
 <%- end -%>
 
 </Field>
-
 <%- end -%>
-
 </Fields>

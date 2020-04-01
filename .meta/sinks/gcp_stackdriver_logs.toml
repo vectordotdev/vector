@@ -1,28 +1,44 @@
 [sinks.gcp_stackdriver_logs]
 title = "GCP Stackdriver Logs"
+noun = "GCP Stackdriver Logs"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_gcp_stackdriver.toml") %>
+features = [
+  "Send logs to GCP Stackdriver.",
+  "Leverage any of GCP's IAM strategies.",
+  "Batch data to maximize throughput.",
+  "Automatically retry failed requests, with backoff.",
+  "Buffer your data in-memory or on-disk for performance and durability."
+]
 function_category = "transmit"
 healthcheck = true
 egress_method = "batching"
 input_types = ["log"]
 requirements = {}
-service_providers = ["Google"]
+service_providers = ["GCP"]
 write_to_description = "[Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "gcp_stackdriver_logs") %>
+<%= render("_partials/fields/_component_options.toml",
+  type: "sink",
+  name: "gcp_stackdriver_logs") %>
 
-<%= render("_partials/_batch_options.toml", namespace: "sinks.gcp_stackdriver_logs.options", common: false, max_events: nil, max_size: 5242880, timeout_secs: 1) %>
+<%= render("_partials/fields/_batch_options.toml",
+  namespace: "sinks.gcp_stackdriver_logs.options",
+  common: false,
+  max_events: nil,
+  max_size: 5242880,
+  timeout_secs: 1) %>
 
 <%= render(
-  "_partials/_buffer_options.toml",
+  "_partials/fields/_buffer_options.toml",
   namespace: "sinks.gcp_stackdriver_logs.options",
   common: false
 ) %>
 
 <%= render(
-  "_partials/_request_options.toml",
+  "_partials/fields/_request_options.toml",
   namespace: "sinks.gcp_stackdriver_logs.options",
   common: false,
   in_flight_limit: 5,
@@ -34,7 +50,10 @@ write_to_description = "[Google Cloud Platform's Stackdriver Logging service][ur
   timeout_secs: 60
 ) %>
 
-<%= render("_partials/_gcp_credentials.toml", namespace: "sinks.gcp_stackdriver_logs", access: "Stackdriver Logging API", required: true) %>
+<%= render("_partials/fields/_gcp.toml",
+  namespace: "sinks.gcp_stackdriver_logs",
+  access: "Stackdriver Logging API",
+  required: true) %>
 
 [sinks.gcp_stackdriver_logs.options.project_id]
 type = "string"
@@ -125,9 +144,13 @@ For example, Compute Engine VM instances use the labels `projectId`, \
 `instanceId`, and `zone`.\
 """
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sinks.gcp_stackdriver_logs.options", can_enable: false, can_verify_certificate: true, can_verify_hostname: false) %>
+<%= render("_partials/fields/_tls_connector_options.toml",
+  namespace: "sinks.gcp_stackdriver_logs.options",
+  can_enable: false,
+  can_verify_certificate: true,
+  can_verify_hostname: true) %>
 
-<%= render("_partials/_encoding.toml",
+<%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.gcp_stackdriver_logs.options",
   encodings: []
 ) %>

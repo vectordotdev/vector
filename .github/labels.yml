@@ -1,6 +1,7 @@
-- name: "domain: blog"
-  description: Anything blog related
-  color: 212f3e
+#
+# domain
+#
+
 - name: "domain: buffers"
   description: Anything buffers related
   color: 212f3e
@@ -12,15 +13,6 @@
   color: 212f3e
 - name: "domain: dependencies"
   description: Anything dependencies related
-  color: 212f3e
-- name: "domain: docs"
-  description: Anything docs related
-  color: 212f3e
-- name: "domain: guides"
-  description: Anything guides related
-  color: 212f3e
-- name: "domain: marketing"
-  description: Anything marketing related
   color: 212f3e
 - name: "domain: networking"
   description: Anything networking related
@@ -37,20 +29,14 @@
 - name: "domain: security"
   description: Anything security related
   color: 212f3e
-- name: "domain: setup"
-  description: Anything setup related
-  color: 212f3e
 - name: "domain: sinks"
   description: Anything sinks related
   color: 212f3e
 - name: "domain: sources"
   description: Anything sources related
   color: 212f3e
-- name: "domain: templating"
-  description: Anything templating related
-  color: 212f3e
-- name: "domain: testing"
-  description: Anything testing related
+- name: "domain: tests"
+  description: Anything tests related
   color: 212f3e
 - name: "domain: topology"
   description: Anything topology related
@@ -58,9 +44,16 @@
 - name: "domain: transforms"
   description: Anything transforms related
   color: 212f3e
+- name: "domain: ux"
+  description: Anything ux related
+  color: 212f3e
 - name: "domain: website"
   description: Anything website related
   color: 212f3e
+
+#
+# event type
+#
 
 - name: "event type: log"
   description: Anything log event related
@@ -68,6 +61,14 @@
 - name: "event type: metric"
   description: Anything metric event related
   color: 1cd1a1
+- name: "event type: trace"
+  description: Anything trace event related
+  color: 1cd1a1
+
+#
+# meta
+#
+
 - name: "meta: announcement"
   description: Any issues that serve as announcements (pinned issues)
   color: c8d6e5
@@ -95,6 +96,25 @@
 - name: "meta: regression"
   description: This issue represents a regression
   color: c8d6e5
+
+#
+# have
+#
+
+- name: "have: nice"
+  description: This feature is nice to have. It is low priority.
+  color: 10ac84
+- name: "have: should"
+  description: We should have this feature, but is not required. It is medium priority.
+  color: ff9f43
+- name: "have: must"
+  description: We must have this feature, it is critical to Vector's success. It is high priority.
+  color: ee5353
+
+#
+# needs
+#
+
 - name: "needs: approval"
   description: Needs review & approval before work can begin (post spec)
   color: feca57
@@ -114,10 +134,11 @@
   description: Needs a light specification before work can begin
   color: feca57
 
-- name: "platform: docker"
-  description: Anything Docker related
-  color: ff9ff3
-- name: "platform: amazon linux"
+#
+# platform
+#
+
+- name: "platform: amazon-linux"
   description: Anything Amazon Linux related
   color: ff9ff3
 - name: "platform: centos"
@@ -132,11 +153,11 @@
 - name: "platform: nixos"
   description: Anything NixOS related
   color: ff9ff3
-- name: "platform: raspbian"
-  description: Anything Raspbian related
-  color: ff9ff3
 - name: "platform: rhel"
   description: Anything RHEL related
+  color: ff9ff3
+- name: "platform: raspbian"
+  description: Anything Raspbian related
   color: ff9ff3
 - name: "platform: ubuntu"
   description: Anything Ubuntu related
@@ -150,18 +171,37 @@
 - name: "platform: homebrew"
   description: Anything Homebrew related
   color: ff9ff3
+- name: "platform: msi"
+  description: Anything MSI related
+  color: ff9ff3
 - name: "platform: nix"
   description: Anything Nix related
   color: ff9ff3
 - name: "platform: rpm"
   description: Anything RPM related
   color: ff9ff3
-- name: "platform: msi"
-  description: Anything MSI related
+- name: "platform: docker"
+  description: Anything Docker related
   color: ff9ff3
+
+#
+# provider
+#
 
 - name: "provider: aws"
   description: Anything AWS related
+  color: ff9f43
+- name: "provider: confluent"
+  description: Anything Confluent related
+  color: ff9f43
+- name: "provider: heroku"
+  description: Anything Heroku related
+  color: ff9f43
+- name: "provider: splunk"
+  description: Anything Splunk related
+  color: ff9f43
+- name: "provider: yandex"
+  description: Anything Yandex related
   color: ff9f43
 - name: "provider: datadog"
   description: Anything Datadog related
@@ -169,21 +209,37 @@
 - name: "provider: elastic"
   description: Anything Elastic related
   color: ff9f43
-- name: "provider: google"
-  description: Anything Google related
+- name: "provider: gcp"
+  description: Anything GCP related
+  color: ff9f43
+- name: "provider: honeycomb"
+  description: Anything Honeycomb related
+  color: ff9f43
+- name: "provider: humio"
+  description: Anything Humio related
   color: ff9f43
 - name: "provider: influxdata"
   description: Anything InfluxData related
   color: ff9f43
-- name: "provider: confluent"
-  description: Anything Confluent related
+- name: "provider: logdna"
+  description: Anything LogDNA related
+  color: ff9f43
+- name: "provider: grafana"
+  description: Anything Grafana related
   color: ff9f43
 - name: "provider: new relic"
   description: Anything New Relic related
   color: ff9f43
-- name: "provider: splunk"
-  description: Anything Splunk related
+- name: "provider: papertrail"
+  description: Anything Papertrail related
   color: ff9f43
+- name: "provider: sematext"
+  description: Anything Sematext related
+  color: ff9f43
+
+#
+# source
+#
 
 - name: "source: docker"
   description: Anything `docker` source realted
@@ -225,6 +281,10 @@
   description: Anything `vector` source realted
   color: ff9ff3
 
+#
+# transform
+#
+
 - name: "transform: add_fields"
   description: Anything `add_fields` transform related
   color: 54a0ff
@@ -246,8 +306,8 @@
 - name: "transform: dedupe"
   description: Anything `dedupe` transform related
   color: 54a0ff
-- name: "transform: field_filter"
-  description: Anything `field_filter` transform related
+- name: "transform: filter"
+  description: Anything `filter` transform related
   color: 54a0ff
 - name: "transform: geoip"
   description: Anything `geoip` transform related
@@ -257,6 +317,9 @@
   color: 54a0ff
 - name: "transform: json_parser"
   description: Anything `json_parser` transform related
+  color: 54a0ff
+- name: "transform: kubernetes_pod_metadata"
+  description: Anything `kubernetes_pod_metadata` transform related
   color: 54a0ff
 - name: "transform: log_to_metric"
   description: Anything `log_to_metric` transform related
@@ -297,6 +360,10 @@
 - name: "transform: tokenizer"
   description: Anything `tokenizer` transform related
   color: 54a0ff
+
+#
+# sink
+#
 
 - name: "sink: aws_cloudwatch_logs"
   description: Anything `aws_cloudwatch_logs` sink related
@@ -391,6 +458,10 @@
 - name: "sink: vector"
   description: Anything `vector` sink related
   color: 4ddbfb
+
+#
+# type
+#
 
 - name: "type: bug"
   description: A user facing bug

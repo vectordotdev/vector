@@ -249,6 +249,7 @@ transforms = [
   "transforms-concat",
   "transforms-dedupe",
   "transforms-field_filter",
+  "transforms-filter",
   "transforms-geoip",
   "transforms-grok_parser",
   "transforms-json_parser",
@@ -274,11 +275,12 @@ transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
 transforms-dedupe = []
+transforms-filter = []
 transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
-transforms-kubernetes = ["k8s-openapi"]
+transforms-kubernetes = ["k8s-openapi","evmap","sources-kubernetes"]
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
@@ -391,7 +393,7 @@ influxdb-integration-tests = []
 pulsar-integration-tests = []
 
 kubernetes = ["kubernetes-integration-tests"]
-kubernetes-integration-tests = []
+kubernetes-integration-tests = ["uuid"]
 
 disable-resolv-conf = []
 

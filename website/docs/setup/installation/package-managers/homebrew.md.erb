@@ -1,0 +1,77 @@
+---
+title: Install Vector via Homebrew
+sidebar_label: Homebrew
+description: Install Vector through the Homebrew package manager
+---
+
+<%- package_manager = metadata.installation.package_managers.homebrew -%>
+<%- interfaces = fetch_interfaces(package_manager.interfaces) -%>
+<%- strategies = fetch_strategies(package_manager.strategies) -%>
+
+Vector can be installed through [Homebrew][urls.homebrew] which is generally
+used on MacOS systems.
+
+## Install
+
+<%= installation_tutorial(interfaces, strategies, heading_depth: 3) %>
+
+## Configuring
+
+The Vector configuration file is placed in:
+
+```text
+/usr/local/etc/vector/vector.toml
+```
+
+A full spec is located at `/usr/local/etc/vector/vector.spec.toml` and examples
+are located in `/usr/local/etc/vector/examples/*`. You can learn more about
+configuring Vector in the [Configuration][docs.configuration] section.
+
+## Deploying
+
+How you deploy Vector is largely dependent on your use case and environment.
+Please see the [deployment section][docs.deployment] for more info on how to
+deploy Vector.
+
+## Administering
+
+Vector can be managed through the [Homebrew services][urls.homebrew_services]
+manager:
+
+<Jump to="/docs/administration">Administration</Jump>
+
+## Uninstalling
+
+```bash
+brew remove vector
+```
+
+## Updating
+
+```bash
+brew update && brew upgrade vector
+```
+
+## Package
+
+### Architectures
+
+Vector's Homebrew packages only support the X86_64 arhcitecture.
+
+### Versions
+
+Historical Vector versions can be found in the [releases][urls.vector_releases].
+Once you've found the version you'd like to install you can specify it with:
+
+```bash
+brew install vector@X.X.X
+```
+
+Due to limitations of Homebrew, Vector cannot pin specific major or minor
+versions. If this is a requirement, then we recommend installing Vector
+directly [from an archive][docs.manual.from-archives].
+
+### Source Files
+
+Vector's Homebrew source files are located in
+[Vector's brew repo][urls.vector_homebrew_source_files].

@@ -4,6 +4,22 @@ kind: Namespace
 metadata:
    name: telemetry
 ---
+# Permissions to use Kubernetes API.
+# Necessary for kubernetes_pod_metadata transform.
+# Requires that RBAC authorization is enabled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector-permissions
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: telemetry
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
 # ConfigMap which contains vector.toml configuration for pods.
 #
 # This can also be removed and loaded from a file via `kubectl`.
@@ -16,17 +32,31 @@ data:
   vector-agent-config: |
     # file: vector.toml
     # Configuration for vector-agent
+    # Docs: https://vector.dev/docs/
 
     # Set global options
     data_dir = "/var/tmp/vector"
 
     # Ingest logs from Kubernetes
     [sources.kubernetes]
-    type = "kubernetes"
+      type = "kubernetes"
 
-    ######
-    # NOTE: Here, vector can be configured
-    ######
+    # Enrich logs with Pod metadata
+    [transforms.pod_metadata]
+      type = "kubernetes_pod_metadata"
+      inputs = ["kubernetes"]
+
+    # Add additional Vector transforms and sinks as desired!
+    #
+    # For example:
+    #
+    # [sinks.aws_s3]
+    #   type = "aws_s3"
+    #   inputs = ["pod_metadata"]
+    #   bucket = "my-bucket"
+    #   compression = "gzip"
+    #   region = "us-east-1"
+    #   key_prefix = "date=%F/"
 
   # This line is not in VECTOR.TOML
 ---
@@ -84,3 +114,8 @@ spec:
         - name: config-dir
           mountPath: /etc/vector
           readOnly: true
+        env:
+        - name: VECTOR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName

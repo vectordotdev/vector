@@ -1,19 +1,24 @@
 ---
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` source ingests data through the Splunk HTTP Event Collector protocol and outputs `log` events."
 event_types: ["log"]
 function_category: "receive"
 issues_url: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+splunk_hec%22
-min_version: null
 operating_systems: ["Linux","MacOS","Windows"]
-service_name: "Splunk HEC"
 sidebar_label: "splunk_hec|[\"log\"]"
 source_url: https://github.com/timberio/vector/tree/master/src/sources/splunk_hec.rs
 status: "beta"
 title: "Splunk HEC Source"
 unsupported_operating_systems: []
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `splunk_hec` source
 ingests data through the [Splunk HTTP Event Collector
@@ -27,40 +32,38 @@ protocol][urls.splunk_hec_protocol] and [outputs `log` events](#output).
      website/docs/reference/sources/splunk_hec.md.erb
 -->
 
-## Configuration
+## Requirements
 
-import Tabs from '@theme/Tabs';
+<Alert icon={false} type="danger" classNames="list--warnings">
+
+* This component exposes a configured port. You must ensure your network allows access to this port.
+
+</Alert>
+
+## Configuration
 
 <Tabs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-import TabItem from '@theme/TabItem';
-
 <TabItem value="common">
 
-import CodeHeader from '@site/src/components/CodeHeader';
-
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "splunk_hec" # required
-  address = "0.0.0.0:8088" # optional, default
+  address = "0.0.0.0:80" # optional, default
   token = "A94A8FE5CCB19BA61C4C08" # optional, no default
 ```
 
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "splunk_hec" # required
-  address = "0.0.0.0:8088" # optional, default
+  address = "0.0.0.0:80" # optional, default
   token = "A94A8FE5CCB19BA61C4C08" # optional, no default
 
   # TLS
@@ -75,18 +78,12 @@ import CodeHeader from '@site/src/components/CodeHeader';
 </TabItem>
 </Tabs>
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
-  defaultValue={"0.0.0.0:8088"}
+  defaultValue={"0.0.0.0:80"}
   enumValues={null}
-  examples={["0.0.0.0:8088"]}
+  examples={["0.0.0.0:80"]}
   groups={[]}
   name={"address"}
   path={null}
@@ -105,8 +102,6 @@ The address to accept connections on.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -129,8 +124,6 @@ Configures the TLS options for connections from this source.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -155,8 +148,6 @@ Absolute path to an additional CA certificate file, in DER or PEM format
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -182,8 +173,6 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={false}
@@ -208,8 +197,6 @@ is also required.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -234,8 +221,6 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -260,8 +245,6 @@ PEM format (PKCS#8).
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={false}
@@ -287,13 +270,9 @@ will ignore the presence of a client certificate.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -320,8 +299,6 @@ ignored and requests will not be authenticated.
 
 
 </Field>
-
-
 </Fields>
 
 ## Output
@@ -332,13 +309,13 @@ For example:
 
 Given the following input:
 
-```text
+```text title="Example input"
 Hello world
 ```
 
 A log event will be output with the following structure:
 
-```json
+```json title="Example log event"
 {
   "timestamp": <2019-07-26T20:30:27.000443Z>, // time event was received,
   "host": "my.host.com", // value of the `Host` header
@@ -351,8 +328,6 @@ A log event will be output with the following structure:
 More detail on the output schema is below.
 
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -376,8 +351,6 @@ The raw log message, unaltered.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -401,8 +374,6 @@ The Splunk channel, value of the `X-Splunk-Request-Channel` header.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -429,8 +400,6 @@ event was received will be used.
 
 
 </Field>
-
-
 </Fields>
 
 ## How It Works

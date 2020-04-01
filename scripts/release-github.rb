@@ -19,14 +19,14 @@ SHA1 = ENV.fetch("CIRCLE_SHA1")
 # Setup
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, PAGES_ROOT)
+metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
 release = metadata.releases.to_h.fetch(:"#{VERSION}")
 
 #
 # Release
 #
 
-title("Releasing artifacts to Github")
+Printer.title("Releasing artifacts to Github")
 
 flags = [
   "--assets '#{ROOT_DIR}/target/artifacts/*'",
@@ -40,7 +40,7 @@ end
 
 command = "grease --debug create-release timberio/vector v#{VERSION} #{SHA1} #{flags.join(" ")}"
 
-say(
+Printer.say(
   <<~EOF
   Running command:
 

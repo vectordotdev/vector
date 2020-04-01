@@ -1,19 +1,27 @@
 [sources.kafka]
 title = "Kafka"
+noun = "Kafka"
 beta = true
 common = true
 delivery_guarantee = "at_least_once"
+<%= render("_partials/descriptions/_kafka.toml") %>
+features = [
+  "Consume one or more Kafka topics.",
+  "Checkpoint your position to ensure data is not lost between restarts.",
+  "Enrich your logs with useful Kafka context."
+]
 function_category = "collect"
-min_version = "0.8"
 output_types = ["log"]
-requirements = {}
-through_description = "Kafka 0.9 or later"
+requirements.kafka = ">= 0.8"
+service_providers = ["AWS", "Confluent"]
+strategies = ["service"]
+through_description = "[Kafka][urls.kafka]"
 
-<%= render("_partials/_component_options.toml", type: "source", name: "kafka") %>
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "kafka") %>
 
-<%= render("_partials/_kafka_common.toml", namespace: "sources.kafka") %>
+<%= render("_partials/fields/_kafka_options.toml", namespace: "sources.kafka.options") %>
 
-<%= render("_partials/_tls_connector_options.toml", namespace: "sources.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
+<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sources.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
 
 [sources.kafka.options.topics]
 type = "[string]"
@@ -39,7 +47,7 @@ The consumer group name to be used to consume events from Kafka.
 [sources.kafka.options.key_field]
 type = "string"
 common = true
-examples = ["user_id"]
+examples = ["topic"]
 description = """\
 The log field name to use for the topic key. If unspecified, the key would not \
 be added to the log event. If the message has null key, then this field would \

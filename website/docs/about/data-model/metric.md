@@ -1,8 +1,12 @@
 ---
+last_modified_on: "2020-04-01"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
 
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Jump from '@site/src/components/Jump';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/data-model-metric.svg" />
@@ -163,13 +167,7 @@ import TabItem from '@theme/TabItem';
 The metric data model is comprised of 6 types: [`aggregated_histogram`](#aggregated_histogram), [`aggregated_summary`](#aggregated_summary), [`counter`](#counter), [`distribution`](#distribution), [`gauge`](#gauge), [`set`](#set).
 You'll notice that certain fields are shared across all types.
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -194,8 +192,6 @@ metrics are aggregated.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -219,8 +215,6 @@ The metric name.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -245,8 +239,6 @@ key/value pairs in `string` format and cannot be nested.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -271,8 +263,6 @@ Vector.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -296,8 +286,6 @@ different attributes depending on the value type.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -322,8 +310,6 @@ configurable buckets. It also provides a sum of all observed values.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -347,8 +333,6 @@ The buckets contained within this histogram.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -372,8 +356,6 @@ The total number of values contained within the histogram.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -397,8 +379,6 @@ The number of values contained within each bucket.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -422,13 +402,9 @@ The sum of all values contained within the histogram.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -454,8 +430,6 @@ quantiles over a sliding time window.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -479,8 +453,6 @@ The total number of values contained within the summary.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -504,8 +476,6 @@ The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -529,8 +499,6 @@ The sum of all values contained within the summary.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -554,13 +522,9 @@ The values contained within the summary that align with the [`quantiles`](#quant
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -584,8 +548,6 @@ be decremented.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -609,13 +571,9 @@ The value to increment the counter by. Can only be positive.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -638,8 +596,6 @@ A distribution represents a distribution of sampled values.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -663,8 +619,6 @@ The rate at which each individual value was sampled.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -688,13 +642,9 @@ The list of values contained within the distribution.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -719,8 +669,6 @@ used to track fluctuations in values, like current memory or CPU usage.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -744,13 +692,9 @@ A specific point-in-time value for the gauge.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -773,8 +717,6 @@ A set represents a count of unique values, AKA the cardinality.
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -798,23 +740,15 @@ The list of unique values.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Components
-
-import Jump from '@site/src/components/Jump';
 
 <Jump to="/components/?event-types[]=metric">View all metric compatible components</Jump>
 

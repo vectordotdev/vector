@@ -11,8 +11,8 @@ method. Each installation guide provides it's own "Updating" section:
 
 ### <%= category.to_s.humanize %>
 
-<%- methods.each do |method| -%>
-<Jump to="[[[docs.<%= category %>.<%= method["id"] %>#updating]]]"><%= method["name"] %></Jump>
+<%- methods.values.each do |method| -%>
+<Jump to="[[[docs.<%= category %>.<%= method.name %>#updating]]]"><%= method.title %></Jump>
 <%- end -%>
 <%- end -%>
 
@@ -38,12 +38,3 @@ upstream data will accumulate and buffer. To avoid overloading your instances,
 you'll want to make sure you have enough capacity to handle the surplus of
 data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
-
-
-[docs.containers.docker#updating]: /docs/setup/installation/containers/docker#updating
-[docs.dpkg#updating]: /docs/setup/installation/package-managers/dpkg#updating
-[docs.from_archives#updating]: /docs/setup/installation/manual/from-archives#updating
-[docs.homebrew#updating]: /docs/setup/installation/package-managers/homebrew#updating
-[docs.installation]: /docs/setup/installation
-[docs.rpm#updating]: /docs/setup/installation/package-managers/rpm#updating
-[docs.topologies]: /docs/setup/deployment/topologies

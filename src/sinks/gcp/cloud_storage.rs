@@ -8,7 +8,7 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchBytesConfig, Buffer, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            SinkExt, TowerRequestConfig,
+            TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -237,8 +237,10 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let sink = crate::sinks::util::BatchServiceSink::new(svc, cx.acker())
-            .partitioned_batched_with_min(PartitionBuffer::new(Buffer::new(compression)), &batch)
+        let buffer = PartitionBuffer::new(Buffer::new(compression));
+
+        let sink = crate::sinks::util::PartitionBatchSink::new(svc, buffer, batch, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))

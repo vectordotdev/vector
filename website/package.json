@@ -10,9 +10,11 @@
     "deploy": "docusaurus deploy"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-alpha.48",
-    "@docusaurus/preset-classic": "^2.0.0-alpha.48",
-    "@docusaurus/utils": "^2.0.0-alpha.48",
+    "@docusaurus/core": "^2.0.0-alpha.49",
+    "@docusaurus/preset-classic": "^2.0.0-alpha.49",
+    "@docusaurus/utils": "^2.0.0-alpha.49",
+    "@types/fs-extra": "^8.1.0",
+    "@types/lodash": "^4.14.149",
     "axios": "^0.18.1",
     "cash-dom": "^4.1.5",
     "classnames": "^2.2.6",
@@ -27,10 +29,12 @@
     "react-dom": "^16.8.4",
     "react-github-btn": "^1.1.1",
     "react-inlinesvg": "^1.1.7",
+    "react-modal": "^3.11.2",
     "react-select": "^3.0.8",
     "reading-time": "^1.2.0",
     "strftime": "^0.10.0",
-    "svg.js": "^2.6.2"
+    "svg.js": "^2.6.2",
+    "titleize": "^2.1.0"
   },
   "browserslist": {
     "production": [

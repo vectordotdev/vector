@@ -1,0 +1,6 @@
+[installation.languages.ruby]
+title = "Ruby"
+interfaces = []
+strategies = [
+  {name = "daemon", source = "journald"},
+]

@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         rusoto::{self, AwsCredentialsProvider},
-        BatchEventsConfig, SinkExt, TowerRequestConfig,
+        BatchEventsConfig, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -102,8 +102,8 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let sink = request
-            .batch_sink(KinesisRetryLogic, kinesis, cx.acker())
-            .batched_with_min(Vec::new(), &batch)
+            .batch_sink(KinesisRetryLogic, kinesis, Vec::new(), batch, cx.acker())
+            .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
