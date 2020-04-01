@@ -56,9 +56,7 @@ Given the following `log` event:
 
 And a Vector configuration like:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "rename_fields"
   inputs = [...]

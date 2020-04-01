@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "beta"
 title: "Concat Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ of other fields to a new one.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "concat" # required
   inputs = ["my-source-id"] # required
@@ -51,9 +48,7 @@ of other fields to a new one.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "concat" # required
   inputs = ["my-source-id"] # required
@@ -209,9 +204,7 @@ The [`target`](#target) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_concat_transform_id]
   # ...
   target = "root_field_name"

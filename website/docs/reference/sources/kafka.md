@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -49,9 +48,7 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "kafka" # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
@@ -63,9 +60,7 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "kafka" # required

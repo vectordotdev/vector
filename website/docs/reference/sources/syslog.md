@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "syslog" # required
   address = "0.0.0.0:514" # required, required when mode = "tcp" or mode = "udp"
@@ -63,9 +60,7 @@ events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "syslog" # required

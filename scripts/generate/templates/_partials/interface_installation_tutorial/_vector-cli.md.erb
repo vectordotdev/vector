@@ -13,7 +13,7 @@
 
 <ConfigExample
   format="toml"
-  path="vector.toml"
+  path={<%= interface.config_path.to_json %>}
   sourceName={<%= (source && source.name).to_json %>}
   sinkName={<%= (sink && sink.name).to_json %>} />
 
@@ -22,9 +22,7 @@
 
 ### Start Vector
 
-```bash
-vector --config vector.toml
-```
+<%= interface_start(interface, requirements: (source && source.requirements)) %>
 
 That's it! Simple and to the point. Hit `ctrl+c` to exit.
 

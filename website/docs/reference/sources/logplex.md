@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "Heroku Logplex"
 description: "The Vector `logplex` source ingests data through the Heroku Logplex HTTP Drain protocol and outputs `log` events."
@@ -15,7 +15,6 @@ unsupported_operating_systems: []
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -50,9 +49,7 @@ protocol][urls.logplex_protocol] and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "logplex" # required
   address = "0.0.0.0:80" # required
@@ -61,9 +58,7 @@ protocol][urls.logplex_protocol] and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   # General
   type = "logplex" # required

@@ -2,7 +2,7 @@
 title = "Filter"
 allow_you_to_description = "select events based on a set of logical conditions"
 beta = true
-common = false
+common = true
 function_category = "filter"
 input_types = ["log"]
 output_types = ["log"]
@@ -12,10 +12,11 @@ requirements = {}
 
 [transforms.filter.options.condition]
 type = "table"
-common = false
+common = true
 required = true
 description = """\
-The set of logical conditions to be matched against every input event.\
+The set of logical conditions to be matched against every input event. Only \
+messages that pass all conditions will be forwarded.\
 """
 
 <%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.filter.options.condition.children") %>
@@ -26,9 +27,7 @@ body = """\
 The `filter` transform is a simple conditional match, forwarding only those messages that pass all the conditions.
 In this example, we drop all events that do not come from the host `gerry`:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.from_gerry]
   inputs = [ "somewhere" ]
   type = "filter"

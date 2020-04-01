@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR."
@@ -14,7 +14,6 @@ title: "Console Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -34,9 +33,7 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "console" # required

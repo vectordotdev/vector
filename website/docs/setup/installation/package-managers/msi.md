@@ -89,7 +89,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="config\vector.toml"
+      path={"config\\vector.toml"}
       sourceName={"file"}
       sinkName={null} />
 
@@ -166,7 +166,7 @@ The following diagram demonstrates how it works.
 
     <ConfigExample
       format="toml"
-      path="config\vector.toml"
+      path={"config\\vector.toml"}
       sourceName={"vector"}
       sinkName={null} />
 

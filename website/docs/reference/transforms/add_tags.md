@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events allowing you to add one or more metric tags."
 event_types: ["metric"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Add Tags Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ add one or more metric tags.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "add_tags" # required

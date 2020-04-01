@@ -3128,7 +3128,7 @@ module.exports = {
       "title": "Windows Support Is Here!"
     },
     {
-      "author_github": "https://github.com/Jeffail",
+      "author_github": "https://github.com/binarylogic",
       "date": "2019-11-25",
       "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
       "id": "unit-testing-vector-config-files",
@@ -15625,7 +15625,7 @@ module.exports = {
           "title": "Windows Support Is Here!"
         },
         {
-          "author_github": "https://github.com/Jeffail",
+          "author_github": "https://github.com/binarylogic",
           "date": "2019-11-25",
           "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
           "id": "unit-testing-vector-config-files",
@@ -26191,43 +26191,6 @@ module.exports = {
       "short_description": "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache.",
       "status": "prod-ready",
       "title": "Dedupe events",
-      "type": "transform",
-      "unsupported_operating_systems": [
-
-      ]
-    },
-    "field_filter": {
-      "beta": true,
-      "config_examples": {
-        "toml": "[transforms.out]\n  type = \"field_filter\" # required\n  inputs = [\"in\"] # required\n  field = \"application_id\" # required\n  value = \"/var/log/nginx.log\" # required"
-      },
-      "delivery_guarantee": null,
-      "description": null,
-      "event_types": [
-        "log"
-      ],
-      "features": [
-
-      ],
-      "function_category": "filter",
-      "id": "field_filter_transform",
-      "inpuut_types": [
-        "log"
-      ],
-      "logo_path": null,
-      "name": "field_filter",
-      "operating_systems": [
-
-      ],
-      "output_types": [
-        "log"
-      ],
-      "service_providers": [
-
-      ],
-      "short_description": "Accepts log events and allows you to filter events by a log field's value.",
-      "status": "beta",
-      "title": "Field Filter",
       "type": "transform",
       "unsupported_operating_systems": [
 

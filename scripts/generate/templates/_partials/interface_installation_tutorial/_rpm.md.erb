@@ -27,15 +27,13 @@
 
     <ConfigExample
       format="toml"
-      path="/etc/vector/vector.toml"
+      path={<%= interface.config_path.to_json %>}
       sourceName={<%= (source && source.name).to_json %>}
       sinkName={<%= (sink && sink.name).to_json %>} />
 
 4.  ### Start Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+<%= interface_start(interface, requirements: (source && source.requirements)).indent(4) %>
 
 </TabItem>
 <%- end -%>

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
@@ -14,7 +14,6 @@ title: "New Relic Logs Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -43,9 +42,7 @@ API][urls.new_relic_log_api].
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "new_relic_logs" # required
@@ -62,9 +59,7 @@ API][urls.new_relic_log_api].
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "new_relic_logs" # required

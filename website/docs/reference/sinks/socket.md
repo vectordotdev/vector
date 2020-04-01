@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or UDS socket."
@@ -14,7 +14,6 @@ title: "Socket Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -43,9 +42,7 @@ The Vector `socket` sink
 
 <TabItem value="unix">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   mode = "tcp" # required
   path = "/path/to/socket" # required, required when mode = "unix"
@@ -54,9 +51,7 @@ The Vector `socket` sink
 </TabItem>
 <TabItem value="udp">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
@@ -65,9 +60,7 @@ The Vector `socket` sink
 </TabItem>
 <TabItem value="tcp">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
@@ -76,9 +69,7 @@ The Vector `socket` sink
 </TabItem>
 <TabItem value="unix-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   mode = "tcp" # required
@@ -94,9 +85,7 @@ The Vector `socket` sink
 </TabItem>
 <TabItem value="udp-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
@@ -112,9 +101,7 @@ The Vector `socket` sink
 </TabItem>
 <TabItem value="tcp-adv">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"

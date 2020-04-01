@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Coercer"
 description: "The Vector `coercer` transform accepts and outputs `log` events allowing you to coerce log fields into fixed types."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Coercer Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -38,9 +37,7 @@ into fixed types.
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "coercer" # required
@@ -58,9 +55,7 @@ into fixed types.
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "coercer" # required
@@ -192,9 +187,7 @@ Given the following input:
 
 And the following configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.<transform-id>]
   type = "coercer"
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Regex Parser Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ log field's value with a [Regular Expression][urls.regex].
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "regex_parser" # required
@@ -266,9 +263,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_regex_parser_transform_id]
   # ...
   field = "message"

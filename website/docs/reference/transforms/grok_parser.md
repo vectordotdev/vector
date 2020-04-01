@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "prod-ready"
 title: "Grok Parser Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ log field value with [Grok][urls.grok].
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "grok_parser" # required
@@ -221,9 +218,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_grok_parser_transform_id]
   # ...
   field = "message"

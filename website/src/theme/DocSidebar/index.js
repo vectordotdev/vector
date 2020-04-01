@@ -8,6 +8,7 @@ import isInternalUrl from '@docusaurus/utils';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
+import useLogo from '@theme/hooks/useLogo';
 
 import styles from './styles.module.css';
 
@@ -150,9 +151,10 @@ function mutateSidebarCollapsingState(item, path) {
 function DocSidebar(props) {
   const [showResponsiveSidebar, setShowResponsiveSidebar] = useState(false);
   const {
-    siteConfig: {themeConfig: {navbar: {title, logo = {}} = {}}} = {},
+    siteConfig: {themeConfig: {navbar: {title} = {}}} = {},
+    isClient,
   } = useDocusaurusContext();
-  const logoUrl = useBaseUrl(logo.src);
+  const {logoLink, logoLinkProps, logoImageUrl, logoAlt} = useLogo();
 
 
   const {
@@ -184,10 +186,12 @@ function DocSidebar(props) {
 
   return (
     <div className={styles.sidebar}>
-      <div className={classnames(styles.sidebarLogo, 'sidebar__logo')}>
-        {logo != null && <SVG src={logoUrl} alt={logo.alt} />}
+      <Link className={classnames('sidebar__logo', styles.sidebarLogo)} to={logoLink} {...logoLinkProps}>
+        {logoImageUrl != null && (
+          <SVG key={isClient} src={logoImageUrl} alt={logoAlt} />
+        )}
         {title != null && <strong>{title}</strong>}
-      </div>
+      </Link>
       <div
         className={classnames('menu', 'menu--responsive', styles.menu, {
           'menu--show': showResponsiveSidebar,

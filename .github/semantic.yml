@@ -92,7 +92,6 @@ scopes:
   - coercer transform
   - concat transform
   - dedupe transform
-  - field_filter transform
   - filter transform
   - geoip transform
   - grok_parser transform

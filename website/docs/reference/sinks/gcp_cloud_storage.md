@@ -14,7 +14,6 @@ title: "GCP Cloud Storage (GCS) Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -43,9 +42,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
@@ -68,9 +65,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "gcp_cloud_storage" # required
@@ -1370,9 +1365,7 @@ values derived from the event's data. This syntax accepts
 [strptime specifiers][urls.strptime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.my_gcp_cloud_storage_sink_id]
   # ...
   key_prefix = "date=%F/"

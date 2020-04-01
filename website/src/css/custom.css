@@ -857,7 +857,7 @@ input[type="text"] {
   border-radius: calc( var(--ifm-global-radius) * var(--ifm-button-size-multiplier) );
   box-shadow: var(--ifm-panel-box-shadow);
   box-sizing: border-box;
-  color: var(--ifm-font-base-color);
+  color: var(--ifm-heading-color);
   display: inline-block;
   font-size: calc(0.8rem * var(--ifm-button-size-multiplier));
   line-height: 1.5;
@@ -871,6 +871,7 @@ input[type="text"]:focus {
   background: var(--ifm-panel-background-active);
   border-color: var(--ifm-color-primary);
   box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-color-primary);
 }
 input.input--block {
   display: block !important;

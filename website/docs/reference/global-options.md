@@ -1,9 +1,9 @@
 ---
+last_modified_on: "2020-04-01"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -21,9 +21,7 @@ Vector as a whole and set defaults for component options.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 # General
 data_dir = "/var/lib/vector" # optional, no default
 dns_servers = ["0.0.0.0:53"] # optional, no default

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 delivery_guarantee: "best_effort"
 component_title: "Sematext Logs"
 description: "The Vector `sematext_logs` sink batches `log` events to Sematext via the Elasticsearch API."
@@ -14,7 +14,6 @@ title: "Sematext Logs Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -42,9 +41,7 @@ The Vector `sematext_logs` sink
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
@@ -55,9 +52,7 @@ The Vector `sematext_logs` sink
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "sematext_logs" # required

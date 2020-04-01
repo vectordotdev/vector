@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field."
 event_types: ["log"]
@@ -11,7 +11,6 @@ status: "beta"
 title: "Logfmt Parser Transform"
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 
@@ -29,9 +28,7 @@ data from a logfmt-formatted log field.
 
 ## Configuration
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "logfmt_parser" # required
@@ -184,9 +181,7 @@ The [`field`](#field) options
 support [Vector's field notiation syntax][docs.reference.field-path-notation],
 enabling access to root-level, nested, and array field values. For example:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_logfmt_parser_transform_id]
   # ...
   field = "message"

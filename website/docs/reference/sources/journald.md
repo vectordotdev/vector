@@ -15,7 +15,6 @@ unsupported_operating_systems: ["MacOS","Windows"]
 ---
 
 import Alert from '@site/src/components/Alert';
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -51,9 +50,7 @@ utility and [outputs `log` events](#output).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "journald" # required
   current_boot_only = true # optional, default
@@ -63,9 +60,7 @@ utility and [outputs `log` events](#output).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sources.my_source_id]
   type = "journald" # required
   batch_size = 16 # optional, default

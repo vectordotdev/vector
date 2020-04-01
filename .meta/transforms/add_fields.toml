@@ -46,9 +46,7 @@ label = "Generic"
 body = """\
 Given the following configuration:
 
-<CodeHeader text="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]

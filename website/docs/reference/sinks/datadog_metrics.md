@@ -14,7 +14,6 @@ title: "Datadog Metrics Sink"
 unsupported_operating_systems: []
 ---
 
-import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import Tabs from '@theme/Tabs';
@@ -42,9 +41,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 <TabItem value="common">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "datadog_metrics" # required
   inputs = ["my-source-id"] # required
@@ -56,9 +53,7 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 </TabItem>
 <TabItem value="advanced">
 
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "datadog_metrics" # required

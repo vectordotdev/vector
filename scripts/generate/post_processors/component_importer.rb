@@ -11,7 +11,6 @@ module PostProcessors
       'Accordion' => "import Accordion from '@site/src/components/Accordion';",
       'Alert' => "import Alert from '@site/src/components/Alert';",
       'CodeExplanation' => "import CodeExplanation from '@site/src/components/CodeExplanation';",
-      'CodeHeader' => "import CodeHeader from '@site/src/components/CodeHeader';",
       'ConfigExample' => "import ConfigExample from '@site/src/components/ConfigExample';",
       'DaemonDiagram' => "import DaemonDiagram from '@site/src/components/DaemonDiagram';",
       'Diagram' => "import Diagram from '@site/src/components/Diagram';",
