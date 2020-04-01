@@ -205,7 +205,7 @@ fn main() {
 
     trace::init(color, json, levels.as_str());
 
-    metrics::init();
+    metrics::init().expect("metrics initialization failed");
 
     sub_command.map(|s| {
         std::process::exit(match s {
