@@ -91,8 +91,6 @@ endpoint][urls.datadog_logs_endpoints].
 </TabItem>
 </Tabs>
 
-## Options
-
 <Fields filters={true}>
 <Field
   common={true}
