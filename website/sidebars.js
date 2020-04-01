@@ -23,6 +23,7 @@ module.exports = {
       type: 'category',
       label: 'Setup',
       items: [
+        "setup",
         {
           type: 'category',
           label: 'Installation',

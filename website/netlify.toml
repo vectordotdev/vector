@@ -80,19 +80,19 @@
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/"
-  to = "/docs/setup/strategies/"
+  to = "/docs/setup/deployment/strategies/"
   status = 301
   force = true
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/agent/"
-  to = "/docs/setup/strategies/"
+  to = "/docs/setup/deployment/strategies/"
   status = 301
   force = true
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/service/"
-  to = "/docs/setup/strategies/"
+  to = "/docs/setup/deployment/strategies/"
   status = 301
   force = true
 
