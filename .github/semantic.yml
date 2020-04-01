@@ -59,7 +59,6 @@ scopes:
   - yandex provider
   - datadog provider
   - elastic provider
-  - google provider
   - gcp provider
   - honeycomb provider
   - humio provider

@@ -24678,7 +24678,7 @@ module.exports = {
         "Windows"
       ],
       "service_providers": [
-        "Google"
+        "GCP"
       ],
       "short_description": "Batches log events to [Google Cloud Platform's BigQuery service][urls.gcp_bigquery] via the [REST Interface][urls.gcp_bigquery_rest].",
       "status": "beta",
