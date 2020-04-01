@@ -44,7 +44,7 @@ promhttp_metric_handler_requests_total{code="200"} 100
 
 A metric event will be output with the following structure:
 
-```json title="Example log event"
+```json title="Example metric event"
 {
   "name": "promhttp_metric_handler_requests_total",
   "kind": "absolute",
