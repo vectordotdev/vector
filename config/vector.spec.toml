@@ -1506,37 +1506,6 @@ dns_servers = ["0.0.0.0:53"]
     # * type: [string]
     match = ["field1", "parent.child_field"]
 
-# Accepts and outputs `log` events allowing you to filter events by a log field's value.
-[transforms.field_filter]
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "field_filter"
-  type = "field_filter"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # The target log field to compare against the `value`.
-  #
-  # * required
-  # * type: string
-  field = "application_id"
-  field = "parent.child"
-  field = "array[0]"
-
-  # If the value of the specified `field` matches this value then the event will
-  # be permitted, otherwise it is dropped.
-  #
-  # * required
-  # * type: string
-  value = "/var/log/nginx.log"
-
 # Accepts and outputs `log` events allowing you to select events based on a set of logical conditions.
 [transforms.filter]
   #

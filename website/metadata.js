@@ -26196,43 +26196,6 @@ module.exports = {
 
       ]
     },
-    "field_filter": {
-      "beta": true,
-      "config_examples": {
-        "toml": "[transforms.out]\n  type = \"field_filter\" # required\n  inputs = [\"in\"] # required\n  field = \"application_id\" # required\n  value = \"/var/log/nginx.log\" # required"
-      },
-      "delivery_guarantee": null,
-      "description": null,
-      "event_types": [
-        "log"
-      ],
-      "features": [
-
-      ],
-      "function_category": "filter",
-      "id": "field_filter_transform",
-      "inpuut_types": [
-        "log"
-      ],
-      "logo_path": null,
-      "name": "field_filter",
-      "operating_systems": [
-
-      ],
-      "output_types": [
-        "log"
-      ],
-      "service_providers": [
-
-      ],
-      "short_description": "Accepts log events and allows you to filter events by a log field's value.",
-      "status": "beta",
-      "title": "Field Filter",
-      "type": "transform",
-      "unsupported_operating_systems": [
-
-      ]
-    },
     "filter": {
       "beta": true,
       "config_examples": {

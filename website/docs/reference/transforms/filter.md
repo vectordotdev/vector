@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-03-31"
+last_modified_on: "2020-04-01"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` events allowing you to select events based on a set of logical conditions."
 event_types: ["log"]
@@ -14,8 +14,6 @@ title: "Filter Transform"
 import CodeHeader from '@site/src/components/CodeHeader';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 
 The Vector `filter` transform
 accepts and [outputs `log` events](#output) allowing you to select events based
@@ -31,24 +29,6 @@ on a set of logical conditions.
 
 ## Configuration
 
-<Tabs
-  block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
-<TabItem value="common">
-
-<CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
-[transforms.my_transform_id]
-  type = "filter" # required
-  inputs = ["my-source-id"] # required
-```
-
-</TabItem>
-<TabItem value="advanced">
-
 <CodeHeader text="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
 
 ```toml
@@ -60,15 +40,10 @@ on a set of logical conditions.
   # Condition
   condition.type = "check_fields" # optional, default
   condition."message.eq" = "this is the content to match against" # example
-  condition."host.exists" = true # example
-  condition."method.neq" = "POST" # example
   condition."message.contains" = "foo" # example
   condition."environment.ends_with" = "-staging" # example
   condition."environment.starts_with" = "staging-" # example
 ```
-
-</TabItem>
-</Tabs>
 
 ## Options
 
@@ -76,7 +51,7 @@ on a set of logical conditions.
 
 
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -92,7 +67,8 @@ on a set of logical conditions.
 
 ### condition
 
-The set of logical conditions to be matched against every input event.
+The set of logical conditions to be matched against every input event. Only
+messages that pass all conditions will be forwarded.
 
 
 
