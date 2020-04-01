@@ -146,8 +146,6 @@ module.exports = {
             
               "reference/transforms/dedupe",
             
-              "reference/transforms/field_filter",
-            
               "reference/transforms/filter",
             
               "reference/transforms/geoip",

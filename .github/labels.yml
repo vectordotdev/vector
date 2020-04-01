@@ -306,9 +306,6 @@
 - name: "transform: dedupe"
   description: Anything `dedupe` transform related
   color: 54a0ff
-- name: "transform: field_filter"
-  description: Anything `field_filter` transform related
-  color: 54a0ff
 - name: "transform: filter"
   description: Anything `filter` transform related
   color: 54a0ff
