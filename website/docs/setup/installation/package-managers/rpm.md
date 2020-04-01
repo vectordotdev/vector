@@ -8,7 +8,6 @@ description: Install Vector through the RPM package manager
 import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -29,7 +28,7 @@ generally used on CentOS.
 <Tabs
   block={true}
   defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+  values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -163,139 +162,6 @@ The following diagram demonstrates how it works.
 </TabItem>
 </Tabs>
 </TabItem>
-<TabItem value="service">
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-Typically, upstream sources are other Vector instances sending data via the
-[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
-[sources][docs.sources].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={null}
-  sinkName={null} />
-
----
-
-<Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"rpm"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
-<TabItem value="rpm">
-
-<Steps headingDepth={3}>
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="arm64"
-  values={[{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"},{"label":"x86_64","value":"x86_64"}]}>
-
-<TabItem value="arm64">
-
-1.  ### Download the Vector `.rpm` file
-
-    ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-aarch64.rpm
-    ```
-
-    [Looking for a specific version?][docs.package_managers.rpm#versions]
-
-2.  ### Install the Vector `.rpm` package directly
-
-    ```bash
-    sudo rpm -i vector-aarch64.rpm
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"vector"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-<TabItem value="armv7">
-
-1.  ### Download the Vector `.rpm` file
-
-    ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-armv7hl.rpm
-    ```
-
-    [Looking for a specific version?][docs.package_managers.rpm#versions]
-
-2.  ### Install the Vector `.rpm` package directly
-
-    ```bash
-    sudo rpm -i vector-armv7hl.rpm
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"vector"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-<TabItem value="x86_64">
-
-1.  ### Download the Vector `.rpm` file
-
-    ```bash
-    curl -O https://packages.timber.io/vector/0.8.X/vector-x86_64.rpm
-    ```
-
-    [Looking for a specific version?][docs.package_managers.rpm#versions]
-
-2.  ### Install the Vector `.rpm` package directly
-
-    ```bash
-    sudo rpm -i vector-x86_64.rpm
-    ```
-
-3.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"vector"}
-      sinkName={null} />
-
-4.  ### Start Vector
-
-    ```bash
-    sudo systemctl start vector
-    ```
-
-</TabItem>
-</Tabs>
-</Steps>
-
-</TabItem>
-</Tabs>
-</TabItem>
 </Tabs>
 
 ## Configuring
@@ -399,11 +265,9 @@ Vector's RPM source files are located in
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.rpm#versions]: /docs/setup/installation/package-managers/rpm/#versions
-[docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
-[docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.rpm]: https://rpm.org/
 [urls.systemd]: https://systemd.io/
 [urls.vector_releases]: https://vector.dev/releases/latest

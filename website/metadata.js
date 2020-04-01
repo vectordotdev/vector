@@ -2799,10 +2799,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "dpkg"
@@ -2819,10 +2815,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "file"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "homebrew"
@@ -2839,10 +2831,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "file"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "msi"
@@ -2859,10 +2847,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "nix"
@@ -2879,10 +2863,6 @@ module.exports = {
           {
             "name": "daemon",
             "source": "journald"
-          },
-          {
-            "name": "service",
-            "source": "vector"
           }
         ],
         "name": "rpm"

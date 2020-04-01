@@ -10,7 +10,6 @@ import CodeExplanation from '@site/src/components/CodeExplanation';
 import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -39,7 +38,7 @@ delayed. Generally new Vector releases are made available within a few days.
 <Tabs
   block={true}
   defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+  values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -91,78 +90,6 @@ The following diagram demonstrates how it works.
       format="toml"
       path={"/etc/vector/vector.toml"}
       sourceName={"journald"}
-      sinkName={null} />
-
-3.  ### Start Vector
-
-    ```bash
-    vector --config /etc/vector/vector.toml
-    ```
-
-    <CodeExplanation>
-
-    * `vector` is placed in your `$PATH`.
-    * You must create a [Vector configuration file][docs.configuration] to
-      successfully start Vector.
-
-    </CodeExplanation>
-
-</Steps>
-
-</TabItem>
-</Tabs>
-</TabItem>
-<TabItem value="service">
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-Typically, upstream sources are other Vector instances sending data via the
-[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
-[sources][docs.sources].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={null}
-  sinkName={null} />
-
----
-
-<Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"nix"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"Nix","value":"nix"}]}>
-<TabItem value="nix">
-
-<Steps headingDepth={3}>
-
-1.  ### Install Vector
-
-    ```bash
-    nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
-    ```
-
-    <CodeExplanation>
-
-    * The `--file` flag ensures that you're installing the latest stable version
-      of Vector (0.8.2).
-    * The `--attr` improves installation speed.
-
-    </CodeExplanation>
-
-    [Looking for a specific version?][docs.package_managers.nix#versions]
-
-2.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"vector"}
       sinkName={null} />
 
 3.  ### Start Vector
@@ -279,11 +206,9 @@ Vector's Nix source files are located in the
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.nix#versions]: /docs/setup/installation/package-managers/nix/#versions
 [docs.process-management#starting]: /docs/administration/process-management/#starting
-[docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
-[docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.nix]: https://nixos.org/nix/
 [urls.nixos]: https://nixos.org/
 [urls.vector_nix_package]: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix
