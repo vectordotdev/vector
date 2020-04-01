@@ -340,12 +340,6 @@ mod tests {
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
-[log_schema]
-message_key = "message"
-timestamp_key = "timestamp"
-host_key = "host"
-kubernetes_key = "kubernetes"
-
 [sources.source0]
 max_length = 102400
 type = "stdin"
@@ -373,12 +367,6 @@ when_full = "block"
             generate_example(true, "stdin|json_parser|console"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
-
-[log_schema]
-message_key = "message"
-timestamp_key = "timestamp"
-host_key = "host"
-kubernetes_key = "kubernetes"
 
 [sources.source0]
 max_length = 102400
@@ -408,12 +396,6 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
-[log_schema]
-message_key = "message"
-timestamp_key = "timestamp"
-host_key = "host"
-kubernetes_key = "kubernetes"
-
 [sources.source0]
 max_length = 102400
 type = "stdin"
@@ -436,12 +418,6 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
 
-[log_schema]
-message_key = "message"
-timestamp_key = "timestamp"
-host_key = "host"
-kubernetes_key = "kubernetes"
-
 [sinks.sink0]
 healthcheck = true
 inputs = ["TODO"]
@@ -459,12 +435,6 @@ when_full = "block"
             generate_example(true, "/add_fields,json_parser,remove_fields"),
             Ok(r#"data_dir = "/var/lib/vector/"
 dns_servers = []
-
-[log_schema]
-message_key = "message"
-timestamp_key = "timestamp"
-host_key = "host"
-kubernetes_key = "kubernetes"
 
 [transforms.transform0]
 inputs = []
