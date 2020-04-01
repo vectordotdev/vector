@@ -11,7 +11,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::Future;
+use futures01::{Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
@@ -74,7 +74,8 @@ impl SinkConfig for BigQueryConfig {
             batch_settings,
             None,
             &cx,
-        );
+        )
+        .sink_map_err(|error| error!("Fatal GCP BigQuery sink error: {}", error));
 
         Ok((Box::new(service), healthcheck))
     }
