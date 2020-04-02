@@ -496,11 +496,12 @@ function (event, emit)
 end
 ```
 
-### Lua Manual
+### Learning Lua
 
-Understanding Lua and how to write it is outside of the scope of Vector. We
-encourage you to take a look at the [Lua manual][urls.lua_manual] for more
-information.
+In order to write non-trivial transforms in Lua, one has to have basic
+understanding of Lua. Because Lua is an easy to learn language, reading the
+first few chapters of [the official book][urls.lua_pil] or consulting
+[the manual][urls.lua_manual] would suffice.
 
 ### Lua Version
 
@@ -527,8 +528,6 @@ Vector provides a [`search_dirs`](#search_dirs) option that allows you to specif
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 
-
-
 ### Types
 
 Event fields can be set to scalar values (booleans, numbers, or strings),
@@ -544,7 +543,8 @@ set to an invalid value, a message will be logged and the field will be dropped.
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.data_model]: /docs/about/data-model/
 [urls.lua]: https://www.lua.org/
-[urls.lua_manual]: https://www.lua.org/manual/5.1/manual.html
+[urls.lua_manual]: https://www.lua.org/manual/5.3/manual.html
 [urls.lua_pairs]: https://www.lua.org/manual/5.3/manual.html#pdf-pairs
-[urls.lua_require]: https://www.lua.org/manual/5.1/manual.html#pdf-require
+[urls.lua_pil]: https://www.lua.org/pil/
+[urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
 [urls.rlua]: https://github.com/kyren/rlua

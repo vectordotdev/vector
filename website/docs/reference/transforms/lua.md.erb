@@ -133,20 +133,19 @@ function (event, emit)
 end
 ```
 
-### Lua Manual
-
-Understanding Lua and how to write it is outside of the scope of Vector. We
-encourage you to take a look at the [Lua manual][urls.lua_manual] for more
-information.
-
-### Lua Version
-
-Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
-
 ### Search Directories
 
 Vector provides a `search_dirs` option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 
+### Lua Version
 
+Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
+
+### Learning Lua
+
+In order to write non-trivial transforms in Lua, one has to have basic
+understanding of Lua. Because Lua is an easy to learn language, reading the
+first few chapters of [the official book][urls.lua_pil] or consulting
+[the manual][urls.lua_manual] would suffice.
