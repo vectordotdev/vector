@@ -14,7 +14,7 @@ class AccessibleHash < Hash
       elsif key?(name.to_s)
         self[name.to_s]
       else
-        raise(NoMethodError.new("Method #{name} does not exist on:\n\n  #{inspect}"))
+        raise(NoMethodError.new("Method `#{name}` does not exist on:\n\n  #{inspect}"))
       end
     end
 
