@@ -13,7 +13,7 @@ type = "string"
 common = true
 required = true
 description = """
-Transform API version. Indicates the version 2 is used instead of version 1,\
+Transform API version. Indicates the version 2 is used instead of version 1,
 which is supported, but deprecated.\
 """
 enum = { 2 = "Lua transform API version 2" }
@@ -28,7 +28,7 @@ custom_module = require('custom_module')\
 """
 ]
 description = """
-In version 2 it is the source which is evaluated when the transform is created.\
+In version 2 it is the source which is evaluated when the transform is created.
 In version 1 it is the inline Lua source called for each incoming event.\
 """
 

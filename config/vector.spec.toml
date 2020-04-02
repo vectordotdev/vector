@@ -1970,8 +1970,8 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
-  # Transform API version. Indicates the version 2 is used instead of version
-  # 1,which is supported, but deprecated.
+  # Transform API version. Indicates the version 2 is used instead of version 1,
+  # which is supported, but deprecated.
   #
   # * required
   # * type: string
@@ -1987,8 +1987,8 @@ dns_servers = ["0.0.0.0:53"]
   search_dirs = ["/etc/vector/lua"]
 
   # In version 2 it is the source which is evaluated when the transform is
-  # created.In version 1 it is the inline Lua source called for each incoming
-  # event.
+  # created.
+  # In version 1 it is the inline Lua source called for each incoming event.
   #
   # * optional
   # * no default

@@ -222,8 +222,8 @@ A list of directories search when loading a Lua file via the `require` function.
 
 ### source
 
-In version 2 it is the source which is evaluated when the transform is
-created.In version 1 it is the inline Lua source called for each incoming event.
+In version 2 it is the source which is evaluated when the transform is created.
+In version 1 it is the inline Lua source called for each incoming event.
 
 
 
@@ -318,8 +318,8 @@ Defines the interval at which the timer handler would be executed.
 
 ### version
 
-Transform API version. Indicates the version 2 is used instead of version
-1,which is supported, but deprecated.
+Transform API version. Indicates the version 2 is used instead of version 1,
+which is supported, but deprecated.
 
 
 
