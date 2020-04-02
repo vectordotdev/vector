@@ -2034,16 +2034,38 @@ end
   end
   """
 
-    # A function which is called when the trasnform is initialized.
+    # A function which is called when Vector is stopped. It can produce new events
+    # using `emit` function.
+    #
+    # * required
+    # * type: string
+    shutdown = """
+  function (emit)
+    emit {
+      log = {
+        message = "shutting down..."
+      }
+    }
+  end
+  """
+
+    # A function which is called when the first event comes, before calling
+    # `hooks.process`
     #
     # * optional
     # * no default
     # * type: string
     init = """
-  function ()
+  function (emit)
     local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
     hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
     f:close() -- close the pipe
+
+    emit {
+      log = {
+        message = "initialized!"
+      }
+    }
   end
   """
 

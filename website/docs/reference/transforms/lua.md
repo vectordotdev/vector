@@ -34,11 +34,76 @@ a full embedded [Lua][urls.lua] engine.
 <Tabs
   block={true}
   defaultValue="v2"
-  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"}]}>
+  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
 
 <TabItem value="v2">
 
 ```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
+  version = "2" # required
+
+  # Hooks
+  hooks.process = """
+  function (event, emit)
+    event.log.field = "value" -- set value of a field
+    event.log.another_field = nil -- remove field
+    event.log.first, event.log.second = nil, event.log.first -- rename field
+    emit(event) -- emit the processed event
+  end
+  """ # required
+  hooks.shutdown = """
+  function (emit)
+    emit {
+      log = {
+        message = "shutting down..."
+      }
+    }
+  end
+  """ # required
+  hooks.init = """
+  function (emit)
+    local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
+    hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
+    f:close() -- close the pipe
+
+    emit {
+      log = {
+        message = "initialized!"
+      }
+    }
+  end
+  """ # optional, no default
+```
+
+</TabItem>
+<TabItem value="v1">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
+  source = """
+  require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
+
+  if event["host"] == nil then
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname = string.gsub(hostname, "\n$", "")
+    event["host"] = hostname
+  end
+  """ # required
+```
+
+</TabItem>
+<TabItem value="v2-adv">
+
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
 [transforms.my_transform_id]
   # General
   type = "lua" # required
@@ -55,19 +120,36 @@ a full embedded [Lua][urls.lua] engine.
     emit(event) -- emit the processed event
   end
   """ # required
+  hooks.shutdown = """
+  function (emit)
+    emit {
+      log = {
+        message = "shutting down..."
+      }
+    }
+  end
+  """ # required
   hooks.init = """
-  function ()
+  function (emit)
     local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
     hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
     f:close() -- close the pipe
+
+    emit {
+      log = {
+        message = "initialized!"
+      }
+    }
   end
   """ # optional, no default
 ```
 
 </TabItem>
-<TabItem value="v1">
+<TabItem value="v1-adv">
 
-```toml title="vector.toml"
+<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
+
+```toml
 [transforms.my_transform_id]
   type = "lua" # required
   inputs = ["my-source-id"] # required
@@ -115,7 +197,7 @@ Configures hooks handlers.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["function ()\n  local f = io.popen (\"/bin/hostname\") -- run \"hostname\" command to determine the hostname\n  hostname = f:read(\"*a\") or \"\" -- set a global variable which can be used in other hooks\n  f:close() -- close the pipe\nend"]}
+  examples={["function (emit)\n  local f = io.popen (\"/bin/hostname\") -- run \"hostname\" command to determine the hostname\n  hostname = f:read(\"*a\") or \"\" -- set a global variable which can be used in other hooks\n  f:close() -- close the pipe\n\n  emit {\n    log = {\n      message = \"initialized!\"\n    }\n  }\nend"]}
   groups={["v2"]}
   name={"init"}
   path={"hooks"}
@@ -128,7 +210,8 @@ Configures hooks handlers.
 
 #### init
 
-A function which is called when the trasnform is initialized.
+A function which is called when the first event comes, before calling
+`hooks.process`
 
 
 
@@ -158,11 +241,39 @@ using `emit` function.
 
 
 </Field>
+
+
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["function (emit)\n  emit {\n    log = {\n      message = \"shutting down...\"\n    }\n  }\nend"]}
+  groups={["v2"]}
+  name={"shutdown"}
+  path={"hooks"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### shutdown
+
+A function which is called when Vector is stopped. It can produce new events
+using `emit` function.
+
+
+
+
+</Field>
+
+
 </Fields>
 
 </Field>
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={[["/etc/vector/lua"]]}

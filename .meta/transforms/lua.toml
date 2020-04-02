@@ -47,7 +47,8 @@ description = "The inline Lua source to evaluate."
 type = "[string]"
 groups = ["v1", "v2"]
 examples = [["/etc/vector/lua"]]
-common = true
+common = false
+required = false
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
@@ -67,14 +68,20 @@ groups = ["v2"]
 common = true
 required = false
 description = """\
-A function which is called when the trasnform is initialized.\
+A function which is called when the first event comes, before calling `hooks.process`\
 """
 examples = [
 """\
-function ()
+function (emit)
   local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
   hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
   f:close() -- close the pipe
+
+  emit {
+    log = {
+      message = "initialized!"
+    }
+  }
 end\
 """
 ]
@@ -94,6 +101,26 @@ function (event, emit)
   event.log.another_field = nil -- remove field
   event.log.first, event.log.second = nil, event.log.first -- rename field
   emit(event) -- emit the processed event
+end\
+"""
+]
+
+[transforms.lua.options.hooks.children.shutdown]
+type = "string"
+groups = ["v2"]
+common = true
+required = true
+description = """\
+A function which is called when Vector is stopped. It can produce new events using `emit` function.\
+"""
+examples = [
+"""\
+function (emit)
+  emit {
+    log = {
+      message = "shutting down..."
+    }
+  }
 end\
 """
 ]
