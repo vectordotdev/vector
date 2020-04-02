@@ -534,10 +534,7 @@ Event fields can be set to scalar values (booleans, numbers, or strings),
 and the resulting event will keep the correct types. If an event field is
 set to an invalid value, a message will be logged and the field will be dropped.
 
-[data types][docs.about.data-model.log#types]
 
-
-[docs.about.data-model.log#types]: /docs/about/data-model/log/#types
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
