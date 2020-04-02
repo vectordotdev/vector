@@ -209,10 +209,22 @@ impl Lua {
     }
 }
 
-impl ScriptedRuntime for Lua {
-    // TODO: make code more DRY
+// A helper that reduces code duplication.
+fn wrap_emit_fn<'lua, 'scope, F: 'scope>(
+    scope: &rlua::Scope<'lua, 'scope>,
+    mut emit_fn: F,
+) -> rlua::Result<rlua::Function<'lua>>
+where
+    F: FnMut(Event) -> (),
+{
+    scope.create_function_mut(move |_, event: Event| -> rlua::Result<()> {
+        emit_fn(event);
+        Ok(())
+    })
+}
 
-    fn hook_process<F>(self: &mut Self, event: Event, mut emit_fn: F)
+impl ScriptedRuntime for Lua {
+    fn hook_process<F>(self: &mut Self, event: Event, emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
@@ -220,15 +232,9 @@ impl ScriptedRuntime for Lua {
             .lua
             .context(|ctx: rlua::Context<'_>| {
                 ctx.scope(|scope| -> rlua::Result<()> {
-                    let emit: rlua::Function<'_> =
-                        scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
-                            emit_fn(event);
-                            Ok(())
-                        })?;
                     let process =
                         ctx.named_registry_value::<_, rlua::Function<'_>>("hooks_process")?;
-
-                    process.call((event, emit))
+                    process.call((event, wrap_emit_fn(&scope, emit_fn)?))
                 })
             })
             .context(RuntimeErrorHooksProcess)
@@ -237,7 +243,7 @@ impl ScriptedRuntime for Lua {
         self.attempt_gc();
     }
 
-    fn hook_init<F>(self: &mut Self, mut emit_fn: F)
+    fn hook_init<F>(self: &mut Self, emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
@@ -245,17 +251,9 @@ impl ScriptedRuntime for Lua {
             .lua
             .context(|ctx: rlua::Context<'_>| {
                 ctx.scope(|scope| -> rlua::Result<()> {
-                    if let Some(init) =
-                        ctx.named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_init")?
-                    {
-                        let emit: rlua::Function<'_> =
-                            scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
-                                emit_fn(event);
-                                Ok(())
-                            })?;
-                        init.call((emit,))
-                    } else {
-                        Ok(())
+                    match ctx.named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_init")? {
+                        Some(init) => init.call((wrap_emit_fn(&scope, emit_fn)?,)),
+                        None => Ok(()),
                     }
                 })
             })
@@ -265,7 +263,7 @@ impl ScriptedRuntime for Lua {
         self.attempt_gc();
     }
 
-    fn hook_shutdown<F>(self: &mut Self, mut emit_fn: F)
+    fn hook_shutdown<F>(self: &mut Self, emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
@@ -273,17 +271,11 @@ impl ScriptedRuntime for Lua {
             .lua
             .context(|ctx: rlua::Context<'_>| {
                 ctx.scope(|scope| -> rlua::Result<()> {
-                    if let Some(shutdown) =
-                        ctx.named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_shutdown")?
+                    match ctx
+                        .named_registry_value::<_, Option<rlua::Function<'_>>>("hooks_shutdown")?
                     {
-                        let emit: rlua::Function<'_> =
-                            scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
-                                emit_fn(event);
-                                Ok(())
-                            })?;
-                        shutdown.call((emit,))
-                    } else {
-                        Ok(())
+                        Some(shutdown) => shutdown.call((wrap_emit_fn(&scope, emit_fn)?,)),
+                        None => Ok(()),
                     }
                 })
             })
@@ -293,7 +285,7 @@ impl ScriptedRuntime for Lua {
         self.attempt_gc();
     }
 
-    fn timer_handler<F>(self: &mut Self, timer: Timer, mut emit_fn: F)
+    fn timer_handler<F>(self: &mut Self, timer: Timer, emit_fn: F)
     where
         F: FnMut(Event) -> (),
     {
@@ -301,16 +293,11 @@ impl ScriptedRuntime for Lua {
             .lua
             .context(|ctx: rlua::Context<'_>| {
                 ctx.scope(|scope| -> rlua::Result<()> {
-                    let emit: rlua::Function<'_> =
-                        scope.create_function_mut(|_, event: Event| -> rlua::Result<()> {
-                            emit_fn(event);
-                            Ok(())
-                        })?;
                     let handler_name = format!("timer_handler_{}", timer.id);
                     let handler =
                         ctx.named_registry_value::<_, rlua::Function<'_>>(&handler_name)?;
 
-                    handler.call((emit,))
+                    handler.call((wrap_emit_fn(&scope, emit_fn)?,))
                 })
             })
             .context(RuntimeErrorTimerHandler)
