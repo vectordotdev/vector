@@ -413,7 +413,7 @@ Transform API version
 
 <TabItem value="add_fields">
 
-Add a field to an event. Supply this as a the [`source`](#source) value:
+Add a field to an event. Supply this as the `hooks.proces` value:
 
 ```lua
 function (event, emit)
@@ -429,7 +429,7 @@ end
 </TabItem>
 <TabItem value="remove_fields">
 
-Remove a field from an event. Supply this as a the [`source`](#source) value:
+Remove a field from an event. Supply this as the `hooks.process` value:
 
 ```lua
 function (event, emit)
@@ -445,7 +445,7 @@ end
 </TabItem>
 <TabItem value="drop_event">
 
-Drop an event entirely. Supply this as a the [`source`](#source) value:
+Drop an event entirely. Supply this as the `hooks.process` value:
 
 ```lua
 function (event, emit)
