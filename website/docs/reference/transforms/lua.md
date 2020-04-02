@@ -397,7 +397,7 @@ You can learn more in the
 
 ### Dropping Events
 
-To drop events, simply not call the emitting function with it. For example:
+To drop events, simply do not call the emitting function with it. For example:
 
 ```lua
 function (event, emit)
