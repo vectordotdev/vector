@@ -24417,7 +24417,7 @@ module.exports = {
     "elasticsearch": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required"
+        "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required\n  compression = \"gzip\" # required"
       },
       "delivery_guarantee": "best_effort",
       "description": "[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.",
@@ -24448,7 +24448,7 @@ module.exports = {
         "AWS",
         "Elastic"
       ],
-      "short_description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).",
+      "short_description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint][urls.elasticsearch_bulk].",
       "status": "prod-ready",
       "title": "Elasticsearch",
       "type": "sink",
