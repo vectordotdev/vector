@@ -4472,9 +4472,10 @@ end
   # * type: string
   host = "http://10.24.32.122:9000"
 
-  # The name of the event key that should map to Elasticsearch's `_id` field. You
-  # should think carefully about setting your own Elasticsearch IDs, since this
-  # can hinder perofrmance.
+  # The name of the event key that should map to Elasticsearch's `_id` field. By
+  # default, Vector does not set the `_id` field, which allows Elasticsearch to
+  # set this automatically. You should think carefully about setting your own
+  # Elasticsearch IDs, since this can hinder perofrmance.
   #
   # * optional
   # * no default
