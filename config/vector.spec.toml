@@ -1984,7 +1984,9 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The inline Lua source to evaluate.
+  # In version 2 it is the source which is evaluated when the transform is
+  # created. In version 1 it is the inline Lua source called for each incoming
+  # event.
   #
   # * required
   # * type: string
@@ -2016,6 +2018,35 @@ end
   search_dirs = ["/etc/vector/lua"]
 
   #
+  # Timers
+  #
+
+  [[transforms.lua.timers]]
+    # Defines a handler function which is executed periodially at
+    # `interval_seconds`. It can produce new events using`emit` function.
+    #
+    # * required
+    # * type: string
+    handler = """
+  function (emit)
+    emit {
+      log = {
+        message = "current time: " .. os.date()
+      }
+    }
+  end
+
+  """
+
+    # Defines the interval at which the timer handler would be executed.
+    #
+    # * required
+    # * type: integer
+    interval_seconds = 1
+    interval_seconds = 10
+    interval_seconds = 30
+
+  #
   # Hooks
   #
 
@@ -2034,21 +2065,6 @@ end
   end
   """
 
-    # A function which is called when Vector is stopped. It can produce new events
-    # using `emit` function.
-    #
-    # * required
-    # * type: string
-    shutdown = """
-  function (emit)
-    emit {
-      log = {
-        message = "shutting down..."
-      }
-    }
-  end
-  """
-
     # A function which is called when the first event comes, before calling
     # `hooks.process`
     #
@@ -2064,6 +2080,22 @@ end
     emit {
       log = {
         message = "initialized!"
+      }
+    }
+  end
+  """
+
+    # A function which is called when Vector is stopped. It can produce new events
+    # using `emit` function.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    shutdown = """
+  function (emit)
+    emit {
+      log = {
+        message = "shutting down..."
       }
     }
   end

@@ -54,28 +54,6 @@ a full embedded [Lua][urls.lua] engine.
     emit(event) -- emit the processed event
   end
   """ # required
-  hooks.shutdown = """
-  function (emit)
-    emit {
-      log = {
-        message = "shutting down..."
-      }
-    }
-  end
-  """ # required
-  hooks.init = """
-  function (emit)
-    local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
-    hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
-    f:close() -- close the pipe
-
-    emit {
-      log = {
-        message = "initialized!"
-      }
-    }
-  end
-  """ # optional, no default
 ```
 
 </TabItem>
@@ -109,6 +87,19 @@ a full embedded [Lua][urls.lua] engine.
   version = "2" # required
   search_dirs = ["/etc/vector/lua"] # optional, no default
 
+  # Timers
+  timers.handler = """
+  function (emit)
+    emit {
+      log = {
+        message = "current time: " .. os.date()
+      }
+    }
+  end
+
+  """ # required
+  timers.interval_seconds = 1 # required
+
   # Hooks
   hooks.process = """
   function (event, emit)
@@ -116,15 +107,6 @@ a full embedded [Lua][urls.lua] engine.
     event.log.another_field = nil -- remove field
     event.log.first, event.log.second = nil, event.log.first -- rename field
     emit(event) -- emit the processed event
-  end
-  """ # required
-  hooks.shutdown = """
-  function (emit)
-    emit {
-      log = {
-        message = "shutting down..."
-      }
-    }
   end
   """ # required
   hooks.init = """
@@ -136,6 +118,15 @@ a full embedded [Lua][urls.lua] engine.
     emit {
       log = {
         message = "initialized!"
+      }
+    }
+  end
+  """ # optional, no default
+  hooks.shutdown = """
+  function (emit)
+    emit {
+      log = {
+        message = "shutting down..."
       }
     }
   end
@@ -190,7 +181,7 @@ Configures hooks handlers.
 
 <Fields filters={false}>
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["function (emit)\n  local f = io.popen (\"/bin/hostname\") -- run \"hostname\" command to determine the hostname\n  hostname = f:read(\"*a\") or \"\" -- set a global variable which can be used in other hooks\n  f:close() -- close the pipe\n\n  emit {\n    log = {\n      message = \"initialized!\"\n    }\n  }\nend"]}
@@ -238,7 +229,7 @@ using `emit` function.
 
 </Field>
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
   examples={["function (emit)\n  emit {\n    log = {\n      message = \"shutting down...\"\n    }\n  }\nend"]}
@@ -246,7 +237,7 @@ using `emit` function.
   name={"shutdown"}
   path={"hooks"}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -304,10 +295,83 @@ A list of directories search when loading a Lua file via the `require` function.
 
 ### source
 
-The inline Lua source to evaluate.
+In version 2 it is the source which is evaluated when the transform is created.
+In version 1 it is the inline Lua source called for each incoming event.
 
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={["v2"]}
+  name={"timers"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[table]"}
+  unit={null}
+  >
+
+### timers
+
+Configures timers which are executed periodically at given interval
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["function (emit)\n  emit {\n    log = {\n      message = \"current time: \" .. os.date()\n    }\n  }\nend\n"]}
+  groups={["v2"]}
+  name={"handler"}
+  path={"timers"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  >
+
+#### handler
+
+Defines a handler function which is executed periodially at [`interval_seconds`](#interval_seconds).
+It can produce new events using`emit` function.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[1,10,30]}
+  groups={["v2"]}
+  name={"interval_seconds"}
+  path={"timers"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"integer"}
+  unit={null}
+  >
+
+#### interval_seconds
+
+Defines the interval at which the timer handler would be executed.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

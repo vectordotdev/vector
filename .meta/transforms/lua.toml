@@ -41,7 +41,7 @@ end\
 """
 ]
 required = true
-description = "The inline Lua source to evaluate."
+description = "In version 2 it is the source which is evaluated when the transform is created. In version 1 it is the inline Lua source called for each incoming event."
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
@@ -65,7 +65,7 @@ description = "Configures hooks handlers."
 [transforms.lua.options.hooks.children.init]
 type = "string"
 groups = ["v2"]
-common = true
+common = false
 required = false
 description = """\
 A function which is called when the first event comes, before calling `hooks.process`\
@@ -108,8 +108,8 @@ end\
 [transforms.lua.options.hooks.children.shutdown]
 type = "string"
 groups = ["v2"]
-common = true
-required = true
+common = false
+required = false
 description = """\
 A function which is called when Vector is stopped. It can produce new events using `emit` function.\
 """
@@ -122,5 +122,44 @@ function (emit)
     }
   }
 end\
+"""
+]
+
+[transforms.lua.options.timers]
+type = "[table]"
+category = "Timers"
+common = false
+required = false
+groups = ["v2"]
+description = "Configures timers which are executed periodically at given interval"
+
+[transforms.lua.options.timers.children.interval_seconds]
+type = "integer"
+groups = ["v2"]
+common = false
+required = true
+description = """\
+Defines the interval at which the timer handler would be executed.
+"""
+examples = [1, 10, 30]
+
+[transforms.lua.options.timers.children.handler]
+type = "string"
+groups = ["v2"]
+common = false
+required = true
+description = """\
+Defines a handler function which is executed periodially at `interval_seconds`. It can produce new events using\
+`emit` function.\
+"""
+examples = [
+"""\
+function (emit)
+  emit {
+    log = {
+      message = "current time: " .. os.date()
+    }
+  }
+end
 """
 ]
