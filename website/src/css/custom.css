@@ -1129,6 +1129,9 @@ ol li.list--li--pink {
  * Global navbar styling, used in the global header of the site.
  */
 
+.navbar {
+  display: block;
+}
 .navbar .navbar__brand {
   min-width: 100px;
 }
