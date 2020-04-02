@@ -8,7 +8,6 @@ description: Install Vector through the DKG package manager
 import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -29,7 +28,7 @@ generally used on Debian and Ubuntu systems.
 <Tabs
   block={true}
   defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+  values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -206,182 +205,6 @@ sudo systemctl start vector
 </TabItem>
 </Tabs>
 </TabItem>
-<TabItem value="service">
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-Typically, upstream sources are other Vector instances sending data via the
-[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
-[sources][docs.sources].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={null}
-  sinkName={null} />
-
----
-
-<Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"dpkg"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"DPKG","value":"dpkg"}]}>
-<TabItem value="dpkg">
-
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"},{"label":"ARMv7","value":"armv7"}]}>
-
-<TabItem value="x86_64">
-<Steps headingDepth={3}>
-<ol>
-<li>
-
-### Download the Vector `.deb` package
-
-```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-amd64.deb
-```
-
-[Looking for a different version?][docs.package_managers.dpkg#versions]
-
-</li>
-<li>
-
-### Install the downloaded package
-
-```bash
-sudo dpkg -i vector-amd64.deb
-```
-
-</li>
-<li>
-
-### Configure Vector
-
-<ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"vector"}
-  sinkName={null} />
-
-</li>
-<li>
-
-### Start Vector
-
-```bash
-sudo systemctl start vector
-```
-
-</li>
-</ol>
-</Steps>
-</TabItem>
-<TabItem value="arm64">
-<Steps headingDepth={3}>
-<ol>
-<li>
-
-### Download the Vector `.deb` package
-
-```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-arm64.deb
-```
-
-[Looking for a different version?][docs.package_managers.dpkg#versions]
-
-</li>
-<li>
-
-### Install the downloaded package
-
-```bash
-sudo dpkg -i vector-arm64.deb
-```
-
-</li>
-<li>
-
-### Configure Vector
-
-<ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"vector"}
-  sinkName={null} />
-
-</li>
-<li>
-
-### Start Vector
-
-```bash
-sudo systemctl start vector
-```
-
-</li>
-</ol>
-</Steps>
-</TabItem>
-<TabItem value="armv7">
-<Steps headingDepth={3}>
-<ol>
-<li>
-
-### Download the Vector `.deb` package
-
-```bash
-curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/0.8.X/vector-armhf.deb
-```
-
-[Looking for a different version?][docs.package_managers.dpkg#versions]
-
-</li>
-<li>
-
-### Install the downloaded package
-
-```bash
-sudo dpkg -i vector-armhf.deb
-```
-
-</li>
-<li>
-
-### Configure Vector
-
-<ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"vector"}
-  sinkName={null} />
-
-</li>
-<li>
-
-### Start Vector
-
-```bash
-sudo systemctl start vector
-```
-
-</li>
-</ol>
-</Steps>
-</TabItem>
-</Tabs>
-
-</TabItem>
-</Tabs>
-</TabItem>
 </Tabs>
 
 ## Configuring
@@ -485,11 +308,9 @@ Vector's DPKG source files are located in
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.dpkg#versions]: /docs/setup/installation/package-managers/dpkg/#versions
-[docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
-[docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://systemd.io/
 [urls.vector_debian_source_files]: https://github.com/timberio/vector/tree/master/distribution/debian

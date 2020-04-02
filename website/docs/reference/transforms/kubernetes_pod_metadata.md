@@ -72,8 +72,6 @@ accepts and [outputs `log` events](#output) allowing you to enrich
 </TabItem>
 </Tabs>
 
-## Options
-
 <Fields filters={true}>
 <Field
   common={false}
@@ -231,6 +229,11 @@ variable is set for you.
 </Fields>
 
 ## Permissions
+
+The `kubernetes_pod_metadata` transform requires the following
+permissions. If you are running a Kubernetes cluster you should have a basic
+understanding of Kubernetes permissions. Refer to [Kubernetes Authorization
+docs][urls.kubernetes_authorization] for more info.
 
 <Fields>
 <Field
@@ -749,6 +752,7 @@ root of the event.
 [urls.kubernetes_accessing_api_from_pod]: https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
 [urls.kubernetes_api]: https://kubernetes.io/docs/concepts/overview/kubernetes-api/
 [urls.kubernetes_api_server]: https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/
+[urls.kubernetes_authorization]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/
 [urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/
 [urls.kubernetes_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [urls.kubernetes_request_verbs]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb

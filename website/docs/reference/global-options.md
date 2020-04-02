@@ -33,8 +33,6 @@ log_schema.message_key = "message" # optional, default
 log_schema.timestamp_key = "timestamp" # optional, default
 ```
 
-## Options
-
 <Fields filters={true}>
 <Field
   common={false}

@@ -43,8 +43,6 @@ on a set of logical conditions.
   condition."environment.starts_with" = "staging-" # example
 ```
 
-## Options
-
 <Fields filters={true}>
 <Field
   common={true}

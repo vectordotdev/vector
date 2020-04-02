@@ -12,8 +12,6 @@
 
 <%= component_config_example(component) %>
 
-## Options
-
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
 <%- if component.env_vars_list.any? -%>
@@ -24,6 +22,11 @@
 <%- end -%>
 <%- if component.permissions_list.any? -%>
 ## Permissions
+
+The `<%= component.name %>` <%= component.type %> requires the following
+permissions. If you are running a Kubernetes cluster you should have a basic
+understanding of Kubernetes permissions. Refer to [Kubernetes Authorization
+docs][urls.kubernetes_authorization] for more info.
 
 <%= permissions(component.permissions_list, heading_depth: 3) %>
 

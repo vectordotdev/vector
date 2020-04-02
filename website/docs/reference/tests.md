@@ -130,8 +130,6 @@ vector test /etc/vector/*.toml
 
 For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
-## Options
-
 <Fields filters={true}>
 <Field
   common={true}
