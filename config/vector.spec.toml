@@ -1970,39 +1970,8 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "lua"
-  type = "lua"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # In version 2 it is the source which is evaluated when the transform is
-  # created. In version 1 it is the inline Lua source called for each incoming
-  # event.
-  #
-  # * required
-  # * type: string
-  source = """
-require("script") # a `script.lua` file must be in your `search_dirs`
-
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\n$", "")
-  event["host"] = hostname
-end
-"""
-
-  # Transform API version
+  # Transform API version. Indicates the version 2 is used instead of version
+  # 1,which is supported, but deprecated.
   #
   # * required
   # * type: string
@@ -2017,6 +1986,15 @@ end
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
+  # In version 2 it is the source which is evaluated when the transform is
+  # created.In version 1 it is the inline Lua source called for each incoming
+  # event.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  source = "custom_module = require('custom_module')"
+
   #
   # Timers
   #
@@ -2027,6 +2005,7 @@ end
     #
     # * required
     # * type: string
+    handler = "custom_module.timer_handler"
     handler = """
   function (emit)
     emit {
@@ -2064,6 +2043,7 @@ end
     emit(event) -- emit the processed event
   end
   """
+    process = "custom_module.hook_process"
 
     # A function which is called when the first event comes, before calling
     # `hooks.process`
@@ -2071,6 +2051,7 @@ end
     # * optional
     # * no default
     # * type: string
+    init = "custom_module.hook_init"
     init = """
   function (emit)
     local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
@@ -2091,6 +2072,7 @@ end
     # * optional
     # * no default
     # * type: string
+    shutdown = "custom_module.hook_shutdown"
     shutdown = """
   function (emit)
     emit {

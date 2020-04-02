@@ -8,44 +8,32 @@ input_types = ["log", "metric"]
 output_types = ["log", "metric"]
 requirements = {}
 
-<%= render(
-  "_partials/fields/_component_options.toml",
-  groups: ["v1", "v2"],
-  name: "lua",
-  type: "transform"
-) %>
-
 [transforms.lua.options.version]
 type = "string"
 common = true
 required = true
-groups = ["v2"]
-description = "Transform API version"
+description = """
+Transform API version. Indicates the version 2 is used instead of version 1,\
+which is supported, but deprecated.\
+"""
 enum = { 2 = "Lua transform API version 2" }
 
 [transforms.lua.options.source]
 type = "string"
-common = true
-groups = ["v1"]
+common = false
+required = false
 examples = [
 """\
-require("script") # a `script.lua` file must be in your `search_dirs`
-
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\\n$", "")
-  event["host"] = hostname
-end\
+custom_module = require('custom_module')\
 """
 ]
-required = true
-description = "In version 2 it is the source which is evaluated when the transform is created. In version 1 it is the inline Lua source called for each incoming event."
+description = """
+In version 2 it is the source which is evaluated when the transform is created.\
+In version 1 it is the inline Lua source called for each incoming event.\
+"""
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
-groups = ["v1", "v2"]
 examples = [["/etc/vector/lua"]]
 common = false
 required = false
@@ -59,18 +47,17 @@ type = "table"
 category = "Hooks"
 common = true
 required = true
-groups = ["v2"]
 description = "Configures hooks handlers."
 
 [transforms.lua.options.hooks.children.init]
 type = "string"
-groups = ["v2"]
 common = false
 required = false
 description = """\
 A function which is called when the first event comes, before calling `hooks.process`\
 """
 examples = [
+"custom_module.hook_init",
 """\
 function (emit)
   local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
@@ -88,7 +75,6 @@ end\
 
 [transforms.lua.options.hooks.children.process]
 type = "string"
-groups = ["v2"]
 common = true
 required = true
 description = """\
@@ -102,18 +88,19 @@ function (event, emit)
   event.log.first, event.log.second = nil, event.log.first -- rename field
   emit(event) -- emit the processed event
 end\
-"""
+""",
+"custom_module.hook_process"
 ]
 
 [transforms.lua.options.hooks.children.shutdown]
 type = "string"
-groups = ["v2"]
 common = false
 required = false
 description = """\
 A function which is called when Vector is stopped. It can produce new events using `emit` function.\
 """
 examples = [
+"custom_module.hook_shutdown",
 """\
 function (emit)
   emit {
@@ -130,12 +117,10 @@ type = "[table]"
 category = "Timers"
 common = false
 required = false
-groups = ["v2"]
 description = "Configures timers which are executed periodically at given interval"
 
 [transforms.lua.options.timers.children.interval_seconds]
 type = "integer"
-groups = ["v2"]
 common = false
 required = true
 description = """\
@@ -145,7 +130,6 @@ examples = [1, 10, 30]
 
 [transforms.lua.options.timers.children.handler]
 type = "string"
-groups = ["v2"]
 common = false
 required = true
 description = """\
@@ -153,6 +137,7 @@ Defines a handler function which is executed periodially at `interval_seconds`. 
 `emit` function.\
 """
 examples = [
+"custom_module.timer_handler",
 """\
 function (emit)
   emit {

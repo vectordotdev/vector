@@ -33,16 +33,14 @@ a full embedded [Lua][urls.lua] engine.
 
 <Tabs
   block={true}
-  defaultValue="v2"
-  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
 
-<TabItem value="v2">
+<TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
-  type = "lua" # required
-  inputs = ["my-source-id"] # required
   version = "2" # required
 
   # Hooks
@@ -57,47 +55,17 @@ a full embedded [Lua][urls.lua] engine.
 ```
 
 </TabItem>
-<TabItem value="v1">
-
-```toml title="vector.toml"
-[transforms.my_transform_id]
-  type = "lua" # required
-  inputs = ["my-source-id"] # required
-  source = """
-  require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
-
-  if event["host"] == nil then
-    local f = io.popen ("/bin/hostname")
-    local hostname = f:read("*a") or ""
-    f:close()
-    hostname = string.gsub(hostname, "\n$", "")
-    event["host"] = hostname
-  end
-  """ # required
-```
-
-</TabItem>
-<TabItem value="v2-adv">
+<TabItem value="advanced">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
-  type = "lua" # required
-  inputs = ["my-source-id"] # required
   version = "2" # required
   search_dirs = ["/etc/vector/lua"] # optional, no default
+  source = "custom_module = require('custom_module')" # optional, no default
 
   # Timers
-  timers.handler = """
-  function (emit)
-    emit {
-      log = {
-        message = "current time: " .. os.date()
-      }
-    }
-  end
-
-  """ # required
+  timers.handler = "custom_module.timer_handler" # required
   timers.interval_seconds = 1 # required
 
   # Hooks
@@ -109,49 +77,8 @@ a full embedded [Lua][urls.lua] engine.
     emit(event) -- emit the processed event
   end
   """ # required
-  hooks.init = """
-  function (emit)
-    local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
-    hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
-    f:close() -- close the pipe
-
-    emit {
-      log = {
-        message = "initialized!"
-      }
-    }
-  end
-  """ # optional, no default
-  hooks.shutdown = """
-  function (emit)
-    emit {
-      log = {
-        message = "shutting down..."
-      }
-    }
-  end
-  """ # optional, no default
-```
-
-</TabItem>
-<TabItem value="v1-adv">
-
-```toml title="vector.toml"
-[transforms.my_transform_id]
-  type = "lua" # required
-  inputs = ["my-source-id"] # required
-  source = """
-  require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
-
-  if event["host"] == nil then
-    local f = io.popen ("/bin/hostname")
-    local hostname = f:read("*a") or ""
-    f:close()
-    hostname = string.gsub(hostname, "\n$", "")
-    event["host"] = hostname
-  end
-  """ # required
-  search_dirs = ["/etc/vector/lua"] # optional, no default
+  hooks.init = "custom_module.hook_init" # optional, no default
+  hooks.shutdown = "custom_module.hook_shutdown" # optional, no default
 ```
 
 </TabItem>
@@ -163,7 +90,7 @@ a full embedded [Lua][urls.lua] engine.
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  groups={["v2"]}
+  groups={[]}
   name={"hooks"}
   path={null}
   relevantWhen={null}
@@ -184,8 +111,8 @@ Configures hooks handlers.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["function (emit)\n  local f = io.popen (\"/bin/hostname\") -- run \"hostname\" command to determine the hostname\n  hostname = f:read(\"*a\") or \"\" -- set a global variable which can be used in other hooks\n  f:close() -- close the pipe\n\n  emit {\n    log = {\n      message = \"initialized!\"\n    }\n  }\nend"]}
-  groups={["v2"]}
+  examples={["custom_module.hook_init","function (emit)\n  local f = io.popen (\"/bin/hostname\") -- run \"hostname\" command to determine the hostname\n  hostname = f:read(\"*a\") or \"\" -- set a global variable which can be used in other hooks\n  f:close() -- close the pipe\n\n  emit {\n    log = {\n      message = \"initialized!\"\n    }\n  }\nend"]}
+  groups={[]}
   name={"init"}
   path={"hooks"}
   relevantWhen={null}
@@ -208,8 +135,8 @@ A function which is called when the first event comes, before calling
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n  emit(event) -- emit the processed event\nend"]}
-  groups={["v2"]}
+  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n  emit(event) -- emit the processed event\nend","custom_module.hook_process"]}
+  groups={[]}
   name={"process"}
   path={"hooks"}
   relevantWhen={null}
@@ -232,8 +159,8 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["function (emit)\n  emit {\n    log = {\n      message = \"shutting down...\"\n    }\n  }\nend"]}
-  groups={["v2"]}
+  examples={["custom_module.hook_shutdown","function (emit)\n  emit {\n    log = {\n      message = \"shutting down...\"\n    }\n  }\nend"]}
+  groups={[]}
   name={"shutdown"}
   path={"hooks"}
   relevantWhen={null}
@@ -260,7 +187,7 @@ using `emit` function.
   defaultValue={null}
   enumValues={null}
   examples={[["/etc/vector/lua"]]}
-  groups={["v1","v2"]}
+  groups={[]}
   name={"search_dirs"}
   path={null}
   relevantWhen={null}
@@ -279,15 +206,15 @@ A list of directories search when loading a Lua file via the `require` function.
 
 </Field>
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["require(\"script\") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\\n$\", \"\")\n  event[\"host\"] = hostname\nend"]}
-  groups={["v1"]}
+  examples={["custom_module = require('custom_module')"]}
+  groups={[]}
   name={"source"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -295,8 +222,8 @@ A list of directories search when loading a Lua file via the `require` function.
 
 ### source
 
-In version 2 it is the source which is evaluated when the transform is created.
-In version 1 it is the inline Lua source called for each incoming event.
+In version 2 it is the source which is evaluated when the transform is
+created.In version 1 it is the inline Lua source called for each incoming event.
 
 
 
@@ -307,7 +234,7 @@ In version 1 it is the inline Lua source called for each incoming event.
   defaultValue={null}
   enumValues={null}
   examples={[]}
-  groups={["v2"]}
+  groups={[]}
   name={"timers"}
   path={null}
   relevantWhen={null}
@@ -328,8 +255,8 @@ Configures timers which are executed periodically at given interval
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["function (emit)\n  emit {\n    log = {\n      message = \"current time: \" .. os.date()\n    }\n  }\nend\n"]}
-  groups={["v2"]}
+  examples={["custom_module.timer_handler","function (emit)\n  emit {\n    log = {\n      message = \"current time: \" .. os.date()\n    }\n  }\nend\n"]}
+  groups={[]}
   name={"handler"}
   path={"timers"}
   relevantWhen={null}
@@ -353,7 +280,7 @@ It can produce new events using`emit` function.
   defaultValue={null}
   enumValues={null}
   examples={[1,10,30]}
-  groups={["v2"]}
+  groups={[]}
   name={"interval_seconds"}
   path={"timers"}
   relevantWhen={null}
@@ -379,7 +306,7 @@ Defines the interval at which the timer handler would be executed.
   defaultValue={null}
   enumValues={{"2":"Lua transform API version 2"}}
   examples={["2"]}
-  groups={["v2"]}
+  groups={[]}
   name={"version"}
   path={null}
   relevantWhen={null}
@@ -391,7 +318,8 @@ Defines the interval at which the timer handler would be executed.
 
 ### version
 
-Transform API version
+Transform API version. Indicates the version 2 is used instead of version
+1,which is supported, but deprecated.
 
 
 
