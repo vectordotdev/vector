@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-02"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -236,7 +236,7 @@ The dot notation also supports accessing array fields using by placing the index
 array[0]
 ```
 
-The indexes start from 0, missing value are auto-filled by [null values](#null-values).
+The indexes start from 0, missing values are auto-filled by [null values](#null-values).
 
 <Alert type="warning">
 

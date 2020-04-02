@@ -486,7 +486,7 @@ To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs] metho
 ```lua
 function (event, emit)
   # Remove all fields where the value is "-"
-  for f,v in pairs(event) do
+  for f, v in pairs(event) do
     if v == "-" then
       event[f] = nil
     end
@@ -498,7 +498,7 @@ end
 
 ### Lua Manual
 
-Understanding Lua and how write it is outside of the scope of Vector. We
+Understanding Lua and how to write it is outside of the scope of Vector. We
 encourage you to take a look at the [Lua manual][urls.lua_manual] for more
 information.
 
@@ -535,7 +535,10 @@ Event fields can be set to scalar values (booleans, numbers, or strings),
 and the resulting event will keep the correct types. If an event field is
 set to an invalid value, a message will be logged and the field will be dropped.
 
+[data types][docs.about.data-model.log#types]
 
+
+[docs.about.data-model.log#types]: /docs/about/data-model/log/#types
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
