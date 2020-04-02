@@ -458,6 +458,15 @@ end
 
 ## How It Works
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
+
+You can learn more in the
+[Environment Variables][docs.configuration#environment-variables] section.
+
 ### Dropping Events
 
 To drop events, simply not call the emitting function with it. For example:
@@ -470,14 +479,26 @@ function (event, emit)
 end
 ```
 
-### Environment Variables
+### Types
 
-Environment variables are supported through all of Vector's configuration.
-Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
-will be replaced before being evaluated.
+Event fields can be set to scalar values (booleans, numbers, or strings),
+and the resulting event will keep the correct types. If an event field is
+set to an invalid value, a message will be logged and the field will be dropped.
 
-You can learn more in the
-[Environment Variables][docs.configuration#environment-variables] section.
+### Nested Fields
+
+As described in the [Data Model document][docs.data_model], Vector flatten
+events, representing nested field with a `.` delimiter. Therefore, adding,
+accessing, or removing nested fields is as simple as added a `.` in your key
+name:
+
+```lua
+# Add nested field
+event.log.nested.field = "nested value"
+
+# Remove nested field
+event.log.nested.field = nil
+```
 
 ### Iterate over fields
 
@@ -496,43 +517,22 @@ function (event, emit)
 end
 ```
 
-### Learning Lua
-
-In order to write non-trivial transforms in Lua, one has to have basic
-understanding of Lua. Because Lua is an easy to learn language, reading the
-first few chapters of [the official book][urls.lua_pil] or consulting
-[the manual][urls.lua_manual] would suffice.
-
-### Lua Version
-
-Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
-
-### Nested Fields
-
-As described in the [Data Model document][docs.data_model], Vector flatten
-events, representing nested field with a `.` delimiter. Therefore, adding,
-accessing, or removing nested fields is as simple as added a `.` in your key
-name:
-
-```lua
-# Add nested field
-event.log.nested.field = "nested value"
-
-# Remove nested field
-event.log.nested.field = nil
-```
-
 ### Search Directories
 
 Vector provides a [`search_dirs`](#search_dirs) option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
 function][urls.lua_require].
 
-### Types
+### Lua Version
 
-Event fields can be set to scalar values (booleans, numbers, or strings),
-and the resulting event will keep the correct types. If an event field is
-set to an invalid value, a message will be logged and the field will be dropped.
+Vector uses the [`rlua` Rust crate][urls.rlua] which currently embeds Lua 5.3.
+
+### Learning Lua
+
+In order to write non-trivial transforms in Lua, one has to have basic
+understanding of Lua. Because Lua is an easy to learn language, reading a few
+first chapters of [the official book][urls.lua_pil] or consulting
+[the manual][urls.lua_manual] would suffice.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
