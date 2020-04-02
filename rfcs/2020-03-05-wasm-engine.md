@@ -16,8 +16,8 @@ topics, all asking for different features. Later, we'll see how wasm helps us.
 We noted in discussions with several current and prospective users that custom protobuf support in the form of an
 `encoding` option or a transform.
 
-Protobufs in their `proto` form aren't usable usable by the prevailing Rust Protobuf libraries in a dynamic way. Both
-`serde` and `rust-protobuf` focus almost solely on compiling support for specific Protobufs **into** a Rust program.
+Protobufs in their `proto` form aren't usable by the prevailing Rust Protobuf libraries in a dynamic way. Both
+`prost` and `rust-protobuf` focus almost solely on compiling support for specific Protobufs **into** a Rust program.
 While a `serde-protobuf` crate exists, we found it to be an order of magnitude slower than the other two options, we
 also noted it lacked serialization support.
 
@@ -71,7 +71,7 @@ of optimized binaries, or requiring folks build their own optimized binaries. Te
 so unoptimized binaries are acceptable.
 
 Vector is in a slightly different position than Terraform though! Vector runs primarily in servers and even end user
-machines. We can't expect users to have build tooling installed to their servers (it's a security risk!) and we
+machines. We can't expect users to have build tooling installed on their servers (it's a security risk!) and we
 definitely can't expect it on an end-user machines. Most people just aren't that interested in computers. Vector has
 different performance needs, too. While folk's aren't generally wanting to execute terraform providers hundreds of
 thousands (or millions) of times per second, they are absolutely doing that with Vector.
@@ -156,7 +156,8 @@ special transform to do *exactly* what you want. With the WASM engine, Vector pu
 There is a trade-off though! You'll need to embolden yourself, as WASM is a fledgling technology. When it first loads a
 WASM file, Vector needs to spend some time building an optimized module before it can load it. You'll also be
 responsible for the safety and correctness of your code, if your module crashes on an event, Vector will re-initialize
-the module and try again on the next event.
+the module and try again on the next event. This should be modelled roughly off
+[Erlang's OTP](https://erlang.org/doc/design_principles/sup_princ.html).
 
 Here's some examples of when a WASM module is a good fit:
 
@@ -465,7 +466,7 @@ test test.toml: demo-tester ... passed
 Integrating a flexible, practical, simple WASM engine means we can:
 
 * Expose one common interface to any existing and future languages.
-* Allow large-scale users to use custom protobufs.
+* Allow large-scale users to use custom encodings.
 * Support and advertise a plugin system.
 * Empower us to modularize Vector's components and increase maintainability.
 * Share a common plugin format with Tremor.
