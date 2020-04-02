@@ -319,7 +319,7 @@ Defines the interval at which the timer handler would be executed.
 ### version
 
 Transform API version. Indicates the version 2 is used instead of version 1,
-which is supported, but deprecated.
+is deprecated, but still supported.
 
 
 

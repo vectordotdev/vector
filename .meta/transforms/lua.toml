@@ -14,7 +14,7 @@ common = true
 required = true
 description = """
 Transform API version. Indicates the version 2 is used instead of version 1,
-which is supported, but deprecated.\
+is deprecated, but still supported.\
 """
 enum = { 2 = "Lua transform API version 2" }
 
