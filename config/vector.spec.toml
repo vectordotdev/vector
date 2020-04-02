@@ -4439,6 +4439,14 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
   # Elasticsearch has removed it.
@@ -4463,6 +4471,17 @@ end
   # * no default
   # * type: string
   host = "http://10.24.32.122:9000"
+
+  # The name of the event key that should map to Elasticsearch's `_id` field. By
+  # default, Vector does not set the `_id` field, which allows Elasticsearch to
+  # set this automatically. You should think carefully about setting your own
+  # Elasticsearch IDs, since this can hinder perofrmance.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  id_key = "id"
+  id_key = "_id"
 
   # Index name to write events to.
   #

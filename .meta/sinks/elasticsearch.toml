@@ -25,13 +25,30 @@ healthcheck = true
 input_types = ["log"]
 requirements = {}
 service_providers = ["AWS", "Elastic"]
-write_to_description = "[Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
+write_to_description = """\
+[Elasticsearch][urls.elasticsearch] via the [`_bulk` API \
+endpoint][urls.elasticsearch_bulk]\
+"""
 
-<%= render("_partials/fields/_aws_env_vars.toml", namespace: "sinks.elasticsearch.env_vars") %>
+<%= render(
+  "_partials/fields/_aws_env_vars.toml",
+  namespace: "sinks.elasticsearch.env_vars"
+) %>
 
-<%= render("_partials/fields/_component_options.toml", type: "sink", name: "elasticsearch") %>
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "sink",
+  name: "elasticsearch"
+) %>
 
-<%= render("_partials/fields/_batch_options.toml", namespace: "sinks.elasticsearch.options", common: false, max_events: nil, max_size: 10490000, timeout_secs: 1) %>
+<%= render(
+  "_partials/fields/_batch_options.toml",
+  namespace: "sinks.elasticsearch.options",
+  common: false,
+  max_events: nil,
+  max_size: 10490000,
+  timeout_secs: 1
+) %>
 
 <%= render(
   "_partials/fields/_buffer_options.toml",
@@ -69,7 +86,10 @@ sort = 1
 description = "The authentication strategy to use."
 
 [sinks.elasticsearch.options.auth.children.strategy.enum]
-aws = "Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch]."
+aws = """\
+Authentication strategy used for [AWS' hosted Elasticsearch \
+service][urls.aws_elasticsearch].\
+"""
 basic = "The [basic authentication strategy][urls.basic_auth]."
 
 [sinks.elasticsearch.options.auth.children.password]
@@ -86,10 +106,24 @@ relevant_when = {strategy = "basic"}
 required = true
 description = "The basic authentication user name."
 
+[sinks.elasticsearch.options.compression]
+type = "string"
+common = true
+required = true
+description = "The compression mechanism to use."
+
+[sinks.elasticsearch.options.compression.enum]
+gzip = "GZIP compression"
+none = "No compression"
+
 [sinks.elasticsearch.options.doc_type]
 type = "string"
 default = "_doc"
-description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
+description = """\
+The `doc_type` for your index data. This is only relevant for \
+Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this \
+option since Elasticsearch has removed it.\
+"""
 
 [sinks.elasticsearch.options.headers]
 type = "table"
@@ -102,13 +136,32 @@ examples = [
   {"X-Powered-By" = "Vector"}
 ]
 required = true
-description = "A custom header to be added to each outgoing Elasticsearch request."
+description = """\
+A custom header to be added to each outgoing Elasticsearch request.\
+"""
 
 [sinks.elasticsearch.options.host]
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
-description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
+description = """\
+The host of your Elasticsearch cluster. This should be the full URL as shown \
+in the example.\
+"""
+
+[sinks.elasticsearch.options.id_key]
+type = "string"
+examples = [
+  "id",
+  "_id",
+]
+description = """\
+The name of the event key that should map to Elasticsearch's \
+[`_id` field][urls.elasticsearch_id_field]. By default, Vector does not set \
+the `_id` field, which allows Elasticsearch to set this automatically. You \
+should think carefully about setting your own Elasticsearch IDs, since this \
+can [hinder perofrmance][urls.elasticsearch_id_performance].\
+"""
 
 [sinks.elasticsearch.options.index]
 type = "string"
@@ -130,7 +183,6 @@ type = "string"
 examples = [{"X-Powered-By" = "Vector"}]
 required = true
 description = "A custom parameter to be added to each Elasticsearch request."
-
 
 <%= render(
   "_partials/fields/_tls_connector_options.toml",
