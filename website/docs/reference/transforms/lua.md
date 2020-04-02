@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-02"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -101,9 +101,7 @@ a full embedded [Lua][urls.lua] engine.
 </TabItem>
 <TabItem value="v2-adv">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "lua" # required
@@ -147,9 +145,7 @@ a full embedded [Lua][urls.lua] engine.
 </TabItem>
 <TabItem value="v1-adv">
 
-<CodeHeader fileName="vector.toml" learnMoreUrl="/docs/setup/configuration/"/ >
-
-```toml
+```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "lua" # required
   inputs = ["my-source-id"] # required
@@ -241,8 +237,6 @@ using `emit` function.
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -267,8 +261,6 @@ using `emit` function.
 
 
 </Field>
-
-
 </Fields>
 
 </Field>
