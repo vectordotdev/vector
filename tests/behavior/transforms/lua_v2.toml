@@ -21,7 +21,7 @@
       "a.exists" = false
       "b.equals" = "example value"
 
-[transforms.lua_v2_source] 
+[transforms.lua_v2_source]
   inputs = []
   type = "lua"
   version = "2"
