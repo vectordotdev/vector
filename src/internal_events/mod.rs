@@ -22,7 +22,7 @@ pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
 
-pub trait InternalEvent: Sized {
+pub trait InternalEvent {
     fn emit_logs(&self) {}
     fn emit_metrics(&self) {}
 }
