@@ -98,9 +98,7 @@ impl SinkConfig for ElasticSearchConfig {
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = common.tls_settings.clone();
 
-        // Only apply gzip if gzip is selected and/or we are running with no credentials.
-        let gzip = matches!(&self.compression, Some(Compression::Gzip) | None)
-            && common.credentials.is_none();
+        let gzip = common.compression == Compression::Gzip;
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
@@ -135,6 +133,7 @@ pub struct ElasticSearchCommon {
     tls_settings: TlsSettings,
     path_and_query: String,
     config: ElasticSearchConfig,
+    compression: Compression,
 }
 
 #[derive(Debug, Snafu)]
@@ -221,7 +220,7 @@ impl HttpSink for ElasticSearchCommon {
         } else {
             builder.header("Content-Type", "application/x-ndjson");
 
-            if matches!(&self.config.compression, Some(Compression::Gzip) | None) {
+            if self.compression == Compression::Gzip {
                 builder.header("Content-Encoding", "gzip");
             }
 
@@ -319,6 +318,14 @@ impl ElasticSearchCommon {
             }
         };
 
+        // Only apply compression if explicitly selected and we are
+        // running with no AWS credentials.
+        let compression = match (&credentials, config.compression) {
+            (Some(_), _) => Compression::None,
+            (_, None) => Compression::None,
+            (None, Some(c)) => c,
+        };
+
         let index = if let Some(idx) = &config.index {
             Template::from(idx.as_str())
         } else {
@@ -350,6 +357,7 @@ impl ElasticSearchCommon {
             path_and_query,
             tls_settings,
             config,
+            compression,
         })
     }
 }

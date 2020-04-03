@@ -46,7 +46,7 @@ endpoint][urls.elasticsearch_bulk].
 [sinks.my_sink_id]
   type = "elasticsearch" # required
   inputs = ["my-source-id"] # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
   index = "vector-%F" # optional, default
@@ -60,7 +60,7 @@ endpoint][urls.elasticsearch_bulk].
   # General
   type = "elasticsearch" # required
   inputs = ["my-source-id"] # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   doc_type = "_doc" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
@@ -400,14 +400,14 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"none"}
   enumValues={{"gzip":"GZIP compression","none":"No compression"}}
   examples={["gzip","none"]}
   groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
@@ -415,7 +415,8 @@ The behavior when the buffer becomes full.
 
 ### compression
 
-The compression mechanism to use.
+The compression mechanism to use. Note that AWS hosted Elasticsearch is unable
+to use compression.
 
 
 

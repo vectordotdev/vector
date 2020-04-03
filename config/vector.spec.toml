@@ -4439,9 +4439,11 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The compression mechanism to use.
+  # The compression mechanism to use. Note that AWS hosted Elasticsearch is
+  # unable to use compression.
   #
-  # * required
+  # * optional
+  # * default: "none"
   # * type: string
   # * enum: "gzip" or "none"
   compression = "gzip"

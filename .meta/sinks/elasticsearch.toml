@@ -109,8 +109,12 @@ description = "The basic authentication user name."
 [sinks.elasticsearch.options.compression]
 type = "string"
 common = true
-required = true
-description = "The compression mechanism to use."
+required = false
+default = "none"
+description = """\
+The compression mechanism to use. \
+Note that AWS hosted Elasticsearch is unable to use compression.\
+"""
 
 [sinks.elasticsearch.options.compression.enum]
 gzip = "GZIP compression"
