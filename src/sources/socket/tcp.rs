@@ -1,11 +1,12 @@
 use crate::{
+    emit,
     event::{self, Event},
+    internal_events::TcpEventReceived,
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
 };
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
-use metrics::counter;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
@@ -55,7 +56,7 @@ impl TcpSource for RawTcpSource {
     }
 
     fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
-        let byte_count = frame.len() as u64;
+        let byte_size = frame.len();
         let mut event = Event::from(frame);
 
         let host_key = if let Some(key) = &self.config.host_key {
@@ -70,8 +71,7 @@ impl TcpSource for RawTcpSource {
             message = "Received one event.",
             event = field::debug(&event)
         );
-        counter!("sources.socket.tcp.events", 1);
-        counter!("sources.socket.tcp.total_bytes", byte_count);
+        emit!(TcpEventReceived { byte_size });
 
         Some(event)
     }

@@ -1,14 +1,14 @@
 use super::Transform;
 use crate::{
+    emit,
     event::{self, Event, Value},
+    internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
-use metrics::counter;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
@@ -135,7 +135,7 @@ impl Transform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
-        counter!("transforms.regex_parser.events", 1);
+        emit!(RegexEventProcessed);
 
         if let Some(value) = &value {
             if self
@@ -182,19 +182,10 @@ impl Transform for RegexParser {
                 }
                 return Some(event);
             } else {
-                warn!(
-                    message = "Regex pattern failed to match.",
-                    field = &truncate_string_at(&String::from_utf8_lossy(&value), 60)[..],
-                    rate_limit_secs = 30
-                );
-                counter!("transforms.regex_parser.failed_match", 1);
+                emit!(RegexFailedMatch { value });
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
-            counter!("transforms.regex_parser.missing_field", 1);
+            emit!(RegexMissingField { field: &self.field });
         }
 
         if self.drop_failed {
@@ -202,20 +193,6 @@ impl Transform for RegexParser {
         } else {
             Some(event)
         }
-    }
-}
-
-const ELLIPSIS: &str = "[...]";
-
-fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
-    if s.len() >= maxlen {
-        let mut len = maxlen - ELLIPSIS.len();
-        while !s.is_char_boundary(len) {
-            len -= 1;
-        }
-        format!("{}{}", &s[..len], ELLIPSIS).into()
-    } else {
-        s.into()
     }
 }
 

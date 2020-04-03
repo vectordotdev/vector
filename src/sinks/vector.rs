@@ -1,5 +1,7 @@
 use crate::{
+    emit,
     event::proto,
+    internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSink},
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -7,7 +9,6 @@ use crate::{
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use futures01::{stream::iter_ok, Sink};
-use metrics::counter;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -72,14 +73,15 @@ enum HealthcheckError {
 
 fn encode_event(event: Event) -> Option<Bytes> {
     let event = proto::EventWrapper::from(event);
-    let event_len = event.encoded_len() as u32;
+    let event_len = event.encoded_len();
     let full_len = event_len + 4;
 
-    counter!("sinks.vector.events", 1);
-    counter!("sinks.vector.total_bytes", full_len as u64);
+    emit!(VectorEventSent {
+        byte_size: full_len
+    });
 
-    let mut out = BytesMut::with_capacity(full_len as usize);
-    out.put_u32_be(event_len);
+    let mut out = BytesMut::with_capacity(full_len);
+    out.put_u32_be(event_len as u32);
     event.encode(&mut out).unwrap();
     Some(out.freeze())
 }

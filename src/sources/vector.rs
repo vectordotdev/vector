@@ -1,6 +1,8 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
+    emit,
     event::proto,
+    internal_events::{VectorEventReceived, VectorProtoParseError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -8,11 +10,9 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use futures01::sync::mpsc;
-use metrics::counter;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio01::codec::LengthDelimitedCodec;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -76,18 +76,14 @@ impl TcpSource for VectorSource {
     }
 
     fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
+        let byte_size = frame.len();
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
-                trace!(
-                    message = "Received one event.",
-                    event = field::debug(&event)
-                );
-                counter!("sources.vector.events", 1);
+                emit!(VectorEventReceived { byte_size });
                 Some(event)
             }
-            Err(e) => {
-                error!("failed to parse protobuf message: {:?}", e);
-                counter!("sources.vector.parse_errors", 1);
+            Err(error) => {
+                emit!(VectorProtoParseError { error });
                 None
             }
         }

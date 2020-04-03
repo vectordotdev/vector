@@ -1,5 +1,7 @@
 use crate::{
+    emit,
     event::{self, Event},
+    internal_events::FileEventReceived,
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
@@ -7,7 +9,6 @@ use crate::{
 use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
-use metrics::counter;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -284,13 +285,10 @@ pub fn file_source(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
-                    trace!(
-                        message = "Received one event.",
-                        file = file.as_str(),
-                        rate_limit_secs = 10
-                    );
-                    counter!("sources.file.events", 1);
-                    counter!("sources.file.total_bytes", msg.len() as u64);
+                    emit!(FileEventReceived {
+                        file: &file,
+                        byte_size: msg.len(),
+                    });
                     create_event(msg, file, &host_key, &hostname, &file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))

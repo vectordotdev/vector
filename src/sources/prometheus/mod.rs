@@ -1,9 +1,13 @@
-use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event};
+use crate::{
+    emit,
+    internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
+    shutdown::ShutdownSignal,
+    topology::config::GlobalOptions,
+    Event,
+};
 use futures01::{sync::mpsc, Future, Sink, Stream};
 use http::Uri;
-use hyper;
 use hyper_openssl::HttpsConnector;
-use metrics::counter;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
@@ -67,13 +71,12 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
                 .request(request)
                 .and_then(|response| response.into_body().concat2())
                 .map(|body| {
-                    counter!("sources.prometheus.requests_completed", 1);
+                    emit!(PrometheusRequestCompleted);
 
                     let packet = String::from_utf8_lossy(&body);
                     let metrics = parser::parse(&packet)
                         .map_err(|error| {
-                            error!(message = "parsing error", %error);
-                            counter!("sources.prometheus.parse_errors", 1);
+                            emit!(PrometheusParseError { error });
                         })
                         .unwrap_or_default()
                         .into_iter()
@@ -83,8 +86,7 @@ fn prometheus(urls: Vec<String>, interval: u64, out: mpsc::Sender<Event>) -> sup
                 })
                 .flatten_stream()
                 .map_err(|error| {
-                    error!(message = "http request processing error", %error);
-                    counter!("sources.prometheus.request_errors", 1);
+                    emit!(PrometheusHttpError { error });
                 })
         })
         .flatten()

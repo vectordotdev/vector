@@ -1,11 +1,14 @@
-use crate::shutdown::ShutdownSignal;
-use crate::stream::StreamExt;
-use crate::tls::{MaybeTlsListener, MaybeTlsSettings};
-use crate::Event;
+use crate::{
+    emit,
+    internal_events::TcpConnectionError,
+    shutdown::ShutdownSignal,
+    stream::StreamExt,
+    tls::{MaybeTlsListener, MaybeTlsSettings},
+    Event,
+};
 use bytes::Bytes;
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use listenfd::ListenFd;
-use metrics::counter;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
     fmt, io,
@@ -161,8 +164,7 @@ fn handle_stream(
             source.build_event(frame, host)
         })
         .map_err(|error| {
-            warn!(message = "connection error.", %error);
-            counter!("sources.tcp_connection_errors", 1);
+            emit!(TcpConnectionError { error });
         })
         .forward(out)
         .map(|_| debug!("connection closed."))

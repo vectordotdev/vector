@@ -1,9 +1,10 @@
 use crate::{
+    emit,
     event::{Event, Value},
+    internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     topology::config::{DataType, TransformContext},
     transforms::Transform,
 };
-use metrics::{counter, gauge, timing};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::time::Instant;
@@ -117,11 +118,16 @@ impl Lua {
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
-            gauge!("transforms.lua.used_memory", self.lua.used_memory() as i64);
+            emit!(LuaGcTriggered {
+                used_memory: self.lua.used_memory()
+            });
             self.lua.gc_collect()?;
             self.invocations_after_gc = 0;
         }
-        timing!("transforms.lua.processing_duration", start, Instant::now());
+
+        emit!(LuaEventProcessed {
+            duration: Instant::now() - start
+        });
 
         result
     }
@@ -129,12 +135,10 @@ impl Lua {
 
 impl Transform for Lua {
     fn transform(&mut self, event: Event) -> Option<Event> {
-        counter!("transforms.lua.events", 1);
         match self.process(event) {
             Ok(event) => event,
-            Err(err) => {
-                error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
-                counter!("transforms.lua.script_error", 1);
+            Err(error) => {
+                emit!(LuaScriptError { error });
                 None
             }
         }
@@ -211,13 +215,6 @@ impl rlua::UserData for LuaEvent {
                 })?;
             Ok((function, state))
         });
-    }
-}
-
-fn format_error(error: &rlua::Error) -> String {
-    match error {
-        rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
-        err => err.to_string(),
     }
 }
 
