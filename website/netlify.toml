@@ -31,6 +31,18 @@
 #
 
 [[redirects]]
+  from = "https://docs.vector.dev/correctness"
+  to = "https://vector.dev/#correctness"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://docs.vector.dev/performance"
+  to = "https://vector.dev/#performance"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "https://docs.vector.dev/usage/administration/stopping"
   to = "https://vector.dev/docs/administration/process-management/#stopping"
   status = 301
