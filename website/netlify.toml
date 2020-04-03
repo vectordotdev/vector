@@ -86,13 +86,13 @@
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/agent/"
-  to = "/docs/setup/deployment/strategies/"
+  to = "/docs/setup/deployment/strategies/#daemon"
   status = 301
   force = true
 
 [[redirects]]
   from = "/docs/setup/deployment/roles/service/"
-  to = "/docs/setup/deployment/strategies/"
+  to = "/docs/setup/deployment/strategies/#service"
   status = 301
   force = true
 
