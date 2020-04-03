@@ -730,7 +730,7 @@ any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][urls.new_humio_logs_sink_issue].
+with the Vector team by [opening an issue][urls.new_humio_logs_sink_issue].
 
 ### Retry Policy
 
