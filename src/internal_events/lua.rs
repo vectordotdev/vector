@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::transforms::lua::v1::format_error;
 use metrics::{counter, gauge, timing};
 use std::time::Duration;
 
@@ -47,12 +48,5 @@ impl InternalEvent for LuaScriptError {
             "component_kind" => "transform",
             "component_type" => "lua",
         );
-    }
-}
-
-fn format_error(error: &rlua::Error) -> String {
-    match error {
-        rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
-        err => err.to_string(),
     }
 }

@@ -68,3 +68,12 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
         s.into()
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn truncate_utf8() {
+        let message = "hello 😁 this is test";
+        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
+    }
+}

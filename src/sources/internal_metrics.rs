@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn captures_internal_metrics() {
-        crate::metrics::init();
+        crate::metrics::init().unwrap();
 
         let controller = get_controller().expect("no controller");
 

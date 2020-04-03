@@ -392,10 +392,4 @@ mod tests {
         assert_eq!(log[&"status".into()], Value::Integer(1234));
         assert_eq!(log[&"time".into()], Value::Float(6789.01));
     }
-
-    #[test]
-    fn truncate_utf8() {
-        let message = "hello 😁 this is test";
-        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
-    }
 }
