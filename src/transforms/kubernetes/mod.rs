@@ -555,7 +555,7 @@ data:
     }
 
     /// Starts a vector with metadata transform with `fields` and an echo.
-    /// Calls test function once for log of started echo.  
+    /// Calls test function once for log of started echo.
     fn metadata_test(
         namespace: &str,
         fields: Vec<&str>,

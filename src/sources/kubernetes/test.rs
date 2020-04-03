@@ -147,10 +147,10 @@ kind: Pod
 metadata:
   name: $(ECHO_NAME)
   namespace: $(TEST_NAMESPACE)
-  labels: 
+  labels:
     vector.test/label: echo
-  annotations: 
-    vector.test/annotation: echo  
+  annotations:
+    vector.test/annotation: echo
 spec:
   hostname: kube-test-node
   subdomain: echo
