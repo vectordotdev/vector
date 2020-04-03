@@ -60,11 +60,18 @@
   animation-fill-mode: forwards;
   background-image: radial-gradient(ellipse at center calc( 50% + 6em ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
   background-position: center center;
+  font-size: 1.05em;
+}
+
+@media (min-width: 1330px) {
+  .indexHeroBanner {
+    font-size: 1.15em;
+  }
 }
 
 .indexHeroDiagram {
   margin: calc( var(--ifm-spacing-vertical) * 2 ) 0;
-  max-height: 325px;
+  max-height: 21em;
   height: auto;
   width: 100%;
 }

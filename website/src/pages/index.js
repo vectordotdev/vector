@@ -413,7 +413,7 @@ function Home() {
   return (
     <Layout title={`${siteConfig.title} - ${siteConfig.tagline}`} description={siteConfig.tagline}>
       <header className={classnames('hero', 'hero--full-height', styles.indexHeroBanner)}>
-        <div className="container">
+        <div className="container container--fluid">
           {newRelease && (
             <Link to={`/releases/${newRelease.version}`} className={styles.indexAnnouncement}>
               <span className="badge badge-primary">new</span>
