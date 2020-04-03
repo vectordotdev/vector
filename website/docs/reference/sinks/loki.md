@@ -180,7 +180,7 @@ The authentication strategy to use.
 
 #### password
 
-The basic authentication password.If using GrafanaLab's hosted Loki then this
+The basic authentication password. If using GrafanaLab's hosted Loki then this
 must be setto your `instanceId`.
 
 
@@ -204,7 +204,7 @@ must be setto your `instanceId`.
 
 #### user
 
-The basic authentication user name.If using GrafanaLab's hosted Loki then this
+The basic authentication user name. If using GrafanaLab's hosted Loki then this
 must be setto your Grafana.com api key.
 
 
@@ -582,10 +582,10 @@ Enables/disables the sink healthcheck upon start.
 
 ### labels
 
-A set of labels that will be attached to each batch of events. These valuesare
-also templateable to allow events to provide dynamic label values.Note: If the
-set of label values has high cardinality this can cause drasticperformance
-issues with Loki. To ensure this does not happen one should tryto reduce the
+A set of labels that will be attached to each batch of events. These values are
+also templateable to allow events to provide dynamic label values. Note: If the
+set of label values has high cardinality this can cause drastic performance
+issues with Loki. To ensure this does not happen one should try to reduce the
 amount of unique label values.
 
 
@@ -659,7 +659,7 @@ fields will also get removed from the event.
 ### remove_timestamp
 
 If this is set to `true` then the timestamp will be removed from the event.
-This is useful because loki uses the timestamp to index the event.
+This is useful because Loki uses the timestamp to index the event.
 
 
 
@@ -798,7 +798,7 @@ The maximum number of retries to make for failed requests.
 #### retry_initial_backoff_secs
 
 The amount of time to wait before attempting the first retry for a failed
-request. Once, the first retry has failed the fibonacci sequence will be used
+request. Once, the first retry has failed the Fibonacci sequence will be used
 to select future backoffs.
 
 
@@ -875,7 +875,7 @@ duplicate data downstream.
 ### tenant_id
 
 The tenant id that will be sent with every request, by default this is not
-required since a proxy should set this header. When running loki locally a
+required since a proxy should set this header. When running Loki locally a
 tenant id is not required either.
 
 You can read more about tenant id's [here][urls.loki_multi_tenancy]
@@ -1080,7 +1080,7 @@ are contained and [delivery guarantees][docs.guarantees] are honored.
 ### Decentralized Deployments
 
 Loki currently does not support out-of-order inserts. If Vector is deployed in
-a decentralized setup  then there is the possiblity that logs might get
+a decentralized setup  then there is the possibility that logs might get
 rejected due to data races between Vector instances. To avoid this we suggest
 either assigning each Vector instance with a unique label or deploying a
 centralized Vector which will ensure no logs will get sent out-of-order.
