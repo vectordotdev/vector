@@ -6,7 +6,7 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
+    compat::{Future01CompatExt},
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
@@ -16,7 +16,7 @@ use metrics_runtime::{Controller, Measurement};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Duration};
 use stream_cancel::Tripwire;
-use tokio01::timer::Interval;
+use tokio::time::interval;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct InternalMetricsConfig;
@@ -61,8 +61,7 @@ async fn run(
     mut out: mpsc::Sender<Event>,
     mut tripwire: Tripwire,
 ) -> Result<(), ()> {
-    let mut interval = Interval::new_interval(Duration::from_secs(2))
-        .compat()
+    let mut interval = interval(Duration::from_secs(2))
         .map(|_| ());
 
     while let Some(()) = interval.next().await {
