@@ -74,7 +74,7 @@ jobs:
     - name: Start local repository
       run: docker run -d -p 5000:5000 --restart=always --name registry registry:2
     - name: Start minikube
-      run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=v${{ matrix.kube }} --v=2 
+      run: sudo CHANGE_MINIKUBE_NONE_USER=true /home/runner/bin/minikube start --vm-driver=none --kubernetes-version=v${{ matrix.kube }}
     - name: Build & push image
       run: |
         docker build -t "localhost:5000/vector_test:latest" -f - . << EOF
