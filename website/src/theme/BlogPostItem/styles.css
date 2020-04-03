@@ -20,8 +20,8 @@
 }
 
 .blog-post-item .avatar {
-  margin-top: calc( var(--ifm-spacing-vertical) / 1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) / 1 );
+  margin-top: var(--ifm-spacing-vertical);
+  margin-bottom: var(--ifm-spacing-vertical);
 }
 
 .blog-post-item .avatar__name {

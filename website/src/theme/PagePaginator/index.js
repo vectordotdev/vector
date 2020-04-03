@@ -3,6 +3,8 @@ import Link from '@docusaurus/Link';
 
 import classnames from 'classnames';
 
+import './styles.css';
+
 function PagePaginator({className, previous, next}) {
   return (
     <nav className={classnames('pagination-nav', className)}>

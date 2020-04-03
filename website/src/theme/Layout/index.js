@@ -12,6 +12,8 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 import './styles.css';
 
+const VECTOR_HOST = 'https://vector.dev';
+
 function Layout(props) {
   const {siteConfig = {}} = useDocusaurusContext();
   const {
@@ -36,7 +38,7 @@ function Layout(props) {
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
   // purposefully hardcoded to protect against people copying our site
-  const canonURL = typeof(window) != 'undefined' && window.location && ('https://vector.dev' + window.location.pathname);
+  const canonURL = permalink ? (VECTOR_HOST + permalink + '/') : null;
 
   return (
     <ThemeProvider>
@@ -64,11 +66,13 @@ function Layout(props) {
           {metaImage && (
             <meta name="twitter:image:alt" content={`Image for ${metaTitle}`} />
           )}
-          {permalink && (
-            <meta property="og:url" content={siteUrl + permalink} />
+          {canonURL && (
+            <meta property="og:url" content={canonURL} />
           )}
           <meta name="twitter:card" content="summary" />
-          {canonURL && <link rel="canonical" href={canonURL} />}
+          {canonURL && (
+            <link rel="canonical" href={canonURL} />
+          )}
         </Head>
         <AnnouncementBar />
         <Navbar />

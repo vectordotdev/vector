@@ -89,8 +89,9 @@
   }
 
   .vector-components--cols .filters {
-    flex: 0 0 25%;
-    max-width: calc( var(--ifm-sidebar-width) - var(--ifm-spacing-horizontal) );
+    --ifm-sidebar-width: 225px;
+    flex: 0 0 var(--ifm-sidebar-width);
+    max-width: var(--ifm-sidebar-width);
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
     padding-left: 0;
   }
