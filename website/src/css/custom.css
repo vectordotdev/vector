@@ -235,13 +235,13 @@ a.badge:hover {
   padding-right: var(--bleed-padding);
 }
 
-.align-text-edges > div[class^='mdxCodeBlock_'],
+.align-text-edges > div[class^="mdxCodeBlock_"],
 .align-text-edges > div > div > .tabs--block {
   margin-left: var(--bleed-margin);
   margin-right: var(--bleed-margin);
 }
 
-.align-text-edges > div[class^='mdxCodeBlock_'] code {
+.align-text-edges > div[class^="mdxCodeBlock_"] code {
   padding-left: var(--bleed-padding);
   padding-right: var(--bleed-padding);
 }
@@ -501,6 +501,14 @@ table.comparison tr td.bar.vector .bar {
 
 .container--l {
   --ifm-container-width: 1330px;
+}
+
+.container--l2 {
+  --ifm-container-width: 1425px;
+}
+
+.container--xl {
+  --ifm-container-width: 1520px;
 }
 
 /**
@@ -1914,51 +1922,51 @@ ul.tabs.rounded li.tab-item.tab-item--active {
  * Specific styling for the docs section.
  ******************************************************************************/
 
-div[class^='docPage_'] div[class^='docItemContainer_'] {
+div[class^="docPage_"] div[class^="docItemContainer_"] {
   max-width: none;
 }
 @media (min-width: 997px) {
-  div[class^='docPage_'] div[class^='docItemContainer_'] {
+  div[class^="docPage_"] div[class^="docItemContainer_"] {
     max-width: none;
     padding: 0 calc( var(--ifm-spacing-horizontal) * 2);
   }
 }
 
-div[class^='docPage_'] h1[class^='docTitle_'] {
+div[class^="docPage_"] h1[class^="docTitle_"] {
   font-size: 2em;
   margin-bottom: 0.3em;
 }
 
-div[class^='docPage_'] .markdown > h2 {
+div[class^="docPage_"] .markdown > h2 {
   font-size: 1.5em;
 }
 
-div[class^='docPage_'] main[class^='docMainContainer_'] div.container div.row div.col.col--3 {
+div[class^="docPage_"] main[class^="docMainContainer_"] div.container div.row div.col.col--3 {
   padding-left: 0;
 }
 
-div[class^='docPage_'] div[class^='docSidebarContainer_'] {
+div[class^="docPage_"] div[class^="docSidebarContainer_"] {
   border-right-color: var(--ifm-sidebar-border-color);
   max-width: var(--ifm-sidebar-width);
   min-width: var(--ifm-sidebar-width);
 }
 
-div[class^='docPage_'] div[class^='sidebar_'] {
+div[class^="docPage_"] div[class^="sidebar_"] {
   font-size: 0.85em;
   font-weight: bold;
 }
-div[class^='docPage_'] div[class^='sidebar_'] .menu {
+div[class^="docPage_"] div[class^="sidebar_"] .menu {
   background: var(--ifm-sidebar-background);
   font-weight: bold;
-  padding: var(--ifm-spacing-vertical) var(--ifm-navbar-padding-horizontal) 0 var(--ifm-navbar-padding-horizontal);
+  padding: var(--ifm-spacing-vertical) var(--ifm-navbar-padding-horizontal) 0 0;
 }
-div[class^='docPage_'] div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) {
+div[class^="docPage_"] div[class^="sidebar_"] .menu__link.menu__link--active:not(.menu__link--sublist) {
   border-radius: 0;
   border-right: 2px solid var(--ifm-color-primary);
   margin-right: calc(var(--ifm-navbar-padding-horizontal) * -1);
   padding-right: calc(var(--ifm-navbar-padding-horizontal) - 2px);
 }
-div[class^='docPage_'] div[class^='sidebar_'] .menu__link.menu__link--active:not(.menu__link--sublist) .badge {
+div[class^="docPage_"] div[class^="sidebar_"] .menu__link.menu__link--active:not(.menu__link--sublist) .badge {
   background: rgba(var(--ifm-color-primary-rgb), 0.2);
   background-clip: padding-box;
   border: 1px solid rgba(var(--ifm-color-primary-rgb), 0.2);
