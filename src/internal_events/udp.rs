@@ -14,12 +14,12 @@ impl InternalEvent for UdpEventReceived {
     fn emit_metrics(&self) {
         counter!("events_received", 1,
             "component_kind" => "source",
-            "component_kind" => "socket",
+            "component_type" => "socket",
             "mode" => "udp",
         );
         counter!("bytes_received", self.byte_size as u64,
             "component_kind" => "source",
-            "component_kind" => "socket",
+            "component_type" => "socket",
             "mode" => "udp",
         );
     }
@@ -38,7 +38,7 @@ impl InternalEvent for UdpSocketError {
     fn emit_metrics(&self) {
         counter!("socket_errors", 1,
             "component_kind" => "source",
-            "component_kind" => "socket",
+            "component_type" => "socket",
             "mode" => "udp",
         );
     }
