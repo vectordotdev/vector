@@ -457,7 +457,9 @@ mod tests {
 mod integration_tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
-    use crate::sources::kubernetes::test::{echo, logs, start_vector, user_namespace, Kube};
+    use crate::sources::kubernetes::test::{
+        echo, info_vector_logs, logs, start_vector, user_namespace, Kube,
+    };
     use crate::test_util::{random_string, wait_for};
     use kube::api::RawApi;
     use uuid::Uuid;
@@ -552,9 +554,13 @@ data:
         CONFIG_MAP_YAML_WITH_METADATA.replace(FIELD_MARKER, replace.as_str())
     }
 
-    /// Starts a vector with metadata transform with `field` and an echo.
+    /// Starts a vector with metadata transform with `fields` and an echo.
     /// Calls test function once for log of started echo.  
-    fn metadata_test(namespace: &str, field: &str, test: impl Fn(serde_json::Value) -> bool) {
+    fn metadata_test(
+        namespace: &str,
+        fields: Vec<&str>,
+        test: impl Fn(&serde_json::Value) -> bool,
+    ) {
         let namespace = format!("{}-{}", namespace, Uuid::new_v4());
         let message = random_string(300);
         let user_namespace = user_namespace(namespace.as_str());
@@ -577,7 +583,7 @@ data:
             &kube,
             &user_namespace,
             None,
-            metadata_config_map(Some(vec![field])).as_str(),
+            metadata_config_map(Some(fields)).as_str(),
         );
 
         // Start echo
@@ -592,9 +598,14 @@ data:
                     .and_then(|value| value.as_str())
                     == Some(&message)
                 {
-                    assert!(test(line));
-                    // DONE
-                    return true;
+                    if test(&line) {
+                        // DONE
+                        return true;
+                    } else {
+                        info!(?line);
+                        info_vector_logs(&kube, &vector);
+                        panic!("Test failed");
+                    }
                 } else {
                     debug!(namespace=namespace.as_str(),log=%line);
                 }
@@ -605,7 +616,7 @@ data:
 
     #[test]
     fn kube_metadata() {
-        metadata_test("kube-metadata", "node_name", |value| {
+        metadata_test("kube-metadata", vec!["node_name"], |value| {
             value
                 .get(crate::event::log_schema().kubernetes_key().as_ref())
                 .and_then(|kube| kube.get("node_name"))
@@ -615,13 +626,59 @@ data:
 
     #[test]
     fn kube_labels() {
-        metadata_test("kube-labels", "labels", |value| {
+        metadata_test("kube-labels", vec!["labels"], |value| {
             value
                 .get(crate::event::log_schema().kubernetes_key().as_ref())
                 .and_then(|kube| kube.get("labels"))
                 .and_then(|labels| labels.get("vector.test/label"))
                 .and_then(|value| value.as_str())
                 == Some("echo")
+        });
+    }
+
+    #[test]
+    fn kube_annotations() {
+        metadata_test("kube-annotations", vec!["annotations"], |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .and_then(|kube| kube.get("annotations"))
+                .and_then(|labels| labels.get("vector.test/annotation"))
+                .and_then(|value| value.as_str())
+                == Some("echo")
+        });
+    }
+
+    #[test]
+    fn kube_all_metadata_present() {
+        let all_fields = vec![
+            "name",
+            "namespace",
+            "creation_timestamp",
+            // "deletion_timestamp", // This field isn't usually present since logs usually come before the pod is deleted
+            "labels",
+            "annotations",
+            "node_name",
+            "hostname",
+            "priority",
+            // "priority_class_name", // Requiers createing PriorityClass which would add more complexity.
+            "service_account_name",
+            "subdomain",
+            "host_ip",
+            // "ip", // Requiers either creating a Service or allocating static ip which would clash with other tests.
+        ];
+        metadata_test("kube-all-metadata", all_fields.clone(), move |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .map(|kube| {
+                    for field in all_fields.iter() {
+                        if kube.get(field).is_none() {
+                            error!(message = "Field missing in log event.", field);
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .unwrap_or(false)
         });
     }
 }

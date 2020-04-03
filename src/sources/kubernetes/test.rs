@@ -123,7 +123,6 @@ spec:
         # This allows the caller to define imagePullPolicy with image tag:
         # - tag is 'latest' => imagePullPolicy: Always
         # - else => imagePullPolicy: IfNotPresent
-        args: ["-vv"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
@@ -150,7 +149,11 @@ metadata:
   namespace: $(TEST_NAMESPACE)
   labels: 
     vector.test/label: echo
+  annotations: 
+    vector.test/annotation: echo  
 spec:
+  hostname: kube-test-node
+  subdomain: echo
   containers:
   - name: $(ECHO_NAME)
     image: busybox:1.28
@@ -286,14 +289,7 @@ impl Kube {
                 } if number_available == desired_number_scheduled => Ok(object.clone()),
                 status => {
                     // Try fetching Vectors logs for diagnostic purpose
-                    for daemon_instance in self.list(&object) {
-                        if let Ok(logs) = self.api(Api::v1Pod).log(
-                            daemon_instance.metadata.name.as_str(),
-                            &LogParams::default(),
-                        ) {
-                            info!("Deamon Vector's logs:\n{}", logs);
-                        }
-                    }
+                    info_vector_logs(self, &object);
 
                     Err(format!(
                         "DaemonSet not yet ready with status: {:?}. Pods status: {:?}",
@@ -494,6 +490,20 @@ pub fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<Value> {
         );
     }
     logs
+}
+
+pub fn info_vector_logs(kube: &Kube, vector: &KubeDaemon) {
+    for daemon_instance in kube.list(&vector) {
+        if let Ok(logs) = kube.api(Api::v1Pod).log(
+            daemon_instance.metadata.name.as_str(),
+            &LogParams::default(),
+        ) {
+            info!(
+                "Deamon Vector's logs [{}]:\n{}",
+                daemon_instance.metadata.name, logs
+            );
+        }
+    }
 }
 
 #[test]
