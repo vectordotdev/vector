@@ -148,6 +148,8 @@ kind: Pod
 metadata:
   name: $(ECHO_NAME)
   namespace: $(TEST_NAMESPACE)
+  labels: 
+    vector.test/label: echo
 spec:
   containers:
   - name: $(ECHO_NAME)

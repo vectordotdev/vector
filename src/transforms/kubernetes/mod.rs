@@ -423,10 +423,33 @@ impl Field {
 #[cfg(test)]
 mod tests {
     use super::Field;
+    use crate::event::Event;
+    use std::collections::BTreeMap;
 
     #[test]
     fn field_name() {
         assert_eq!("priority_class_name", &Field::PriorityClassName.name());
+    }
+
+    #[test]
+    fn label_with_dot() {
+        let field = Field::Labels;
+        let mut labels = BTreeMap::new();
+
+        labels.insert("kubectl.io/some".to_owned(), "Label".to_owned());
+
+        let (key, value) = field.collection(&labels);
+
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert(key, value);
+
+        assert_eq!(
+            event
+                .as_log()
+                .get(&(Field::with_prefix("labels") + r#".kubectl\.io/some"#).into())
+                .unwrap(),
+            &"Label".into()
+        );
     }
 }
 
@@ -529,11 +552,11 @@ data:
         CONFIG_MAP_YAML_WITH_METADATA.replace(FIELD_MARKER, replace.as_str())
     }
 
-    #[test]
-    fn kube_metadata() {
-        let namespace = format!("kube-metadata-{}", Uuid::new_v4());
+    /// Starts a vector with metadata transform with `field` and an echo.
+    /// Calls test function once for log of started echo.  
+    fn metadata_test(namespace: &str, field: &str, test: impl Fn(serde_json::Value) -> bool) {
+        let namespace = format!("{}-{}", namespace, Uuid::new_v4());
         let message = random_string(300);
-        let field = "node_name";
         let user_namespace = user_namespace(namespace.as_str());
         let binding_name = binding_name(namespace.as_str());
 
@@ -565,10 +588,11 @@ data:
             // If any daemon logged message, done.
             for line in logs(&kube, &vector) {
                 if line
-                    .get(crate::event::log_schema().kubernetes_key().as_ref())
-                    .and_then(|kube| kube.get(field))
-                    .is_some()
+                    .get(crate::event::log_schema().message_key().as_ref())
+                    .and_then(|value| value.as_str())
+                    == Some(&message)
                 {
+                    assert!(test(line));
                     // DONE
                     return true;
                 } else {
@@ -576,6 +600,28 @@ data:
                 }
             }
             false
+        });
+    }
+
+    #[test]
+    fn kube_metadata() {
+        metadata_test("kube-metadata", "node_name", |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .and_then(|kube| kube.get("node_name"))
+                .is_some()
+        });
+    }
+
+    #[test]
+    fn kube_labels() {
+        metadata_test("kube-labels", "labels", |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .and_then(|kube| kube.get("labels"))
+                .and_then(|labels| labels.get("vector.test/label"))
+                .and_then(|value| value.as_str())
+                == Some("echo")
         });
     }
 }
