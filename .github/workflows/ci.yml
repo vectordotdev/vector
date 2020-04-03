@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        kube: [1.17.2]
+        kube: [1.14.10, 1.17.2]
     steps:
     - name: Load vector
       uses: actions/download-artifact@v1
