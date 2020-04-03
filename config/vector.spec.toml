@@ -7160,7 +7160,7 @@ end
   remove_label_fields = true
 
   # If this is set to `true` then the timestamp will be removed from the event.
-  # This is useful because loki uses the timestamp to index the event.
+  # This is useful because Loki uses the timestamp to index the event.
   #
   # * optional
   # * default: true
@@ -7169,7 +7169,7 @@ end
   remove_timestamp = false
 
   # The tenant id that will be sent with every request, by default this is not
-  # required since a proxy should set this header. When running loki locally a
+  # required since a proxy should set this header. When running Loki locally a
   # tenant id is not required either.
   #
   # You can read more about tenant id's here
@@ -7191,8 +7191,8 @@ end
     # * must be: "basic"
     strategy = "basic"
 
-    # The basic authentication password.If using GrafanaLab's hosted Loki then this
-    # must be setto your `instanceId`.
+    # The basic authentication password. If using GrafanaLab's hosted Loki then
+    # this must be set to your `instanceId`.
     #
     # * required
     # * type: string
@@ -7200,8 +7200,8 @@ end
     password = "${LOKI_PASSWORD}"
     password = "password"
 
-    # The basic authentication user name.If using GrafanaLab's hosted Loki then
-    # this must be setto your Grafana.com api key.
+    # The basic authentication user name. If using GrafanaLab's hosted Loki then
+    # this must be set to your Grafana.com api key.
     #
     # * required
     # * type: string
