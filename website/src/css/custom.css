@@ -552,12 +552,6 @@ table.comparison tr td.bar.vector .bar {
   text-align: center;
 }
 
-.empty .icon {
-  font-size: 4rem;
-  font-weight: bold;
-  line-height: 1;
-}
-
 .empty .icon img {
   height: 100px;
 }
@@ -678,15 +672,15 @@ header {
 header .badges {
   float: right;
   font-family: monospace;
-  margin-top: 0.5rem;
+  margin-top: 0.5em;
 }
 header .badges .badge {
-  margin-left: 2px;
+  margin-left: 0.5em;
 }
 header h1 {
   font-family: Ubuntu, var(--ifm-font-family-base);
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 2.5em;
+  margin-bottom: 0;
 }
 
 /**
@@ -707,12 +701,12 @@ header h1 {
   display: block;
   align-items: center;
   min-height: 175px;
-  padding: 2.5em 0 2.2em 0;
+  padding: 2.5em 0;
   position: relative;
   text-align: center;
 }
 .hero h1 {
-  font-size: 2.5rem;
+  font-size: 2.5em;
 }
 .hero .hero--category {
   color: var(--ifm-heading-color);
@@ -734,7 +728,6 @@ header h1 {
 .hero .hero--subtitle {
   color: var(--ifm-color-emphasis-600);
   font-size: 1.3em;
-  margin-top: 0.3em;
   margin-bottom: var(--ifm-spacing-vertical);
 }
 .hero .hero--subtitle a {
@@ -755,17 +748,16 @@ header h1 {
 }
 .hero .hero--subsubtitle {
   color: var(--ifm-hero-text-color);
-  font-size: 0.9rem;
-  margin-top: 0.3rem;
+  font-size: 1em;
 }
 .hero .hero--buttons {
-  --ifm-button-padding-vertical: 0.5rem;
-  --ifm-button-padding-horizontal: 4rem;
+  --ifm-button-padding-vertical: 0.5em;
+  --ifm-button-padding-horizontal: 4em;
   margin-bottom: var(--ifm-spacing-vertical);
 }
 .hero .hero--buttons .button {
-  border-radius: 2rem;
-  margin-right: 1rem;
+  border-radius: 2em;
+  margin-right: 1em;
   min-width: 240px;
 }
 .hero .hero--buttons .button:last-child {
@@ -782,6 +774,9 @@ header h1 {
   justify-content: center;
   min-height: calc( 100vh - var(--ifm-navbar-height) );
 }
+.hero.hero--full-height > .container > *:last-child {
+  margin-bottom: 0;
+}
 .hero.hero--animated-graph {
   padding: 0;
   margin: 0;
@@ -797,7 +792,7 @@ header h1 {
     padding: 2em 0;
   }
   .hero .hero--buttons .button {
-    --ifm-button-padding-horizontal: 2rem;
+    --ifm-button-padding-horizontal: 3em;
     min-width: 180px;
   }
 }
@@ -813,7 +808,7 @@ header h1 {
   }
   .hero .hero--buttons .button {
     display: block;
-    border-radius: 0.5rem;
+    border-radius: 0.5em;
     margin: 0 0 1rem 0;
     min-width: auto;
     width: 100%;
@@ -836,9 +831,9 @@ input[type="checkbox"] {
   border: 1px solid var(--ifm-color-emphasis-200);
   border-radius: 4px;
   cursor: pointer;
-  height: 1rem;
-  margin-bottom: 0.5rem;
-  width: 1rem;
+  height: 1.5em;
+  margin-bottom: 0.75em;
+  width: 1.5em;
   outline: none;
   transition-duration: var(--ifm-transition-fast);
   vertical-align: middle;
@@ -890,17 +885,6 @@ input.input--highlight-wrapper {
   border: 0px none;
   font-weight: 600;
   padding: 1px;
-}
-
-/**
- * label
- */
-
-.label.label--warning {
-  color: var(--ifm-color-warning);
-  border-bottom: 1px solid var(--ifm-color-warning);
-  padding-bottom: 5px;
-  font-size: 0.8rem;
 }
 
 /**
@@ -1002,7 +986,7 @@ ol li.list--li--pink {
   color: var(--ifm-color-emphasis-300);
   cursor: text;
   display: flex;
-  font-size: 0.9rem;
+  font-size: 1.0em;
   justify-content: space-between;
   line-height: calc( var(--ifm-spacing-vertical) * 1.25 );
   margin-top: calc( var(--ifm-spacing-vertical) * 1.5 );
@@ -1020,7 +1004,7 @@ ol li.list--li--pink {
 }
 .menu > ul.menu__list ul.menu__list .menu__link {
   border-radius: 0;
-  font-size: 0.85rem;
+  font-size: 1em;
   margin-left: calc( var(--ifm-menu-link-padding-horizontal) * -1 );
   padding-left: var(--ifm-menu-link-padding-horizontal);
 }
@@ -1070,19 +1054,19 @@ ol li.list--li--pink {
   border-radius: 0.25em;
   display: inline-block;
   font-family: monospace;
-  font-size: 0.5rem;
+  font-size: 0.7em;
   font-weight: bold;
-  height: 1rem;
-  line-height: 1rem;
+  height: 1.5em;
+  line-height: 1.3em;
   margin-right: 2px;
-  padding: 0 0.25rem;
+  padding: 0 0.4em;
   vertical-align: middle;
 }
 .menu.menu--responsive .menu__button {
   background: var(--ifm-panel-background-solid);
   border-color: var(--ifm-color-content-secondary);
-  bottom: 1rem;
-  right: 1rem;
+  bottom: 1em;
+  right: 1.5em;
 }
 
 /**
@@ -1149,7 +1133,7 @@ ol li.list--li--pink {
     text-align: right;
   }
   .navbar .navbar__search .navbar__search-input {
-    width: 12.5rem;
+    width: 15em;
   }
   .navbar .navbar-sidebar__items .navbar__item {
     display: inline-block;
@@ -1644,7 +1628,7 @@ table {
   top: var(--ifm-navbar-height);
 }
 .table-of-contents {
-  font-size: 0.8rem;
+  font-size: 0.8em;
 }
 .table-of-contents .section {
   border-bottom: 1px solid var(--ifm-hr-border-color);
@@ -1661,14 +1645,14 @@ table {
 }
 .table-of-contents .title {
   color: var(--ifm-color-emphasis-300);
-  font-size: 0.9rem;
+  font-size: 1.1em;
   font-weight: bold;
   margin-bottom: var(--ifm-contents-padding-vertical);
   text-transform: uppercase;
 }
 .table-of-contents ul.contents {
   font-weight: bold;
-  font-size: 0.75rem;
+  font-size: 0.95em;
   padding: 0;
 }
 .table-of-contents ul.contents code {
@@ -1942,11 +1926,11 @@ div[class^='docPage_'] div[class^='docItemContainer_'] {
 
 div[class^='docPage_'] h1[class^='docTitle_'] {
   font-size: 2em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3em;
 }
 
 div[class^='docPage_'] .markdown > h2 {
-  font-size: 1.5rem;
+  font-size: 1.5em;
 }
 
 div[class^='docPage_'] main[class^='docMainContainer_'] div.container div.row div.col.col--3 {
@@ -1960,7 +1944,7 @@ div[class^='docPage_'] div[class^='docSidebarContainer_'] {
 }
 
 div[class^='docPage_'] div[class^='sidebar_'] {
-  font-size: 0.85rem;
+  font-size: 0.85em;
   font-weight: bold;
 }
 div[class^='docPage_'] div[class^='sidebar_'] .menu {

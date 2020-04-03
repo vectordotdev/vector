@@ -38,12 +38,12 @@
   }
 
   .sidebarLogo img {
-    margin-right: 0.5rem;
-    height: 2rem;
+    margin-right: 0.5em;
+    height: 2em;
   }
 
   .menu {
-    padding: 0.5rem;
+    padding: 0.5em;
   }
 }
 
@@ -60,7 +60,7 @@
   justify-content: center;
   align-items: center;
   height: 24px;
-  font-size: 1.5rem;
+  font-size: 2em;
   font-weight: var(--ifm-font-weight-bold);
   line-height: 0.9;
   width: 24px;

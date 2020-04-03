@@ -7,7 +7,7 @@
   border-top-right-radius: var(--ifm-global-radius);
   border-bottom: 1px solid var(--ifm-hr-border-color);
   color: var(--ifm-color-emphasis-400);
-  font-size: 0.8rem;
+  font-size: 0.95em;
   font-weight: bold;
   padding: calc( var(--ifm-pre-padding) / 2 ) var(--ifm-pre-padding);
 }

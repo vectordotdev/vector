@@ -58,7 +58,7 @@
   animation: indexHeroInitial 700ms cubic-bezier(0, 1.5, 0.32, 1.5), indexHeroPulsating 2.5s linear infinite;
   animation-delay: 650ms, 1350ms;
   animation-fill-mode: forwards;
-  background-image: radial-gradient(ellipse at center calc( 50% + 125px ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
+  background-image: radial-gradient(ellipse at center calc( 50% + 6em ), rgba(var(--ifm-color-primary-rgb), 0.25), transparent 20%);
   background-position: center center;
 }
 
@@ -151,7 +151,7 @@ html[data-theme="dark"] .hero {
 .components h3 {
   align-items: center;
   display: flex;
-  font-size: 3.5rem;
+  font-size: 3.5em;
   height: 100%;
   justify-content: center;
   position: relative;
@@ -187,7 +187,7 @@ html[data-theme="dark"] .hero {
   }
 
   .components h3 {
-    font-size: 2.5rem;
+    font-size: 2.5em;
   }
 }
 
@@ -209,7 +209,7 @@ html[data-theme="dark"] .hero {
   .components ul {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    grid-gap: 1rem;
+    grid-gap: 1em;
     margin: 0;
     padding: 0;
   }

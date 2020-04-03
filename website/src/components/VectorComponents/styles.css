@@ -20,7 +20,7 @@
 .vector-components--grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  grid-gap: 1rem;
+  grid-gap: 1em;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 

@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 
 import CheckboxList from '@site/src/components/CheckboxList';
+import Empty from '@site/src/components/Empty';
 
 import _ from 'lodash';
 
@@ -80,10 +81,7 @@ function Fields({children, filters}) {
       <div className="section-list">
         {!Array.isArray(filteredChildren) || filteredChildren.length > 0 ?
           filteredChildren :
-          <div className="empty">
-            <div className="icon">☹</div>
-            <div>No fields found</div>
-          </div>}
+          <Empty text="no components found" />}
       </div>
     </div>
   );
