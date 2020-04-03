@@ -294,6 +294,9 @@ blockquote > footer {
  * button
  */
 
+.button {
+  font-size: calc(0.875em * var(--ifm-button-size-multiplier));
+}
 .button.button--primary {
   --ifm-button-color: var(--ifm-background-color);
 }
@@ -1135,6 +1138,11 @@ ol li.list--li--pink {
   display: none;
 }
 
+@media (max-width: 1050px) {
+  .navbar .navbar__search .navbar__search-input {
+    width: 10em;
+  }
+}
 @media (max-width: 996px) {
   .navbar .navbar__search {
     flex-grow: 1;
@@ -1176,15 +1184,13 @@ ol li.list--li--pink {
 .navbar .navbar__item .badge {
   border-color: var(--ifm-background-color) !important;
   border-radius: 1em;
-  display: block;
-  float: right;
   font-size: 0.6em;
   line-height: 1;
-  margin-top: -0.7em;
   margin-right: -1.5em;
   margin-left: -0.5em;
   padding: 0.3em 0.5em;
   position: relative;
+  top: -1em;
   z-index: 1;
 }
 .navbar-sidebar__brand .navbar__brand {

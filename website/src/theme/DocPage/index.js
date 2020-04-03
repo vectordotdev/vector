@@ -40,7 +40,7 @@ function DocPage(props) {
 
   return (
     <Layout version={version} key={isClient}>
-      <div className={classnames(styles.docPage, 'container', 'container--l2')}>
+      <div className={classnames(styles.docPage, 'container', 'container--l')}>
         {sidebar && (
           <div className={styles.docSidebarContainer}>
             <DocSidebar
