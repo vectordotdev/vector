@@ -1,6 +1,6 @@
 use crate::{
-    shutdown::ShutdownSignal,
     event::metric::{Metric, MetricKind, MetricValue},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event,
 };
