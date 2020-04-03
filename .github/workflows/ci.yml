@@ -87,5 +87,5 @@ jobs:
     - name: Make test binary executable
       run: chmod +x ./builds/vector-test
     - name: Run kubernetes integration tests
-      run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest ./builds/vector-test --test-threads=1 kubernetes
+      run: KUBE_TEST_IMAGE=localhost:5000/vector_test:latest TEST_LOG=debug ./builds/vector-test --test-threads=1 kubernetes
 
