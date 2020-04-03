@@ -69,7 +69,7 @@ jobs:
         name: builds
     - uses: opsgang/ga-setup-minikube@v0.1.1
       with:
-        minikube-version: 1.9.0
+        minikube-version: 1.9.1
         k8s-version: ${{ matrix.kube }}
     - name: Start local repository
       run: docker run -d -p 5000:5000 --restart=always --name registry registry:2
