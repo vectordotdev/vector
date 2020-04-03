@@ -68,7 +68,7 @@ required = false
 examples = ["some_tenant_id"]
 description = """\
 The tenant id that will be sent with every request, by default this is not \
-required since a proxy should set this header. When running loki locally a \
+required since a proxy should set this header. When running Loki locally a \
 tenant id is not required either.
 
 You can read more about tenant id's [here][urls.loki_multi_tenancy]\
@@ -79,11 +79,11 @@ type = "table"
 required = true
 examples = [{label = "value"}]
 description = """\
-A set of labels that will be attached to each batch of events. These values\
+A set of labels that will be attached to each batch of events. These values \
 are also templateable to allow events to provide dynamic label values.\
 
-Note: If the set of label values has high cardinality this can cause drastic\
-performance issues with Loki. To ensure this does not happen one should try\
+Note: If the set of label values has high cardinality this can cause drastic \
+performance issues with Loki. To ensure this does not happen one should try \
 to reduce the amount of unique label values.\
 """
 
@@ -109,7 +109,7 @@ required = false
 default = true
 description = """\
 If this is set to `true` then the timestamp will be removed from the event. \
-This is useful because loki uses the timestamp to index the event.\
+This is useful because Loki uses the timestamp to index the event.\
 """
 
 [sinks.loki.options.auth]
@@ -133,9 +133,9 @@ examples = ["${LOKI_PASSWORD}", "password"]
 relevant_when = {strategy = "basic"}
 required = true
 description = """\
-The basic authentication password.\
+The basic authentication password. \
 
-If using GrafanaLab's hosted Loki then this must be set\
+If using GrafanaLab's hosted Loki then this must be set \
 to your `instanceId`.\
 """
 
@@ -145,8 +145,8 @@ examples = ["${LOKI_USERNAME}", "username"]
 relevant_when = {strategy = "basic"}
 required = true
 description = """\
-The basic authentication user name.\
+The basic authentication user name. \
 
-If using GrafanaLab's hosted Loki then this must be set\
+If using GrafanaLab's hosted Loki then this must be set \
 to your Grafana.com api key.\
 """
