@@ -30,7 +30,7 @@ pub struct UdpSocketError {
 
 impl InternalEvent for UdpSocketError {
     fn emit_logs(&self) {
-        error!(message = "error reading datagram.", %self.error);
+        error!(message = "error reading datagram.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

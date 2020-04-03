@@ -7,7 +7,7 @@ pub struct SyslogEventReceived {
 
 impl InternalEvent for SyslogEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received line.", %self.byte_size);
+        trace!(message = "Received line.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -28,7 +28,7 @@ pub struct SyslogUdpReadError {
 
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
-        error!(message = "error reading datagram.", %self.error);
+        error!(message = "error reading datagram.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

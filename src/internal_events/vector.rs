@@ -50,7 +50,7 @@ pub struct VectorProtoParseError {
 
 impl InternalEvent for VectorProtoParseError {
     fn emit_logs(&self) {
-        error!(message = "failed to parse protobuf message", %self.error);
+        error!(message = "failed to parse protobuf message", error = %self.error);
     }
 
     fn emit_metrics(&self) {

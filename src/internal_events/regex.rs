@@ -41,10 +41,7 @@ pub struct RegexMissingField<'a> {
 
 impl InternalEvent for RegexMissingField<'_> {
     fn emit_logs(&self) {
-        debug!(
-            message = "Field does not exist.",
-            %self.field,
-        );
+        debug!(message = "Field does not exist.", field = %self.field);
     }
 
     fn emit_metrics(&self) {

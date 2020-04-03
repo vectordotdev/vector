@@ -21,7 +21,7 @@ pub struct TcpConnectionFailed {
 
 impl InternalEvent for TcpConnectionFailed {
     fn emit_logs(&self) {
-        error!(message = "unable to connect.", %self.error);
+        error!(message = "unable to connect.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -37,7 +37,7 @@ pub struct TcpConnectionDisconnected {
 
 impl InternalEvent for TcpConnectionDisconnected {
     fn emit_logs(&self) {
-        error!(message = "connection disconnected.", %self.error);
+        error!(message = "connection disconnected.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -53,7 +53,7 @@ pub struct TcpConnectionError {
 
 impl InternalEvent for TcpConnectionError {
     fn emit_logs(&self) {
-        warn!(message = "connection error.", %self.error);
+        warn!(message = "connection error.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -69,7 +69,7 @@ pub struct TcpFlushError {
 
 impl InternalEvent for TcpFlushError {
     fn emit_logs(&self) {
-        error!(message = "unable to flush connection.", %self.error);
+        error!(message = "unable to flush connection.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -85,10 +85,7 @@ pub struct TcpEventSent {
 
 impl InternalEvent for TcpEventSent {
     fn emit_logs(&self) {
-        debug!(
-            message = "sending event.",
-            %self.byte_size
-        );
+        debug!(message = "sending event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -107,10 +104,7 @@ pub struct TcpEventReceived {
 
 impl InternalEvent for TcpEventReceived {
     fn emit_logs(&self) {
-        debug!(
-            message = "sending event.",
-            %self.byte_size
-        );
+        debug!(message = "sending event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

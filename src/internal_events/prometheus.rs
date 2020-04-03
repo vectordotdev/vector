@@ -19,7 +19,7 @@ pub struct PrometheusParseError {
 
 impl InternalEvent for PrometheusParseError {
     fn emit_logs(&self) {
-        error!(message = "parsing error", %self.error);
+        error!(message = "parsing error", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -36,7 +36,7 @@ pub struct PrometheusHttpError {
 
 impl InternalEvent for PrometheusHttpError {
     fn emit_logs(&self) {
-        error!(message = "http request processing error", %self.error);
+        error!(message = "http request processing error", error = %self.error);
     }
 
     fn emit_metrics(&self) {
