@@ -420,6 +420,7 @@ fn topology_swap_transform() {
     assert_eq!(vec!["this replaced"], res1v2);
 }
 
+#[ignore] // TODO: issue #2186
 #[test]
 fn topology_swap_transform_is_atomic() {
     let mut rt = runtime();
