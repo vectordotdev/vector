@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct UdpEventReceived {
     pub byte_size: usize,
 }
@@ -24,6 +25,7 @@ impl InternalEvent for UdpEventReceived {
     }
 }
 
+#[derive(Debug)]
 pub struct UdpSocketError {
     pub error: std::io::Error,
 }

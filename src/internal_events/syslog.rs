@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct SyslogEventReceived {
     pub byte_size: usize,
 }
@@ -22,6 +23,7 @@ impl InternalEvent for SyslogEventReceived {
     }
 }
 
+#[derive(Debug)]
 pub struct SyslogUdpReadError {
     pub error: std::io::Error,
 }

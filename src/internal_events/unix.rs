@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
     pub path: &'a std::path::Path,
 }
@@ -17,6 +18,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct UnixSocketConnectionFailure<'a> {
     pub error: std::io::Error,
     pub path: &'a std::path::Path,
@@ -38,6 +40,7 @@ impl InternalEvent for UnixSocketConnectionFailure<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct UnixSocketError<'a> {
     pub error: std::io::Error,
     pub path: &'a std::path::Path,
@@ -57,6 +60,7 @@ impl InternalEvent for UnixSocketError<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct UnixSocketEventSent {
     pub byte_size: usize,
 }
@@ -72,6 +76,7 @@ impl InternalEvent for UnixSocketEventSent {
     }
 }
 
+#[derive(Debug)]
 pub struct UnixSocketEventReceived {
     pub byte_size: usize,
 }

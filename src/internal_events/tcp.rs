@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct TcpConnectionEstablished;
 
 impl InternalEvent for TcpConnectionEstablished {
@@ -15,6 +16,7 @@ impl InternalEvent for TcpConnectionEstablished {
     }
 }
 
+#[derive(Debug)]
 pub struct TcpConnectionFailed {
     pub error: crate::tls::TlsError,
 }
@@ -31,6 +33,7 @@ impl InternalEvent for TcpConnectionFailed {
     }
 }
 
+#[derive(Debug)]
 pub struct TcpConnectionDisconnected {
     pub error: std::io::Error,
 }
@@ -47,6 +50,7 @@ impl InternalEvent for TcpConnectionDisconnected {
     }
 }
 
+#[derive(Debug)]
 pub struct TcpConnectionError {
     pub error: std::io::Error,
 }
@@ -63,6 +67,7 @@ impl InternalEvent for TcpConnectionError {
     }
 }
 
+#[derive(Debug)]
 pub struct TcpFlushError {
     pub error: std::io::Error,
 }
@@ -79,6 +84,7 @@ impl InternalEvent for TcpFlushError {
     }
 }
 
+#[derive(Debug)]
 pub struct TcpEventSent {
     pub byte_size: usize,
 }
@@ -98,6 +104,7 @@ impl InternalEvent for TcpEventSent {
     }
 }
 
+#[derive(Debug)]
 pub struct TcpEventReceived {
     pub byte_size: usize,
 }

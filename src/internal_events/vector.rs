@@ -2,6 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 use prost::DecodeError;
 
+#[derive(Debug)]
 pub struct VectorEventSent {
     pub byte_size: usize,
 }
@@ -21,6 +22,7 @@ impl InternalEvent for VectorEventSent {
     }
 }
 
+#[derive(Debug)]
 pub struct VectorEventReceived {
     pub byte_size: usize,
 }
@@ -44,6 +46,7 @@ impl InternalEvent for VectorEventReceived {
     }
 }
 
+#[derive(Debug)]
 pub struct VectorProtoParseError {
     pub error: DecodeError,
 }

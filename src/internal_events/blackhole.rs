@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct BlackholeEventReceived {
     pub byte_size: usize,
 }

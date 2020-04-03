@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct FileEventReceived<'a> {
     pub file: &'a str,
     pub byte_size: usize,

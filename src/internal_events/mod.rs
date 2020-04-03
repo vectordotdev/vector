@@ -22,7 +22,7 @@ pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
 
-pub trait InternalEvent {
+pub trait InternalEvent: std::fmt::Debug {
     fn emit_logs(&self) {}
     fn emit_metrics(&self) {}
 }

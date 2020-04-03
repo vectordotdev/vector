@@ -2,6 +2,7 @@ use super::InternalEvent;
 use crate::sources::prometheus::parser::ParserError;
 use metrics::counter;
 
+#[derive(Debug)]
 pub struct PrometheusRequestCompleted;
 
 impl InternalEvent for PrometheusRequestCompleted {
@@ -13,6 +14,7 @@ impl InternalEvent for PrometheusRequestCompleted {
     }
 }
 
+#[derive(Debug)]
 pub struct PrometheusParseError {
     pub error: ParserError,
 }
@@ -30,6 +32,7 @@ impl InternalEvent for PrometheusParseError {
     }
 }
 
+#[derive(Debug)]
 pub struct PrometheusHttpError {
     pub error: hyper::Error,
 }

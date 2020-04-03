@@ -3,6 +3,7 @@ use metrics::counter;
 use std::borrow::Cow;
 use string_cache::DefaultAtom as Atom;
 
+#[derive(Debug)]
 pub struct RegexEventProcessed;
 
 impl InternalEvent for RegexEventProcessed {
@@ -14,6 +15,7 @@ impl InternalEvent for RegexEventProcessed {
     }
 }
 
+#[derive(Debug)]
 pub struct RegexFailedMatch<'a> {
     pub value: &'a [u8],
 }
@@ -35,6 +37,7 @@ impl InternalEvent for RegexFailedMatch<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct RegexMissingField<'a> {
     pub field: &'a Atom,
 }

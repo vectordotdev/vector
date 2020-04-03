@@ -3,6 +3,7 @@ use crate::transforms::lua::v1::format_error;
 use metrics::{counter, gauge, timing};
 use std::time::Duration;
 
+#[derive(Debug)]
 pub struct LuaEventProcessed {
     pub duration: Duration,
 }
@@ -20,6 +21,7 @@ impl InternalEvent for LuaEventProcessed {
     }
 }
 
+#[derive(Debug)]
 pub struct LuaGcTriggered {
     pub used_memory: usize,
 }
@@ -33,6 +35,7 @@ impl InternalEvent for LuaGcTriggered {
     }
 }
 
+#[derive(Debug)]
 pub struct LuaScriptError {
     pub error: rlua::Error,
 }
