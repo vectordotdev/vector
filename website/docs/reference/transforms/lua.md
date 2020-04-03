@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-02"
+last_modified_on: "2020-04-03"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -407,26 +407,165 @@ function (event, emit)
 end
 ```
 
-### Types
+### Representation of Events
 
-Event fields can be set to scalar values (booleans, numbers, or strings),
-and the resulting event will keep the correct types. If an event field is
-set to an invalid value, a message will be logged and the field will be dropped.
+Events are represented as tables in Lua. Vector uses
+[externally tagged representation][urls.externally_tagged_representation] to encode both log and metric events in
+a consistent fashion:
 
-### Nested Fields
+* [Log events][docs.about.data-model.log] are represented as values of a key named `log`.
+* [Metric events][docs.about.data-model.metric] are represnted as values of a key named `metric`.
 
-As described in the [Data Model document][docs.data_model], Vector flatten
-events, representing nested field with a `.` delimiter. Therefore, adding,
-accessing, or removing nested fields is as simple as added a `.` in your key
-name:
+For instance, a typical log event produced by the [`stdin`][docs.reference.sources.stdin] source could have been
+created programmatically using the following code:
 
 ```lua
-# Add nested field
-event.log.nested.field = "nested value"
-
-# Remove nested field
-event.log.nested.field = nil
+event = {
+  log = {
+    host = "localhost",
+    message = "the message",
+    timestamp = os.date("!*t")
+  }
+}
 ```
+
+A typical metric event could have been created programmatically in a similar way:
+
+<Tabs
+  defaultValue="gauge"
+  select={true}
+  urlKey="metric_kind"
+  values={[
+    { label: 'Counter', value: 'counter', },
+    { label: 'Gauge', value: 'gauge', },
+    { label: 'Set', value: 'set', },
+    { label: 'Distribution', value: 'distribution', },
+    { label: 'Aggregated Histogram', value: 'aggregated_histogram', },
+    { label: 'Aggregated Summary', value: 'aggregated_summary', },
+  ]
+}>
+<TabItem value="counter">
+
+```lua
+event = {
+  metric = {
+    name = "login.count",
+    timestamp = os.date("!*t"),
+    kind = "absolute",
+    tags = {
+      host = "my.host.example"
+    },
+    counter = {
+      value: 24.2
+    }
+  }
+}
+```
+
+</TabItem>
+<TabItem value="gauge">
+
+```lua
+event = {
+  metric = {
+    name = "memory_rss",
+    timestamp = os.date("!*t"),
+    kind = "absolute",
+    tags = {
+      host = "my.host.example"
+    },
+    gauge = {
+      value = 512.0
+    }
+  }
+}
+```
+
+</TabItem>
+<TabItem value="set">
+
+```lua
+event = {
+  metric = {
+    name = "user_names",
+    timestamp = os.date("!*t"),
+    kind = "absolute",
+    tags = {
+      host = "my.host.example"
+    },
+    set = {
+      values = {"value1", "value2"}
+    }
+  }
+}
+```
+
+</TabItem>
+<TabItem value="distribution">
+
+```javascript
+event = {
+  metric = {
+    name = "response_time_ms",
+    timestamp = os.date("!*t"),
+    kind = "absolute",
+    tags = {
+      host = "my.host.example"
+    },
+    distribution = {
+      values = {2.21, 5.46, 10.22},
+      sample_rates = {5, 2, 5}
+    }
+  }
+}
+```
+
+</TabItem>
+<TabItem value="aggregated_histogram">
+
+```lua
+event = {
+  metric = {
+    name = "response_time_ms",
+    timestamp = os.date("!*t"),
+    kind = "absolute",
+    tags = {
+      host = "my.host.example"
+    },
+    aggregated_histogram = {
+      buckets = {1.0, 2.0, 4.0, 8.0, 16.0, 32.0},
+      counts = {20, 10, 45, 12, 18, 92},
+      count = 197,
+      sum = 975.2
+    }
+  }
+}
+```
+
+</TabItem>
+<TabItem value="aggregated_summary">
+
+```lua
+event = {
+  metric = {
+    name = "response_time_ms",
+    timestamp = os.date("!*t"),
+    kind = "absolute",
+    tags = {
+      host: "my.host.example"
+    },
+    aggregated_sumary = {
+      quantiles = {0.1, 0.25, 0.5, 0.9, 0.99, 1.0},
+      values = {2.0, 3.0, 5.0, 8.0, 9.0, 10.0},
+      count = 197,
+      sum = 975.2
+    }
+  }
+}
+```
+
+</TabItem>
+</Tabs>
 
 ### Iterate over fields
 
@@ -463,10 +602,13 @@ first chapters of [the official book][urls.lua_pil] or consulting
 [the manual][urls.lua_manual] would suffice.
 
 
+[docs.about.data-model.log]: /docs/about/data-model/log/
+[docs.about.data-model.metric]: /docs/about/data-model/metric/
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
-[docs.data_model]: /docs/about/data-model/
+[docs.reference.sources.stdin]: /docs/reference/sources/stdin/
+[urls.externally_tagged_representation]: https://serde.rs/enum-representations.html#externally-tagged
 [urls.lua]: https://www.lua.org/
 [urls.lua_manual]: https://www.lua.org/manual/5.3/manual.html
 [urls.lua_pairs]: https://www.lua.org/manual/5.3/manual.html#pdf-pairs

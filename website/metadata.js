@@ -10,6 +10,15 @@ module.exports = {
       "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
       "guides": [
         {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
+          "id": "/advanced/custom-aggregations-with-lua",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/custom-aggregations-with-lua.md",
+          "series_position": null,
+          "title": "Custom Aggregations with Lua"
+        },
+        {
           "author_github": "https://github.com/Jeffail",
           "description": null,
           "id": "/advanced/managing-complex-configs",
@@ -25802,6 +25811,7 @@ module.exports = {
   "team": [
     {
       "avatar": "https://github.com/a-rodin.png",
+      "bio": "Alexander is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://alexanderrodin.com/qstardict\">QStarDict</a>, a dictionary application written in C++.",
       "github": "https://github.com/a-rodin",
       "id": "alex",
       "keybase": "https://keybase.io/arodin",
