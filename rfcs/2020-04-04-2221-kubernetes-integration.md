@@ -126,7 +126,7 @@ TODO: insert diagram
     kubectl create -f vector-daemonset.yaml
     ```
 
-    * *See [outstanding questions 2, 3, 4, 5, and 6](#outstanding-questions).*
+    * *See [outstanding questions 3, 4, 5, 6, and 7](#outstanding-questions).*
 
     That's it!
 
@@ -162,38 +162,60 @@ See [motivation](#motivation).
 
 ## Outstanding Questions
 
-1. What is the best to avoid Vector from ingesting it's own logs?
-2. I've seen two different installation strategies. For example, Fluentd offers
+1. What is the minimal Kubernetes version that we want to support. See
+   [this comment][kubernetes_version_comment].
+1. What is the best to avoid Vector from ingesting it's own logs? I'm assuming
+   that my [`kubectl` tutoria](#kubectl-interface) handles this with namespaces?
+   We'd just need to configure Vector to excluse this namespace?
+1. I've seen two different installation strategies. For example, Fluentd offers
    a [single daemonset configuration file][fluentd_daemonset] while Fluentbit
    offers [four separate configuration files][fluentbit_installation]
    (`service-account.yaml`, `role.yaml`, `role-binding.yaml`, `configmap.yaml`).
    Which approach is better? Why are they different?
-3. Should we prefer `kubectl create ...` or `kubectl apply ...`? The examples
+1. Should we prefer `kubectl create ...` or `kubectl apply ...`? The examples
    in the  [prior art](#prior-art) section use both.
-4. From what I understand, Vector requires the Kubernetes `watch` verb in order
+1. From what I understand, Vector requires the Kubernetes `watch` verb in order
    to receive updates to k8s cluster changes. This is required for the
    `kubernetes_pod_metadata` transform. Yet, Fluentbit [requires the `get`,
    `list`, and `watch` verbs][fluentbit_role]. Why don't we require the same?
-5. What is `updateStrategy` ... `RollingUpdate`? This is not included in
+1. What is `updateStrategy` ... `RollingUpdate`? This is not included in
    [our daemonset][vector_daemonset] or in [any of Fluentbit's config
    files][fluentbit_installation]. But it is included in both [Fluentd's
    daemonset][fluentd_daemonset] and [LogDNA's daemonset][logdna_daemonset].
-6. I've also noticed `resources` declarations in some of these config files.
+1. I've also noticed `resources` declarations in some of these config files.
    For example [LogDNA's daemonset][logdna_daemonset]. I assume this is limiting
    resources. Do we want to consider this?
-7. What the hell is going on with [Honeycomb's integration
+1. What the hell is going on with [Honeycomb's integration
    strategy][Hoenycomb integration]? :) It seems like the whole "Heapster"
    pipeline is specifically for system events, but Heapster is deprecated?
    This leads me to my next question...
-8. How are we collecting Kubernetes system events? Is that outside of the
+1. How are we collecting Kubernetes system events? Is that outside of the
    scope of this RFC? And why does this take an entirely different path?
    (ref [issue#1293])
-9. What are some of the details that sets Vector's Kubernetes integration apart?
+1. What are some of the details that sets Vector's Kubernetes integration apart?
    This is for marketing purposes and also helps us "raise the bar".
 
 ## Plan Of Attack
 
-- [ ]
+- [ ] Setup a proper testing suite for k8s.
+      - [ ] Support for customizable k8s clusters. See [issue#2170].
+      - [ ] Stabilize k8s integration tests. See [isue#2193], [issue#2216],
+            and [issue#1635].
+      - [ ] Ensure we are testing all supported minor versions. See
+            [issue#2223].
+- [ ] Audit and improve the `kubernetes` source.
+      - [ ] Handle the log recursion problem where Vector ingests it's own logs.
+            See [issue#2218] and [issue#2171].
+      - [ ] Audit the `file` source strategy. See [issue#2199] and [issue#1910].
+      - [ ] Merge split logs. See [pr#2134].
+- [ ] Audit and improve the `kubernetes_pod_matadata` transform.
+      - [ ] Use the `log_schema.kubernetes_key` setting. See [issue#1867].
+- [ ] Ensure our config reload strategy is solid.
+      - [ ] Don't exit when there are configuration errors. See [issue#1816].
+      - [ ] Test this. See [issue#2224].
+- [ ] Add `kubernetes` source reference documentation.
+- [ ] Add Kubernetes setup/integration guide.
+- [ ] Release `0.10.0` and announce.
 
 [Bonzai logging operator]: https://github.com/banzaicloud/logging-operator
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
@@ -208,7 +230,20 @@ See [motivation](#motivation).
 [Honeycomb integration]: https://docs.honeycomb.io/getting-data-in/integrations/kubernetes/
 [Influx Helm charts]: https://github.com/influxdata/helm-charts
 [issue#1293]: https://github.com/timberio/vector/issues/1293
+[issue#1635]: https://github.com/timberio/vector/issues/1635
+[issue#1816]: https://github.com/timberio/vector/issues/1867
+[issue#1867]: https://github.com/timberio/vector/issues/1867
+[issue#1910]: https://github.com/timberio/vector/issues/1910
+[issue#2170]: https://github.com/timberio/vector/issues/2170
+[issue#2171]: https://github.com/timberio/vector/issues/2171
+[issue#2199]: https://github.com/timberio/vector/issues/2199
+[issue#2216]: https://github.com/timberio/vector/issues/2216
+[issue#2218]: https://github.com/timberio/vector/issues/2218
+[issue#2223]: https://github.com/timberio/vector/issues/2223
+[issue#2224]: https://github.com/timberio/vector/issues/2224
+[kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [LogDNA k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
+[pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
