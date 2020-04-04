@@ -197,6 +197,7 @@ See [motivation](#motivation).
 
 ## Plan Of Attack
 
+- [ ] Agree on minimal Kubernetes version.
 - [ ] Setup a proper testing suite for k8s.
   - [ ] Support for customizable k8s clusters. See [issue#2170].
   - [ ] Stabilize k8s integration tests. See [isue#2193], [issue#2216],
