@@ -200,6 +200,8 @@ See [motivation](#motivation).
 - [ ] Agree on minimal Kubernetes version.
 - [ ] Setup a proper testing suite for k8s.
   - [ ] Support for customizable k8s clusters. See [issue#2170].
+  - [ ] Look into [issue#2225] and see if we can include it as part of this
+        work.
   - [ ] Stabilize k8s integration tests. See [isue#2193], [issue#2216],
         and [issue#1635].
   - [ ] Ensure we are testing all supported minor versions. See
@@ -242,6 +244,7 @@ See [motivation](#motivation).
 [issue#2218]: https://github.com/timberio/vector/issues/2218
 [issue#2223]: https://github.com/timberio/vector/issues/2223
 [issue#2224]: https://github.com/timberio/vector/issues/2224
+[issue#2225]: https://github.com/timberio/vector/issues/2225
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [LogDNA k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
