@@ -115,7 +115,7 @@ package-rpm-armv7: build-archive-armv7
 	$(RUN) package-rpm-armv7
 
 package-rpm-aarch64: build-archive-aarch64
-	$(RUN) package-rpm-armv7
+	$(RUN) package-rpm-aarch64
 
 # verifications
 verify: verify-rpm verify-deb
