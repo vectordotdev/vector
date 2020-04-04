@@ -43,16 +43,6 @@ Short of `grep`, there is no easy way to catalog and display these
 instrumentation points to users. Particularly for metrics, this can be very
 valuable.
 
-## Prior Art
-
-This work is based primarily on the implementation within Timber's closed-source
-hosted service (https://timber.io). We can't use it because it's written in
-Elixir.
-
-It also builds on top of the excellent work done on the `tracing` and `metrics`
-crates. While it presents a different API for contributors, it still uses the
-full flexibility and performance of these great libraries under the hood.
-
 ## Guide-level Proposal
 
 At any point in the code where something happens that a user might want to
@@ -131,6 +121,16 @@ Some specific notes on the implementation:
   familiar and easy-to-read key/value format of the underlying APIs while using
   the compiler to inform us of any missing fields or mismatched types. See the
   [init struct pattern][1] for more discussion.
+
+## Prior Art
+
+This work is based primarily on the implementation within Timber's closed-source
+hosted service (https://timber.io). We can't use it because it's written in
+Elixir.
+
+It also builds on top of the excellent work done on the `tracing` and `metrics`
+crates. While it presents a different API for contributors, it still uses the
+full flexibility and performance of these great libraries under the hood.
 
 ## Sales Pitch
 

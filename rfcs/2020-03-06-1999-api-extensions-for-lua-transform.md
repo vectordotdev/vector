@@ -3,7 +3,6 @@
 This RFC proposes a new API for the `lua` transform.
 
 * [Motivation](#motivation)
-* [Prior Art](#prior-art)
 * [Motivating Examples](#motivating-examples)
   * [Fields Manipulation](#fields-manipulation)
   * [Log To Metric](#log-to-metric)
@@ -20,6 +19,7 @@ This RFC proposes a new API for the `lua` transform.
   * [Event Schema](#event-schema)
   * [Data Types](#data-types)
   * [Configuration](#configuration)
+* [Prior Art](#prior-art)
 * [Sales Pitch](#sales-pitch)
 * [Plan of Action](#plan-of-action)
 
@@ -84,19 +84,6 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
     It should be possible to define channels for output events, similarly to how it is done in [`swimlanes`](https://vector.dev/docs/reference/transforms/swimlanes/) transform.
 
     See [#1942](https://github.com/timberio/vector/issues/1942).
-
-## Prior Art
-
-The implementation of `lua` transform supports only log events. Processing of log events has the following design:
-
-* There is a `source` parameter which takes a string of code.
-* When a new event comes in, the global variable `event` is set inside the Lua context and the code from `source` is evaluated.
-* After that, Vector reads the global variable `event` as the processed event.
-* If the global variable `event` is set to `nil`, then the event is dropped.
-
-Events have type [`userdata`](https://www.lua.org/pil/28.1.html) with custom [metamethods](https://www.lua.org/pil/13.html), so they are views to Vector's events. Thus passing an event to Lua has zero cost, so only when fields are actually accessed the data is copied to Lua.
-
-The fields are accessed through string indexes using [Vector's field path notation](https://vector.dev/docs/about/data-model/log/).
 
 ## Motivating Examples
 
@@ -680,6 +667,19 @@ The new configuration options are the following:
 | `hooks`.`shutdown` | no | `example_function` or `function (emit) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
 | `hooks`.`process` | yes | `example_function` or `function (event, emit) ... end` | Contains a Lua expression evaluating to `shutdown` hook function. |
 | `timers` | no | `[{interval_seconds = 10, handler = "example_function"}]` or `[{interval_seconds = 10, handler = "function (emit) ... end"}]` | Contains an [array of tables](https://github.com/toml-lang/toml#user-content-array-of-tables). Each table in the array has two fields, `interval_seconds` which can take an integer number of seconds, and `handler`, which is a Lua expression evaluating to a handler function for the timer. |
+
+## Prior Art
+
+The implementation of `lua` transform supports only log events. Processing of log events has the following design:
+
+* There is a `source` parameter which takes a string of code.
+* When a new event comes in, the global variable `event` is set inside the Lua context and the code from `source` is evaluated.
+* After that, Vector reads the global variable `event` as the processed event.
+* If the global variable `event` is set to `nil`, then the event is dropped.
+
+Events have type [`userdata`](https://www.lua.org/pil/28.1.html) with custom [metamethods](https://www.lua.org/pil/13.html), so they are views to Vector's events. Thus passing an event to Lua has zero cost, so only when fields are actually accessed the data is copied to Lua.
+
+The fields are accessed through string indexes using [Vector's field path notation](https://vector.dev/docs/about/data-model/log/).
 
 ## Sales Pitch
 
