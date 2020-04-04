@@ -1,0 +1,126 @@
+# WARNING!
+#
+# DO NOT USE THIS DAEMONSET. THIS IS AN EXAMPLE DAEMONSET USED DURING
+# VECTOR'S KUBERNETES RFC PROCESS.
+
+# Everything related to vector will live under the `telemetry` namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: telemetry
+---
+# Permissions to use Kubernetes API.
+# Necessary for kubernetes_pod_metadata transform.
+# Requires that RBAC authorization is enabled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector-permissions
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: telemetry
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+# ConfigMap which contains vector.toml configuration for pods.
+#
+# This can also be removed and loaded from a file via `kubectl`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: telemetry
+data:
+  vector-agent-config: |
+    # file: vector.toml
+    # Configuration for vector-agent
+    # Docs: https://vector.dev/docs/
+
+    # Set global options
+    data_dir = "/var/tmp/vector"
+
+    # Ingest logs from Kubernetes
+    [sources.kubernetes]
+      type = "kubernetes"
+
+    # Enrich logs with Pod metadata
+    [transforms.pod_metadata]
+      type = "kubernetes_pod_metadata"
+      inputs = ["kubernetes"]
+
+    # Add additional Vector transforms and sinks as desired!
+    #
+    # For example:
+    #
+    # [sinks.aws_s3]
+    #   type = "aws_s3"
+    #   inputs = ["pod_metadata"]
+    #   bucket = "my-bucket"
+    #   compression = "gzip"
+    #   region = "us-east-1"
+    #   key_prefix = "date=%F/"
+
+  # This line is not in VECTOR.TOML
+---
+# Vector agent ran on each node where it collects logs from pods.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector-agent
+  namespace: telemetry
+spec:
+  minReadySeconds: 1
+  selector:
+    matchLabels:
+      name: vector-agent
+  template:
+    metadata:
+      labels:
+        name: vector-agent
+    # TODO: Modify this pod spec to include any extra configuration needed like
+    # secrets or dns.
+    spec:
+      volumes:
+      # Directory with logs
+      - name: var-log
+        hostPath:
+          path: /var/log/
+      # Docker and containerd log files in Kubernetes are symlinks to this folder.
+      - name: var-lib
+        hostPath:
+          path: /var/lib/
+      # Vector will store it's data here.
+      - name: data-dir
+        emptyDir: {}
+      # Mount vector configuration from config map as a file vector.toml
+      - name: config-dir
+        configMap:
+         name: vector-config
+         items:
+           - key: vector-agent-config
+             path: vector.toml
+      containers:
+      - name: vector
+        image: timberio/vector:latest-alpine
+        imagePullPolicy: Always
+        args: ["-w"]
+        volumeMounts:
+        - name: var-log
+          mountPath: /var/log/
+          readOnly: true
+        - name: var-lib
+          mountPath: /var/lib
+          readOnly: true
+        - name: data-dir
+          mountPath: /var/tmp/vector
+        - name: config-dir
+          mountPath: /etc/vector
+          readOnly: true
+        env:
+        - name: VECTOR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
