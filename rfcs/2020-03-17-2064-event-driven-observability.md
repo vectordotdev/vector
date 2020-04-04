@@ -255,7 +255,7 @@ and `emit_metrics`. There's no strong need for this split, since both are simply
 called one after another when an event is emitted. It could be simpler to
 provide one required method instead of these two optional ones.
 
-## Plan of attack
+## Plan Of Attack
 
 Instrumentation work:
 

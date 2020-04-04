@@ -39,7 +39,7 @@ What some alternatives to this approach?
 
 List any outstanding questions that we can discuss and resolve.
 
-## Plan of attack
+## Plan Of Attack
 
 Incremental steps that execute this change. Generally this is in the form of:
 

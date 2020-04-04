@@ -689,7 +689,7 @@ The proposal
 * supports both logs and metrics;
 * makes it possible to add complexity to the configuration of the transform gradually when needed.
 
-## Plan of Action
+## Plan Of Attack
 
 * [ ] Implement support for `version` config option and split implementations for versions 1 and 2.
 * [ ] Add support for `userdata` type for timestamps.
