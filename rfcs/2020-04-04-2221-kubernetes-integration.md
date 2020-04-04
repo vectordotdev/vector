@@ -198,21 +198,21 @@ See [motivation](#motivation).
 ## Plan Of Attack
 
 - [ ] Setup a proper testing suite for k8s.
-      - [ ] Support for customizable k8s clusters. See [issue#2170].
-      - [ ] Stabilize k8s integration tests. See [isue#2193], [issue#2216],
-            and [issue#1635].
-      - [ ] Ensure we are testing all supported minor versions. See
-            [issue#2223].
+  - [ ] Support for customizable k8s clusters. See [issue#2170].
+  - [ ] Stabilize k8s integration tests. See [isue#2193], [issue#2216],
+        and [issue#1635].
+  - [ ] Ensure we are testing all supported minor versions. See
+        [issue#2223].
 - [ ] Audit and improve the `kubernetes` source.
-      - [ ] Handle the log recursion problem where Vector ingests it's own logs.
-            See [issue#2218] and [issue#2171].
-      - [ ] Audit the `file` source strategy. See [issue#2199] and [issue#1910].
-      - [ ] Merge split logs. See [pr#2134].
+  - [ ] Handle the log recursion problem where Vector ingests it's own logs.
+        See [issue#2218] and [issue#2171].
+  - [ ] Audit the `file` source strategy. See [issue#2199] and [issue#1910].
+    - [ ] Merge split logs. See [pr#2134].
 - [ ] Audit and improve the `kubernetes_pod_matadata` transform.
-      - [ ] Use the `log_schema.kubernetes_key` setting. See [issue#1867].
+  - [ ] Use the `log_schema.kubernetes_key` setting. See [issue#1867].
 - [ ] Ensure our config reload strategy is solid.
-      - [ ] Don't exit when there are configuration errors. See [issue#1816].
-      - [ ] Test this. See [issue#2224].
+  - [ ] Don't exit when there are configuration errors. See [issue#1816].
+  - [ ] Test this. See [issue#2224].
 - [ ] Add `kubernetes` source reference documentation.
 - [ ] Add Kubernetes setup/integration guide.
 - [ ] Release `0.10.0` and announce.
