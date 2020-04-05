@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
@@ -55,8 +55,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "counter",
+  "counter": {
     "value": 24.2
   }
 }
@@ -73,8 +72,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "gauge",
+  "gauge": {
     "value": 51200000000.0
   }
 }
@@ -91,8 +89,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "set",
+  "set": {
     "values": ["bob", "sam", "ben"]
   }
 }
@@ -109,8 +106,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "distribution",
+  "distribution": {
     "values": [2.21, 5.46, 10.22],
     "sample_rates": [5, 2, 5]
   }
@@ -128,8 +124,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "aggregated_histogram",
+  "aggregated_histogram": {
     "buckets": [1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
     "counts": [20, 10, 45, 12, 18, 92],
     "count": 197,
@@ -149,8 +144,7 @@ import TabItem from '@theme/TabItem';
   "tags": {
     "host": "my.host.com"
   },
-  "value": {
-    "type": "aggregated_summary",
+  "aggregated_summary": {
     "quantiles": [0.1, 0.25, 0.5, 0.9, 0.99, 1.0],
     "values": [2, 3, 5, 8, 9, 10],
     "count": 197,
