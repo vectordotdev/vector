@@ -174,15 +174,13 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 </Field>
 </Fields>
 
-## Output
 
-The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
-For example:
-
+## Examples
 
 <Tabs
   block={true}
   defaultValue="histograms"
+  select={false}
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
 
 <TabItem value="histograms">

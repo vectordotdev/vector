@@ -1,12 +1,12 @@
 #encoding: utf-8
 
 require_relative "component"
-require_relative "output"
+require_relative "fields"
 
 class Transform < Component
   attr_reader :allow_you_to_description,
+    :fields,
     :input_types,
-    :output,
     :output_types
 
   def initialize(hash)
@@ -15,8 +15,8 @@ class Transform < Component
     # init
 
     @allow_you_to_description = hash.fetch("allow_you_to_description")
+    @fields = OpenStruct.new
     @input_types = hash.fetch("input_types")
-    @output = OpenStruct.new
     @output_types = hash.fetch("output_types")
 
     # checks
@@ -25,16 +25,16 @@ class Transform < Component
       raise("#{self.class.name}#allow_you_to_description cannot not end with a period")
     end
 
-    # output
+    # fields
 
-    output = hash["output"] || {}
+    fields = hash["fields"] || {}
 
-    if output["log"]
-      @output.log = Output.new(output["log"])
+    if fields["log"]
+      @fields.log = Fields.new(fields["log"])
     end
 
-    if output["metric"]
-      @output.metric = Output.new(output["metric"])
+    if fields["metric"]
+      @fields.metric = Output.new(fields["metric"])
     end
   end
 

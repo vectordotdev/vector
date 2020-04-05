@@ -81,7 +81,7 @@ incomplete message (i.e. partial events). If set to `""`, no field will be \
 added to partial event. This allows to opt-out of partial event detection.\
 """
 
-[sources.docker.output.log.fields.container_created_at]
+[sources.docker.fields.log.fields.container_created_at]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
@@ -89,7 +89,7 @@ description = """\
 A UTC timestamp representing when the container was created.\
 """
 
-[sources.docker.output.log.fields.container_id]
+[sources.docker.fields.log.fields.container_id]
 type = "string"
 examples = ["9b6247364a03", "715ebfcee040"]
 required = true
@@ -97,7 +97,7 @@ description = """\
 The Docker container ID that the log was collected from.\
 """
 
-[sources.docker.output.log.fields.container_name]
+[sources.docker.fields.log.fields.container_name]
 type = "string"
 examples = ["evil_ptolemy", "nostalgic_stallman"]
 required = true
@@ -105,7 +105,7 @@ description = """\
 The Docker container name that the log was collected from.\
 """
 
-[sources.docker.output.log.fields.image]
+[sources.docker.fields.log.fields.image]
 type = "string"
 examples = ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
 required = true
@@ -113,7 +113,7 @@ description = """\
 The image name that the container is based on.\
 """
 
-[sources.docker.output.log.fields."`[label-key]`"]
+[sources.docker.fields.log.fields."`[label-key]`"]
 type = "string"
 examples = [
   {"com.example.vendor" = "Timber Inc."},
@@ -126,7 +126,7 @@ description = """\
 with it's exact key/value pair.\
 """
 
-[sources.docker.output.log.fields.message]
+[sources.docker.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -134,18 +134,18 @@ description = """\
 The raw log message, unaltered.\
 """
 
-[sources.docker.output.log.fields.stream]
+[sources.docker.fields.log.fields.stream]
 type = "string"
 required = true
 description = """\
 The [standard stream][urls.standard_streams] that the log was collected from.\
 """
 
-[sources.docker.output.log.fields.stream.enum]
+[sources.docker.fields.log.fields.stream.enum]
 stdout = "The STDOUT stream"
 stderr = "The STDERR stream"
 
-[sources.docker.output.log.fields.timestamp]
+[sources.docker.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

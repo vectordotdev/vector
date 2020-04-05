@@ -48,7 +48,7 @@ of `kube-system`. Which is by default excluded, \
 unless there are any non empty `include` options.\
 """
 
-[sources.kubernetes.output.log.fields.container_name]
+[sources.kubernetes.fields.log.fields.container_name]
 type = "string"
 examples = ["vector"]
 required = true
@@ -56,7 +56,7 @@ description = """\
 The container name that Vector is running in.\
 """
 
-[sources.kubernetes.output.log.fields.host]
+[sources.kubernetes.fields.log.fields.host]
 type = "string"
 examples = ["vector-agent-rmqbn"]
 required = true
@@ -64,7 +64,7 @@ description = """\
 The current hostname where of the local pod Vector is running in.\
 """
 
-[sources.kubernetes.output.log.fields.pod_uid]
+[sources.kubernetes.fields.log.fields.pod_uid]
 type = "string"
 examples = ["vector-f8dd5f7b-tvgfn_52cdc270-c3e6-4769-b0a9-275481502618"]
 required = true
@@ -72,7 +72,7 @@ description = """\
 The pod UID that Vector is running in.\
 """
 
-[sources.kubernetes.output.log.fields.stream]
+[sources.kubernetes.fields.log.fields.stream]
 type = "string"
 examples = ["stdout"]
 required = true
@@ -80,7 +80,7 @@ description = """\
 The [standard stream][urls.standard_streams] that the log was collected from.\
 """
 
-[sources.kubernetes.output.log.fields.timestamp]
+[sources.kubernetes.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

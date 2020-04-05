@@ -32,6 +32,12 @@ The `vector` source is a pass-through source and is intended to accept data
 from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
 augmented.
 
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

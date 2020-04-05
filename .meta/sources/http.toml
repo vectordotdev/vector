@@ -52,14 +52,14 @@ missing.\
 
 <%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.http.options", relevant: "") %>
 
-[sources.http.output.log.fields.message]
+[sources.http.fields.log.fields.message]
 type = "string"
 examples = ["This is one line from the plain text HTTP body"]
 relevant_when = {encoding = ["text"]}
 required = true
 description = "The message field, containing the plain text message."
 
-[sources.http.output.log.fields.timestamp]
+[sources.http.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

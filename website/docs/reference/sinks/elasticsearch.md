@@ -1204,14 +1204,8 @@ Used for AWS authentication when communicating with AWS services. See relevant
 </Field>
 </Fields>
 
-## Output
 
-The `elasticsearch` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint][urls.elasticsearch_bulk].
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-For example:
-
+## Examples
 
 ```http
 POST <host>/_bulk HTTP/1.1

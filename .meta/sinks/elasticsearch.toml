@@ -196,7 +196,7 @@ description = "A custom parameter to be added to each Elasticsearch request."
   can_verify_hostname: true
 ) %>
 
-[[sinks.elasticsearch.output.examples]]
+[[sinks.elasticsearch.examples]]
 label = "Generic"
 body = """\
 ```http

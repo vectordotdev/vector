@@ -58,7 +58,7 @@ If a field with the same name already exists, the parser will fail and \
 produce an error.\
 """
 
-[[transforms.json_parser.output.log.examples]]
+[[transforms.json_parser.examples]]
 label = "Simple"
 body = """\
 Given the following log event:
@@ -90,7 +90,7 @@ By default, Vector drops fields after parsing them via the `drop_field`
 option.\
 """
 
-[[transforms.json_parser.output.log.examples]]
+[[transforms.json_parser.examples]]
 label = "Wrapped"
 body = """\
 It is possible to chain `json_parser` transforms to effectively "unwrap"

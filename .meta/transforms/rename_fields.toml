@@ -38,7 +38,7 @@ default = false
 description = "If set to `true`, after renaming fields, remove any parent objects of the old field that are now empty."
 
 
-[[transforms.rename_fields.output.log.examples]]
+[[transforms.rename_fields.examples]]
 label = "Generic"
 body = """\
 Given the following `log` event:

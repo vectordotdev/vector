@@ -227,7 +227,7 @@ A list of directories search when loading a Lua file via the `require` function.
 
 ### timers
 
-Configures timers which are executed periodically at given interval
+Configures timers which are executed periodically at given interval.
 
 
 
@@ -251,7 +251,7 @@ Configures timers which are executed periodically at given interval
 #### handler
 
 Defines a handler function which is executed periodially at [`interval_seconds`](#interval_seconds).
-It can produce new events using`emit` function.
+It can produce new events using `emit` function.
 
 
 
@@ -311,59 +311,81 @@ break backward compatibility.
 </Field>
 </Fields>
 
-## Output
+## Examples
 
 <Tabs
-  block={true}
-  defaultValue="add_fields"
-  values={[
-    { label: 'Add Fields', value: 'add_fields', },
-    { label: 'Remove Fields', value: 'remove_fields', },
-    { label: 'Drop Event', value: 'drop_event', },
-  ]
-}>
+  block={false}
+  defaultValue="add-rename--remove-log-fields"
+  select={true}
+  values={[{"label":"Add, rename, & remove log fields","value":"add-rename--remove-log-fields"},{"label":"Add, rename, & remove metric tags","value":"add-rename--remove-metric-tags"},{"label":"Drop event","value":"drop-event"}]}>
 
-<TabItem value="add_fields">
+<TabItem value="add-rename--remove-log-fields">
 
-Add a field to an event. Supply this as the `hooks.proces` value:
+The following examples demonstrates how to add, rename, and remove a [`log`][docs.data-model.log] event's fields:
 
-```lua
+```toml title="vector.toml"
+# ...
+hooks.process = """
 function (event, emit)
-  # Add root level field
-  event.log.new_field = "new value"
-  # Add nested field
+  -- Add root level field
+  event.log.field = "new value"
+
+  -- Add nested field
   event.log.nested.field = "nested value"
 
-  emit(event)
-end
-```
+  -- Rename field
+  event.log.new_field = event.log.old_field
+  event.log.old_field = nil
 
-</TabItem>
-<TabItem value="remove_fields">
-
-Remove a field from an event. Supply this as the `hooks.process` value:
-
-```lua
-function (event, emit)
-  # Remove root level field
+  -- Remove fields
   event.log.field = nil
-  # Remove nested field
-  event.log.nested.field = nil
 
   emit(event)
 end
+"""
 ```
 
 </TabItem>
-<TabItem value="drop_event">
+
+<TabItem value="add-rename--remove-metric-tags">
+
+The following examples demonstrates how to add, rename, and remove a
+[`metric`][docs.data-model.log] events's tags:
+
+```toml title="vector.toml"
+# ...
+hooks.process = """
+function (event, emit)
+  -- Add tag
+  event.metric.tags.tag = "new value"
+
+  -- Rename tag
+  event.metric.new_tag = event.log.old_tag
+  event.metric.old_tag = nil
+
+  -- Remove tag
+  event.metric.tag = nil
+
+  emit(event)
+end
+"""
+```
+
+</TabItem>
+
+<TabItem value="drop-event">
 
 Drop an event entirely. Supply this as the `hooks.process` value:
 
-```lua
+```toml title="vector.toml"
+# ...
+hooks.process = """
 function (event, emit)
-  # Drop event entirely by not calling the emitting function
+  -- Drop event entirely by not calling the `emit` function
 end
+"""
 ```
+
 
 </TabItem>
 </Tabs>
@@ -379,6 +401,22 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### Add Fields & Tags
+
+To add `log` fields and `metric` tags just set the desired key to the
+appropriate value:
+
+```lua
+-- Add root level field
+event.log.field = "new value"
+
+-- Add nested field
+event.log.nested.field = "nested value"
+
+-- Add tag
+event.metric.tags.tag = "new value"
+```
+
 ### Dropping Events
 
 To drop events, simply do not call the emitting function with it. For example:
@@ -393,9 +431,21 @@ end\
 """
 ```
 
+### Remove Fields & Tags
+
+You can remove `log` fields and `metric` tags by setting them to `nil`:
+
+```lua
+-- remove a log field
+event.log.field = nil
+
+-- remove a metric tag
+event.metric.tags.tag = nil
+```
+
 ### Representation of Events
 
-Events are represented as tables in Lua. Vector uses
+Events are represented as [tables][urls.lua_table] in Lua. Vector uses
 [externally tagged representation][urls.externally_tagged_representation] to
 encode both log and metric events in a consistent fashion:
 
@@ -404,8 +454,20 @@ encode both log and metric events in a consistent fashion:
 * [Metric events][docs.about.data-model.metric] are represnted as values of a
   key named `metric`.
 
-For instance, a typical log event produced by the [`stdin`][docs.sources.stdin]
-source could have been created programmatically using the following code:
+<Tabs
+  block={true}
+  defaultValue="log"
+  urlKey="event_type"
+  values={[
+    { label: 'Log', value: 'log', },
+    { label: 'Metric', value: 'metric', },
+  ]
+}>
+<TabItem value="log">
+
+For instance, a typical [`log`][docs.data-model.log] event produced by the
+[`stdin`][docs.sources.stdin] source could have been created programmatically
+using the following code:
 
 ```lua
 event = {
@@ -417,7 +479,11 @@ event = {
 }
 ```
 
-A typical metric event could have been created programmatically in a similar way:
+</TabItem>
+<TabItem value="metric">
+
+For instance, a typical [`metric`][docs.data-model.metric] event could have
+been created programmatically in a similar way:
 
 <Tabs
   defaultValue="counter"
@@ -554,14 +620,17 @@ event = {
 
 </TabItem>
 </Tabs>
+</TabItem>
+</Tabs>
 
-### Iterate over fields
+### Iterate Over Fields & Tags
 
-To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs] method.  For example:
+To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs]
+method.  For example:
 
 ```lua
 function (event, emit)
-  # Remove all fields where the value is "-"
+  -- Remove all fields where the value is "-"
   for f, v in pairs(event) do
     if v == "-" then
       event[f] = nil
@@ -602,4 +671,5 @@ first chapters of [the official book][urls.lua_pil] or consulting
 [urls.lua_pairs]: https://www.lua.org/manual/5.3/manual.html#pdf-pairs
 [urls.lua_pil]: https://www.lua.org/pil/
 [urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
+[urls.lua_table]: https://www.lua.org/pil/2.5.html
 [urls.rlua]: https://github.com/kyren/rlua

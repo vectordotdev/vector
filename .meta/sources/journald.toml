@@ -67,7 +67,7 @@ If empty or not present, all units are accepted. \
 Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
 """
 
-[[sources.journald.output.log.examples]]
+[[sources.journald.examples]]
 label = "Generic"
 body = """\
 Given the following input:
@@ -107,7 +107,7 @@ A log event will be output with the following structure:
 ```\
 """
 
-[sources.journald.output.log.fields."`[record-key]`"]
+[sources.journald.fields.log.fields."`[record-key]`"]
 type = "*"
 examples = [
   {_SYSTEMD_UNIT = "ntpd.service"},
@@ -117,7 +117,7 @@ description = """\
 Additional Journald fields are passed through as log fields.
 """
 
-[sources.journald.output.log.fields.host]
+[sources.journald.fields.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
 required = true
@@ -125,7 +125,7 @@ description = """\
 The value of the journald `_HOSTNAME` field.
 """
 
-[sources.journald.output.log.fields.message]
+[sources.journald.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -133,7 +133,7 @@ description = """\
 The value of the journald `MESSAGE` field.\
 """
 
-[sources.journald.output.log.fields.timestamp]
+[sources.journald.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

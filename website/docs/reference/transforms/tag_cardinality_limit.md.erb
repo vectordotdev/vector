@@ -26,10 +26,12 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-## Output
+<%- if component.examples.any? -%>
+## Examples
 
-<%= component_output(component, component.output.metric, heading_depth: 3) %>
+<%= component_examples(component) %>
 
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

@@ -798,14 +798,8 @@ Used for AWS authentication when communicating with AWS services. See relevant
 </Field>
 </Fields>
 
-## Output
 
-The `aws_kinesis_streams` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-For example:
-
+## Examples
 
 ```http
 POST / HTTP/1.1

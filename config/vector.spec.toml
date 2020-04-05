@@ -1260,6 +1260,7 @@ dns_servers = ["0.0.0.0:53"]
     # * type: *
     string_field = "string value"
     env_var_field = "${ENV_VAR}"
+    templated_field = "{{ my_other_field }}"
     int_field = 1
     float_field = 1.2
     bool_field = true
@@ -1992,7 +1993,7 @@ dns_servers = ["0.0.0.0:53"]
 
   [[transforms.lua.timers]]
     # Defines a handler function which is executed periodially at
-    # `interval_seconds`. It can produce new events using`emit` function.
+    # `interval_seconds`. It can produce new events using `emit` function.
     #
     # * required
     # * type: string

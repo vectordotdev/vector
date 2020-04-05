@@ -1,6 +1,7 @@
 #encoding: utf-8
 
 require_relative "config_writers"
+require_relative "example"
 require_relative "field"
 require_relative "permission"
 
@@ -11,6 +12,7 @@ class Component
     :common,
     :description,
     :env_vars,
+    :examples,
     :features,
     :function_category,
     :id,
@@ -31,6 +33,7 @@ class Component
     @common = hash["common"] == true
     @description = hash["description"]
     @env_vars = (hash["env_vars"] || {}).to_struct_with_name(constructor: Field)
+    @examples = (hash["examples"] || []).collect { |e| Example.new(e) }
     @features = hash["features"] || []
     @function_category = hash.fetch("function_category").downcase
     @name = hash.fetch("name")

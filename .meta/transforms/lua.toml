@@ -40,7 +40,8 @@ type = "string"
 common = false
 required = false
 description = """\
-A function which is called when the first event comes, before calling `hooks.process`\
+A function which is called when the first event comes, before calling \
+`hooks.process`\
 """
 examples = [
 "custom_module.hook_init",
@@ -64,7 +65,8 @@ type = "string"
 common = true
 required = true
 description = """\
-A function which is called for each incoming event. It can produce new events using `emit` function.\
+A function which is called for each incoming event. It can produce new events \
+using `emit` function.\
 """
 examples = [
 """\
@@ -83,7 +85,8 @@ type = "string"
 common = false
 required = false
 description = """\
-A function which is called when Vector is stopped. It can produce new events using `emit` function.\
+A function which is called when Vector is stopped. It can produce new events \
+using `emit` function.\
 """
 examples = [
 "custom_module.hook_shutdown",
@@ -103,7 +106,9 @@ type = "[table]"
 category = "Timers"
 common = false
 required = false
-description = "Configures timers which are executed periodically at given interval"
+description = """\
+Configures timers which are executed periodically at given interval.\
+"""
 
 [transforms.lua.options.timers.children.interval_seconds]
 type = "integer"
@@ -111,7 +116,7 @@ common = false
 required = true
 unit = "seconds"
 description = """\
-Defines the interval at which the timer handler would be executed.
+Defines the interval at which the timer handler would be executed.\
 """
 examples = [1, 10, 30]
 
@@ -120,8 +125,8 @@ type = "string"
 common = false
 required = true
 description = """\
-Defines a handler function which is executed periodially at `interval_seconds`. It can produce new events using\
-`emit` function.\
+Defines a handler function which is executed periodially at `interval_seconds`. \
+It can produce new events using `emit` function.\
 """
 examples = [
 "custom_module.timer_handler",
@@ -135,3 +140,73 @@ function (emit)
 end\
 """
 ]
+
+[[transforms.lua.examples]]
+label = "Add, rename, & remove log fields"
+body = """\
+The following examples demonstrates how to add, rename, and remove a \
+[`log`][docs.data-model.log] event's fields:
+
+```toml title="vector.toml"
+# ...
+hooks.process = \"\"\"
+function (event, emit)
+  -- Add root level field
+  event.log.field = "new value"
+
+  -- Add nested field
+  event.log.nested.field = "nested value"
+
+  -- Rename field
+  event.log.new_field = event.log.old_field
+  event.log.old_field = nil
+
+  -- Remove fields
+  event.log.field = nil
+
+  emit(event)
+end
+\"\"\"
+```\
+"""
+
+[[transforms.lua.examples]]
+label = "Add, rename, & remove metric tags"
+body = """\
+The following examples demonstrates how to add, rename, and remove a
+[`metric`][docs.data-model.log] events's tags:
+
+```toml title="vector.toml"
+# ...
+hooks.process = \"\"\"
+function (event, emit)
+  -- Add tag
+  event.metric.tags.tag = "new value"
+
+  -- Rename tag
+  event.metric.new_tag = event.log.old_tag
+  event.metric.old_tag = nil
+
+  -- Remove tag
+  event.metric.tag = nil
+
+  emit(event)
+end
+\"\"\"
+```\
+"""
+
+[[transforms.lua.examples]]
+label = "Drop event"
+body = """\
+Drop an event entirely. Supply this as the `hooks.process` value:
+
+```toml title="vector.toml"
+# ...
+hooks.process = \"\"\"
+function (event, emit)
+  -- Drop event entirely by not calling the `emit` function
+end
+\"\"\"
+```
+"""

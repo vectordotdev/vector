@@ -94,7 +94,7 @@ The timeout before a connection is forcefully closed during shutdown.\
   groups: ["tcp"]
 ) %>
 
-[[sources.socket.output.log.examples]]
+[[sources.socket.examples]]
 label = "Generic"
 body = """\
 Given the following input line:
@@ -114,7 +114,7 @@ A log event will be output with the following structure:
 ```\
 """
 
-[sources.socket.output.log.fields.host]
+[sources.socket.fields.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
 required = true
@@ -122,7 +122,7 @@ description = """\
 The upstream hostname.
 """
 
-[sources.socket.output.log.fields.message]
+[sources.socket.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -130,7 +130,7 @@ description = """\
 The raw message, unaltered.
 """
 
-[sources.socket.output.log.fields.timestamp]
+[sources.socket.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
