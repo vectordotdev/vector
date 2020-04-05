@@ -417,7 +417,7 @@ event.log.nested.field = "nested value"
 event.metric.tags.tag = "new value"
 ```
 
-### Dropping Events
+### Drop Events
 
 To drop events, simply do not call the emitting function with it. For example:
 
