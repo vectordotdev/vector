@@ -5,6 +5,7 @@ import Link from '@docusaurus/Link';
 import PagePaginator from '@theme/PagePaginator';
 
 import _ from 'lodash';
+import classnames from 'classnames';
 import styles from './styles.module.css';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
@@ -182,90 +183,86 @@ function DocItem(props) {
         )}
         {permalink && <meta property="og:url" content={siteUrl + permalink} />}
       </Head>
-      <div className="padding-vert--lg">
-        <div className="container container--fluid">
-          <div className="row">
-            <div className="col col--9" style={{width: "1px"}}>
-              <div className={styles.docItemContainer}>
-                <article>
-                  {version && (
-                    <span
-                      style={{verticalAlign: 'top'}}
-                      className="badge badge--info">
-                      Version: {version}
-                    </span>
-                  )}
+      <div className={styles.container}>
+        <div className={styles.leftCol}>
+          <div className={styles.docItemContainer}>
+            <article>
+              {version && (
+                <span
+                  style={{verticalAlign: 'top'}}
+                  className="badge badge--info">
+                  Version: {version}
+                </span>
+              )}
 
-                  {!metadata.hide_title && (
-                    <header>
-                      <div className="badges">
-                        {functionCategory && <Link to={`/components?functions[]=${functionCategory}`} className="badge badge--primary">{functionCategory}</Link>}
-                      </div>
-                      <h1 className={styles.docTitle}>{metadata.title}</h1>
-                    </header>
-                  )}
-
-                  <div className="markdown">
-                    <DocContent />
+              {!metadata.hide_title && (
+                <header>
+                  <div className="badges">
+                    {functionCategory && <Link to={`/components?functions[]=${functionCategory}`} className="badge badge--primary">{functionCategory}</Link>}
                   </div>
-                </article>
+                  <h1 className={styles.docTitle}>{metadata.title}</h1>
+                </header>
+              )}
+
+              <div className="markdown">
+                <DocContent />
               </div>
-              {!metadata.hide_pagination && (
-                <div className={styles.paginator}>
-                  <PagePaginator metadata={metadata} />
+            </article>
+          </div>
+          {!metadata.hide_pagination && (metadata.next || metadata.previous) && (
+            <div className={styles.paginator}>
+              <PagePaginator next={metadata.next} previous={metadata.previous} />
+            </div>
+          )}
+        </div>
+        {DocContent.rightToc && (
+          <div className={styles.rightCol}>
+            <div className={classnames('table-of-contents', styles.tableOfContents)}>
+              <Statuses
+                deliveryGuarantee={deliveryGuarantee}
+                eventTypes={eventTypes}
+                operatingSystems={operatingSystems}
+                status={status}
+                unsupportedOperatingSystems={unsupportedOperatingSystems} />
+              {DocContent.rightToc.length > 0 &&
+                <div className="section">
+                  <div className="title">Contents</div>
+                  <Headings headings={DocContent.rightToc} />
+                </div>
+              }
+              <div className="section">
+                <div className="title">Resources</div>
+                <ul className="contents">
+                  {editUrl && (<li><a href={editUrl} className="contents__link" target="_blank"><i className="feather icon-edit-1"></i> Edit this page</a></li>)}
+                  {postsPath && (<li><Link to={postsPath} className="contents__link"><i className="feather icon-book-open"></i> View Blog Posts</Link></li>)}
+                  {issuesUrl && (<li><a href={issuesUrl} className="contents__link" target="_blank"><i className="feather icon-message-circle"></i> View Issues</a></li>)}
+                  {sourceUrl && (<li><a href={sourceUrl} className="contents__link" target="_blank"><i className="feather icon-github"></i> View Source</a></li>)}
+                </ul>
+              </div>
+              {(lastUpdatedAt || lastUpdatedBy) && (
+                <div className="section">
+                  Last updated{' '}
+                  {lastUpdatedAt && (
+                    <>
+                      on{' '}
+                      <strong>
+                        {new Date(
+                          lastUpdatedAt * 1000,
+                        ).toLocaleDateString()}
+                      </strong>
+                      {lastUpdatedBy && ' '}
+                    </>
+                  )}
+                  {lastUpdatedBy && (
+                    <>
+                      by <strong>{lastUpdatedBy}</strong>
+                    </>
+                  )}
                 </div>
               )}
             </div>
-            {DocContent.rightToc && (
-              <div className="col col--3">
-                <div className="table-of-contents">
-                  <Statuses
-                    deliveryGuarantee={deliveryGuarantee}
-                    eventTypes={eventTypes}
-                    operatingSystems={operatingSystems}
-                    status={status}
-                    unsupportedOperatingSystems={unsupportedOperatingSystems} />
-                  {DocContent.rightToc.length > 0 &&
-                    <div className="section">
-                      <div className="title">Contents</div>
-                      <Headings headings={DocContent.rightToc} />
-                    </div>
-                  }
-                  <div className="section">
-                    <div className="title">Resources</div>
-                    <ul className="contents">
-                      {editUrl && (<li><a href={editUrl} className="contents__link" target="_blank"><i className="feather icon-edit-1"></i> Edit this page</a></li>)}
-                      {postsPath && (<li><Link to={postsPath} className="contents__link"><i className="feather icon-book-open"></i> View Blog Posts</Link></li>)}
-                      {issuesUrl && (<li><a href={issuesUrl} className="contents__link" target="_blank"><i className="feather icon-message-circle"></i> View Issues</a></li>)}
-                      {sourceUrl && (<li><a href={sourceUrl} className="contents__link" target="_blank"><i className="feather icon-github"></i> View Source</a></li>)}
-                    </ul>
-                  </div>
-                  {(lastUpdatedAt || lastUpdatedBy) && (
-                    <div className="section">
-                      Last updated{' '}
-                      {lastUpdatedAt && (
-                        <>
-                          on{' '}
-                          <strong>
-                            {new Date(
-                              lastUpdatedAt * 1000,
-                            ).toLocaleDateString()}
-                          </strong>
-                          {lastUpdatedBy && ' '}
-                        </>
-                      )}
-                      {lastUpdatedBy && (
-                        <>
-                          by <strong>{lastUpdatedBy}</strong>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

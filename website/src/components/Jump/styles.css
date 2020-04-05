@@ -138,12 +138,3 @@
   line-height: 1em;
   text-transform: uppercase;
 }
-
-@media (max-width: 996px) {
-  .jump-to--inner-2 {
-    border-radius: var(--ifm-global-radius);
-    display: flex;
-    padding: 1em 0.25em;
-    transition: var(--ifm-transition-fast) ease;
-  }
-}

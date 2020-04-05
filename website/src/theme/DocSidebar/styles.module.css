@@ -1,49 +1,29 @@
+.sidebar {
+  font-size: 1.1em;
+}
+
 @media (min-width: 997px) {
   .sidebar {
+    font-size: 0.85em;
+    font-weight: bold;
     height: 100vh;
     overflow-y: auto;
     position: sticky;
     top: 0;
-    padding-top: var(--ifm-navbar-height);
-  }
-
-  .sidebar::-webkit-scrollbar {
-    width: 7px;
-  }
-
-  .sidebar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-  }
-
-  .sidebar::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 10px;
-  }
-
-  .sidebar::-webkit-scrollbar-thumb:hover {
-    background: #555;
   }
 
   .sidebarLogo {
+    color: inherit !important;
     display: flex !important;
     align-items: center;
-    position: absolute;
-    top: 0;
-    margin: 0 var(--ifm-navbar-padding-horizontal);
     height: var(--ifm-navbar-height);
-    max-width: 155px;
-    color: inherit !important;
+    max-width: var(--ifm-navbar-logo-width);
     text-decoration: none !important;
   }
 
-  .sidebarLogo img {
-    margin-right: 0.5em;
-    height: 2em;
-  }
-
   .menu {
-    padding: 0.5em;
+    font-weight: inherit;
+    padding-top: var(--ifm-spacing-vertical);
   }
 }
 

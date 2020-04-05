@@ -1,11 +1,20 @@
-.containers {
+.container {
+  --ifm-sidebar-width: 225px;
   display: flex;
-  margin: 0 var(--ifm-spacing-horizontal);
 }
 
 .sidebar {
-  padding-top: calc( var(--ifm-spacing-vertical) * 2 );
-  width: 125px;
+  border-right: 1px solid var(--ifm-sidebar-border-color);
+  flex: 0 0 var(--ifm-sidebar-width);
+  max-width: var(--ifm-sidebar-width);
+  padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-vertical) 0 0;
+}
+
+.sidebar .menu__list-title,
+.sidebar .menu__link {
+  display: block;
+  padding-right: var(--ifm-spacing-vertical);
+  text-align: right;
 }
 
 .content {
@@ -21,7 +30,9 @@
 }
 
 .toc {
-  width: 200px;
+  border-left: 1px solid var(--ifm-sidebar-border-color);
+  flex: 0 0 var(--ifm-sidebar-width);
+  padding: calc( var(--ifm-spacing-vertical) * 2 ) 0 0 var(--ifm-spacing-vertical);
 }
 
 @media (max-width: 996px) {

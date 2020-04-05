@@ -86,8 +86,8 @@
 }
 
 .guide-item .avatar {
-  margin-top: calc( var(--ifm-spacing-vertical) / 1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) / 1 );
+  margin-top: var(--ifm-spacing-vertical);
+  margin-bottom: var(--ifm-spacing-vertical);
   vertical-align: bottom;
 }
 

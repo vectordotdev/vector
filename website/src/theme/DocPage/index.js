@@ -1,10 +1,3 @@
-/**
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React from 'react';
 import {MDXProvider} from '@mdx-js/react';
 
@@ -40,9 +33,9 @@ function DocPage(props) {
 
   return (
     <Layout version={version} key={isClient}>
-      <div className={classnames(styles.docPage, 'container', 'container--l')}>
+      <div className={classnames(styles.container, 'container', 'container--l')}>
         {sidebar && (
-          <div className={styles.docSidebarContainer}>
+          <div className={classnames(styles.sidebar)}>
             <DocSidebar
               docsSidebars={docsSidebars}
               path={currentRoute.path}
@@ -51,7 +44,7 @@ function DocPage(props) {
             />
           </div>
         )}
-        <main className={styles.docMainContainer}>
+        <main className={styles.main}>
           <MDXProvider components={MDXComponents}>
             {renderRoutes(baseRoute.routes)}
           </MDXProvider>
