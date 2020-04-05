@@ -11,9 +11,9 @@
 
 This chart will do the following:
 
-* Create a ConfigMap with Vector configuration;
-* Install a Daemonset that provisions Vector;
-* Deploy service and service monitor for integration with prometheus-operator (if enabled);
+- Create a ConfigMap with Vector configuration;
+- Install a Daemonset that provisions Vector;
+- Deploy service and service monitor for integration with prometheus-operator (if enabled);
 
 ## Installing the Chart
 
