@@ -185,7 +185,7 @@ function DocItem(props) {
       </Head>
       <div className={styles.container}>
         <div className={styles.leftCol}>
-          <div className={styles.docItemContainer}>
+          <div className="docItemContainer_">
             <article>
               {version && (
                 <span
