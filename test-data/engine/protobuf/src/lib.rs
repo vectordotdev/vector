@@ -67,8 +67,9 @@ pub extern "C" fn process() -> bool {
     match result.unwrap() {
         Some(value) => {
             println!("Pre-insert");
+            let value_str = value.as_str().expect("Protobuf field not a str");
             let decoded = crate::items::AddressBook::decode(
-                value.as_str().expect("Protobuf field not a str").as_bytes(),
+                value_str.as_bytes(),
             )
             .unwrap();
             let reencoded = serde_json::to_string(&decoded).unwrap();

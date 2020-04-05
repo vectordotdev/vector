@@ -47,6 +47,8 @@ pub mod split;
 pub mod swimlanes;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
+#[cfg(feature = "engine")]
+pub mod wasm;
 
 use futures01::{sync::mpsc::Receiver, Stream};
 
