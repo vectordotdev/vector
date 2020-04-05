@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "vector.fullname" . }}
+  labels:
+    {{- include "vector.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "vector.selectorLabels" . | nindent 6 }}
+  minReadySeconds: 1
+  updateStrategy:
+    type: {{ .Values.updateStrategy }}
+  template:
+    metadata:
+      labels:
+        {{- include "vector.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: vector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          args:
+            - "-w"
+            {{- if .Values.metrics.enabled }}
+            - "-m"
+            - "0.0.0.0:{{ .Values.metrics.service.port }}"
+            {{- end }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if or .Values.metrics.enabled }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.service.port }}
+              protocol: TCP
+          {{- end }}
+          volumeMounts:
+            - name: var-log
+              mountPath: /var/log/
+              readOnly: true
+            - name: var-lib
+              mountPath: /var/lib
+              readOnly: true
+            - name: data-dir
+              mountPath: "{{ .Values.globalOptions.dataDir }}"
+            - name: config-dir
+              mountPath: /etc/vector
+              readOnly: true
+            {{- if .Values.extraVolumeMounts }}
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+            {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{ toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{ toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{ toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: var-log
+          hostPath:
+            path: /var/log/
+        - name: var-lib
+          hostPath:
+            path: /var/lib/
+        - name: data-dir
+          emptyDir: {}
+        - name: config-dir
+          configMap:
+            name: {{ include "vector.configMapName" . }}
+        {{- if .Values.extraVolumes }}
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
+        {{- end }}

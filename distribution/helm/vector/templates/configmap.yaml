@@ -1,0 +1,60 @@
+{{- if (empty .Values.existingConfigMap) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vector.configMapName" . }}
+  labels:
+    {{- include "vector.labels" . | nindent 4 }}
+data:
+  vector.toml: |
+    data_dir = "{{ .Values.globalOptions.dataDir }}"
+
+    {{- if .Values.logSchema }}
+    [log_schema]
+      host_key = "{{ .Values.logSchema.hostKey }}"
+      message_key = "{{ .Values.logSchema.messageKey }}"
+      timestamp_key = "{{ .Values.logSchema.timestampKey }}"
+    {{- end }}
+
+    {{- if .Values.sources.kubernetes.enabled }}
+    [sources.{{ .Values.sources.kubernetes.sourceId }}]
+      type = "kubernetes"
+      include_namespaces = {{ .Values.sources.kubernetes.includeNamespaces | toJson }}
+      include_container_names = {{ .Values.sources.kubernetes.includeContainerNames | toJson }}
+
+      {{- if not (empty .Values.sources.kubernetes.rawConfig) }}
+      {{- .Values.sources.kubernetes.rawConfig | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+    {{- range $sourceId, $source := .Values.sources.additionalSources }}
+    [sources.{{ $sourceId }}]
+      type = "{{ $source.type }}"
+
+      {{- if not (empty $source.rawConfig )}}
+      {{- $source.rawConfig | nindent 6}}
+      {{- end }}
+    {{- end }}
+
+    {{- range $transformId, $transform := .Values.transforms }}
+    [transforms.{{ $transformId }}]
+      type = "{{ $transform.type }}"
+      inputs = {{ $transform.inputs | toJson }}
+
+      {{- if not (empty $transform.rawConfig )}}
+      {{- $transform.rawConfig | nindent 6}}
+      {{- end }}
+    {{- end }}
+
+    {{- range $sinkId, $sink := .Values.sinks }}
+    [sinks.{{ $sinkId }}]
+      type = "{{ $sink.type }}"
+      inputs = {{ $sink.inputs | toJson }}
+
+      {{- if not (empty $sink.rawConfig )}}
+      {{- $sink.rawConfig | nindent 6}}
+      {{- end }}
+    {{- end }}
+
+
+{{- end }}
