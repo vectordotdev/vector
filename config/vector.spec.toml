@@ -87,7 +87,7 @@ dns_servers = ["0.0.0.0:53"]
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
 
-# Ingests data through the Docker engine daemon and outputs `log` events.
+# Ingests data through the Docker foreign_modules daemon and outputs `log` events.
 [sources.docker]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -1474,7 +1474,7 @@ dns_servers = ["0.0.0.0:53"]
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
-# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine.
+# Accepts and outputs `log` events allowing you to transform events with a full embedded Lua foreign_modules.
 [transforms.lua]
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.

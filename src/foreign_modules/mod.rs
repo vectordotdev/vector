@@ -5,7 +5,6 @@
 // TODO: FreeBSD: https://github.com/bytecodealliance/lucet/pull/419
 
 use crate::{Event, Result};
-use lru::LruCache;
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::Bindings;
@@ -15,11 +14,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{instrument, Level};
-use uuid::Uuid;
+use foreign_modules::host::ForeignTransform;
 
 mod context;
 mod util;
-use context::EngineContext;
+use context::ForeignModuleContext;
 use std::fmt::Debug;
 
 pub mod hostcall; // Pub is required for lucet.
@@ -27,20 +26,15 @@ mod defaults {
     pub(super) const ARTIFACT_CACHE: &str = "cache";
 }
 
-pub trait ForeignModule: Sized {
-    fn init(config: impl Into<ForeignModuleConfig> + Debug) -> Result<Self>;
-    fn process(&mut self, event: Event) -> Result<Option<Event>>;
-}
-
 #[derive(Derivative, Clone, Debug)]
 #[derivative(Default)]
-pub struct ForeignModuleConfig {
+pub struct WasmModuleConfig {
     path: PathBuf,
     #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
     artifact_cache: PathBuf,
 }
 
-impl ForeignModuleConfig {
+impl WasmModuleConfig {
     pub(crate) fn new(path: impl Into<PathBuf>, artifact_cache: impl Into<PathBuf>) -> Self {
         Self {
             path: path.into(),
@@ -67,14 +61,14 @@ fn compile(input: impl AsRef<Path> + Debug, output: impl AsRef<Path> + Debug) ->
 #[derivative(Debug)]
 pub(crate) struct WasmModule {
     /// A stored version of the config for later referencing.
-    config: ForeignModuleConfig,
+    config: WasmModuleConfig,
     #[derivative(Debug="ignore")]
     instance: InstanceHandle,
 }
 
-impl ForeignModule for WasmModule {
+impl WasmModule {
     #[instrument]
-    fn init(config: impl Into<ForeignModuleConfig> + Debug) -> Result<Self> {
+    pub fn init(config: impl Into<WasmModuleConfig> + Debug) -> Result<Self> {
         event!(Level::TRACE, "instantiating");
         let config = config.into();
         let output_file = config
@@ -105,7 +99,9 @@ impl ForeignModule for WasmModule {
         event!(Level::TRACE, "instantiated");
         Ok(wasm_module)
     }
+}
 
+impl ForeignTransform<crate::Event, crate::Error> for WasmModule {
     #[instrument]
     fn process(&mut self, event: Event) -> Result<Option<Event>> {
         event!(Level::TRACE, "processing");
@@ -114,15 +110,15 @@ impl ForeignModule for WasmModule {
         let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build()?;
         self.instance.insert_embed_ctx(wasi_ctx);
 
-        let engine_context = EngineContext::new(event);
+        let engine_context = ForeignModuleContext::new(event);
         self.instance.insert_embed_ctx(engine_context);
 
         let _worked = self.instance.run("process", &[])?;
 
-        let engine_context: EngineContext = self.instance
+        let engine_context: ForeignModuleContext = self.instance
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
-        let EngineContext { event: out } = engine_context;
+        let ForeignModuleContext { event: out } = engine_context;
 
         event!(Level::TRACE, "processed");
         Ok(out)
@@ -136,7 +132,7 @@ fn protobuf() -> Result<()> {
     crate::test_util::trace_init();
 
     // Load in fixtures.
-    let mut test_file = fs::File::open("test-data/engine/protobuf/demo.pb")?;
+    let mut test_file = fs::File::open("test-data/foreign_modules/protobuf/demo.pb")?;
     let mut buf = String::new();
     test_file.read_to_string(&mut buf)?;
     let mut event = Event::new_empty_log();
@@ -144,11 +140,11 @@ fn protobuf() -> Result<()> {
 
     // Refresh the test json.
     let event_string = serde_json::to_string(&event.as_log())?;
-    let mut json_fixture = fs::File::create("test-data/engine/protobuf/demo.json")?;
+    let mut json_fixture = fs::File::create("test-data/foreign_modules/protobuf/demo.json")?;
     json_fixture.write(event_string.as_bytes());
 
     // Run the test.
-    let mut module = WasmModule::init(ForeignModuleConfig::new("target/wasm32-wasi/release/protobuf.wasm", "cache"))?;
+    let mut module = WasmModule::init(WasmModuleConfig::new("target/wasm32-wasi/release/protobuf.wasm", "cache"))?;
     let out = module.process(event.clone())?;
 
     let retval = out.unwrap();

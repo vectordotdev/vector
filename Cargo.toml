@@ -32,8 +32,9 @@ members = [
   "lib/file-source",
   "lib/tracing-metrics",
   "lib/tracing-limit",
+  "lib/foreign-modules",
   # Wasm test modules.
-  "test-data/engine/protobuf",
+  "test-data/foreign_modules/protobuf",
 ]
 
 [dependencies]
@@ -150,7 +151,7 @@ k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
 lucetc = { version = "0.6.1", optional = true }
 lucet-runtime = { version = "0.6.1", optional = true }
 lucet-wasi = { version = "0.6.1", optional = true }
-lru = { version = "0.4.3", optional = true }
+foreign_modules = { path = "lib/foreign-modules", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -183,11 +184,11 @@ dirs = "2.0.2"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain", "engine"]
+default = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-plain", "rdkafka-plain", "modules"]
 # Default features for *-unknown-linux-musl
-default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "engine"]
+default-musl = ["sources", "transforms", "sinks", "vendored", "unix", "leveldb-cmake", "rdkafka-cmake", "modules"]
 # Default features for *-pc-windows-msvc
-default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake", "engine"]
+default-msvc = ["sources", "transforms", "sinks", "vendored", "leveldb-cmake", "rdkafka-cmake", "modules"]
 
 # Enables features that work only on systems providing `cfg(unix)
 unix = ["jemallocator", "shiplift/unix-socket"]
@@ -203,8 +204,8 @@ rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
 leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
-# This feature enables the WASM engine.
-engine = ["lucetc", "lucet-runtime", "lucet-wasi", "lru", "uuid"]
+# This feature enables the WASM foreign module support.
+modules = ["lucetc", "lucet-runtime", "lucet-wasi", "foreign_modules/host"]
 
 # Sources
 sources = [

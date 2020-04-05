@@ -1,0 +1,24 @@
+[package]
+name = "foreign_modules"
+version = "0.1.0"
+authors = ["Ana Hobden <operator@hoverbear.org>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["guest"]
+host = ["lucet-runtime"]
+guest = []
+
+
+[dependencies]
+# Mutual:
+serde_json = "1.0.51"
+tracing = "0.1.13"
+snafu = "0.6.6"
+
+# Guests only:
+
+# Hosts only:
+lucet-runtime = { version = "0.6.1", optional = true }

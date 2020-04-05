@@ -26058,7 +26058,7 @@ module.exports = {
     "docker": {
       "beta": true,
       "delivery_guarantee": "best_effort",
-      "description": "Ingests data through the [Docker engine daemon][urls.docker_daemon] and outputs log events.",
+      "description": "Ingests data through the [Docker foreign_modules daemon][urls.docker_daemon] and outputs log events.",
       "event_types": [
         "log"
       ],
@@ -26680,7 +26680,7 @@ module.exports = {
     "lua": {
       "beta": true,
       "delivery_guarantee": null,
-      "description": "Accepts log events and allows you to transform events with a full embedded [Lua][urls.lua] engine.",
+      "description": "Accepts log events and allows you to transform events with a full embedded [Lua][urls.lua] foreign_modules.",
       "event_types": [
         "log"
       ],

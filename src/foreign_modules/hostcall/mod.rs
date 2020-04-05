@@ -5,7 +5,7 @@
 //! #[no_mangle]
 //! ```
 
-use super::context::EngineContext;
+use super::context::ForeignModuleContext;
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
 use std::ffi::{CStr, CString};
 use std::io::Write;
@@ -15,10 +15,9 @@ use tracing::{event, Level};
 
 #[lucet_hostcall]
 #[no_mangle]
-#[instrument(skip(vmctx))]
-pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
+unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
     event!(Level::TRACE, "recieved hostcall");
-    let hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
+    let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
     let field_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
     let field_str = field_cstr.to_str().unwrap_or("Broke to str");
@@ -42,10 +41,9 @@ pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> us
 
 #[lucet_hostcall]
 #[no_mangle]
-#[instrument(skip(vmctx))]
-pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
+unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
     event!(Level::TRACE, "recieved hostcall");
-    let hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
+    let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
 
     let key_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);
@@ -74,11 +72,10 @@ pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c
 
 #[lucet_hostcall]
 #[no_mangle]
-#[instrument(skip(vmctx))]
-pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
+unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
     event!(Level::TRACE, "recieved hostcall");
 
-    let mut hostcall_context = vmctx.get_embed_ctx_mut::<EngineContext>();
+    let mut hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
 
     let key_cstr = CStr::from_ptr(heap[key_ptr as usize..].as_mut_ptr() as *mut c_char);

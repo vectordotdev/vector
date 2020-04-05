@@ -13,8 +13,8 @@ pub mod buffers;
 pub mod conditions;
 pub mod config_paths;
 pub mod dns;
-#[cfg(feature = "engine")]
-pub mod engine;
+#[cfg(feature = "foreign_modules")]
+pub mod foreign_modules;
 pub mod event;
 pub mod generate;
 #[cfg(feature = "rdkafka")]

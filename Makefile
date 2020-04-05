@@ -82,18 +82,16 @@ test-behavior: ## Runs behavioral tests
 ensure-has-wasm-toolchain: ### Configures a wasm toolchain for test artifact building, if required
 	rustup target add wasm32-wasi --toolchain nightly
 
-ENGINE_TEST_MODULES := $(patsubst test-data/engine/%, target/wasm-wasi/release/%.wasm, $(wildcard test-data/engine/*))
-build-engine-test-modules: $(ENGINE_TEST_MODULES) ### Builds engine test modules, if required
+TEST_FOREIGN_MODULES := $(patsubst test-data/foreign_modules/%, target/wasm-wasi/release/%.wasm, $(wildcard test-data/foreign_modules/*))
+build-test-foreign-modules: $(TEST_FOREIGN_MODULES) ### Builds engine test modules, if required
 
 .ONESHELL:
-$(ENGINE_TEST_MODULES): ensure-has-wasm-toolchain ### Build the target test module
-	cd $(patsubst target/wasm-wasi/release/%.wasm, test-data/engine/%, $@)
+$(TEST_FOREIGN_MODULES): ensure-has-wasm-toolchain ### Build the target test module
+	cd $(patsubst target/wasm-wasi/release/%.wasm, test-data/foreign_modules/%, $@)
 	cargo +nightly build --target wasm32-wasi --release
 
-test-engine: build-engine-test-modules  ### Run engine tests.
-	cargo test engine -- --nocapture
-	cat test-data/engine/protobuf/demo.json | ./target/debug/vector --config test.toml -vvvv
-
+test-foreign-modules: build-test-foreign-modules  ### Run engine tests.
+	cargo test foreign_modules -- --nocapture
 
 clean: ## Remove build artifacts
 	@cargo clean
