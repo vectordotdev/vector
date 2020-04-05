@@ -62,11 +62,10 @@ a full embedded [Lua][urls.lua] engine.
   # General
   version = "2" # required
   search_dirs = ["/etc/vector/lua"] # optional, no default
-  source = "custom_module = require('custom_module')" # optional, no default
 
   # Timers
   timers.handler = "custom_module.timer_handler" # required
-  timers.interval_seconds = 1 # required
+  timers.interval_seconds = 1 # required, seconds
 
   # Hooks
   hooks.process = """
@@ -214,31 +213,6 @@ A list of directories search when loading a Lua file via the `require` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["custom_module = require('custom_module')"]}
-  groups={[]}
-  name={"source"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### source
-
-In version 2 it is the source which is evaluated when the transform is created.
-In version 1 it is the inline Lua source called for each incoming event.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"timers"}
@@ -262,7 +236,7 @@ Configures timers which are executed periodically at given interval
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["custom_module.timer_handler","function (emit)\n  emit {\n    log = {\n      message = \"current time: \" .. os.date()\n    }\n  }\nend\n"]}
+  examples={["custom_module.timer_handler","function (emit)\n  emit {\n    log = {\n      message = \"current time: \" .. os.date()\n    }\n  }\nend"]}
   groups={[]}
   name={"handler"}
   path={"timers"}
@@ -295,7 +269,7 @@ It can produce new events using`emit` function.
   required={true}
   templateable={false}
   type={"integer"}
-  unit={null}
+  unit={"seconds"}
   warnings={[]}
   >
 
@@ -328,8 +302,8 @@ Defines the interval at which the timer handler would be executed.
 
 ### version
 
-Transform API version. Indicates the version 2 is used instead of version 1,
-is deprecated, but still supported.
+Transform API version. Specifying this version ensures that Vector does not
+break backward compatibility.
 
 
 
@@ -341,7 +315,7 @@ is deprecated, but still supported.
 
 <Tabs
   block={true}
-  defaultValue="timings"
+  defaultValue="add_fields"
   values={[
     { label: 'Add Fields', value: 'add_fields', },
     { label: 'Remove Fields', value: 'remove_fields', },
@@ -409,25 +383,29 @@ You can learn more in the
 
 To drop events, simply do not call the emitting function with it. For example:
 
-```lua
+```toml title="vector.toml"
+hooks.process = """\
 function (event, emit)
   if not event["message"].match(str, "debug") then
     emit(event)
   end
-end
+end\
+"""
 ```
 
 ### Representation of Events
 
 Events are represented as tables in Lua. Vector uses
-[externally tagged representation][urls.externally_tagged_representation] to encode both log and metric events in
-a consistent fashion:
+[externally tagged representation][urls.externally_tagged_representation] to
+encode both log and metric events in a consistent fashion:
 
-* [Log events][docs.about.data-model.log] are represented as values of a key named `log`.
-* [Metric events][docs.about.data-model.metric] are represnted as values of a key named `metric`.
+* [Log events][docs.about.data-model.log] are represented as values of a key
+  named `log`.
+* [Metric events][docs.about.data-model.metric] are represnted as values of a
+  key named `metric`.
 
-For instance, a typical log event produced by the [`stdin`][docs.reference.sources.stdin] source could have been
-created programmatically using the following code:
+For instance, a typical log event produced by the [`stdin`][docs.sources.stdin]
+source could have been created programmatically using the following code:
 
 ```lua
 event = {
@@ -442,7 +420,7 @@ event = {
 A typical metric event could have been created programmatically in a similar way:
 
 <Tabs
-  defaultValue="gauge"
+  defaultValue="counter"
   select={true}
   urlKey="metric_kind"
   values={[
@@ -617,7 +595,7 @@ first chapters of [the official book][urls.lua_pil] or consulting
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
-[docs.reference.sources.stdin]: /docs/reference/sources/stdin/
+[docs.sources.stdin]: /docs/reference/sources/stdin/
 [urls.externally_tagged_representation]: https://serde.rs/enum-representations.html#externally-tagged
 [urls.lua]: https://www.lua.org/
 [urls.lua_manual]: https://www.lua.org/manual/5.3/manual.html

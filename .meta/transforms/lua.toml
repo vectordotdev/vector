@@ -12,25 +12,11 @@ requirements = {}
 type = "string"
 common = true
 required = true
-description = """
-Transform API version. Indicates the version 2 is used instead of version 1,
-is deprecated, but still supported.\
+description = """\
+Transform API version. Specifying this version ensures that Vector does not \
+break backward compatibility.\
 """
 enum = { 2 = "Lua transform API version 2" }
-
-[transforms.lua.options.source]
-type = "string"
-common = false
-required = false
-examples = [
-"""\
-custom_module = require('custom_module')\
-"""
-]
-description = """
-In version 2 it is the source which is evaluated when the transform is created.
-In version 1 it is the inline Lua source called for each incoming event.\
-"""
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
@@ -123,6 +109,7 @@ description = "Configures timers which are executed periodically at given interv
 type = "integer"
 common = false
 required = true
+unit = "seconds"
 description = """\
 Defines the interval at which the timer handler would be executed.
 """
@@ -145,6 +132,6 @@ function (emit)
       message = "current time: " .. os.date()
     }
   }
-end
+end\
 """
 ]

@@ -1970,8 +1970,8 @@ dns_servers = ["0.0.0.0:53"]
   # General
   #
 
-  # Transform API version. Indicates the version 2 is used instead of version 1,
-  # is deprecated, but still supported.
+  # Transform API version. Specifying this version ensures that Vector does not
+  # break backward compatibility.
   #
   # * required
   # * type: string
@@ -1985,15 +1985,6 @@ dns_servers = ["0.0.0.0:53"]
   # * no default
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
-
-  # In version 2 it is the source which is evaluated when the transform is
-  # created.
-  # In version 1 it is the inline Lua source called for each incoming event.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  source = "custom_module = require('custom_module')"
 
   #
   # Timers
@@ -2014,13 +2005,13 @@ dns_servers = ["0.0.0.0:53"]
       }
     }
   end
-
   """
 
     # Defines the interval at which the timer handler would be executed.
     #
     # * required
     # * type: integer
+    # * unit: seconds
     interval_seconds = 1
     interval_seconds = 10
     interval_seconds = 30

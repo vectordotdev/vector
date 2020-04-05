@@ -24,7 +24,13 @@ function keyToTOML(key) {
 }
 
 function valueToTOML(value) {
-  return JSON.stringify(value);
+  if (typeof(value) == "string" && value.includes("\n")) {
+    return `"""
+${value}
+"""`;
+  } else {
+    return JSON.stringify(value);
+  }
 }
 
 function kvToTOML(name, example) {

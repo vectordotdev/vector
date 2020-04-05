@@ -30,7 +30,7 @@
 
 <Tabs
   block={true}
-  defaultValue="timings"
+  defaultValue="add_fields"
   values={[
     { label: 'Add Fields', value: 'add_fields', },
     { label: 'Remove Fields', value: 'remove_fields', },
@@ -91,25 +91,29 @@ end
 
 To drop events, simply do not call the emitting function with it. For example:
 
-```lua
+```toml title="vector.toml"
+hooks.process = """\
 function (event, emit)
   if not event["message"].match(str, "debug") then
     emit(event)
   end
-end
+end\
+"""
 ```
 
 ### Representation of Events
 
 Events are represented as tables in Lua. Vector uses
-[externally tagged representation][urls.externally_tagged_representation] to encode both log and metric events in
-a consistent fashion:
+[externally tagged representation][urls.externally_tagged_representation] to
+encode both log and metric events in a consistent fashion:
 
-* [Log events][docs.about.data-model.log] are represented as values of a key named `log`.
-* [Metric events][docs.about.data-model.metric] are represnted as values of a key named `metric`.
+* [Log events][docs.about.data-model.log] are represented as values of a key
+  named `log`.
+* [Metric events][docs.about.data-model.metric] are represnted as values of a
+  key named `metric`.
 
-For instance, a typical log event produced by the [`stdin`][docs.reference.sources.stdin] source could have been
-created programmatically using the following code:
+For instance, a typical log event produced by the [`stdin`][docs.sources.stdin]
+source could have been created programmatically using the following code:
 
 ```lua
 event = {
@@ -124,7 +128,7 @@ event = {
 A typical metric event could have been created programmatically in a similar way:
 
 <Tabs
-  defaultValue="gauge"
+  defaultValue="counter"
   select={true}
   urlKey="metric_kind"
   values={[
