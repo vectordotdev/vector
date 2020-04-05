@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -47,6 +47,7 @@ log_schema.timestamp_key = "timestamp" # optional, default
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### data_dir
@@ -72,6 +73,7 @@ permissions to this dir.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### dns_servers
@@ -98,6 +100,7 @@ system configuration.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### log_schema
@@ -121,6 +124,7 @@ model page][docs.data-model.log] for more info.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### host_key
@@ -145,6 +149,7 @@ page][docs.data-model.log#host] for more info.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### kubernetes_key
@@ -168,6 +173,7 @@ The key under which Kubernetes related fields are nested.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### message_key
@@ -192,6 +198,7 @@ page][docs.data-model.log#message] for more info.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_key

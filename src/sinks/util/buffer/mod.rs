@@ -9,7 +9,7 @@ pub mod partition;
 
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
     None,

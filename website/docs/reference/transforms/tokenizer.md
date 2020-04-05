@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -61,6 +61,7 @@ characters, and zip the tokens into ordered field names.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -84,6 +85,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -107,6 +109,7 @@ The log field to tokenize.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### field_names
@@ -130,6 +133,7 @@ The log field names assigned to the resulting tokens, in order.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -153,6 +157,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

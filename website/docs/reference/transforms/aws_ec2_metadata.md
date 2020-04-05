@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -63,6 +63,7 @@ AWS EC2 instance metadata.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields
@@ -86,6 +87,7 @@ A list of fields to include in each event.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -109,6 +111,7 @@ Override the default EC2 Metadata host.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -132,6 +135,7 @@ Prepend a namespace to each field's key.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### refresh_interval_secs
@@ -181,6 +185,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### ami-id
@@ -204,6 +209,7 @@ The `ami-id` that the current EC2 instance is using.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### availability-zone
@@ -227,6 +233,7 @@ The `availability-zone` that the current EC2 instance is running in.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### instance-id
@@ -250,6 +257,7 @@ The `instance-id` of the current EC2 instance.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### local-hostname
@@ -273,6 +281,7 @@ The `local-hostname` of the current EC2 instance.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### local-ipv4
@@ -296,6 +305,7 @@ The `local-ipv4` of the current EC2 instance.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### public-hostname
@@ -319,6 +329,7 @@ The `public-hostname` of the current EC2 instance.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### public-ipv4
@@ -342,6 +353,7 @@ The `public-ipv4` of the current EC2 instance.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### region
@@ -365,6 +377,7 @@ The [`region`](#region) that the current EC2 instance is running in.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### role-name
@@ -388,6 +401,7 @@ The `role-name` that the current EC2 instance is using.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### subnet-id
@@ -411,6 +425,7 @@ The `subnet-id` of the current EC2 instance's default network interface.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### vpc-id

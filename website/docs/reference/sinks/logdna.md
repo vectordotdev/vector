@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-03"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "LogDNA"
 description: "The Vector `logdna` sink batches `log` events to LogDna's HTTP Ingestion API."
@@ -109,6 +109,7 @@ The Vector `logdna` sink
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### api_key
@@ -132,6 +133,7 @@ The Ingestion API key.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -154,6 +156,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -177,6 +180,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -203,6 +207,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -225,6 +230,7 @@ Configures the sink specific buffer behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -248,6 +254,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -271,6 +278,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -294,6 +302,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -320,6 +329,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### default_app
@@ -344,6 +354,7 @@ The default app that will be set for events that do not contain a `file` or
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -366,6 +377,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -389,6 +401,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -412,6 +425,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -438,6 +452,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -461,6 +476,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -484,6 +500,7 @@ An optional host that will override the default one.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### hostname
@@ -507,6 +524,7 @@ The hostname that will be attached to each batch of events.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### ip
@@ -530,6 +548,7 @@ The IP address that will be attached to each batch of events.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### mac
@@ -553,6 +572,7 @@ The mac address that will be attached to each batch of events.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -575,6 +595,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -598,6 +619,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -621,6 +643,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -645,6 +668,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -668,6 +692,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -693,6 +718,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -716,6 +742,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -745,6 +772,7 @@ duplicate data downstream.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### tags

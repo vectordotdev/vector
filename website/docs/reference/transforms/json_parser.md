@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "JSON Parser"
 description: "The Vector `json_parser` transform accepts and outputs `log` events allowing you to parse a log field value as JSON."
 event_types: ["log"]
@@ -77,6 +77,7 @@ value as JSON.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -101,6 +102,7 @@ fails, the field will not be removed, irrespective of this setting.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_invalid
@@ -125,6 +127,7 @@ kept and passed through.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -148,6 +151,7 @@ The log field to decode as JSON. Must be a `string` value type.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### overwrite_target
@@ -172,6 +176,7 @@ target, it will only be overwritten if this is set to `true`.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### target_field

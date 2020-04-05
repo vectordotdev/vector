@@ -4441,7 +4441,8 @@ end
 
   # The compression mechanism to use.
   #
-  # * required
+  # * optional
+  # * default: "none"
   # * type: string
   # * enum: "gzip" or "none"
   compression = "gzip"

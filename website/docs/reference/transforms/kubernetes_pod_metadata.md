@@ -86,6 +86,7 @@ accepts and [outputs `log` events](#output) allowing you to enrich
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### cache_ttl
@@ -109,6 +110,7 @@ How many seconds will the metadata be available after its Pod has been deleted.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields
@@ -135,6 +137,7 @@ option][docs.reference.global-options#kubernetes_key]. See
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### max_retry_timeout
@@ -160,6 +163,7 @@ allowed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### node_name
@@ -186,6 +190,7 @@ you. Setting this to a static value will take priority over `VECTOR_NODE_NAME`.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### pod_uid
@@ -214,6 +219,7 @@ Field containg Pod UID to which log belongs.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### VECTOR_NODE_NAME
@@ -297,6 +303,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### annotations
@@ -320,6 +327,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[annotation-key]`
@@ -348,6 +356,7 @@ transform][docs.transforms.remove_fields].
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### creation_timestamp
@@ -371,6 +380,7 @@ Timestamp representing when the Pod was created.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### deletion_timestamp
@@ -394,6 +404,7 @@ Timestamp representing when the Pod was deleted.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host_ip
@@ -417,6 +428,7 @@ The IP address of the host that the Pod is assigned where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### hostname
@@ -440,6 +452,7 @@ The hostname of the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### ip
@@ -463,6 +476,7 @@ The IP address allocated to the Pod where the log originated.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### labels
@@ -486,6 +500,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[label-key]`
@@ -514,6 +529,7 @@ transform][docs.transforms.remove_fields].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### name
@@ -538,6 +554,7 @@ the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -562,6 +579,7 @@ the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### node_name
@@ -585,6 +603,7 @@ The name of the node where the log originated.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### priority
@@ -610,6 +629,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### priority_class_name
@@ -635,6 +655,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### service_account_name
@@ -660,6 +681,7 @@ used to run the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### subdomain

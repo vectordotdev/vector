@@ -153,6 +153,12 @@
           "type": "string",
           "description": "The unit of measurement for the option value",
           "enum": ["bytes", "events", "milliseconds", "requests", "seconds"]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

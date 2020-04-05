@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` sink exposes `metric` events to Prometheus metrics service."
@@ -87,6 +87,7 @@ The Vector `prometheus` sink
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -110,6 +111,7 @@ The address to expose for scraping.
   templateable={false}
   type={"[float]"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### buckets
@@ -134,6 +136,7 @@ Default buckets to use for aggregating
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### flush_period_secs
@@ -157,6 +160,7 @@ Time interval between [set][docs.data-model.metric#set] values are reset.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace

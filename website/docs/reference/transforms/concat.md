@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Concat"
 description: "The Vector `concat` transform accepts and outputs `log` events allowing you to concat (substrings) of other fields to a new one."
 event_types: ["log"]
@@ -74,6 +74,7 @@ of other fields to a new one.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### items
@@ -98,6 +99,7 @@ both start and end negative values are counted from the end of the string.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### joiner
@@ -121,6 +123,7 @@ The string that is used to join all items.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### target

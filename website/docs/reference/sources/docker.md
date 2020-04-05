@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -88,6 +88,7 @@ daemon][urls.docker_daemon] and [outputs `log` events](#output).
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### auto_partial_merge
@@ -111,6 +112,7 @@ Setting this to `false` will disable the automatic merging of partial events.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### include_containers
@@ -136,6 +138,7 @@ container ID or name. If not provided, all containers will be included.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### include_images
@@ -160,6 +163,7 @@ included.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### include_labels
@@ -185,6 +189,7 @@ labels docs][urls.docker_object_labels].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### partial_event_marker_field
@@ -215,6 +220,7 @@ partial event. This allows to opt-out of partial event detection.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### DOCKER_HOST
@@ -238,6 +244,7 @@ The docker host to connect to.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### DOCKER_VERIFY_TLS
@@ -286,6 +293,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### container_created_at
@@ -309,6 +317,7 @@ A UTC timestamp representing when the container was created.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### container_id
@@ -332,6 +341,7 @@ The Docker container ID that the log was collected from.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### container_name
@@ -355,6 +365,7 @@ The Docker container name that the log was collected from.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### image
@@ -378,6 +389,7 @@ The image name that the container is based on.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[label-key]`
@@ -402,6 +414,7 @@ it's exact key/value pair.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -425,6 +438,7 @@ The raw log message, unaltered.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### stream
@@ -448,6 +462,7 @@ The [standard stream][urls.standard_streams] that the log was collected from.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp

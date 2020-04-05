@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-03"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -161,6 +161,7 @@ The Vector `influxdb_metrics` sink
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -183,6 +184,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -206,6 +208,7 @@ The maximum size of a batch, in events, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -232,6 +235,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### endpoint
@@ -255,6 +259,7 @@ InfluxDB endpoint to send metrics to.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### bucket
@@ -278,6 +283,7 @@ The destination bucket for writes into InfluxDB 2.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### consistency
@@ -301,6 +307,7 @@ Sets the write consistency for the point for InfluxDB 1.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### database
@@ -324,6 +331,7 @@ Sets the target database for the write into InfluxDB 1.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -347,6 +355,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -370,6 +379,7 @@ A prefix that will be added to all metric names.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### org
@@ -393,6 +403,7 @@ Specifies the destination organization for writes into InfluxDB 2.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### password
@@ -417,6 +428,7 @@ write into InfluxDB 1.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -439,6 +451,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -462,6 +475,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -485,6 +499,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -509,6 +524,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -532,6 +548,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -557,6 +574,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -580,6 +598,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -609,6 +628,7 @@ duplicate data downstream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### retention_policy_name
@@ -632,6 +652,7 @@ Sets the target retention policy for the write into InfluxDB 1.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### token
@@ -655,6 +676,7 @@ Sets the target retention policy for the write into InfluxDB 1.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### username

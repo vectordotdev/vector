@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -144,6 +144,7 @@ For more information about unit tests check out [this guide][guides.advanced.uni
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### inputs
@@ -166,6 +167,7 @@ A table that defines a unit test input event.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### insert_at
@@ -190,6 +192,7 @@ order to begin the test.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 #### log_fields
@@ -212,6 +215,7 @@ Specifies the log fields when the input type is 'log'.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`
@@ -238,6 +242,7 @@ A key/value pair representing a field to be added to the input event.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 #### metric
@@ -260,6 +265,7 @@ Specifies the metric type when the input type is 'metric'.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### direction
@@ -283,6 +289,7 @@ The direction to increase or decrease the gauge value.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### name
@@ -307,6 +314,7 @@ for `gauge`.
   templateable={false}
   type={"float"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sample_rate
@@ -330,6 +338,7 @@ The bucket/distribution the metric is a part of.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ##### tags
@@ -352,6 +361,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ###### `[tag-name]`
@@ -378,6 +388,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### timestamp
@@ -401,6 +412,7 @@ Time metric was created/ingested.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### type
@@ -424,6 +436,7 @@ The metric type.
   templateable={false}
   type={"float"}
   unit={null}
+  warnings={[]}
   >
 
 ##### val
@@ -450,6 +463,7 @@ Amount to increment/decrement or gauge.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -473,6 +487,7 @@ The event type.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### value
@@ -499,6 +514,7 @@ Specifies the log message field contents when the input type is 'raw'.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### name
@@ -522,6 +538,7 @@ A unique identifier for this test.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### no_outputs_from
@@ -545,6 +562,7 @@ A list of transforms that must NOT output events in order for the test to pass.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### outputs
@@ -567,6 +585,7 @@ A table that defines a unit test expected output.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 #### conditions
@@ -593,6 +612,7 @@ target without checking its values.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### type
@@ -616,6 +636,7 @@ The type of the condition to execute.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.eq
@@ -639,6 +660,7 @@ Check whether a fields contents exactly matches the value specified.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.exists
@@ -663,6 +685,7 @@ being `true` or `false` respectively.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.neq
@@ -686,6 +709,7 @@ Check whether a fields contents does not match the value specified.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.contains
@@ -709,6 +733,7 @@ Checks whether a string field contains a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.ends_with
@@ -732,6 +757,7 @@ Checks whether a string field ends with a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.regex
@@ -759,6 +785,7 @@ preferred where possible.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.starts_with
@@ -785,6 +812,7 @@ Checks whether a string field starts with a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### extract_from

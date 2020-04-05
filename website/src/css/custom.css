@@ -615,6 +615,11 @@ ul.connected-list > li ul.info {
   padding-left: 0.65em;
 }
 
+ul.connected-list > li ul.info > li.warning {
+  color: var(--ifm-color-warning);
+  font-weight: 600;
+}
+
 ul.connected-list > li ul.info .show-more {
   color: var(--ifm-color-primary);
   cursor: pointer;

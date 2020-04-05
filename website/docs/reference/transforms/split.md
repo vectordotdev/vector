@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Split"
 description: "The Vector `split` transform accepts and outputs `log` events allowing you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -61,6 +61,7 @@ value on a _literal_ separator and zip the tokens into ordered field names.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -84,6 +85,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -107,6 +109,7 @@ The field to apply the split on.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### field_names
@@ -130,6 +133,7 @@ The field names assigned to the resulting tokens, in order.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### separator
@@ -155,6 +159,7 @@ Derived Core Property `White_Space`][urls.unicode_whitespace].
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -178,6 +183,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

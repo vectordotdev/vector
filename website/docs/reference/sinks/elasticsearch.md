@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-03"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -14,6 +14,7 @@ title: "Elasticsearch Sink"
 unsupported_operating_systems: []
 ---
 
+import Alert from '@site/src/components/Alert';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
 import SVG from 'react-inlinesvg';
@@ -33,6 +34,14 @@ endpoint][urls.elasticsearch_bulk].
      website/docs/reference/sinks/elasticsearch.md.erb
 -->
 
+## Warnings
+
+<Alert icon={false} type="warning" classNames="list--warnings">
+
+* [`compression`](#compression) option - AWS hosted Elasticsearch is unable to use compression
+
+</Alert>
+
 ## Configuration
 
 <Tabs
@@ -46,7 +55,7 @@ endpoint][urls.elasticsearch_bulk].
 [sinks.my_sink_id]
   type = "elasticsearch" # required
   inputs = ["my-source-id"] # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
   index = "vector-%F" # optional, default
@@ -60,7 +69,7 @@ endpoint][urls.elasticsearch_bulk].
   # General
   type = "elasticsearch" # required
   inputs = ["my-source-id"] # required
-  compression = "gzip" # required
+  compression = "none" # optional, default
   doc_type = "_doc" # optional, default
   healthcheck = true # optional, default
   host = "http://10.24.32.122:9000" # optional, no default
@@ -129,6 +138,7 @@ endpoint][urls.elasticsearch_bulk].
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### auth
@@ -151,6 +161,7 @@ Options for the authentication strategy.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### strategy
@@ -174,6 +185,7 @@ The authentication strategy to use.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### password
@@ -197,6 +209,7 @@ The basic authentication password.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### user
@@ -223,6 +236,7 @@ The basic authentication user name.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -245,6 +259,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -268,6 +283,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -294,6 +310,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -316,6 +333,7 @@ Configures the sink specific buffer behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -339,6 +357,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -362,6 +381,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -385,6 +405,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -400,17 +421,18 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
+  defaultValue={"none"}
   enumValues={{"gzip":"GZIP compression","none":"No compression"}}
   examples={["gzip","none"]}
   groups={[]}
   name={"compression"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={["AWS hosted Elasticsearch is unable to use compression"]}
   >
 
 ### compression
@@ -434,6 +456,7 @@ The compression mechanism to use.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### doc_type
@@ -459,6 +482,7 @@ Elasticsearch has removed it.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -481,6 +505,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -504,6 +529,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -527,6 +553,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -553,6 +580,7 @@ How to format event timestamps.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### headers
@@ -575,6 +603,7 @@ Options for custom headers.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[header-name]`
@@ -601,6 +630,7 @@ A custom header to be added to each outgoing Elasticsearch request.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -624,6 +654,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -648,6 +679,7 @@ the example.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### id_key
@@ -675,6 +707,7 @@ perofrmance][urls.elasticsearch_id_performance].
   templateable={true}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### index
@@ -698,6 +731,7 @@ Index name to write events to.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### query
@@ -720,6 +754,7 @@ Custom parameters to Elasticsearch query string.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[parameter-name]`
@@ -746,6 +781,7 @@ A custom parameter to be added to each Elasticsearch request.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -768,6 +804,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -791,6 +828,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -814,6 +852,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -838,6 +877,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -861,6 +901,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -886,6 +927,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -909,6 +951,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -938,6 +981,7 @@ duplicate data downstream.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -960,6 +1004,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -984,6 +1029,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -1009,6 +1055,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -1033,6 +1080,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -1057,6 +1105,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_certificate
@@ -1082,6 +1131,7 @@ verifying the remote certificate.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_hostname
@@ -1115,6 +1165,7 @@ you understand the risks of not verifying the remote hostname.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -1139,6 +1190,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY

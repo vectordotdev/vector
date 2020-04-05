@@ -8,6 +8,12 @@
 <%= component_requirements(component) %>
 
 <%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>

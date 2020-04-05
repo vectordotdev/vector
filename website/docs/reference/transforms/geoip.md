@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
@@ -51,6 +51,7 @@ geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### database
@@ -76,6 +77,7 @@ not supported.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### source
@@ -100,6 +102,7 @@ IPv4 or IPv6 address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### target
@@ -148,6 +151,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 ### geoip
@@ -170,6 +174,7 @@ The root field containing all geolocation data as sub-fields.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### city_name
@@ -193,6 +198,7 @@ The city name associated with the IP address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### continent_code
@@ -216,6 +222,7 @@ The continent code associated with the IP address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### country_code
@@ -239,6 +246,7 @@ The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### latitude
@@ -262,6 +270,7 @@ The latitude associated with the IP address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### longitude
@@ -285,6 +294,7 @@ The longitude associated with the IP address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### postal_code
@@ -308,6 +318,7 @@ The postal code associated with the IP address.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timezone

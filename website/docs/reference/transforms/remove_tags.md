@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Remove Tags"
 description: "The Vector `remove_tags` transform accepts and outputs `metric` events allowing you to remove one or more metric tags."
 event_types: ["metric"]
@@ -49,6 +49,7 @@ remove one or more metric tags.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### tags

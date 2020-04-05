@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 title: Environment Variables
 description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
@@ -42,6 +42,7 @@ options][docs.global-options] as well.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -66,6 +67,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY
@@ -90,6 +92,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### DOCKER_HOST
@@ -113,6 +116,7 @@ The docker host to connect to.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### DOCKER_VERIFY_TLS
@@ -138,6 +142,7 @@ verifying the remote certificate.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### GOOGLE_APPLICATION_CREDENTIALS
@@ -162,6 +167,7 @@ authenticate access to the Stackdriver Logging API.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### LOG
@@ -186,6 +192,7 @@ guide][docs.monitoring#levels] for more information on the available levels.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### RUST_BACKTRACE
@@ -210,6 +217,7 @@ it can degrade performance.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### VECTOR_NODE_NAME

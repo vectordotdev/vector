@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log"]
@@ -63,6 +63,7 @@ transform events with a full embedded [Lua][urls.lua] engine.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### search_dirs
@@ -86,6 +87,7 @@ A list of directories search when loading a Lua file via the `require` function.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### source
@@ -109,6 +111,7 @@ The inline Lua source to evaluate.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### version

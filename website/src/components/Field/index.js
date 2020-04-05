@@ -145,12 +145,17 @@ function RelevantWhen({value}) {
 // Fields
 //
 
-function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, required, unit}) {
+function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, required, unit, warnings}) {
   const [showExamples, setShowExamples] = useState(false);
 
   if (defaultValue || enumValues || (examples && examples.length > 0) || (groups && groups.length > 0)) {
     return (
       <ul className="info">
+        {warnings && warnings.length > 0 && warnings.map((warning, idx) => (
+          <li key={idx} className="warning">
+            <i className="feather icon-alert-triangle"></i> WARNING: {warning}
+          </li>
+        ))}
         {relevantWhen ?
           <li>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></li> :
           null}
@@ -175,7 +180,7 @@ function FieldFooter({defaultValue, enumValues, examples, groups, name, path, re
   }
 }
 
-function Field({children, common, defaultValue, enumValues, examples, groups, name, path, relevantWhen, templateable, type, unit, required}) {
+function Field({children, common, defaultValue, enumValues, examples, groups, name, path, relevantWhen, required, templateable, type, unit, warnings}) {
   const [collapse, setCollapse] = useState(false);
 
   let filteredChildren = children;
@@ -207,7 +212,8 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
           path={path}
           relevantWhen={relevantWhen}
           required={required}
-          unit={unit} />}
+          unit={unit}
+          warnings={warnings} />}
     </li>
   );
 }

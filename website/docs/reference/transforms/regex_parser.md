@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -95,6 +95,7 @@ log field's value with a [Regular Expression][urls.regex].
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -118,6 +119,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -141,6 +143,7 @@ The log field to parse.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### overwrite_target
@@ -165,6 +168,7 @@ target, it will only be overwritten if this is set to `true`.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### regex
@@ -188,6 +192,7 @@ The Regular Expression to apply. Do not include the leading or trailing `/`.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### target_field
@@ -213,6 +218,7 @@ parser will fail and produce an error.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -236,6 +242,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
