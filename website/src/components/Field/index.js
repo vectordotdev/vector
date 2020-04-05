@@ -3,13 +3,17 @@ import classnames from 'classnames';
 import {MDXProvider} from '@mdx-js/react';
 import CodeBlock from '@theme/CodeBlock';
 
+//
+// Misc
+//
+
 function isObject(a) {
   return (!!a) && (a.constructor === Object);
 };
 
-function toTOML(value) {
-  return JSON.stringify(value);
-}
+//
+// TOML
+//
 
 function keyToTOML(key) {
   if ( key.includes(".") ) {
@@ -19,38 +23,50 @@ function keyToTOML(key) {
   }
 }
 
-function exampleToTOML(name, example) {
+function valueToTOML(value) {
+  return JSON.stringify(value);
+}
+
+function kvToTOML(name, example) {
   if (isObject(example)) {
     if ('name' in example && 'value' in example) {
-      return `${keyToTOML(example.name)} = ${toTOML(example.value)}`;
+      return `${keyToTOML(example.name)} = ${valueToTOML(example.value)}`;
     } else {
-      return `${keyToTOML(Object.keys(example)[0])} = ${toTOML(Object.values(example)[0])}`
+      return `${keyToTOML(Object.keys(example)[0])} = ${valueToTOML(Object.values(example)[0])}`
     }
   } else if (name) {
-    return `${name} = ${toTOML(example)}`;
+    return `${keyToTOML(name)} = ${valueToTOML(example)}`;
   } else {
-    return `${toTOML(example)}`;
+    return valueToTOML(example);
   }
 }
+
+//
+// Enum
+//
 
 function Enum({values}) {
   let elements = [];
 
   if (!Array.isArray(values)) {
     for (var key in values) {
-      elements.push(<code key={key} title={values[key]}>{toTOML(key)}</code>);
+      elements.push(<code key={key} className="with-info-icon" title={values[key]}>{valueToTOML(key)}</code>);
       elements.push(" ");
     }
   } else {
     for (var index in values) {
       let value = values[index];
-      elements.push(<code key={value}>{toTOML(value)}</code>);
+      elements.push(<code key={value}>{valueToTOML(value)}</code>);
       elements.push(" ");
     }
   }
 
   return elements;
 }
+
+//
+// Examples
+//
 
 function Example({name, path, unit, value}) {
   let unitText = '';
@@ -59,19 +75,19 @@ function Example({name, path, unit, value}) {
     unitText = <> ({unit})</>;
   }
 
-  return <><code>{exampleToTOML(null, value)}</code>{unitText}</>;
+  return <><code>{valueToTOML(value)}</code>{unitText}</>;
 }
 
 function Examples({name, path, values}) {
   let code = '';
 
   values.forEach(function (value) {
-    code += (exampleToTOML(name, value) + "\n");
-  });
+    if (path) {
+      code += `${path}.`;
+    }
 
-  if (path) {
-    code = `[${path}]\n${code}`;
-  }
+    code += (kvToTOML(name, value) + "\n");
+  });
 
   return (
     <div>
@@ -82,16 +98,33 @@ function Examples({name, path, values}) {
   );
 }
 
-function Groups({values}) {
+//
+// Values
+//
+
+function Value({unit, value}) {
+  let unitText = '';
+
+  if (unit) {
+    unitText = <> ({unit})</>;
+  }
+
+  return <><code>{valueToTOML(value)}</code>{unitText}</>;
+}
+
+function Values({values}) {
   let elements = [];
 
-  values.forEach(function (value) {
-    elements.push(<code key={value}>{value}</code>);
-    elements.push(" ");
-  })
+  values.forEach(value => elements.push(<Value value={value} />));
+
+  console.log(elements)
 
   return elements;
 }
+
+//
+// Relevance
+//
 
 function RelevantWhen({value}) {
   let relKey = Object.keys(value)[0];
@@ -103,35 +136,39 @@ function RelevantWhen({value}) {
 
   return (
     <span>
-      <code><a href={`#${relKey}`}>{relKey}</a></code> = <code>{toTOML(relValue)}</code>
+      <code><a href={`#${relKey}`}>{relKey}</a></code> = <code>{valueToTOML(relValue)}</code>
     </span>
   );
 }
+
+//
+// Fields
+//
 
 function FieldFooter({defaultValue, enumValues, examples, groups, name, path, relevantWhen, required, unit}) {
   const [showExamples, setShowExamples] = useState(false);
 
   if (defaultValue || enumValues || (examples && examples.length > 0) || (groups && groups.length > 0)) {
     return (
-      <div className="info">
+      <ul className="info">
         {relevantWhen ?
-          <div>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></div> :
+          <li>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></li> :
           null}
         {defaultValue !== undefined ?
           (defaultValue ?
-            <div>Default: <Example name={name} path={path} value={defaultValue} unit={unit} /></div> :
-            <div>No default</div>) :
+            <li>Default: <Value unit={unit} value={defaultValue} /></li> :
+            <li>No default</li>) :
           null}
         {enumValues ?
-          <div>Enum, must be one of: <Enum values={enumValues} /></div> :
+          <li>Enum, must be one of: <Enum values={enumValues} /></li> :
           null}
-        <div>
+        <li>
           <div className="show-more" onClick={() => setShowExamples(!showExamples)}>
             {showExamples ? "Hide examples" : "View examples"}
           </div>
-          {showExamples && <div className="examples"><Examples name={name} path={path} values={examples} /></div>}
-        </div>
-      </div>
+          {showExamples && <Examples name={name} path={path} values={examples} />}
+        </li>
+      </ul>
     );
   } else {
     return null;
@@ -151,10 +188,10 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
     <li className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
         {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
-        {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
+        {templateable && <span className="badge badge--primary with-info-icon" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
         {type && <span className="badge badge--secondary">{type}{unit && <> ({unit})</>}</span>}
-        {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary" title="This option is an enumation and only allows specific values">enum</span>}
-        {common && <span className="badge badge--primary" title="This is a popular that we recommend for getting started">common</span>}
+        {enumValues && Object.keys(enumValues).length > 0 && <span className="badge badge--secondary with-info-icon" title="This option is an enumation and only allows specific values">enum</span>}
+        {common && <span className="badge badge--primary with-info-icon" title="This is a popular that we recommend for getting started">common</span>}
         {required ?
           <span className="badge badge--danger">required{relevantWhen && '*'}</span> :
           <span className="badge badge--secondary">optional</span>}

@@ -146,6 +146,12 @@ li + li {
   text-decoration: underline;
 }
 
+.with-info-icon[title]:after {
+  content: "ⓘ";
+  display: inline-block;
+  margin-left: 0.5em;
+}
+
 /**
  * a
  */
@@ -599,31 +605,22 @@ ul.connected-list > li > .sub__title {
   margin-bottom: 0.25em;
 }
 
-ul.connected-list > li .info {
+ul.connected-list > li ul.info {
   border-left: 1px solid var(--ifm-hr-border-color);
   color: var(--ifm-color-content-secondary);
   font-size: 0.9em;
   margin-top: calc( var(--ifm-spacing-horizontal) * -1 );
   margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
   margin-left: 0.25em;
-  padding-left: var(--ifm-spacing-horizontal);
+  padding-left: 0.65em;
 }
 
-ul.connected-list > li .info > div:before {
-  content: "• ";
-  float: left;
-  display: block;
-  width: calc( var(--ifm-spacing-horizontal) * 2);
-  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
-  text-align: center;
-}
-
-ul.connected-list > li .info .show-more {
+ul.connected-list > li ul.info .show-more {
   color: var(--ifm-color-primary);
   cursor: pointer;
 }
 
-ul.connected-list > li .info .examples {
+ul.connected-list > li ul.info .examples {
   margin-top: 0.5em;
 }
 
