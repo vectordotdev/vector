@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
@@ -58,6 +58,7 @@ or more metrics.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### metrics
@@ -80,6 +81,7 @@ A table of key/value pairs representing the keys to be added to the event.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### field
@@ -103,6 +105,7 @@ The log field to use as the metric.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### increment_by_value
@@ -127,6 +130,7 @@ metric will be incremented by 1 regardless of the [`field`](#field) value.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### name
@@ -151,6 +155,7 @@ for `gauge`.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 #### tags
@@ -173,6 +178,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[tag-name]`
@@ -200,6 +206,7 @@ Environment variables and field interpolation is allowed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type

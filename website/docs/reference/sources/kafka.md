@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -103,6 +103,7 @@ ingests data through [Kafka][urls.kafka] and [outputs `log` events](#output).
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### auto_offset_reset
@@ -128,6 +129,7 @@ option for explanation.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### bootstrap_servers
@@ -153,6 +155,7 @@ initially to bootstrap itself.
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
+  warnings={[]}
   >
 
 ### fetch_wait_max_ms
@@ -176,6 +179,7 @@ Maximum time the broker may wait to fill the response.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### group_id
@@ -199,6 +203,7 @@ The consumer group name to be used to consume events from Kafka.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### key_field
@@ -224,6 +229,7 @@ not be added to the log event.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### librdkafka_options
@@ -247,6 +253,7 @@ details.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
@@ -273,6 +280,7 @@ The options and their values. Accepts `string` values.
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
+  warnings={[]}
   >
 
 ### session_timeout_ms
@@ -296,6 +304,7 @@ The Kafka session timeout in milliseconds.
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
+  warnings={[]}
   >
 
 ### socket_timeout_ms
@@ -319,6 +328,7 @@ Default timeout for network requests.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -341,6 +351,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -364,6 +375,7 @@ Enable TLS during connections to the remote.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -388,6 +400,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -413,6 +426,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -437,6 +451,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -464,6 +479,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### topics
@@ -505,6 +521,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -528,6 +545,7 @@ The raw event message, unaltered.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 title: Log Event
 description: A detailed guide on Vector's internal log data model.
 ---
@@ -102,6 +102,7 @@ changed via the
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -128,6 +129,7 @@ or the source-level `host_key` option for relevant sources.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -153,6 +155,7 @@ source-level `message_key` option for relevant sources.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
@@ -179,6 +182,7 @@ option][docs.reference.global-options#message_key] or the source-level
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[custom-key]`

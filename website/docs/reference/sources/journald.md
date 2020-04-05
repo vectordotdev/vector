@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -87,6 +87,7 @@ utility and [outputs `log` events](#output).
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch_size
@@ -111,6 +112,7 @@ each batch. This option limits the size of the batch.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### current_boot_only
@@ -134,6 +136,7 @@ Include only entries from the current boot.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### data_dir
@@ -159,6 +162,7 @@ permissions to this dir.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### journalctl_path
@@ -183,6 +187,7 @@ the path for [`journalctl`](#journalctl).
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### units
@@ -256,6 +261,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[record-key]`
@@ -279,6 +285,7 @@ Additional Journald fields are passed through as log fields.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -302,6 +309,7 @@ The value of the journald `_HOSTNAME` field.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -325,6 +333,7 @@ The value of the journald `MESSAGE` field.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp

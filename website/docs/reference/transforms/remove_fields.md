@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events allowing you to remove one or more log fields."
 event_types: ["log"]
@@ -72,6 +72,7 @@ one or more log fields.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_empty
@@ -96,6 +97,7 @@ empty.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields

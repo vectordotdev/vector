@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
@@ -62,6 +62,7 @@ ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address

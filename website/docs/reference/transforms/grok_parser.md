@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
@@ -60,6 +60,7 @@ log field value with [Grok][urls.grok].
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -83,6 +84,7 @@ If `true` will drop the specified [`field`](#field) after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -106,6 +108,7 @@ The log field to execute the [`pattern`](#pattern) against. Must be a `string` v
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### pattern
@@ -129,6 +132,7 @@ The [Grok pattern][urls.grok_patterns]
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -152,6 +156,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

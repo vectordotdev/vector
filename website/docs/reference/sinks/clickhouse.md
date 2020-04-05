@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-03"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -135,6 +135,7 @@ The Vector `clickhouse` sink
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### auth
@@ -157,6 +158,7 @@ Options for the authentication strategy.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### strategy
@@ -180,6 +182,7 @@ The authentication strategy to use.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### password
@@ -203,6 +206,7 @@ The basic authentication password.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### user
@@ -229,6 +233,7 @@ The basic authentication user name.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -251,6 +256,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -274,6 +280,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -300,6 +307,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -322,6 +330,7 @@ Configures the sink specific buffer behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -345,6 +354,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -368,6 +378,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -391,6 +402,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -417,6 +429,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### compression
@@ -441,6 +454,7 @@ outputting.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### database
@@ -464,6 +478,7 @@ The database that contains the stable that data will be inserted into.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -486,6 +501,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -509,6 +525,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -532,6 +549,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -558,6 +576,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -581,6 +600,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -604,6 +624,7 @@ The host url of the [Clickhouse][urls.clickhouse] server.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -626,6 +647,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -649,6 +671,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -672,6 +695,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -696,6 +720,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -719,6 +744,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -744,6 +770,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -767,6 +794,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -796,6 +824,7 @@ duplicate data downstream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### table
@@ -819,6 +848,7 @@ The table that data will be inserted into.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -841,6 +871,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -865,6 +896,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -890,6 +922,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -914,6 +947,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -938,6 +972,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_certificate
@@ -963,6 +998,7 @@ verifying the remote certificate.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_hostname

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Rename Fields"
 description: "The Vector `rename_fields` transform accepts and outputs `log` events allowing you to rename one or more log fields."
 event_types: ["log"]
@@ -81,6 +81,7 @@ log fields.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_empty
@@ -105,6 +106,7 @@ field that are now empty.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields
@@ -127,6 +129,7 @@ A table of old-key/new-key pairs representing the keys to be moved in the event.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

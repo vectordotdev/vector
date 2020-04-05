@@ -4439,8 +4439,7 @@ end
   # * type: [string]
   inputs = ["my-source-id"]
 
-  # The compression mechanism to use. Note that AWS hosted Elasticsearch is
-  # unable to use compression.
+  # The compression mechanism to use.
   #
   # * optional
   # * default: "none"

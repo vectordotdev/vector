@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -98,6 +98,7 @@ events](#output).
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### address
@@ -122,6 +123,7 @@ Nth socket passed by systemd socket activation.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host_key
@@ -147,6 +149,7 @@ option][docs.reference.global-options#host_key].
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 ### max_length
@@ -170,6 +173,7 @@ The maximum bytes size of incoming messages before they are discarded.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### mode
@@ -193,6 +197,7 @@ The input mode.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### path
@@ -216,6 +221,7 @@ The unix socket path. *This should be absolute path.*
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -238,6 +244,7 @@ Configures the TLS options for connections from this source.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -262,6 +269,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -287,6 +295,7 @@ format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -311,6 +320,7 @@ is also required.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -335,6 +345,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -359,6 +370,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### verify_certificate
@@ -424,6 +436,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### appname
@@ -448,6 +461,7 @@ found, then the key will not be added.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### facility
@@ -472,6 +486,7 @@ the key will not be added.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -497,6 +512,7 @@ socket path will be used. This key can be renamed via the [`host_key`](#host_key
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -520,6 +536,7 @@ The raw message, unaltered.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### msgid
@@ -544,6 +561,7 @@ will not be added.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### procid
@@ -568,6 +586,7 @@ key will not be added.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### severity
@@ -592,6 +611,7 @@ the key will not be added.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
@@ -616,6 +636,7 @@ then Vector will use the current time.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### version
@@ -640,6 +661,7 @@ key will not be added.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[field-name]`

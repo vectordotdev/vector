@@ -111,9 +111,9 @@ type = "string"
 common = true
 required = false
 default = "none"
+warnings = ["AWS hosted Elasticsearch is unable to use compression"]
 description = """\
-The compression mechanism to use. \
-Note that AWS hosted Elasticsearch is unable to use compression.\
+The compression mechanism to use.\
 """
 
 [sinks.elasticsearch.options.compression.enum]

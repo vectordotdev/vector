@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-03"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "at_least_once"
 component_title: "AWS S3"
 description: "The Vector `aws_s3` sink batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint."
@@ -148,6 +148,7 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### acl
@@ -172,6 +173,7 @@ ACL][urls.aws_s3_canned_acl].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### assume_role
@@ -195,6 +197,7 @@ The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### batch
@@ -217,6 +220,7 @@ Configures the sink batching behavior.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -240,6 +244,7 @@ The maximum size of a batch, in bytes, before it is flushed.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -266,6 +271,7 @@ The maximum age of a batch before it is flushed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### bucket
@@ -289,6 +295,7 @@ The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -311,6 +318,7 @@ Configures the sink specific buffer behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -334,6 +342,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -357,6 +366,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -380,6 +390,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -406,6 +417,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### compression
@@ -429,6 +441,7 @@ The compression mechanism to use.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -451,6 +464,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -474,6 +488,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -497,6 +512,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -520,6 +536,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -546,6 +563,7 @@ How to format event timestamps.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### endpoint
@@ -570,6 +588,7 @@ this option will make [`region`](#region) moot.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### filename_append_uuid
@@ -594,6 +613,7 @@ there are no name collisions high volume use cases.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### filename_extension
@@ -617,6 +637,7 @@ The filename extension to use in the object name.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### filename_time_format
@@ -641,6 +662,7 @@ specifiers][urls.strptime_specifiers] are supported.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_full_control
@@ -665,6 +687,7 @@ permissions on the created objects.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_read
@@ -689,6 +712,7 @@ their metadata.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_read_acp
@@ -713,6 +737,7 @@ ACL.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### grant_write_acp
@@ -737,6 +762,7 @@ ACL.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -760,6 +786,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={true}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### key_prefix
@@ -785,6 +812,7 @@ to be the root S3 "folder".
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### region
@@ -809,6 +837,7 @@ provided it will override this value since the endpoint includes the region.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### request
@@ -831,6 +860,7 @@ Configures the sink request behavior.
   templateable={false}
   type={"int"}
   unit={"requests"}
+  warnings={[]}
   >
 
 #### in_flight_limit
@@ -854,6 +884,7 @@ The maximum number of in-flight requests allowed at any given time.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### rate_limit_duration_secs
@@ -877,6 +908,7 @@ The time window, in seconds, used for the [`rate_limit_num`](#rate_limit_num) op
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### rate_limit_num
@@ -901,6 +933,7 @@ time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### retry_attempts
@@ -924,6 +957,7 @@ The maximum number of retries to make for failed requests.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_initial_backoff_secs
@@ -949,6 +983,7 @@ to select future backoffs.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### retry_max_duration_secs
@@ -972,6 +1007,7 @@ The maximum amount of time, in seconds, to wait between retries.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 #### timeout_secs
@@ -1001,6 +1037,7 @@ duplicate data downstream.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### server_side_encryption
@@ -1024,6 +1061,7 @@ The server-side encryption algorithm used when storing these objects.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### ssekms_key_id
@@ -1050,6 +1088,7 @@ Amazon S3 uses the AWS managed CMK in AWS to protect the data.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### storage_class
@@ -1075,6 +1114,7 @@ for more details.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tags
@@ -1097,6 +1137,7 @@ The tag-set for the object.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[tag-name]`
@@ -1128,6 +1169,7 @@ A custom tag to be added to the created objects.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
@@ -1152,6 +1194,7 @@ Used for AWS authentication when communicating with AWS services. See relevant
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
@@ -75,6 +75,7 @@ events](#output).
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host_key
@@ -100,6 +101,7 @@ option][docs.reference.global-options#host_key].
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 ### max_length
@@ -151,6 +153,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -174,6 +177,7 @@ The local hostname.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -197,6 +201,7 @@ The raw message, unaltered.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp

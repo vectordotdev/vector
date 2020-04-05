@@ -284,4 +284,8 @@ class Component
   def transform?
     type == "transform"
   end
+
+  def warnings
+    @warnings ||= options_list.collect { |option| option.all_warnings }.flatten.freeze
+  end
 end

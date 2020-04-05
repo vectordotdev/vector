@@ -98,6 +98,10 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
+  def component_warnings(component)
+    render("#{partials_path}/_component_warnings.md", binding).strip
+  end
+
   def config_example(options, array: false, key_path: [], table_path: [], &block)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
