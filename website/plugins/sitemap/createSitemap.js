@@ -9,8 +9,10 @@ function createSitemap(siteConfig, routesPaths, options) {
     if (!hostname) {
         throw new Error('Url in docusaurus.config.js cannot be empty/undefined');
     }
-    const urls = routesPaths.map(routesPath => {
-        let url = routesPath.endsWith('/') ? routesPath : (routesPath + '/');
+    const urls = routesPaths.
+        filter(routePath => !routePath.includes("404.html")).
+        map(routePath => {
+        let url = routePath.endsWith('/') ? routePath : (routePath + '/');
         return {
             url: url,
             changefreq: options.changefreq,
