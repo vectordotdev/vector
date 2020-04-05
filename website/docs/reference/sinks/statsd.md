@@ -115,11 +115,8 @@ A prefix that will be added to all metric names.
 </Field>
 </Fields>
 
-## Output
 
-The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
-For example:
-
+## Examples
 
 ```text
 gorets:1|c

@@ -1,0 +1,17 @@
+The `<%= component.name %>` <%= component.type %> <%= component_short_description(component).continuize %>
+<% if component.sink? && component.batching? -%>
+Batches are flushed via the [`batch_size`](#batch_size) or
+[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
+batches](#buffers--batches) section.
+<%- end -%>
+<%- if fields -%>
+For example:
+
+<%= fields_example(fields, root_key: event_type.global_log_schema_key) %>
+<%- end -%>
+<%- if fields.any? -%>
+
+More detail on the output schema is below.
+
+<%= fields(fields, heading_depth: heading_depth) %>
+<%- end -%>

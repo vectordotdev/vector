@@ -64,14 +64,17 @@ class Templates
     render("#{partials_path}/_component_default.md.erb", binding).strip
   end
 
-  def component_header(component)
-    render("#{partials_path}/_component_header.md", binding).strip
+  def component_examples(component)
+    render("#{partials_path}/_component_examples.md", binding).strip
   end
 
-  def component_output(component, output, breakout_top_keys: false, heading_depth: 3, root_key: nil)
-    examples = output.examples
-    fields = output.fields ? output.fields.to_h.values.sort : []
-    render("#{partials_path}/_component_output.md", binding).strip
+  def component_fields(component, event_type, breakout_top_keys: false, heading_depth: 3, root_key: nil)
+    fields = event_type.fields ? event_type.fields.to_h.values.sort : []
+    render("#{partials_path}/_component_fields.md", binding).strip
+  end
+
+  def component_header(component)
+    render("#{partials_path}/_component_header.md", binding).strip
   end
 
   def component_requirements(component)
@@ -392,11 +395,7 @@ class Templates
   end
 
   def outputs_link(component)
-    if component.output.to_h.any?
-      "[outputs #{event_types(component.output_types).to_sentence} events](#output)"
-    else
-      "outputs #{event_type_links(component.output_types).to_sentence} events"
-    end
+    "outputs #{event_type_links(component.output_types).to_sentence} events"
   end
 
   def permissions(permissions, heading_depth: nil)

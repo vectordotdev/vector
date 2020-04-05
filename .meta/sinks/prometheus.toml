@@ -56,7 +56,7 @@ description = """\
 Time interval between [set][docs.data-model.metric#set] values are reset.\
 """
 
-[[sinks.prometheus.output.examples]]
+[[sinks.prometheus.examples]]
 label = "Histograms"
 body = """\
 Given the following histogram metric events:
@@ -106,7 +106,7 @@ response_time_s_count 2
 ```\
 """
 
-[[sinks.prometheus.output.examples]]
+[[sinks.prometheus.examples]]
 label = "Counters"
 body = """
 Given the following counter metric events:
@@ -140,7 +140,7 @@ logins 4
 ```\
 """
 
-[[sinks.prometheus.output.examples]]
+[[sinks.prometheus.examples]]
 label = "Gauges"
 body = """\
 Given the following gauge metric events:

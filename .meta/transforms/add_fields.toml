@@ -27,6 +27,7 @@ required = true
 examples = [
   {string_field = "string value"},
   {env_var_field = "${ENV_VAR}"},
+  {templated_field = "{{ my_other_field }}"},
   {int_field = 1},
   {float_field = 1.2},
   {bool_field = true},
@@ -38,51 +39,4 @@ description = """\
 The name of the field to add. Accepts all \
 [supported types][docs.configuration#types]. Use `.` for adding nested \
 fields.\
-"""
-
-
-[[transforms.add_fields.output.log.examples]]
-label = "Generic"
-body = """\
-Given the following configuration:
-
-```toml title="vector.toml"
-[transforms.my_transform]
-  type = "add_fields"
-  inputs = [...]
-
-  fields.field1 = "string value"
-  fields.field2 = 1
-  fields.field3 = 2.0
-  fields.field4 = true
-  fields.field5 = 2019-05-27T07:32:00Z
-  fields.field6 = ["item 1", "item 2"]
-  fields.field7.nested = "nested value",
-  fields.field8 = "#{HOSTNAME}"
-  fields.field9 = "{{field1}} {{field2}}"
-```
-
-A [`log` event][docs.data-model.log] will be output with the following
-structure:
-
-```javascript
-{
-  // ... existing fields
-  "field1": "string value",
-  "field2": 1,
-  "field3": 2.0,
-  "field4": true,
-  "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6": ["item1", "item2"],
-  "field7": {
-    "nested": "nested value"
-  },
-  "field8": "my.hostname.com",
-  "field9": "string value 1"
-}
-```
-
-While unrealistic, this example demonstrates the various accepted
-[types][docs.configuration#types] and how they're repsented in Vector's
-internal [log structure][docs.data-model.log].\
 """

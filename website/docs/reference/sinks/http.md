@@ -1073,14 +1073,8 @@ host, but can also include the port, path, and any other valid part of a URI.
 </Field>
 </Fields>
 
-## Output
 
-The `http` sink [batches](#buffers--batches) [`log`][docs.data-model.log] events to a generic [HTTP][urls.http] endpoint.
-Batches are flushed via the [`batch_size`](#batch_size) or
-[`batch_timeout`](#batch_timeout) options. You can learn more in the [buffers &
-batches](#buffers--batches) section.
-For example:
-
+## Examples
 
 <Tabs
   block={true}

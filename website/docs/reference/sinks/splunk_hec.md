@@ -955,6 +955,7 @@ Your Splunk HEC token.
 </Field>
 </Fields>
 
+
 ## How It Works
 
 ### Buffers & Batches

@@ -26,6 +26,12 @@
 <%= fields(component.env_vars_list) %>
 
 <%- end -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 ### Obtaining a Log Destination

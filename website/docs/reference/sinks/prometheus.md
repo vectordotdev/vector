@@ -174,11 +174,8 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 </Field>
 </Fields>
 
-## Output
 
-The `prometheus` sink [exposes](#exposing--scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
-For example:
-
+## Examples
 
 <Tabs
   block={true}

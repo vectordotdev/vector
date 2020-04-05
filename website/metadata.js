@@ -25888,7 +25888,7 @@ module.exports = {
     "add_fields": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"add_fields\" # required\n  inputs = [\"in\"] # required\n\n  # Fields\n  fields.string_field = \"string value\" # example\n  fields.env_var_field = \"${ENV_VAR}\" # example\n  fields.int_field = 1 # example\n  fields.float_field = 1.2 # example\n  fields.bool_field = true # example\n  fields.timestamp_field = 1979-05-27T00:32:00Z # example\n  fields.parent.child_field = \"child_value\" # example\n  fields.list_field = [\"first\", \"second\", \"third\"] # example"
+        "toml": "[transforms.out]\n  # General\n  type = \"add_fields\" # required\n  inputs = [\"in\"] # required\n\n  # Fields\n  fields.string_field = \"string value\" # example\n  fields.env_var_field = \"${ENV_VAR}\" # example\n  fields.templated_field = \"{{ my_other_field }}\" # example\n  fields.int_field = 1 # example\n  fields.float_field = 1.2 # example\n  fields.bool_field = true # example\n  fields.timestamp_field = 1979-05-27T00:32:00Z # example\n  fields.parent.child_field = \"child_value\" # example\n  fields.list_field = [\"first\", \"second\", \"third\"] # example"
       },
       "delivery_guarantee": null,
       "description": null,

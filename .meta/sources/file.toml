@@ -240,7 +240,7 @@ Instead of balancing read capacity fairly across all watched files, prioritize \
 draining the oldest files before moving on to read data from younger files.\
 """
 
-[sources.file.output.log.fields.file]
+[sources.file.fields.log.fields.file]
 type = "string"
 examples = ["/var/log/nginx.log"]
 required = true
@@ -249,7 +249,7 @@ The _full_ path of the file tha the log originated from. This can be renamed \
 via the `file_key` option.\
 """
 
-[sources.file.output.log.fields.host]
+[sources.file.fields.log.fields.host]
 type = "string"
 examples = ["my.host.com"]
 required = true
@@ -258,7 +258,7 @@ The current hostname, equivalent to the `gethostname` command. This can be \
 renamed via the `host_key` option.\
 """
 
-[sources.file.output.log.fields.message]
+[sources.file.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -267,7 +267,7 @@ The raw log message, unaltered. This can be renamed via the \
 [global `message_key` option][docs.reference.global-options#message_key].\
 """
 
-[sources.file.output.log.fields.timestamp]
+[sources.file.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

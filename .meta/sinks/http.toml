@@ -120,7 +120,7 @@ examples = ["https://10.22.212.22:9000/endpoint"]
 required = true
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
 
-[[sinks.http.output.examples]]
+[[sinks.http.examples]]
 label = "JSON"
 body = """\
 ```http
@@ -137,7 +137,7 @@ Content-Length: <byte_size>
 ```\
 """
 
-[[sinks.http.output.examples]]
+[[sinks.http.examples]]
 label = "NDJSON"
 body = """\
 ```http
@@ -152,7 +152,7 @@ Content-Length: <byte_size>
 ```\
 """
 
-[[sinks.http.output.examples]]
+[[sinks.http.examples]]
 label = "Text"
 body = """\
 ```http

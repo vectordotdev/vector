@@ -1260,6 +1260,7 @@ dns_servers = ["0.0.0.0:53"]
     # * type: *
     string_field = "string value"
     env_var_field = "${ENV_VAR}"
+    templated_field = "{{ my_other_field }}"
     int_field = 1
     float_field = 1.2
     bool_field = true

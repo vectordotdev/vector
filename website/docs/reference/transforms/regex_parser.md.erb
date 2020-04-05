@@ -72,6 +72,12 @@ Things to note about the output:
 2. The `bytes_in`, `timestamp`, `status`, and `bytes_out` fields were coerced.
 
 
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

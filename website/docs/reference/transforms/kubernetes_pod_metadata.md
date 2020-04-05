@@ -18,7 +18,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `kubernetes_pod_metadata` transform
-accepts and [outputs `log` events](#output) allowing you to enrich
+accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
 [Kubernetes][urls.kubernetes] logs with Pod metadata.
 
 <!--
@@ -257,9 +257,9 @@ order to retrieve Kubernetes metadata.
 </Field>
 </Fields>
 
-## Output
+## Fields
 
-The `kubernetes_pod_metadata` transform accepts and [outputs `log` events](#output) allowing you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.
+The `kubernetes_pod_metadata` transform accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.
 For example:
 
 ```javascript
@@ -765,6 +765,7 @@ root of the event.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.global-options#kubernetes_key]: /docs/reference/global-options/#kubernetes_key
 [docs.transforms.kubernetes_pod_metadata#kubernetes-rbac]: /docs/reference/transforms/kubernetes_pod_metadata/#kubernetes-rbac
 [docs.transforms.kubernetes_pod_metadata#permissions]: /docs/reference/transforms/kubernetes_pod_metadata/#permissions

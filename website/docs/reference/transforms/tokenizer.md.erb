@@ -67,6 +67,12 @@ A few things to note about the output:
 4. [Special wrapper characters](#special-characters) were dropped, such as
    wrapping `[...]` and `"..."` characters.
 
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

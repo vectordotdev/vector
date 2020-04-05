@@ -29,7 +29,7 @@ description = "The identifier of a swimlane."
 
 <%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.swimlanes.options.lanes.children.\"`[swimlane-id]`\".children") %>
 
-[[transforms.swimlanes.output.log.examples]]
+[[transforms.swimlanes.examples]]
 label = "If/Else"
 body = """\
 The `swimlanes` transform, in it's simplest form, can act as a simple if/else \
@@ -62,7 +62,7 @@ This syntax makes it easy to create arbitrary numbers of swimlanes, each with \
 their own logic, and easily route them to downstream components.\
 """
 
-[[transforms.swimlanes.output.log.examples]]
+[[transforms.swimlanes.examples]]
 label = "Splitting"
 body = """\
 To follow up with the previous `If/Else` example, let's say we want to split \
