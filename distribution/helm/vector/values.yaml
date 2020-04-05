@@ -1,0 +1,62 @@
+image:
+  repository: timberio/vector
+  tag: 0.8.X-debian
+  pullPolicy: Always
+
+updateStrategy: RollingUpdate
+
+metrics:
+  enabled: false
+  service:
+    port: 2020
+    type: ClusterIP
+    annotations: {}
+    additionalLabels: {}
+  serviceMonitor:
+    enabled: false
+    endpoint: /
+    additionalLabels: {}
+    interval: 60s
+    scrapeTimeout: 10s
+
+rbac:
+  enabled: true
+  serviceAccount:
+    annotation: {}
+    name:
+  psp:
+    enabled: false
+
+env: []
+
+tolerations: []
+nodeSelector: {}
+affinity: {}
+resources: {}
+
+extraVolumes: []
+
+extraVolumeMounts: []
+
+existingConfigMap: ""
+
+globalOptions:
+  dataDir: "/var/tmp/vector"
+
+logSchema:
+  hostKey: "host"
+  messageKey: "message"
+  timestampKey: "timestamp"
+
+sources:
+  kubernetes:
+    enabled: true
+    sourceId: kubernetes
+    includeNamespaces: []
+    includeContainerNames: []
+
+  additionalSources: {}
+
+transforms: {}
+
+sinks: {}
