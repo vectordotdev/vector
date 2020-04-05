@@ -11,6 +11,7 @@ import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
 import useLogo from '@theme/hooks/useLogo';
 
 import styles from './styles.module.css';
+import './styles.css';
 
 const MOBILE_TOGGLE_SIZE = 24;
 
@@ -185,8 +186,8 @@ function DocSidebar(props) {
   }
 
   return (
-    <div className={styles.sidebar}>
-      <Link className={classnames('sidebar__logo', styles.sidebarLogo)} to={logoLink} {...logoLinkProps}>
+    <div className={classnames('docs-sidebar', styles.sidebar)}>
+      <Link className={styles.sidebarLogo} to={logoLink} {...logoLinkProps}>
         {logoImageUrl != null && (
           <SVG key={isClient} src={logoImageUrl} alt={logoAlt} />
         )}

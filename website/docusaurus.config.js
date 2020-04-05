@@ -133,33 +133,39 @@ module.exports = {
       algoliaOptions: {}, // Optional, if provided by Algolia
     },
   },
-  presets: [
-    [
-      '@docusaurus/preset-classic',
-      {
-        blog: {
-          feedOptions: {
-            type: 'all',
-            copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
-          },
-        },
-        docs: {
-          editUrl: 'https://github.com/timberio/vector/edit/master/website/',
-          sidebarPath: require.resolve('./sidebars.js'),
-        },
-        theme: {
-          customCss: require.resolve('./src/css/custom.css'),
-        },
-      },
-    ],
-  ],
+  presets: [],
   plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        editUrl: 'https://github.com/timberio/vector/edit/master/website/',
+        sidebarPath: require.resolve('./sidebars.js')
+      }
+    ],
+    [
+      '@docusaurus/plugin-content-blog',
+      {
+        feedOptions: {
+          type: 'all',
+          copyright: `Copyright © ${new Date().getFullYear()} Timber, Inc.`,
+        }
+      }
+    ],
     path.resolve(__dirname, './plugins/guides'),
+    ['@docusaurus/plugin-content-pages', {}],
+    [path.resolve(__dirname, './plugins/sitemap'), {}]
   ],
   scripts: [],
   stylesheets: [
     'https://fonts.googleapis.com/css?family=Ubuntu|Roboto|Source+Code+Pro',
-    'https://at-ui.github.io/feather-font/css/iconfont.css',
-    ''
+    'https://at-ui.github.io/feather-font/css/iconfont.css'
   ],
+  themes: [
+    [
+      '@docusaurus/theme-classic',
+      {
+        customCss: require.resolve('./src/css/custom.css')
+      }
+    ]
+  ]
 };

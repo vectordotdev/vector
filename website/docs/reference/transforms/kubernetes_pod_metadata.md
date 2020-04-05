@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Kubernetes Pod Metadata"
 description: "The Vector `kubernetes_pod_metadata` transform accepts and outputs `log` events allowing you to enrich Kubernetes logs with Pod metadata."
 event_types: ["log"]
@@ -33,7 +33,7 @@ accepts and [outputs `log` events](#output) allowing you to enrich
 
 <Alert icon={false} type="danger" classNames="list--warnings">
 
-* [Kubernetes][urls.kubernetes] version `>= 1.15` is required.
+* [Kubernetes][urls.kubernetes] version `>= 1.12` is required.
 * [Kubernetes RBAC][urls.kubernetes_rbac] must be enabled. See the ["Kubernetes RBAC" section][docs.transforms.kubernetes_pod_metadata#kubernetes-rbac] for more info.
 * Permissions are required. See the ["Permissions" section][docs.transforms.kubernetes_pod_metadata#permissions] for more info.
 

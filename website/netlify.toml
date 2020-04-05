@@ -43,6 +43,12 @@
   force = true
 
 [[redirects]]
+  from = "https://docs.vector.dev/usage/administration"
+  to = "https://vector.dev/docs/administration/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "https://docs.vector.dev/usage/administration/stopping"
   to = "https://vector.dev/docs/administration/process-management/#stopping"
   status = 301
@@ -87,6 +93,12 @@
 [[redirects]]
   from = "/docs/"
   to = "/docs/about/what-is-vector/"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/docs/components/*"
+  to = "/docs/refernce/:splat"
   status = 302
   force = true
 
