@@ -530,6 +530,122 @@ table.comparison tr td.bar.vector .bar {
 }
 
 /**
+ * connected-list
+ *
+ * A connected list is like any other list except that it has a left border
+ * that appears to connect the items.
+ */
+
+ul.connected-list {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  list-style-type: disc;
+  margin-left: 0.25em;
+  padding-left: 0.65em;
+}
+
+ul.connected-list ul {
+  list-style-type: disc;
+}
+
+ul.connected-list > li {
+  font-size: 0.95em;
+  padding-bottom: calc( var(--ifm-spacing-vertical) / 1.5 );
+  padding-left: var(--ifm-spacing-horizontal);
+}
+
+ul.connected-list > li:last-child {
+  padding-bottom: 0
+}
+
+ul.connected-list > li > .badges {
+  float: right;
+  margin-top: -0.25em;
+  text-align: right;
+}
+
+ul.connected-list > li > .badges .badge {
+  font-size: 0.7em;
+  margin-left: 3px;
+}
+
+ul.connected-list > li > .badges .badge:first-child {
+  margin-left: 0;
+}
+
+ul.connected-list > li > h3,
+ul.connected-list > li > h4,
+ul.connected-list > li > h5,
+ul.connected-list > li > h6 {
+  margin-bottom: 1em;
+}
+
+ul.connected-list > li > h3 .hash-link,
+ul.connected-list > li > h4 .hash-link,
+ul.connected-list > li > h5 .hash-link,
+ul.connected-list > li > h6 .hash-link {
+  margin-left: calc((var(--ifm-spacing-horizontal) * -1.75) - var(--ifm-spacing-horizontal)) !important;
+  padding-right: 3em;
+}
+
+ul.connected-list > li:hover > h3 > .hash-link,
+ul.connected-list > li:hover > h4 > .hash-link,
+ul.connected-list > li:hover > h5 > .hash-link,
+ul.connected-list > li:hover > h6 > .hash-link {
+  opacity: 1;
+}
+
+ul.connected-list > li > .sub__title {
+  margin-top: -0.4em;
+  margin-bottom: 0.25em;
+}
+
+ul.connected-list > li .info {
+  border-left: 1px solid var(--ifm-hr-border-color);
+  color: var(--ifm-color-content-secondary);
+  font-size: 0.9em;
+  margin-top: calc( var(--ifm-spacing-horizontal) * -1 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
+  margin-left: 0.25em;
+  padding-left: var(--ifm-spacing-horizontal);
+}
+
+ul.connected-list > li .info > div:before {
+  content: "• ";
+  float: left;
+  display: block;
+  width: calc( var(--ifm-spacing-horizontal) * 2);
+  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
+  text-align: center;
+}
+
+ul.connected-list > li .info .show-more {
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+}
+
+ul.connected-list > li .info .examples {
+  margin-top: 0.5em;
+}
+
+ul.connected-list.connected-list--compact > li {
+  padding-top: calc( var(--ifm-spacing-vertical) / 4 );
+  padding-bottom: calc( var(--ifm-spacing-vertical) / 4 );
+}
+
+ul.connected-list.connected-list--compact > li > h4 {
+  font-weight: normal;
+  margin: 0;
+}
+
+ul.connected-list.connected-list--compact > li:last-child > h4 {
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+
+ul.connected-list.connected-list--hover > li:hover {
+  background: var(--ifm-panel-background);
+}
+
+/**
  * container
  *
  * A note about container sizes. The default container is 1140px. Our grid
@@ -659,10 +775,10 @@ table.comparison tr td.bar.vector .bar {
   float: right;
   font-size: 0.9em;
   line-height: 1;
-  margin-bottom: -1em;
+  margin-bottom: -1.5em;
   margin-right: var(--ifm-spacing-horizontal);
   position: relative;
-  top: 0.75em;
+  top: 1em;
 }
 
 .filters .search input {
@@ -698,6 +814,10 @@ table.comparison tr td.bar.vector .bar {
   margin-left: 0.75em;
   margin-top: calc( var(--ifm-spacing-vertical) / 4 );
   white-space: nowrap;
+}
+
+.filters .filter--choices label:first-child {
+  margin-left: 0;
 }
 
 .filters .filter--choices label input {
@@ -1532,134 +1652,6 @@ section:last-child {
 header + section.shade {
   margin-top: calc( -1 * (( var(--ifm-spacing-vertical) * 2 ) - 5px ));
   padding-top: var(--ifm-spacing-vertical);
-}
-
-/**
- * section-list
- *
- * A section list is a generic list that allows for larger sections with
- * headings. This is used for options, fields, or step-by-step guides.
- */
-
-div.section-list {
-  border-left: 1px solid var(--ifm-hr-border-color);
-  margin-left: 0.25em;
-}
-
-div.section-list > .section {
-  border-radius: 5px;
-  font-size: 0.95em;
-  padding-bottom: calc( var(--ifm-spacing-vertical) / 1.5 );
-  padding-left: var(--ifm-spacing-horizontal);
-}
-
-div.section-list > .section:last-child {
-  padding-bottom: 0
-}
-
-div.section-list > .section > .badges {
-  float: right;
-  margin-top: -0.25em;
-  text-align: right;
-}
-
-div.section-list > .section > .badges .badge {
-  font-size: 0.7em;
-  margin-left: 3px;
-}
-
-div.section-list > .section > .badges .badge:first-child {
-  margin-left: 0;
-}
-
-div.section-list > .section > h3,
-div.section-list > .section > h4,
-div.section-list > .section > h5,
-div.section-list > .section > h6 {
-  margin-bottom: 1em;
-}
-
-div.section-list > .section > h3 .hash-link,
-div.section-list > .section > h4 .hash-link,
-div.section-list > .section > h5 .hash-link,
-div.section-list > .section > h6 .hash-link {
-  margin-left: calc((var(--ifm-spacing-horizontal) * -1.75) - var(--ifm-spacing-horizontal)) !important;
-  padding-right: 3em;
-}
-
-div.section-list:not(.section-list--no-bullet) > .section > h3::before,
-div.section-list:not(.section-list--no-bullet) > .section > h4::before,
-div.section-list:not(.section-list--no-bullet) > .section > h5::before,
-div.section-list:not(.section-list--no-bullet) > .section > h6::before,
-div.section-list > .section > .section--bullet {
-  content: "• ";
-  float: left;
-  display: block;
-  width: calc( var(--ifm-spacing-horizontal) * 2);
-  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
-  text-align: center;
-}
-
-div.section-list > .section:hover > h3 > .hash-link,
-div.section-list > .section:hover > h4 > .hash-link,
-div.section-list > .section:hover > h5 > .hash-link,
-div.section-list > .section:hover > h6 > .hash-link {
-  opacity: 1;
-}
-
-div.section-list > .section > .sub__title {
-  margin-top: -0.4em;
-  margin-bottom: 0.25em;
-}
-
-div.section-list > .section .info {
-  border-left: 1px solid var(--ifm-hr-border-color);
-  color: var(--ifm-color-content-secondary);
-  font-size: 0.9em;
-  margin-top: calc( var(--ifm-spacing-horizontal) * -1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
-  margin-left: 0.25em;
-  padding-left: var(--ifm-spacing-horizontal);
-}
-
-div.section-list > .section .info > div:before {
-  content: "• ";
-  float: left;
-  display: block;
-  width: calc( var(--ifm-spacing-horizontal) * 2);
-  margin-left: calc( var(--ifm-spacing-horizontal) * -2 );
-  text-align: center;
-}
-
-div.section-list > .section .info .show-more {
-  color: var(--ifm-color-primary);
-  cursor: pointer;
-}
-
-div.section-list > .section .info .examples {
-  margin-top: 0.5em;
-}
-
-div.section-list.section-list--lg > .section {
-  margin-top: calc( var(--ifm-spacing-vertical) * 2 );
-}
-
-div.section-list.section-list--compact > .section {
-  padding-top: calc( var(--ifm-spacing-vertical) / 4 );
-  padding-bottom: calc( var(--ifm-spacing-vertical) / 4 );
-}
-
-div.section-list.section-list--compact > .section > h4 {
-  font-weight: normal;
-  margin: 0;
-}
-
-div.section-list.section-list--compact > .section:last-child > h4 {
-  margin-bottom: var(--ifm-spacing-vertical);
-}
-
-div.section-list.section-list--hover > .section:hover {
-  background: var(--ifm-panel-background);
 }
 
 /**

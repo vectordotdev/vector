@@ -148,7 +148,7 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
   }
 
   return (
-    <div className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
+    <li className={classnames('field', 'section', (required ? 'field-required' : ''), (collapse ? 'field-collapsed' : ''))} required={required}>
       <div className="badges">
         {groups && groups.map((group, idx) => <span key={idx} className="badge badge--secondary">{group}</span>)}
         {templateable && <span className="badge badge--primary" title="This option is dynamic and accepts the Vector template syntax">templateable</span>}
@@ -171,7 +171,7 @@ function Field({children, common, defaultValue, enumValues, examples, groups, na
           relevantWhen={relevantWhen}
           required={required}
           unit={unit} />}
-    </div>
+    </li>
   );
 }
 
