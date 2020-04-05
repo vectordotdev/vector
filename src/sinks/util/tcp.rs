@@ -11,6 +11,7 @@ use futures01::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::io::{ErrorKind, Read};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio01::{
@@ -146,17 +147,13 @@ impl TcpSink {
                         self.backoff = Self::fresh_backoff();
                         TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
                     }
-                    Ok(Async::NotReady) => {
-                        return Ok(Async::NotReady);
-                    }
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
                         error!(message = "unable to connect.", %error);
                         TcpSinkState::Backoff(self.next_delay())
                     }
                 },
-                TcpSinkState::Connected(ref mut connection) => {
-                    return Ok(Async::Ready(connection));
-                }
+                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
             };
         }
     }
@@ -172,17 +169,28 @@ impl Sink for TcpSink {
 
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
-                debug!(
-                    message = "sending event.",
-                    bytes = &field::display(line.len())
-                );
-                match connection.start_send(line) {
-                    Err(error) => {
+                let mut dummy = [0; 0];
+                // Test if the remote has issued a disconnect
+                match connection.get_mut().read(&mut dummy) {
+                    Err(error) if error.kind() != ErrorKind::WouldBlock => {
                         error!(message = "connection disconnected.", %error);
                         self.state = TcpSinkState::Disconnected;
-                        Ok(AsyncSink::Ready)
+                        Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(ok) => Ok(ok),
+                    _ => {
+                        debug!(
+                            message = "sending event.",
+                            bytes = &field::display(line.len())
+                        );
+                        match connection.start_send(line) {
+                            Err(error) => {
+                                error!(message = "connection disconnected.", %error);
+                                self.state = TcpSinkState::Disconnected;
+                                Ok(AsyncSink::Ready)
+                            }
+                            Ok(ok) => Ok(ok),
+                        }
+                    }
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),

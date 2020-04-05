@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Tag Cardinality Limit"
 description: "The Vector `tag_cardinality_limit` transform accepts and outputs `metric` events allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 event_types: ["metric"]
@@ -76,6 +76,7 @@ cardinality of metric tags to prevent downstream disruption of metrics services.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 ### cache_size_per_tag
@@ -101,6 +102,7 @@ a new value for tag even after we have reached the configured limits.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### limit_exceeded_action
@@ -125,6 +127,7 @@ the configured limit on cardinality.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### mode
@@ -149,6 +152,7 @@ and deterime when a tag on an incoming metric exceeds the limit.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### value_limit

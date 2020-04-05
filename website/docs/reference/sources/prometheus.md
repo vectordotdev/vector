@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
@@ -56,6 +56,7 @@ events](#output).
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### hosts
@@ -79,6 +80,7 @@ Host addresses to scrape metrics from.
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### scrape_interval_secs

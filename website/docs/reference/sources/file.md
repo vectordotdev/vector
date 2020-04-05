@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -113,6 +113,7 @@ events](#output).
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### data_dir
@@ -138,6 +139,7 @@ sure the Vector project has write permissions to this dir.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### exclude
@@ -162,6 +164,7 @@ precedence over the [`include` option](#include).*
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### file_key
@@ -185,6 +188,7 @@ The key name added to each event with the full path of the file.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### fingerprinting
@@ -207,6 +211,7 @@ Configuration for how the file source should identify files.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### strategy
@@ -231,6 +236,7 @@ The strategy used to uniquely identify files. This is important for
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### fingerprint_bytes
@@ -255,6 +261,7 @@ fingerprint.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### ignored_header_bytes
@@ -282,6 +289,7 @@ fingerprint. This is helpful if all files share a common header.
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
+  warnings={[]}
   >
 
 ### glob_minimum_cooldown
@@ -306,6 +314,7 @@ searches for files.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host_key
@@ -331,6 +340,7 @@ option][docs.reference.global-options#host_key].
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### ignore_older
@@ -354,6 +364,7 @@ Ignore files with a data modification date that does not exceed this age.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### include
@@ -377,6 +388,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 ### max_line_bytes
@@ -401,6 +413,7 @@ protects against malformed lines or tailing incorrect files.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 ### max_read_bytes
@@ -425,6 +438,7 @@ time.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### multiline
@@ -448,6 +462,7 @@ If not speicified, multiline parsing is disabled.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### start_pattern
@@ -471,6 +486,7 @@ Start regex pattern to look for as a beginning of the message.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### mode
@@ -494,6 +510,7 @@ Mode of operation, specifies how the [`condition_pattern`](#condition_pattern) i
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### condition_pattern
@@ -517,6 +534,7 @@ Condition regex pattern to look for. Exact behavior is configured via [`mode`](#
   templateable={false}
   type={"int"}
   unit={"milliseconds"}
+  warnings={[]}
   >
 
 #### timeout_ms
@@ -544,6 +562,7 @@ the buffered message is guaraneed to be flushed, even if incomplete.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### oldest_first
@@ -568,6 +587,7 @@ draining the oldest files before moving on to read data from younger files.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### start_at_beginning
@@ -612,6 +632,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### file
@@ -636,6 +657,7 @@ via the [`file_key`](#file_key) option.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -660,6 +682,7 @@ renamed via the [`host_key`](#host_key) option.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -684,6 +707,7 @@ The raw log message, unaltered. This can be renamed via the [global
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp

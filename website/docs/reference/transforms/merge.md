@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
 event_types: ["log"]
@@ -53,6 +53,7 @@ events into a single event.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### merge_fields
@@ -80,6 +81,7 @@ non-partial event fields are merged in, producing the resulting merged event.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### partial_event_marker_field
@@ -104,6 +106,7 @@ partial events along with the first non-partial event will be merged together.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### stream_discriminant_fields

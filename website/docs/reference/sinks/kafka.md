@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -123,6 +123,7 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### bootstrap_servers
@@ -148,6 +149,7 @@ initially to bootstrap itself.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### buffer
@@ -170,6 +172,7 @@ Configures the sink specific buffer behavior.
   templateable={false}
   type={"int"}
   unit={"events"}
+  warnings={[]}
   >
 
 #### max_events
@@ -193,6 +196,7 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
   templateable={false}
   type={"int"}
   unit={"bytes"}
+  warnings={[]}
   >
 
 #### max_size
@@ -216,6 +220,7 @@ The maximum size of the buffer on the disk.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### type
@@ -239,6 +244,7 @@ The buffer's type and storage mechanism.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### when_full
@@ -265,6 +271,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### compression
@@ -288,6 +295,7 @@ Compression codec to use for compressing message sets
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -310,6 +318,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -333,6 +342,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -356,6 +366,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -379,6 +390,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -405,6 +417,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -428,6 +441,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### key_field
@@ -453,6 +467,7 @@ be used.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### librdkafka_options
@@ -476,6 +491,7 @@ details.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
@@ -502,6 +518,7 @@ The options and their values. Accepts `string` values.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### message_timeout_ms
@@ -525,6 +542,7 @@ Local message timeout.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### socket_timeout_ms
@@ -548,6 +566,7 @@ Default timeout for network requests.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -570,6 +589,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -593,6 +613,7 @@ Enable TLS during connections to the remote.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -617,6 +638,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -642,6 +664,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -666,6 +689,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -693,6 +717,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### topic

@@ -14,6 +14,7 @@
   templateable={<%= field.templateable? %>}
   type={<%= field.type.to_json %>}
   unit={<%= field.unit.to_json %>}
+  warnings={<%= field.warnings.to_json %>}
   >
 
 <%= "#" * heading_depth %> <%= field.name %>

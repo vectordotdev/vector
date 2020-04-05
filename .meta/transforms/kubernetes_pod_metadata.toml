@@ -6,16 +6,8 @@ common = true
 function_category = "enrich"
 input_types = ["log"]
 output_types = ["log"]
-requirements.kubernetes = ">= 1.15"
+requirements.kubernetes = ">= 1.12"
 requirements.kubernetes_rbac = true
-requirements.additional = """\
-Vector must be run inside a Kubernetes cluster for this transform to work. \
-See [Connecting To The Kubernetes API server section](#connecting-to-the-kubernetes-api-server) for more info.
-
-Vector must be given authorization to `watch` resource `pods`. \
-In the case of using [predefined Kubernetes config][https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml] \
-[RBAC Authorization][https://kubernetes.io/docs/reference/access-authn-authz/rbac/] must be enabled. Which is usually enabled by default.
-"""
 
 <%= render(
   "_partials/fields/_component_options.toml",

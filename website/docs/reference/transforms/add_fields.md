@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events allowing you to add one or more log fields."
 event_types: ["log"]
@@ -59,6 +59,7 @@ fields.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields
@@ -81,6 +82,7 @@ A table of key/value pairs representing the keys to be added to the event.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

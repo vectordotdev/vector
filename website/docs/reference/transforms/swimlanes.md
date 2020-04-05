@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -60,6 +60,7 @@ parallel streams using logical filters.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### lanes
@@ -84,6 +85,7 @@ components with the name `<transform_name>.<swimlane_id>`.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[swimlane-id]`
@@ -106,6 +108,7 @@ The identifier of a swimlane.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### type
@@ -129,6 +132,7 @@ The type of the condition to execute.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.eq
@@ -152,6 +156,7 @@ Check whether a fields contents exactly matches the value specified.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.exists
@@ -176,6 +181,7 @@ being `true` or `false` respectively.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.neq
@@ -199,6 +205,7 @@ Check whether a fields contents does not match the value specified.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.contains
@@ -222,6 +229,7 @@ Checks whether a string field contains a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.ends_with
@@ -245,6 +253,7 @@ Checks whether a string field ends with a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.regex
@@ -272,6 +281,7 @@ preferred where possible.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.starts_with

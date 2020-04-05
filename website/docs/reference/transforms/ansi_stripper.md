@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "ANSI Stripper"
 description: "The Vector `ansi_stripper` transform accepts and outputs `log` events allowing you to strips ANSI escape sequences from the specified field."
 event_types: ["log"]
@@ -49,6 +49,7 @@ ANSI escape sequences from the specified field.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field

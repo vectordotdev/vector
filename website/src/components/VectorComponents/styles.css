@@ -20,7 +20,7 @@
 .vector-components--grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  grid-gap: 1rem;
+  grid-gap: 1em;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
@@ -89,9 +89,11 @@
   }
 
   .vector-components--cols .filters {
-    flex: 0 0 25%;
-    max-width: calc( var(--ifm-sidebar-width) - var(--ifm-spacing-horizontal) );
+    --ifm-sidebar-width: 225px;
+    flex: 0 0 var(--ifm-sidebar-width);
+    max-width: var(--ifm-sidebar-width);
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
+    padding-left: 0;
   }
 
   .vector-components--cols .filters .search {
@@ -126,5 +128,6 @@
     flex: 1 0;
     max-width: 100%;
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
+    padding-right: 0;
   }
 }

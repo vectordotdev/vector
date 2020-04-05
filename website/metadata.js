@@ -24457,7 +24457,7 @@ module.exports = {
         "AWS",
         "Elastic"
       ],
-      "short_description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).",
+      "short_description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint][urls.elasticsearch_bulk].",
       "status": "prod-ready",
       "title": "Elasticsearch",
       "type": "sink",

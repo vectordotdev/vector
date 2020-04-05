@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Dedupe events"
 description: "The Vector `dedupe` transform accepts and outputs `log` events allowing you to prevent duplicate Events from being outputted by using an LRU cache."
 event_types: ["log"]
@@ -81,6 +81,7 @@ duplicate Events from being outputted by using an LRU cache.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### cache
@@ -103,6 +104,7 @@ Options controlling how we cache recent Events for future duplicate checking.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 #### num_events
@@ -129,6 +131,7 @@ The number of recent Events to cache and compare new incoming Events against.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields
@@ -151,6 +154,7 @@ Options controlling what fields to match against
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### ignore
@@ -175,6 +179,7 @@ Incompatible with the `fields.match` option.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### match

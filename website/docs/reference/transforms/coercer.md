@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 component_title: "Coercer"
 description: "The Vector `coercer` transform accepts and outputs `log` events allowing you to coerce log fields into fixed types."
 event_types: ["log"]
@@ -88,6 +88,7 @@ into fixed types.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_unspecified
@@ -114,6 +115,7 @@ other extraneous fields.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -137,6 +139,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

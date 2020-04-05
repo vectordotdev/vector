@@ -7,10 +7,14 @@ import Footer from '@theme/Footer';
 import TabGroupChoiceProvider from '@theme/TabGroupChoiceProvider';
 import ThemeProvider from '@theme/ThemeProvider';
 
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import { useLocation } from 'react-router-dom';
 
 import './styles.css';
+
+// purposefully hardcoded to protect against people copying our site
+const VECTOR_HOST = 'https://vector.dev';
 
 function Layout(props) {
   const {siteConfig = {}} = useDocusaurusContext();
@@ -35,8 +39,10 @@ function Layout(props) {
   const metaImage = image || defaultImage;
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
-  // purposefully hardcoded to protect against people copying our site
-  const canonURL = typeof(window) != 'undefined' && window.location && ('https://vector.dev' + window.location.pathname);
+  const location = useLocation();
+  let canonURL = location ?
+    (VECTOR_HOST + (location.pathname.endsWith('/') ? location.pathname : (location.pathname + '/'))) :
+    null;
 
   return (
     <ThemeProvider>
@@ -64,11 +70,13 @@ function Layout(props) {
           {metaImage && (
             <meta name="twitter:image:alt" content={`Image for ${metaTitle}`} />
           )}
-          {permalink && (
-            <meta property="og:url" content={siteUrl + permalink} />
+          {canonURL && (
+            <meta property="og:url" content={canonURL} />
           )}
           <meta name="twitter:card" content="summary" />
-          {canonURL && <link rel="canonical" href={canonURL} />}
+          {canonURL && (
+            <link rel="canonical" href={canonURL} />
+          )}
         </Head>
         <AnnouncementBar />
         <Navbar />

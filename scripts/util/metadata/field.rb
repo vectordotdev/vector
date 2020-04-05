@@ -21,7 +21,8 @@ class Field
     :templateable,
     :toml_display,
     :type,
-    :unit
+    :unit,
+    :warnings
 
   def initialize(hash)
     @children = (hash["children"] || {}).to_struct_with_name(constructor: self.class)
@@ -41,6 +42,7 @@ class Field
     @toml_display = hash["toml_display"]
     @type = hash.fetch("type")
     @unit = hash["unit"]
+    @warnings = (hash["warnings"] || []).freeze
 
     @category = hash["category"] || ((@children.to_h.values.empty?) ? "General" : @name.humanize)
 
@@ -116,6 +118,14 @@ class Field
     else
       !common?
     end
+  end
+
+  def all_warnings
+    @all_warnings ||=
+      (
+        warnings.collect { |warning| "`#{name}` option - #{warning}" } +
+          children_list.collect { |child| child.all_warnings }.flatten
+      ).freeze
   end
 
   def array?

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-03"
+last_modified_on: "2020-04-05"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -195,6 +195,7 @@ using `emit` function.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### search_dirs
@@ -218,6 +219,7 @@ A list of directories search when loading a Lua file via the `require` function.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### source
@@ -314,6 +316,7 @@ Defines the interval at which the timer handler would be executed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### version

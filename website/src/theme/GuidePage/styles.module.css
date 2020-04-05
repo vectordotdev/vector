@@ -3,7 +3,12 @@
 }
 
 .container {
+  display: flex;
   margin-top: calc( var(--ifm-spacing-vertical) * 4 );
+}
+
+.sidebar {
+  width: var(--ifm-sidebar-width);
 }
 
 .avatar {
@@ -21,11 +26,16 @@
 
 .tableOfContents {
   border-left: 0px none;
+  max-height: calc(100vh - var(--ifm-spacing-vertical));
+  overflow-y: auto;
+  position: sticky;
   top: var(--ifm-spacing-vertical);
 }
 
-.rightCol {
-  padding-left: calc( var(--ifm-spacing-horizontal) * 2 ) !important;
+.article {
+  flex: 0 0 60%;
+  max-width: 60%;
+  padding-left: calc( var(--ifm-spacing-horizontal) * 2 );
 }
 
 .paginator {
@@ -34,7 +44,16 @@
 }
 
 @media (max-width: 996px) {
-  .rightCol {
-    padding-left: var(--ifm-spacing-horizontal) !important;
+  .container {
+    display: block;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+
+  .article {
+    max-width: 100%;
+    padding-left: 0;
   }
 }
