@@ -7,11 +7,13 @@ import Footer from '@theme/Footer';
 import TabGroupChoiceProvider from '@theme/TabGroupChoiceProvider';
 import ThemeProvider from '@theme/ThemeProvider';
 
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import { useLocation } from 'react-router-dom';
 
 import './styles.css';
 
+// purposefully hardcoded to protect against people copying our site
 const VECTOR_HOST = 'https://vector.dev';
 
 function Layout(props) {
@@ -37,8 +39,10 @@ function Layout(props) {
   const metaImage = image || defaultImage;
   const metaImageUrl = siteUrl + useBaseUrl(metaImage);
   const faviconUrl = useBaseUrl(favicon);
-  // purposefully hardcoded to protect against people copying our site
-  const canonURL = permalink ? (VECTOR_HOST + permalink + '/') : null;
+  const location = useLocation();
+  let canonURL = location ?
+    (VECTOR_HOST + (location.pathname.endsWith('/') ? location.pathname : (location.pathname + '/'))) :
+    null;
 
   return (
     <ThemeProvider>
