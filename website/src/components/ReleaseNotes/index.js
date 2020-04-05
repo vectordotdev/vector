@@ -50,10 +50,10 @@ function Sidebar({releases, release}) {
 
 function Highlight({post}) {
   return (
-    <div className="section">
+    <li>
       <AnchoredH3 id={post.id}>{post.title}</AnchoredH3>
       <div dangerouslySetInnerHTML={{__html: post.body}} />
-    </div>
+    </li>
   );
 }
 
@@ -62,7 +62,7 @@ function BlogHighlight({post}) {
   const MAX_LENGTH = 175;
 
   return (
-    <div className="section">
+    <li>
       <div className="badges">
         <Tags tags={post.tags} valuesOnly={true} />
       </div>
@@ -71,16 +71,16 @@ function BlogHighlight({post}) {
       <p>
         {post.description.substring(0, MAX_LENGTH)}... <Link to={`/blog/${post.id}`}>read the full post</Link>
       </p>
-    </div>
+    </li>
   );
 }
 
 function UpgradeGuide({upgradeGuide, key}) {
   return (
-    <div className="section">
+    <li>
       <AnchoredH3 id={upgradeGuide.id}>{upgradeGuide.title}</AnchoredH3>
       <div dangerouslySetInnerHTML={{__html: upgradeGuide.body}} />
-    </div>
+    </li>
   );
 }
 
@@ -154,14 +154,14 @@ function Notes({release, latest}) {
           <>
             <AnchoredH2 id="highlights">Highlights</AnchoredH2>
 
-            <div className="section-list">
+            <ul className="connected-list">
               {posts.map((post, idx) => (
                 <BlogHighlight post={post} key={idx} />
               ))}
               {highlights.map((post, idx) => (
                 <Highlight post={post} key={idx} />
               ))}
-            </div>
+            </ul>
           </>
         )}
 
@@ -169,11 +169,11 @@ function Notes({release, latest}) {
           <>
             <AnchoredH2 id="breaking-changes" className="text--danger"><i className="feather icon-alert-triangle"></i> Breaking Changes</AnchoredH2>
 
-            <div className="section-list">
+            <ul className="connected-list">
               {release.upgrade_guides.map((upgradeGuide, idx) => (
                 <UpgradeGuide upgradeGuide={upgradeGuide} key={idx} />
               ))}
-            </div>
+            </ul>
           </>
         )}
 
