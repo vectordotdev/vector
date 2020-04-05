@@ -98,6 +98,7 @@ a full embedded [Lua][urls.lua] engine.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### hooks
@@ -120,6 +121,7 @@ Configures hooks handlers.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### init
@@ -144,6 +146,7 @@ A function which is called when the first event comes, before calling
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### process
@@ -168,6 +171,7 @@ using `emit` function.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### shutdown
@@ -244,6 +248,7 @@ In version 1 it is the inline Lua source called for each incoming event.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### timers
@@ -266,6 +271,7 @@ Configures timers which are executed periodically at given interval
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### handler
@@ -290,6 +296,7 @@ It can produce new events using`emit` function.
   templateable={false}
   type={"integer"}
   unit={null}
+  warnings={[]}
   >
 
 #### interval_seconds
