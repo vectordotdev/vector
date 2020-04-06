@@ -443,11 +443,11 @@ function (event, emit)
   event.metric.tags.tag = "new value"
 
   -- Rename tag
-  event.metric.new_tag = event.log.old_tag
-  event.metric.old_tag = nil
+  event.metric.tags.new_tag = event.log.old_tag
+  event.metric.tags.old_tag = nil
 
   -- Remove tag
-  event.metric.tag = nil
+  event.metric.tags.tag = nil
 
   emit(event)
 end
