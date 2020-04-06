@@ -1,7 +1,11 @@
 use crate::{
+    dns::Resolver,
     event::metric::{Metric, MetricValue},
     sinks::util::{
-        http::{Error as HttpError, HttpBatchService, HttpRetryLogic, Response as HttpResponse},
+        http::{
+            Error as HttpError, HttpBatchService, HttpClient, HttpRetryLogic,
+            Response as HttpResponse,
+        },
         BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -10,7 +14,6 @@ use chrono::{DateTime, Utc};
 use futures01::{Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper;
-use hyper_openssl::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -152,8 +155,8 @@ inventory::submit! {
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let healthcheck = InfluxDBSvc::healthcheck(self.clone(), cx.resolver())?;
         let sink = InfluxDBSvc::new(self.clone(), cx)?;
-        let healthcheck = InfluxDBSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }
 
@@ -210,7 +213,10 @@ impl InfluxDBSvc {
 
     // V1: https://docs.influxdata.com/influxdb/v1.7/tools/api/#ping-http-endpoint
     // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
-    fn healthcheck(config: InfluxDBConfig) -> crate::Result<super::Healthcheck> {
+    fn healthcheck(
+        config: InfluxDBConfig,
+        resolver: Resolver,
+    ) -> crate::Result<super::Healthcheck> {
         let settings = InfluxDBSvc::influxdb_settings(config.clone())?;
 
         let endpoint = config.endpoint.clone();
@@ -219,11 +225,10 @@ impl InfluxDBSvc {
 
         let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client = hyper::Client::builder().build(https);
+        let mut client = HttpClient::new(resolver, None)?;
 
         let healthcheck = client
-            .request(request)
+            .call(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 StatusCode::OK => Ok(()),
