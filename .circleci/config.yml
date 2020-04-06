@@ -537,6 +537,7 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Build & verify Docker
+          environment: "linux/amd64,linux/arm64,linux/arm"
           command: |
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
