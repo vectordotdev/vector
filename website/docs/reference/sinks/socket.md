@@ -627,16 +627,14 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x0000562af30c8338>"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.Note: The certificate will be checked for
-validity, but the negotiation will continue regardless of the result of that
-check.
+verifying the remote certificate.
 
 
 
@@ -719,6 +717,10 @@ If you'd like to disable health checks for this sink you can set the
 
 The `socket` sink streams data on a real-time
 event-by-event basis. It does not batch data.
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

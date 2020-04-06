@@ -565,6 +565,10 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 ### librdkafka
 

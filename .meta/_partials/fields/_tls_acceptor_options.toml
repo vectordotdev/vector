@@ -75,4 +75,4 @@ and terminate the connection if it is not valid. \
 If `false` (the default), Vector will ignore the presence of a client \
 certificate.\
 """
-warnings = [{visibility_level = "option", text = "Setting this to `tru` will cause OpenSSL to not request a certificate from the client"}]
+warnings = [{visibility_level = "option", text = "Setting this to `true` will cause OpenSSL to not request a certificate from the client"}]

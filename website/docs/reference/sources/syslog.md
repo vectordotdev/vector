@@ -369,7 +369,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `tru` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x00005614a13a9290>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x0000562af276abd8>"}]}
   >
 
 #### verify_certificate
@@ -701,7 +701,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
 ### Line Delimiters
 
 Each line is read until a new line delimiter (the `0xA` byte) is found.
@@ -720,6 +719,11 @@ key. If you find this happening often, we recommend using the
 [`regex_parser` transform][docs.transforms.regex_parser] to implement your own
 ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
 requesting support for your specific format.
+
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

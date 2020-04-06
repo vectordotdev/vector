@@ -794,6 +794,10 @@ If you'd like to disable health checks for this sink you can set the
 
 The `kafka` sink streams data on a real-time
 event-by-event basis. It does not batch data.
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 ### librdkafka
 

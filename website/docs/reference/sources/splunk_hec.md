@@ -265,7 +265,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `tru` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x00005614a14a44d8>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x0000562af26a5158>"}]}
   >
 
 #### verify_certificate
@@ -429,6 +429,10 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

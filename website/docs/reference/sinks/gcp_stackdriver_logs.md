@@ -1008,16 +1008,14 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x0000562af2b1e9c8>"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.Note: The certificate will be checked for
-validity, but the negotiation will continue regardless of the result of that
-check.
+verifying the remote certificate.
 
 
 
@@ -1153,6 +1151,10 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

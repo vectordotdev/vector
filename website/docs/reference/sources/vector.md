@@ -290,7 +290,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `tru` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x00005614a1500fd0>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x0000562af264e100>"}]}
   >
 
 #### verify_certificate
@@ -328,7 +328,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
 ### Message Acking
 
 Currently, Vector does not perform any application level message acknowledgement. While rare, this means the individual message could be lost.
@@ -336,6 +335,13 @@ Currently, Vector does not perform any application level message acknowledgement
 ### TCP Protocol
 
 Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
+
+
+
+### TLS
+
+Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
+security. You can enable and adjust TLS behavior via the `tls.*` options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
