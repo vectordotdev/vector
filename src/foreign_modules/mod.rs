@@ -1,8 +1,10 @@
-//! The WebAssembly Execution Engine
+//! Foreign module support
 //!
-//! This module contains the Vector transparent WebAssembly Engine.
-
-// TODO: FreeBSD: https://github.com/bytecodealliance/lucet/pull/419
+//! This module contains the implementation code of our foreign module support. The core traits of
+//! our foreign module support exist in the `foreign_modules` crate.
+//!
+//! **Note:** This code is experimental.
+//!
 
 use crate::{Event, Result};
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
@@ -12,37 +14,49 @@ use lucetc::{Lucetc, LucetcOpts};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tracing::{instrument, Level};
-use foreign_modules::host::ForeignTransform;
 
 mod context;
 mod util;
 use context::ForeignModuleContext;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 pub mod hostcall; // Pub is required for lucet.
 mod defaults {
     pub(super) const ARTIFACT_CACHE: &str = "cache";
+    pub(super) const HEAP_MEMORY_SIZE: usize = 16 * 64 * 1024 * 10; // 10MB
 }
 
+/// The base configuration required for a WasmModule.
+///
+/// If you're designing a module around the WasmModule type, you need to build it with one of these.
 #[derive(Derivative, Clone, Debug)]
 #[derivative(Default)]
 pub struct WasmModuleConfig {
     path: PathBuf,
     #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
     artifact_cache: PathBuf,
+    #[derivative(Default(value = "defaults::HEAP_MEMORY_SIZE"))]
+    heap_memory_size: usize,
 }
 
 impl WasmModuleConfig {
-    pub(crate) fn new(path: impl Into<PathBuf>, artifact_cache: impl Into<PathBuf>) -> Self {
+    pub fn new(path: impl Into<PathBuf>, artifact_cache: impl Into<PathBuf>) -> Self {
         Self {
             path: path.into(),
             artifact_cache: artifact_cache.into(),
+            heap_memory_size: defaults::HEAP_MEMORY_SIZE,
         }
+    }
+
+    pub fn set_heap_memory_size(&mut self, heap_memory_size: usize) -> &mut Self {
+        self.heap_memory_size = heap_memory_size;
+        self
     }
 }
 
+/// Compiles a WASM module located at `input` and writes an optimized shared object to `output`.
 #[instrument]
 fn compile(input: impl AsRef<Path> + Debug, output: impl AsRef<Path> + Debug) -> Result<()> {
     event!(Level::INFO, "begin");
@@ -57,18 +71,22 @@ fn compile(input: impl AsRef<Path> + Debug, output: impl AsRef<Path> + Debug) ->
     Ok(ret)
 }
 
+/// A foreign module that is operating as a WASM guest.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct WasmModule {
+pub struct WasmModule<Archetype> {
     /// A stored version of the config for later referencing.
     config: WasmModuleConfig,
+    /// The handle to the Lucet instance.
     #[derivative(Debug="ignore")]
     instance: InstanceHandle,
+    archetype: PhantomData<Archetype>,
 }
 
-impl WasmModule {
+impl<Archetype> WasmModule<Archetype> {
+    /// Build the WASM instance from a given config.
     #[instrument]
-    pub fn init(config: impl Into<WasmModuleConfig> + Debug) -> Result<Self> {
+    pub fn build(config: impl Into<WasmModuleConfig> + Debug) -> Result<Self> {
         event!(Level::TRACE, "instantiating");
         let config = config.into();
         let output_file = config
@@ -85,7 +103,7 @@ impl WasmModule {
         let region = &MmapRegion::create(
             1,
             &Limits {
-                heap_memory_size: 16 * 64 * 1024 * 10, // 10MB
+                heap_memory_size: config.heap_memory_size,
                 ..Limits::default()
             },
         )?;
@@ -95,15 +113,17 @@ impl WasmModule {
         let wasm_module = Self {
             config,
             instance,
+            archetype: Default::default(),
         };
         event!(Level::TRACE, "instantiated");
         Ok(wasm_module)
     }
 }
 
-impl ForeignTransform<crate::Event, crate::Error> for WasmModule {
+
+impl WasmModule<foreign_modules::host::archetypes::Transform> {
     #[instrument]
-    fn process(&mut self, event: Event) -> Result<Option<Event>> {
+    pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
         event!(Level::TRACE, "processing");
 
         // The instance context is essentially an anymap, so this these aren't colliding!
@@ -144,7 +164,7 @@ fn protobuf() -> Result<()> {
     json_fixture.write(event_string.as_bytes());
 
     // Run the test.
-    let mut module = WasmModule::init(WasmModuleConfig::new("target/wasm32-wasi/release/protobuf.wasm", "cache"))?;
+    let mut module = WasmModule::build(WasmModuleConfig::new("target/wasm32-wasi/release/protobuf.wasm", "cache", ))?;
     let out = module.process(event.clone())?;
 
     let retval = out.unwrap();

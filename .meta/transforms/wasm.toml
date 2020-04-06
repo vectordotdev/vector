@@ -1,0 +1,60 @@
+[transforms.wasm]
+title = "WASM"
+allow_you_to_description = "execute a custom WASM module on your events"
+beta = true
+common = false
+function_category = "program"
+input_types = ["log"]
+output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/_component_options.toml", type: "transform", name: "wasm") %>
+
+[transforms.wasm.options.fields]
+type = "module"
+common = true
+required = true
+description = """\
+The file path of the `.wasm` module.
+"""
+
+[transforms.wasm.options.fields]
+type = "wasi"
+common = true
+default = true
+required = true
+description = """\
+If [WASI](https://wasi.dev) functionality should be exposed. This can be disabled if your module doesn't require any
+system interface. (Eg: It was built with Rust `#[no_std]` and `--target wasm32-unknown-unknown`.)
+"""
+
+[transforms.wasm.options.fields]
+type = "heap_max_size"
+common = true
+default = "10485760"
+required = true
+description = """\
+The maximum size of the heap of this module, in bytes. (This includes the module itself, default is 10 MB.)
+"""
+
+
+[[transforms.wasm.output.log.examples]]
+label = "Generic"
+body = """\
+Given the following configuration:
+
+<CodeHeader fileName="vector.toml" />
+
+```toml
+[transforms.test]
+  inputs = [...]
+  type = "wasm"
+  module = "module.wasm"
+  wasi = true
+```
+
+Accompanied by a `module.wasm` file built via `cargo +nightly --target wasm32-wasi ...`, Vector will use the module as a
+custom transform.
+
+For more information about this process, please see the [WASM Module Guide](TODO).
+"""

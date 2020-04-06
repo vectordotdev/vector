@@ -11,11 +11,12 @@ use std::ffi::{CStr, CString};
 use std::io::Write;
 use std::os::raw::c_char;
 use std::str::FromStr;
-use tracing::{event, Level};
+use tracing::{event, Level, instrument};
+
 
 #[lucet_hostcall]
 #[no_mangle]
-unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
+pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
     event!(Level::TRACE, "recieved hostcall");
     let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
@@ -39,9 +40,11 @@ unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize 
     ret
 }
 
+
+
 #[lucet_hostcall]
 #[no_mangle]
-unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
+pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
     event!(Level::TRACE, "recieved hostcall");
     let hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();
     let mut heap = vmctx.heap_mut();
@@ -70,9 +73,10 @@ unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_cha
     ret
 }
 
+
 #[lucet_hostcall]
 #[no_mangle]
-unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
+pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
     event!(Level::TRACE, "recieved hostcall");
 
     let mut hostcall_context = vmctx.get_embed_ctx_mut::<ForeignModuleContext>();

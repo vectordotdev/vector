@@ -1,10 +1,9 @@
-use super::{BuildError, Transform};
+use super::{Transform};
 use crate::{
     event::Event,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     foreign_modules::{WasmModuleConfig, WasmModule},
 };
-use ::foreign_modules::host::ForeignTransform;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -49,12 +48,12 @@ impl TransformConfig for WasmConfig {
 
 #[derive(Debug)]
 pub struct Wasm {
-    module: WasmModule,
+    module: WasmModule<foreign_modules::host::archetypes::Transform>,
 }
 
 impl Wasm {
     pub fn new(config: WasmConfig) -> crate::Result<Self> {
-        let module = WasmModule::init(config)?;
+        let module = WasmModule::build(config)?;
 
         Ok(Self {
             module

@@ -1,3 +1,17 @@
+//! Writing a Foreign module guest involves writing some 'hooks' which the host will call over the
+//! normal course of operation.
+//!
+//! Please ensure all your function signatures match these:
+//!
+//! ```rust
+//! #[no_mangle]
+//! pub extern "C" fn init(&mut self) -> Result<Option<AbstractEvent>, AbstractError>;
+//! #[no_mangle]
+//! pub extern "C" fn shutdown(&mut self) -> Result<(), AbstractError>;
+//! #[no_mangle]
+//! pub extern "C" fn process() -> bool {
+//! ```
+
 use serde_json::Value;
 use std::ffi::CString;
 use std::os::raw::c_char;
