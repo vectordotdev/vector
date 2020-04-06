@@ -65,6 +65,7 @@ If `true` (the default), Vector will validate the TLS certificate of the \
 remote host. Do NOT set this to `false` unless you understand the risks of not \
 verifying the remote certificate.\
 """
+warnings = [{visibility_level = "option", text = "Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate."}]
 <%- end -%>
 
 <%- if can_verify_hostname -%>

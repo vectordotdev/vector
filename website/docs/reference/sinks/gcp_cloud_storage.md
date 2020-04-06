@@ -1077,7 +1077,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
@@ -1293,6 +1293,12 @@ object level. In the context of Vector only the object level is relevant
 (Vector does not create or modify buckets). You can set the storage
 class via the [`storage_class`](#storage_class) option.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
+
 ### Tags & metadata
 
 Vector supports adding [custom metadata][urls.gcs_custom_metadata] to
@@ -1330,5 +1336,6 @@ You can learn more about the complete syntax in the
 [urls.gcs_predefined_acl]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 [urls.gcs_storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 [urls.new_gcp_cloud_storage_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+gcp_cloud_storage
+[urls.openssl]: https://www.openssl.org/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)

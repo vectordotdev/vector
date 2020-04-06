@@ -1052,7 +1052,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
@@ -1180,6 +1180,11 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -1190,3 +1195,4 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.loki]: https://grafana.com/oss/loki/
 [urls.loki_multi_tenancy]: https://github.com/grafana/loki/blob/master/docs/operations/multi-tenancy.md
 [urls.new_loki_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+loki
+[urls.openssl]: https://www.openssl.org/

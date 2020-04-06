@@ -447,14 +447,14 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
@@ -586,11 +586,17 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
+[urls.openssl]: https://www.openssl.org/
 [urls.socket]: https://en.wikipedia.org/wiki/Network_socket
 [urls.tcp]: https://en.wikipedia.org/wiki/Transmission_Control_Protocol
 [urls.udp]: https://en.wikipedia.org/wiki/User_Datagram_Protocol

@@ -369,14 +369,14 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
@@ -701,7 +701,6 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
-
 ### Line Delimiters
 
 Each line is read until a new line delimiter (the `0xA` byte) is found.
@@ -721,6 +720,12 @@ key. If you find this happening often, we recommend using the
 ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
 requesting support for your specific format.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
@@ -728,5 +733,6 @@ requesting support for your specific format.
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.openssl]: https://www.openssl.org/
 [urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

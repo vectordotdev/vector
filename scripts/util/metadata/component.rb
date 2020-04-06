@@ -240,6 +240,10 @@ class Component
   end
 
   def warnings
-    @warnings ||= options_list.collect { |option| option.all_warnings }.flatten.freeze
+    @warnings ||= options_list.
+      collect { |option| option.all_warnings }.
+      flatten.
+      select { |warning| warning.visibility_level == "component" }.
+      freeze
   end
 end

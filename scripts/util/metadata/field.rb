@@ -79,7 +79,7 @@ class Field
     @toml_display = hash["toml_display"]
     @type = hash.fetch("type")
     @unit = hash["unit"]
-    @warnings = (hash["warnings"] || []).freeze
+    @warnings = (hash["warnings"] || []).collect(&:to_struct).freeze
 
     # category
 
@@ -164,10 +164,23 @@ class Field
 
   def all_warnings
     @all_warnings ||=
-      (
-        warnings.collect { |warning| "`#{name}` option - #{warning}" } +
-          children_list.collect { |child| child.all_warnings }.flatten
-      ).freeze
+      begin
+        new_warnings = []
+
+        new_warnings +=
+          warnings.collect do |warning|
+            warning["option_name"] = name
+            warning
+          end
+
+        new_warnings +=
+          children_list.collect do |child|
+            child.all_warnings
+          end.
+          flatten
+
+        new_warnings.freeze
+      end
   end
 
   def array?

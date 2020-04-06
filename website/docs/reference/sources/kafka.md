@@ -565,6 +565,11 @@ will be replaced before being evaluated.
 
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 ### librdkafka
 
@@ -579,3 +584,4 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [urls.kafka]: https://kafka.apache.org/
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.openssl]: https://www.openssl.org/

@@ -176,7 +176,19 @@
         "warnings": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "visibility_level": {
+                "type": "string",
+                "description": "The visiblity level. `component` will bubble up the warning at the top of the component page (higher visibility). `option` will display the warning on the option only (lower visibility).",
+                "enum": ["component", "option"]
+              },
+              "text": {
+                "type": "string",
+                "description": "The warning text."
+              }
+            }
           }
         }
       }
