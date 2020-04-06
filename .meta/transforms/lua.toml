@@ -97,7 +97,9 @@ function (event, emit)
   event.log.field = "value" -- set value of a field
   event.log.another_field = nil -- remove field
   event.log.first, event.log.second = nil, event.log.first -- rename field
-  emit(event) -- emit the processed event
+
+  -- Very important! Emit the processed event.
+  emit(event)
 end\
 """
 ]

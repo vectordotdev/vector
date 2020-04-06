@@ -50,7 +50,9 @@ a full embedded [Lua][urls.lua] engine.
     event.log.field = "value" -- set value of a field
     event.log.another_field = nil -- remove field
     event.log.first, event.log.second = nil, event.log.first -- rename field
-    emit(event) -- emit the processed event
+
+    -- Very important! Emit the processed event.
+    emit(event)
   end
   """
 ```
@@ -242,7 +244,7 @@ A function which is called when the first event comes, before calling
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n  emit(event) -- emit the processed event\nend","function (event, emit)\n  count = count + 1 -- increment the counter and exit\nend","process"]}
+  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n\n  -- Very important! Emit the processed event.\n  emit(event)\nend","function (event, emit)\n  count = count + 1 -- increment the counter and exit\nend","process"]}
   groups={["simple","inline","module"]}
   name={"process"}
   path={"hooks"}

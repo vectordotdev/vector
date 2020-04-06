@@ -26417,7 +26417,7 @@ module.exports = {
     "lua": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n    emit(event) -- emit the processed event\n  end\n  \"\"\""
+        "toml": "[transforms.out]\n  # General\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n\n    -- Very important! Emit the processed event.\n    emit(event)\n  end\n  \"\"\""
       },
       "delivery_guarantee": null,
       "description": null,
