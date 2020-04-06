@@ -16,10 +16,8 @@ import './styles.css';
 
 function GuideItem(props) {
   const {
-    children,
     frontMatter,
     metadata,
-    truncated,
     isGuidePage = false,
   } = props;
   const {categories, description, permalink, readingTime, seriesPosition, tags} = metadata;

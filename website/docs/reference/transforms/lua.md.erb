@@ -56,14 +56,12 @@ event.metric.tags.tag = "new value"
 
 To drop events, simply do not call the emitting function with it. For example:
 
-```toml title="vector.toml"
-hooks.process = """\
+```lua
 function (event, emit)
   if not event["message"].match(str, "debug") then
     emit(event)
   end
-end\
-"""
+end
 ```
 
 ### Remove Fields & Tags

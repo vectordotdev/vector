@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -62,6 +62,7 @@ a full embedded [Lua][urls.lua] engine.
   # General
   version = "2" # required
   search_dirs = ["/etc/vector/lua"] # optional, no default
+  source = "custom_module = require('custom_module')" # optional, no default
 
   # Timers
   timers.handler = "custom_module.timer_handler" # required
@@ -206,6 +207,30 @@ using `emit` function.
 A list of directories search when loading a Lua file via the `require` function.
 
  See [Search Directories](#search-directories) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["custom_module = require('custom_module')"]}
+  groups={[]}
+  name={"source"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source
+
+The source which is evaluated when the transform is created.
+
+
 
 
 </Field>
@@ -421,14 +446,12 @@ event.metric.tags.tag = "new value"
 
 To drop events, simply do not call the emitting function with it. For example:
 
-```toml title="vector.toml"
-hooks.process = """\
+```lua
 function (event, emit)
   if not event["message"].match(str, "debug") then
     emit(event)
   end
-end\
-"""
+end
 ```
 
 ### Remove Fields & Tags

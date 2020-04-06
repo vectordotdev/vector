@@ -1987,6 +1987,13 @@ dns_servers = ["0.0.0.0:53"]
   # * type: [string]
   search_dirs = ["/etc/vector/lua"]
 
+  # The source which is evaluated when the transform is created.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  source = "custom_module = require('custom_module')"
+
   #
   # Timers
   #

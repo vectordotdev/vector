@@ -28,6 +28,19 @@ A list of directories search when loading a Lua file via the `require` \
 function.\
 """
 
+[transforms.lua.options.source]
+type = "string"
+common = false
+required = false
+examples = [
+"""\
+custom_module = require('custom_module')\
+"""
+]
+description = """\
+The source which is evaluated when the transform is created.\
+"""
+
 [transforms.lua.options.hooks]
 type = "table"
 category = "Hooks"
