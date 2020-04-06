@@ -297,7 +297,7 @@ PEM format (PKCS#8).
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
