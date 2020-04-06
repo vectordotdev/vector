@@ -187,6 +187,12 @@
   force = true
 
 [[redirects]]
+  from = "/docs/setup/installation/package-managers/yum"
+  to = "/docs/setup/installation/package-managers/rpm/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/reference/sinks/s3"
   to = "/docs/reference/sinks/aws_s3/"
   status = 301
