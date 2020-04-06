@@ -33,13 +33,15 @@ a full embedded [Lua][urls.lua] engine.
 
 <Tabs
   block={true}
-  defaultValue="common"
-  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-<TabItem value="common">
+  defaultValue="simple"
+  values={[{"label":"simple","value":"simple"},{"label":"inline","value":"inline"},{"label":"module","value":"module"}]}>
+<TabItem value="simple">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
   version = "2" # required
 
   # Hooks
@@ -50,34 +52,89 @@ a full embedded [Lua][urls.lua] engine.
     event.log.first, event.log.second = nil, event.log.first -- rename field
     emit(event) -- emit the processed event
   end
-  """ # required
+  """
 ```
 
 </TabItem>
-<TabItem value="advanced">
+<TabItem value="inline">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
   version = "2" # required
-  search_dirs = ["/etc/vector/lua"] # optional, no default
-  source = "custom_module = require('custom_module')" # optional, no default
-
-  # Timers
-  timers.handler = "custom_module.timer_handler" # required
-  timers.interval_seconds = 1 # required, seconds
 
   # Hooks
+  hooks.init = """
+  function (emit)
+    count = 0 -- initialize state by setting a global variable
+  end
+  """
   hooks.process = """
   function (event, emit)
-    event.log.field = "value" -- set value of a field
-    event.log.another_field = nil -- remove field
-    event.log.first, event.log.second = nil, event.log.first -- rename field
-    emit(event) -- emit the processed event
+    count = count + 1 -- increment the counter and exit
   end
-  """ # required
-  hooks.init = "custom_module.hook_init" # optional, no default
-  hooks.shutdown = "custom_module.hook_shutdown" # optional, no default
+  """
+  hooks.shutdown = """
+  function (emit)
+    emit {
+      metric = {
+        name = "event_counter",
+        kind = "incremental",
+        timestamp = os.date("!*t"),
+        counter = {
+          value = counter
+        }
+      }
+    }
+  end
+  """
+
+  # Timers
+  timers.handler = """
+  function (emit)
+    emit {
+      metric = {
+        name = "event_counter",
+        kind = "incremental",
+        timestamp = os.date("!*t"),
+        counter = {
+          value = counter
+        }
+      }
+    }
+    counter = 0
+  end
+  """
+  timers.interval_seconds = 1 # required, seconds
+```
+
+</TabItem>
+<TabItem value="module">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
+  version = "2" # required
+  search_dirs = ["/etc/vector/lua"] # optional, no default
+
+  # Hooks
+  hooks.init = "init" # optional, no default
+  hooks.process = "process" # required
+  hooks.shutdown = "shutdown" # optional, no default
+
+  # Timers
+  timers.handler = "timer_handler" # required
+  timers.interval_seconds = 1 # required, seconds
+
+  # Source Code
+  source = """
+  -- external file with hooks and timers defined
+  require('custom_module')
+  """
 ```
 
 </TabItem>
@@ -87,9 +144,58 @@ a full embedded [Lua][urls.lua] engine.
 <Field
   common={true}
   defaultValue={null}
+  enumValues={{"2":"Lua transform API version 2"}}
+  examples={["2"]}
+  groups={["simple","inline","module"]}
+  name={"version"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### version
+
+Transform API version. Specifying this version ensures that Vector does not
+break backward compatibility.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["/etc/vector/lua"]]}
+  groups={["module"]}
+  name={"search_dirs"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### search_dirs
+
+A list of directories search when loading a Lua file via the `require` function.
+
+ See [Search Directories](#search-directories) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={[]}
-  groups={[]}
+  groups={["simple","inline","module"]}
   name={"hooks"}
   path={null}
   relevantWhen={null}
@@ -111,8 +217,8 @@ Configures hooks handlers.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["custom_module.hook_init","function (emit)\n  local f = io.popen (\"/bin/hostname\") -- run \"hostname\" command to determine the hostname\n  hostname = f:read(\"*a\") or \"\" -- set a global variable which can be used in other hooks\n  f:close() -- close the pipe\n\n  emit {\n    log = {\n      message = \"initialized!\"\n    }\n  }\nend"]}
-  groups={[]}
+  examples={["function (emit)\n  count = 0 -- initialize state by setting a global variable\nend","init"]}
+  groups={["inline","module"]}
   name={"init"}
   path={"hooks"}
   relevantWhen={null}
@@ -136,8 +242,8 @@ A function which is called when the first event comes, before calling
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n  emit(event) -- emit the processed event\nend","custom_module.hook_process"]}
-  groups={[]}
+  examples={["function (event, emit)\n  event.log.field = \"value\" -- set value of a field\n  event.log.another_field = nil -- remove field\n  event.log.first, event.log.second = nil, event.log.first -- rename field\n  emit(event) -- emit the processed event\nend","function (event, emit)\n  count = count + 1 -- increment the counter and exit\nend","process"]}
+  groups={["simple","inline","module"]}
   name={"process"}
   path={"hooks"}
   relevantWhen={null}
@@ -161,8 +267,8 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["custom_module.hook_shutdown","function (emit)\n  emit {\n    log = {\n      message = \"shutting down...\"\n    }\n  }\nend"]}
-  groups={[]}
+  examples={["function (emit)\n  emit {\n    metric = {\n      name = \"event_counter\",\n      kind = \"incremental\",\n      timestamp = os.date(\"!*t\"),\n      counter = {\n        value = counter\n      }\n    }\n  }\nend","shutdown"]}
+  groups={["inline","module"]}
   name={"shutdown"}
   path={"hooks"}
   relevantWhen={null}
@@ -189,56 +295,8 @@ using `emit` function.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[["/etc/vector/lua"]]}
-  groups={[]}
-  name={"search_dirs"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### search_dirs
-
-A list of directories search when loading a Lua file via the `require` function.
-
- See [Search Directories](#search-directories) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["custom_module = require('custom_module')"]}
-  groups={[]}
-  name={"source"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### source
-
-The source which is evaluated when the transform is created.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
-  groups={[]}
+  groups={["inline","module"]}
   name={"timers"}
   path={null}
   relevantWhen={null}
@@ -260,8 +318,8 @@ Configures timers which are executed periodically at given interval.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["custom_module.timer_handler","function (emit)\n  emit {\n    log = {\n      message = \"current time: \" .. os.date()\n    }\n  }\nend"]}
-  groups={[]}
+  examples={["function (emit)\n  emit {\n    metric = {\n      name = \"event_counter\",\n      kind = \"incremental\",\n      timestamp = os.date(\"!*t\"),\n      counter = {\n        value = counter\n      }\n    }\n  }\n  counter = 0\nend","timer_handler"]}
+  groups={["inline","module"]}
   name={"handler"}
   path={"timers"}
   relevantWhen={null}
@@ -286,7 +344,7 @@ It can produce new events using `emit` function.
   defaultValue={null}
   enumValues={null}
   examples={[1,10,30]}
-  groups={[]}
+  groups={["inline","module"]}
   name={"interval_seconds"}
   path={"timers"}
   relevantWhen={null}
@@ -309,25 +367,24 @@ Defines the interval at which the timer handler would be executed.
 
 </Field>
 <Field
-  common={true}
+  common={false}
   defaultValue={null}
-  enumValues={{"2":"Lua transform API version 2"}}
-  examples={["2"]}
-  groups={[]}
-  name={"version"}
+  enumValues={null}
+  examples={["-- external file with hooks and timers defined\nrequire('custom_module')"]}
+  groups={["module"]}
+  name={"source"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### version
+### source
 
-Transform API version. Specifying this version ensures that Vector does not
-break backward compatibility.
+The source which is evaluated when the transform is created.
 
 
 

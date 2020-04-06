@@ -24011,7 +24011,7 @@ module.exports = {
     "aws_cloudwatch_logs": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_cloudwatch_logs\" # required\n  inputs = [\"in\"] # required\n  group_name = \"group-name\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"{{ host }}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  group_name = \"group-name\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_cloudwatch_logs\" # required\n  inputs = [\"in\"] # required\n  stream_name = \"{{ host }}\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
@@ -24053,7 +24053,7 @@ module.exports = {
     "aws_cloudwatch_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  type = \"aws_cloudwatch_metrics\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\""
+        "toml": "[sinks.out]\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_cloudwatch_metrics\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
@@ -24094,7 +24094,7 @@ module.exports = {
     "aws_kinesis_firehose": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_firehose\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_kinesis_firehose\" # required\n  inputs = [\"in\"] # required\n  stream_name = \"my-stream\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.",
@@ -24135,7 +24135,7 @@ module.exports = {
     "aws_kinesis_streams": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_streams\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"json\" # required\n\n  # General\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_kinesis_streams\" # required\n  inputs = [\"in\"] # required\n  stream_name = \"my-stream\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.",
@@ -24176,7 +24176,7 @@ module.exports = {
     "aws_s3": {
       "beta": false,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"aws_s3\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
+        "toml": "[sinks.out]\n  # Encoding\n  encoding.codec = \"ndjson\" # required\n\n  # General\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  type = \"aws_s3\" # required\n  inputs = [\"in\"] # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",
@@ -24762,7 +24762,7 @@ module.exports = {
     "influxdb_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
+        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:8086/\" # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  namespace = \"service\" # required\n\n  # Auth\n  token = \"${INFLUXDB_TOKEN}\" # required\n  org = \"my-org\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
@@ -26342,7 +26342,7 @@ module.exports = {
     "log_to_metric": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"log_to_metric\" # required\n  inputs = [\"in\"] # required\n\n  # Metrics\n  metrics.type = \"counter\" # required\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required"
+        "toml": "[transforms.out]\n  # General\n  type = \"log_to_metric\" # required\n  inputs = [\"in\"] # required\n\n  # Metrics\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required\n  metrics.type = \"counter\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -26417,7 +26417,7 @@ module.exports = {
     "lua": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n    emit(event) -- emit the processed event\n  end\n  \"\"\" # required"
+        "toml": "[transforms.out]\n  # General\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n    emit(event) -- emit the processed event\n  end\n  \"\"\""
       },
       "delivery_guarantee": null,
       "description": null,

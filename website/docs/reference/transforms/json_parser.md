@@ -40,8 +40,8 @@ log field value as JSON.
 [transforms.my_transform_id]
   type = "json_parser" # required
   inputs = ["my-source-id"] # required
-  drop_invalid = true # required
   drop_field = true # optional, default
+  drop_invalid = true # required
   field = "message" # optional, default
 ```
 
@@ -52,8 +52,8 @@ log field value as JSON.
 [transforms.my_transform_id]
   type = "json_parser" # required
   inputs = ["my-source-id"] # required
-  drop_invalid = true # required
   drop_field = true # optional, default
+  drop_invalid = true # required
   field = "message" # optional, default
   overwrite_target = false # optional, default
   target_field = "root_field" # optional, no default

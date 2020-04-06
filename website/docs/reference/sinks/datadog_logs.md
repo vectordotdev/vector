@@ -66,9 +66,9 @@ endpoint][urls.datadog_logs_endpoints].
   healthcheck = true # optional, default
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -78,9 +78,9 @@ endpoint][urls.datadog_logs_endpoints].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # TLS
+  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
-  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
@@ -91,30 +91,6 @@ endpoint][urls.datadog_logs_endpoints].
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
-
- See [Obtaining an API token](#obtaining-an-api-token) for more info.
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -357,6 +333,30 @@ How to format event timestamps.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)
+
+ See [Obtaining an API token](#obtaining-an-api-token) for more info.
+
 
 </Field>
 <Field

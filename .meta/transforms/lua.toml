@@ -8,80 +8,90 @@ input_types = ["log", "metric"]
 output_types = ["log", "metric"]
 requirements = {}
 
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "transform",
+  name: "lua",
+  groups: ["simple", "inline", "module"]
+) %>
+
 [transforms.lua.options.version]
 type = "string"
 common = true
-required = true
 description = """\
 Transform API version. Specifying this version ensures that Vector does not \
 break backward compatibility.\
 """
 enum = { 2 = "Lua transform API version 2" }
+groups = ["simple", "inline", "module"]
+required = true
+sort = 1
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
-examples = [["/etc/vector/lua"]]
 common = false
+examples = [["/etc/vector/lua"]]
+groups = ["module"]
 required = false
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
 """
+sort = 2
 
 [transforms.lua.options.source]
 type = "string"
+category = "Source Code"
 common = false
-required = false
-examples = [
+examples.module = [
 """\
-custom_module = require('custom_module')\
+-- external file with hooks and timers defined
+require('custom_module')\
 """
 ]
+groups = ["module"]
+required = false
 description = """\
 The source which is evaluated when the transform is created.\
 """
+sort = 5
 
 [transforms.lua.options.hooks]
 type = "table"
 category = "Hooks"
 common = true
+groups = ["simple", "inline", "module"]
 required = true
 description = "Configures hooks handlers."
+sort = 3
 
 [transforms.lua.options.hooks.children.init]
 type = "string"
 common = false
-required = false
 description = """\
 A function which is called when the first event comes, before calling \
 `hooks.process`\
 """
-examples = [
-"custom_module.hook_init",
+examples.inline = [
 """\
 function (emit)
-  local f = io.popen ("/bin/hostname") -- run "hostname" command to determine the hostname
-  hostname = f:read("*a") or "" -- set a global variable which can be used in other hooks
-  f:close() -- close the pipe
-
-  emit {
-    log = {
-      message = "initialized!"
-    }
-  }
+  count = 0 -- initialize state by setting a global variable
 end\
 """
 ]
+examples.module = ["init"]
+groups = ["inline", "module"]
+required = false
+sort = 1
 
 [transforms.lua.options.hooks.children.process]
 type = "string"
 common = true
-required = true
 description = """\
 A function which is called for each incoming event. It can produce new events \
 using `emit` function.\
 """
-examples = [
+examples.simple = [
 """\
 function (event, emit)
   event.log.field = "value" -- set value of a field
@@ -89,70 +99,97 @@ function (event, emit)
   event.log.first, event.log.second = nil, event.log.first -- rename field
   emit(event) -- emit the processed event
 end\
-""",
-"custom_module.hook_process"
+"""
 ]
+examples.inline = [
+"""\
+function (event, emit)
+  count = count + 1 -- increment the counter and exit
+end\
+"""
+]
+examples.module = ["process"]
+groups = ["simple", "inline", "module"]
+required = true
+sort = 2
 
 [transforms.lua.options.hooks.children.shutdown]
 type = "string"
 common = false
-required = false
 description = """\
 A function which is called when Vector is stopped. It can produce new events \
 using `emit` function.\
 """
-examples = [
-"custom_module.hook_shutdown",
+examples.inline = [
 """\
 function (emit)
   emit {
-    log = {
-      message = "shutting down..."
+    metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = counter
+      }
     }
   }
 end\
 """
 ]
+examples.module = ["shutdown"]
+groups = ["inline", "module"]
+required = false
+sort = 3
 
 [transforms.lua.options.timers]
 type = "[table]"
 category = "Timers"
 common = false
+groups = ["inline", "module"]
 required = false
 description = """\
 Configures timers which are executed periodically at given interval.\
 """
-
-[transforms.lua.options.timers.children.interval_seconds]
-type = "integer"
-common = false
-required = true
-unit = "seconds"
-description = """\
-Defines the interval at which the timer handler would be executed.\
-"""
-examples = [1, 10, 30]
+sort = 4
 
 [transforms.lua.options.timers.children.handler]
 type = "string"
 common = false
+examples.inline = [
+"""\
+function (emit)
+  emit {
+    metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = counter
+      }
+    }
+  }
+  counter = 0
+end\
+"""
+]
+examples.module = ["timer_handler"]
+groups = ["inline", "module"]
 required = true
 description = """\
 Defines a handler function which is executed periodially at `interval_seconds`. \
 It can produce new events using `emit` function.\
 """
-examples = [
-"custom_module.timer_handler",
-"""\
-function (emit)
-  emit {
-    log = {
-      message = "current time: " .. os.date()
-    }
-  }
-end\
+
+[transforms.lua.options.timers.children.interval_seconds]
+type = "integer"
+common = false
+examples = [1, 10, 30]
+groups = ["inline", "module"]
+required = true
+unit = "seconds"
+description = """\
+Defines the interval at which the timer handler would be executed.\
 """
-]
 
 [[transforms.lua.examples]]
 label = "Add, rename, & remove log fields"

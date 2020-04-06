@@ -2,7 +2,6 @@ require "erb"
 
 require "active_support/core_ext/string/output_safety"
 
-require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 require_relative "templates/integration_guide"
 require_relative "templates/interface_start"
@@ -56,7 +55,7 @@ class Templates
     links.join(", ")
   end
 
-  def component_config_example(component)
+  def component_config_example(component, advanced: true)
     groups = []
 
     if component.option_groups.empty?
@@ -64,34 +63,38 @@ class Templates
         label: "Common",
         group_name: nil,
         option_filter: lambda do |option|
-          option.common?
+          !advanced || option.common?
         end
       })
 
-      groups << AccessibleHash.new({
-        label: "Advanced",
-        group_name: nil,
-        option_filter: lambda do |option|
-          true
-        end
-      })
+      if advanced
+        groups << AccessibleHash.new({
+          label: "Advanced",
+          group_name: nil,
+          option_filter: lambda do |option|
+            true
+          end
+        })
+      end
     else
       component.option_groups.each do |group_name|
         groups << AccessibleHash.new({
           label: group_name,
           group_name: group_name,
           option_filter: lambda do |option|
-            option.group?(group_name) && option.common?
+            option.group?(group_name) && (!advanced || option.common?)
           end
         })
 
-        groups << AccessibleHash.new({
-          label: "#{group_name} (adv)",
-          group_name: group_name,
-          option_filter: lambda do |option|
-            option.group?(group_name)
-          end
-        })
+        if advanced
+          groups << AccessibleHash.new({
+            label: "#{group_name} (adv)",
+            group_name: group_name,
+            option_filter: lambda do |option|
+              option.group?(group_name)
+            end
+          })
+        end
       end
     end
 
@@ -151,18 +154,6 @@ class Templates
     example.to_toml
   end
 
-  def config_schema(options, opts = {})
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-    opts[:titles] = true unless opts.key?(:titles)
-
-    options = options.sort_by(&:config_file_sort_token)
-    schema = ConfigSchema.new(options)
-    render("#{partials_path}/_config_schema.toml", binding).strip
-  end
-
   def config_spec(options, opts = {})
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
@@ -170,7 +161,6 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
-    options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
     content = render("#{partials_path}/_config_spec.toml", binding).strip
 

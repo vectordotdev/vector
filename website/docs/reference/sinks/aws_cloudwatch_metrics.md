@@ -43,11 +43,11 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  region = "us-east-1" # required, required when endpoint = ""
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
-  namespace = "service" # required
-  region = "us-east-1" # required, required when endpoint = ""
   healthcheck = true # optional, default
+  namespace = "service" # required
 ```
 
 </TabItem>
@@ -55,48 +55,24 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  # General
-  type = "aws_cloudwatch_metrics" # required
-  inputs = ["my-source-id"] # required
-  namespace = "service" # required
-  region = "us-east-1" # required, required when endpoint = ""
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  healthcheck = true # optional, default
-
   # Batch
   batch.max_events = 20 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
+
+  # General
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  region = "us-east-1" # required, required when endpoint = ""
+  type = "aws_cloudwatch_metrics" # required
+  inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
+  namespace = "service" # required
 ```
 
 </TabItem>
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -175,6 +151,30 @@ The maximum age of a batch before it is flushed.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
   name={"endpoint"}
@@ -191,6 +191,31 @@ The maximum age of a batch before it is flushed.
 
 Custom endpoint for use with AWS-compatible services. Providing a value for
 this option will make [`region`](#region) moot.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  groups={[]}
+  name={"region"}
+  path={null}
+  relevantWhen={{"endpoint":""}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
+provided it will override this value since the endpoint includes the region.
 
 
 
@@ -241,31 +266,6 @@ Enables/disables the sink healthcheck upon start.
 A
 [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace)
 that will isolate different metrics from each other.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  groups={[]}
-  name={"region"}
-  path={null}
-  relevantWhen={{"endpoint":""}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### region
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
-provided it will override this value since the endpoint includes the region.
 
 
 

@@ -45,11 +45,11 @@ HTTP Event Collector][urls.splunk_hec].
   # General
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
-  host = "http://my-splunk-host.com" # required
-  token = "${SPLUNK_HEC_TOKEN}" # required
   healthcheck = true # optional, default
+  host = "http://my-splunk-host.com" # required
   host_key = "hostname" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Encoding
   encoding.codec = "json" # required
@@ -63,21 +63,21 @@ HTTP Event Collector][urls.splunk_hec].
   # General
   type = "splunk_hec" # required
   inputs = ["my-source-id"] # required
-  host = "http://my-splunk-host.com" # required
-  token = "${SPLUNK_HEC_TOKEN}" # required
   healthcheck = true # optional, default
+  host = "http://my-splunk-host.com" # required
   host_key = "hostname" # optional, no default
   index = "custom_index" # optional, no default
   indexed_fields = ["field1", "field2"] # optional, no default, relevant when encoding = "json"
+  token = "${SPLUNK_HEC_TOKEN}" # required
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -550,6 +550,30 @@ Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields].
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${SPLUNK_HEC_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+Your Splunk HEC token.
+
+ See [Setup](#setup) for more info.
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -926,30 +950,6 @@ you understand the risks of not verifying the remote hostname.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${SPLUNK_HEC_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-Your Splunk HEC token.
-
- See [Setup](#setup) for more info.
-
 
 </Field>
 </Fields>

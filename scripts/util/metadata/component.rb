@@ -159,7 +159,7 @@ class Component
   end
 
   def option_groups
-    @option_groups ||= options_list.collect(&:groups).flatten.uniq.sort
+    @option_groups ||= options_list.collect(&:groups).flatten.uniq
   end
 
   def partition_options
@@ -218,21 +218,6 @@ class Component
       type: type,
       unsupported_operating_systems: unsupported_operating_systems
     }
-  end
-
-  def to_toml_example(common: true)
-    example_options = options_list.sort_by(&:config_file_sort_token)
-    example_options = common ? example_options.select(&:common?) : example_options
-
-    option_examples =
-      included_options.collect do |option|
-        option.to_toml_example(common: common)
-      end
-
-    <<~EOF
-    [#{type.pluralize}.my_#{type}_id]
-    #{option_examples.join}
-    EOF
   end
 
   def transform?

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Log to Metric"
 description: "The Vector `log_to_metric` transform accepts `log` events but outputs [`metric`](#metric) events allowing you to convert logs into one or more metrics."
 event_types: ["log","metric"]
@@ -145,6 +145,30 @@ for `gauge`.
 <Field
   common={true}
   defaultValue={null}
+  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
+  examples={["counter","gauge","histogram","set"]}
+  groups={[]}
+  name={"type"}
+  path={"metrics"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The metric type.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
   enumValues={null}
   examples={[]}
   groups={[]}
@@ -191,30 +215,6 @@ Environment variables and field interpolation is allowed.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"counter":"A [counter metric type][docs.data-model.metric#counter].","gauge":"A [gauge metric type][docs.data-model.metric#gauge].","histogram":"A [distribution metric type][docs.data-model.metric#distribution].","set":"A [set metric type][docs.data-model.metric#set]."}}
-  examples={["counter","gauge","histogram","set"]}
-  groups={[]}
-  name={"type"}
-  path={"metrics"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The metric type.
-
-
-
 
 </Field>
 </Fields>

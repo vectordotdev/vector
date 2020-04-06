@@ -64,7 +64,7 @@ function Fields({children, filters}) {
                   type="checkbox"
                   onChange={(event) => setOnlyCommon(event.currentTarget.checked)}
                   checked={onlyCommon} />
-                common only
+                common
               </label>)}
               {requiredRelevant && (
                 <label title="Only show required results">
@@ -72,7 +72,7 @@ function Fields({children, filters}) {
                   type="checkbox"
                   onChange={(event) => setOnlyRequired(event.currentTarget.checked)}
                   checked={onlyRequired} />
-                required only
+                required
               </label>)}
             </div>
           </div>

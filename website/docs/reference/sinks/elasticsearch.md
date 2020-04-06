@@ -85,9 +85,9 @@ endpoint][urls.elasticsearch_bulk].
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -419,56 +419,6 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={["AWS hosted Elasticsearch is unable to use compression"]}
-  >
-
-### compression
-
-The compression mechanism to use.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"_doc"}
-  enumValues={null}
-  examples={["_doc"]}
-  groups={[]}
-  name={"doc_type"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### doc_type
-
-The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <=
-6.X. If you are using >= 7.0 you do not need to set this option since
-Elasticsearch has removed it.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -567,53 +517,53 @@ How to format event timestamps.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
   groups={[]}
-  name={"headers"}
+  name={"compression"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"table"}
+  type={"string"}
   unit={null}
-  warnings={[]}
+  warnings={["AWS hosted Elasticsearch is unable to use compression"]}
   >
 
-### headers
+### compression
 
-Options for custom headers.
+The compression mechanism to use.
 
 
 
-<Fields filters={false}>
+
+</Field>
 <Field
-  common={true}
-  defaultValue={null}
+  common={false}
+  defaultValue={"_doc"}
   enumValues={null}
-  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  examples={["_doc"]}
   groups={[]}
-  name={"`[header-name]`"}
-  path={"headers"}
+  name={"doc_type"}
+  path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-#### `[header-name]`
+### doc_type
 
-A custom header to be added to each outgoing Elasticsearch request.
+The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <=
+6.X. If you are using >= 7.0 you do not need to set this option since
+Elasticsearch has removed it.
 
 
 
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -715,6 +665,56 @@ Index name to write events to.
 
  See [Document Conflicts](#document-conflicts) and [Template Syntax](#template-syntax) for more info.
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"headers"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### headers
+
+Options for custom headers.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
+  name={"`[header-name]`"}
+  path={"headers"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[header-name]`
+
+A custom header to be added to each outgoing Elasticsearch request.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field

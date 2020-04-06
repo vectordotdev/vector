@@ -66,9 +66,9 @@ The Vector `honeycomb` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Request
@@ -85,30 +85,6 @@ The Vector `honeycomb` sink
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${HONEYCOMB_API_KEY}","some-api-key"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-The team key that will be used to authenticate against Honeycomb.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -303,6 +279,30 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${HONEYCOMB_API_KEY}","some-api-key"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+The team key that will be used to authenticate against Honeycomb.
+
+
+
 
 </Field>
 <Field

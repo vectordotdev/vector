@@ -44,15 +44,15 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  # General
-  type = "aws_kinesis_firehose" # required
-  inputs = ["my-source-id"] # required
-  region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "my-stream" # required
-  healthcheck = true # optional, default
-
   # Encoding
   encoding.codec = "json" # required
+
+  # General
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+  type = "aws_kinesis_firehose" # required
+  inputs = ["my-source-id"] # required
+  stream_name = "my-stream" # required
 ```
 
 </TabItem>
@@ -60,23 +60,14 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  # General
-  type = "aws_kinesis_firehose" # required
-  inputs = ["my-source-id"] # required
-  region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "my-stream" # required
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  healthcheck = true # optional, default
-
   # Batch
   batch.max_events = 500 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -84,6 +75,15 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
+
+  # General
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+  type = "aws_kinesis_firehose" # required
+  inputs = ["my-source-id"] # required
+  stream_name = "my-stream" # required
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests
@@ -99,30 +99,6 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -445,6 +421,30 @@ How to format event timestamps.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
   name={"endpoint"}
@@ -510,6 +510,31 @@ Enables/disables the sink healthcheck upon start.
 
 The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
 provided it will override this value since the endpoint includes the region.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-stream"]}
+  groups={[]}
+  name={"stream_name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### stream_name
+
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
+Firehose delivery stream.
 
 
 
@@ -713,31 +738,6 @@ duplicate data downstream.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-stream"]}
-  groups={[]}
-  name={"stream_name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### stream_name
-
-The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
-Firehose delivery stream.
-
-
-
 
 </Field>
 </Fields>

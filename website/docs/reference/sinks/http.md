@@ -45,17 +45,17 @@ The Vector `http` sink
   # General
   type = "http" # required
   inputs = ["my-source-id"] # required
-  uri = "https://10.22.212.22:9000/endpoint" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
+  uri = "https://10.22.212.22:9000/endpoint" # required
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.type = "memory" # optional, default
 
   # Encoding
   encoding.codec = "json" # required
@@ -75,10 +75,10 @@ The Vector `http` sink
   # General
   type = "http" # required
   inputs = ["my-source-id"] # required
-  uri = "https://10.22.212.22:9000/endpoint" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # optional, no default
+  uri = "https://10.22.212.22:9000/endpoint" # required
 
   # Auth
   auth.strategy = "basic" # required
@@ -90,9 +90,9 @@ The Vector `http` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -423,31 +423,6 @@ The behavior when the buffer becomes full.
 </Field>
 <Field
   common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
-  examples={["none","gzip"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### compression
-
-The compression strategy used to compress the encoded event data before
-outputting.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={null}
   enumValues={null}
   examples={[]}
@@ -569,53 +544,28 @@ How to format event timestamps.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  examples={["none","gzip"]}
   groups={[]}
-  name={"headers"}
+  name={"compression"}
   path={null}
   relevantWhen={null}
   required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### headers
-
-Options for custom headers.
-
- See [Authentication](#authentication) for more info.
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]}
-  groups={[]}
-  name={"`[header-key]`"}
-  path={"headers"}
-  relevantWhen={null}
-  required={true}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-#### `[header-key]`
+### compression
 
-A custom header to be added to each outgoing HTTP request.
+The compression strategy used to compress the encoded event data before
+outputting.
 
 
 
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -664,6 +614,81 @@ A URI that Vector can request in order to determine the service health.
 
  See [Health Checks](#health-checks) for more info.
 
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["https://10.22.212.22:9000/endpoint"]}
+  groups={[]}
+  name={"uri"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### uri
+
+The full URI to make HTTP requests to. This should include the protocol and
+host, but can also include the port, path, and any other valid part of a URI.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"headers"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### headers
+
+Options for custom headers.
+
+ See [Authentication](#authentication) for more info.
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
+  name={"`[header-key]`"}
+  path={"headers"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[header-key]`
+
+A custom header to be added to each outgoing HTTP request.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -1043,31 +1068,6 @@ you understand the risks of not verifying the remote hostname.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["https://10.22.212.22:9000/endpoint"]}
-  groups={[]}
-  name={"uri"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### uri
-
-The full URI to make HTTP requests to. This should include the protocol and
-host, but can also include the port, path, and any other valid part of a URI.
-
-
-
 
 </Field>
 </Fields>

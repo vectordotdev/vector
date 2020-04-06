@@ -45,8 +45,8 @@ The Vector `humio_logs` sink
   # General
   type = "humio_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${HUMIO_TOKEN}" # required
   healthcheck = true # optional, default
+  token = "${HUMIO_TOKEN}" # required
 
   # Encoding
   encoding.codec = "json" # optional, default
@@ -60,18 +60,18 @@ The Vector `humio_logs` sink
   # General
   type = "humio_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${HUMIO_TOKEN}" # required
   healthcheck = true # optional, default
   host = "http://myhumiohost.com" # optional, no default
+  token = "${HUMIO_TOKEN}" # required
 
   # Batch
   batch.max_size = 1049000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -461,6 +461,30 @@ The optional host to send Humio logs to.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${HUMIO_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+Your Humio ingestion token.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -658,30 +682,6 @@ duplicate data downstream.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${HUMIO_TOKEN}","A94A8FE5CCB19BA61C4C08"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-Your Humio ingestion token.
-
-
-
 
 </Field>
 </Fields>

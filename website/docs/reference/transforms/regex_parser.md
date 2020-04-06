@@ -41,9 +41,9 @@ log field's value with a [Regular Expression][urls.regex].
   # General
   type = "regex_parser" # required
   inputs = ["my-source-id"] # required
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
 
   # Types
   types.status = "int" # example
@@ -62,10 +62,10 @@ log field's value with a [Regular Expression][urls.regex].
   # General
   type = "regex_parser" # required
   inputs = ["my-source-id"] # required
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   drop_field = true # optional, default
   field = "message" # optional, default
   overwrite_target = true # optional, default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   target_field = "root_field" # optional, no default
 
   # Types

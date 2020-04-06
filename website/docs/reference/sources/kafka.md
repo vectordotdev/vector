@@ -53,8 +53,8 @@ ingests data through [Kafka][urls.kafka] and outputs
   type = "kafka" # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   group_id = "consumer-group-name" # required
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
   key_field = "topic" # optional, no default
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
 ```
 
 </TabItem>
@@ -64,14 +64,14 @@ ingests data through [Kafka][urls.kafka] and outputs
 [sources.my_source_id]
   # General
   type = "kafka" # required
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
-  group_id = "consumer-group-name" # required
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
   auto_offset_reset = "largest" # optional, default
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   fetch_wait_max_ms = 100 # optional, default, milliseconds
+  group_id = "consumer-group-name" # required
   key_field = "topic" # optional, no default
   session_timeout_ms = 10000 # optional, default, milliseconds
   socket_timeout_ms = 60000 # optional, default, milliseconds
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
 
   # Advanced
   librdkafka_options."client.id" = "${ENV_VAR}" # example
@@ -79,9 +79,9 @@ ingests data through [Kafka][urls.kafka] and outputs
   librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # TLS
+  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
-  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
@@ -90,6 +90,57 @@ ingests data through [Kafka][urls.kafka] and outputs
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### librdkafka_options
+
+Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
+details.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
 <Field
   common={false}
   defaultValue={"largest"}
@@ -218,57 +269,6 @@ not be added to the log event.
 </Field>
 <Field
   common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"librdkafka_options"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### librdkafka_options
-
-Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
-details.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={"librdkafka_options"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[field-name]`
-
-The options and their values. Accepts `string` values.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={false}
   defaultValue={10000}
   enumValues={null}
   examples={[5000,10000]}
@@ -310,6 +310,31 @@ The Kafka session timeout in milliseconds.
 ### socket_timeout_ms
 
 Default timeout for network requests.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
+  groups={[]}
+  name={"topics"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topics
+
+The Kafka topics names to read events from. Regex is supported if the topic
+begins with `^`.
 
 
 
@@ -464,31 +489,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
-  groups={[]}
-  name={"topics"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### topics
-
-The Kafka topics names to read events from. Regex is supported if the topic
-begins with `^`.
-
-
-
 
 </Field>
 </Fields>

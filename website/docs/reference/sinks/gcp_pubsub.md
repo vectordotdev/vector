@@ -57,20 +57,20 @@ Interface][urls.gcp_pubsub_rest].
   # General
   type = "gcp_pubsub" # required
   inputs = ["my-source-id"] # required
-  project = "vector-123456" # required
-  topic = "this-is-a-topic" # required
   api_key = "${GCP_API_KEY}" # optional, no default
   credentials_path = "/path/to/credentials.json" # optional, no default
   healthcheck = true # optional, default
+  project = "vector-123456" # required
+  topic = "this-is-a-topic" # required
 
   # Batch
   batch.max_size = 10485760 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -100,32 +100,6 @@ Interface][urls.gcp_pubsub_rest].
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
-  groups={[]}
-  name={"api_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### api_key
-
-A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate
-access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be
-set.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -323,33 +297,6 @@ The behavior when the buffer becomes full.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/path/to/credentials.json"]}
-  groups={[]}
-  name={"credentials_path"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### credentials_path
-
-The filename for a Google Cloud service account credentials JSON file used to
-authenticate access to the pubsub project and topic. If this is unset, Vector
-checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
-filename.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -448,6 +395,59 @@ How to format event timestamps.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]}
+  groups={[]}
+  name={"api_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### api_key
+
+A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate
+access the pubsub project and topic. Either this or [`credentials_path`](#credentials_path) must be
+set.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/path/to/credentials.json"]}
+  groups={[]}
+  name={"credentials_path"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### credentials_path
+
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the pubsub project and topic. If this is unset, Vector
+checks the `$GOOGLE_APPLICATION_CREDENTIALS` environment variable for a
+filename.
+
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={true}
   enumValues={null}
@@ -490,6 +490,30 @@ Enables/disables the sink healthcheck upon start.
 ### project
 
 The project name to which to publish logs.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["this-is-a-topic"]}
+  groups={[]}
+  name={"topic"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topic
+
+The topic within the project to which to publish logs.
 
 
 
@@ -872,30 +896,6 @@ you understand the risks of not verifying the remote hostname.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["this-is-a-topic"]}
-  groups={[]}
-  name={"topic"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### topic
-
-The topic within the project to which to publish logs.
-
-
-
 
 </Field>
 </Fields>

@@ -42,9 +42,9 @@ characters, and zip the tokens into ordered field names.
   # General
   type = "tokenizer" # required
   inputs = ["my-source-id"] # required
-  field_names = ["timestamp", "level", "message", "parent.child"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
 
   # Types
   types.status = "int" # example
@@ -63,9 +63,9 @@ characters, and zip the tokens into ordered field names.
   # General
   type = "tokenizer" # required
   inputs = ["my-source-id"] # required
-  field_names = ["timestamp", "level", "message", "parent.child"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
 
   # Types
   types.status = "int" # example

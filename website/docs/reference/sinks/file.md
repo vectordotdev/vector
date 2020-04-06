@@ -43,8 +43,8 @@ The Vector `file` sink
   # General
   type = "file" # required
   inputs = ["my-source-id"] # required
-  path = "vector-%Y-%m-%d.log" # required
   healthcheck = true # optional, default
+  path = "vector-%Y-%m-%d.log" # required
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -58,9 +58,9 @@ The Vector `file` sink
   # General
   type = "file" # required
   inputs = ["my-source-id"] # required
-  path = "vector-%Y-%m-%d.log" # required
   healthcheck = true # optional, default
   idle_timeout_secs = "30" # optional, default
+  path = "vector-%Y-%m-%d.log" # required
 
   # Encoding
   encoding.codec = "ndjson" # required

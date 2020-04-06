@@ -42,9 +42,9 @@ names.
   # General
   type = "split" # required
   inputs = ["my-source-id"] # required
-  field_names = ["timestamp", "level", "message", "parent.child"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
   separator = "[whitespace]" # optional, default
 
   # Types
@@ -64,9 +64,9 @@ names.
   # General
   type = "split" # required
   inputs = ["my-source-id"] # required
-  field_names = ["timestamp", "level", "message", "parent.child"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
   separator = "[whitespace]" # optional, default
 
   # Types
