@@ -2667,10 +2667,123 @@ require('custom_module')
 # Batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint.
 [sinks.aws_cloudwatch_logs]
   #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Dynamically create a log group if it does not already exist. This will ignore
+  # `create_missing_stream` directly after creating the group and will create the
+  # first stream.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  create_missing_group = true
+  create_missing_group = false
+
+  # Dynamically create a log stream if it does not already exist.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  create_missing_stream = true
+  create_missing_stream = false
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
+  # The group name of the target CloudWatch Logs stream.
+  #
+  # * required
+  # * type: string
+  group_name = "group-name"
+  group_name = "{{ file }}"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  # * required when endpoint = ""
+  region = "us-east-1"
+
+  # The stream name of the target CloudWatch Logs stream.
+  #
+  # * required
+  # * type: string
+  stream_name = "{{ host }}"
+  stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
+
+  #
+  # Batch
+  #
+
+  [sinks.aws_cloudwatch_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 1049000
+    # * type: int
+    # * unit: bytes
+    max_size = 1049000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: int
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
   # Buffer
   #
 
   [sinks.aws_cloudwatch_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -2687,15 +2800,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -2741,110 +2845,6 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
-
-  #
-  # General
-  #
-
-  # The ARN of an IAM role to assume at startup.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # Dynamically create a log group if it does not already exist. This will ignore
-  # `create_missing_stream` directly after creating the group and will create the
-  # first stream.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  create_missing_group = true
-  create_missing_group = false
-
-  # Dynamically create a log stream if it does not already exist.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  create_missing_stream = true
-  create_missing_stream = false
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
-  # The group name of the target CloudWatch Logs stream.
-  #
-  # * required
-  # * type: string
-  group_name = "group-name"
-  group_name = "{{ file }}"
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  # * required when endpoint = ""
-  region = "us-east-1"
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_cloudwatch_logs"
-  type = "aws_cloudwatch_logs"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The stream name of the target CloudWatch Logs stream.
-  #
-  # * required
-  # * type: string
-  stream_name = "{{ host }}"
-  stream_name = "%Y-%m-%d"
-  stream_name = "stream-name"
-
-  #
-  # Batch
-  #
-
-  [sinks.aws_cloudwatch_logs.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 1049000
-    # * type: int
-    # * unit: bytes
-    max_size = 1049000
-
-    # The maximum age of a batch before it is flushed.
-    #
-    # * optional
-    # * default: 1
-    # * type: int
-    # * unit: seconds
-    timeout_secs = 1
 
   #
   # Request
@@ -2914,6 +2914,62 @@ require('custom_module')
 # Streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
   #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A namespace that will isolate different metrics from each other.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  # * required when endpoint = ""
+  region = "us-east-1"
+
+  #
   # Batch
   #
 
@@ -2934,9 +2990,25 @@ require('custom_module')
     # * unit: seconds
     timeout_secs = 1
 
+# Batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.
+[sinks.aws_kinesis_firehose]
   #
   # General
   #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_kinesis_firehose"
+  type = "aws_kinesis_firehose"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
 
   # The ARN of an IAM role to assume at startup.
   #
@@ -2954,28 +3026,6 @@ require('custom_module')
   # * relevant when region = ""
   endpoint = "127.0.0.0:5000/path/to/service"
 
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  # * required when endpoint = ""
-  region = "us-east-1"
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_cloudwatch_metrics"
-  type = "aws_cloudwatch_metrics"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
   # Enables/disables the sink healthcheck upon start.
   #
   # * optional
@@ -2984,14 +3034,20 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
-  # A namespace that will isolate different metrics from each other.
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
   #
   # * required
   # * type: string
-  namespace = "service"
+  # * required when endpoint = ""
+  region = "us-east-1"
 
-# Batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.
-[sinks.aws_kinesis_firehose]
+  # The stream name of the target Kinesis Firehose delivery stream.
+  #
+  # * required
+  # * type: string
+  stream_name = "my-stream"
+
   #
   # Batch
   #
@@ -3018,6 +3074,15 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_firehose.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3034,15 +3099,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3088,62 +3144,6 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
-
-  #
-  # General
-  #
-
-  # The ARN of an IAM role to assume at startup.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  # * required when endpoint = ""
-  region = "us-east-1"
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_kinesis_firehose"
-  type = "aws_kinesis_firehose"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # The stream name of the target Kinesis Firehose delivery stream.
-  #
-  # * required
-  # * type: string
-  stream_name = "my-stream"
 
   #
   # Request
@@ -3213,6 +3213,61 @@ require('custom_module')
 # Batches `log` events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
   #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_kinesis_streams"
+  type = "aws_kinesis_streams"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
+  # The log field used as the Kinesis record's partition key value.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  partition_key_field = "user_id"
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  # * required when endpoint = ""
+  region = "us-east-1"
+
+  # The stream name of the target Kinesis Logs stream.
+  #
+  # * required
+  # * type: string
+  stream_name = "my-stream"
+
+  #
   # Batch
   #
 
@@ -3238,6 +3293,15 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_streams.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3254,15 +3318,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3308,61 +3363,6 @@ require('custom_module')
     # * enum: "rfc3339" or "unix"
     timestamp_format = "rfc3339"
     timestamp_format = "unix"
-
-  #
-  # General
-  #
-
-  # The ARN of an IAM role to assume at startup.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
-  # The log field used as the Kinesis record's partition key value.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  partition_key_field = "user_id"
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  # * required when endpoint = ""
-  region = "us-east-1"
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_kinesis_streams"
-  type = "aws_kinesis_streams"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # The stream name of the target Kinesis Logs stream.
-  #
-  # * required
-  # * type: string
-  stream_name = "my-stream"
 
   #
   # Request
@@ -3431,6 +3431,70 @@ require('custom_module')
 
 # Batches `log` events to Amazon Web Service's S3 service via the `PutObject` API endpoint.
 [sinks.aws_s3]
+  #
+  # General
+  #
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_s3"
+  type = "aws_s3"
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-id"]
+
+  # The ARN of an IAM role to assume at startup.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
+  #
+  # * required
+  # * type: string
+  bucket = "my-bucket"
+
+  # The compression mechanism to use.
+  #
+  # * required
+  # * type: string
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # Custom endpoint for use with AWS-compatible services. Providing a value for
+  # this option will make `region` moot.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  # * relevant when region = ""
+  endpoint = "127.0.0.0:5000/path/to/service"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # The AWS region of the target service. If `endpoint` is provided it will
+  # override this value since the endpoint includes the region.
+  #
+  # * required
+  # * type: string
+  # * required when endpoint = ""
+  region = "us-east-1"
+
   #
   # ACL
   #
@@ -3512,6 +3576,15 @@ require('custom_module')
   #
 
   [sinks.aws_s3.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3528,15 +3601,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -3606,70 +3670,6 @@ require('custom_module')
   # * type: string
   # * relevant when server_side_encryption = "aws:kms"
   ssekms_key_id = "abcd1234"
-
-  #
-  # General
-  #
-
-  # The ARN of an IAM role to assume at startup.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  assume_role = "arn:aws:iam::123456789098:role/my_role"
-
-  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
-  #
-  # * required
-  # * type: string
-  bucket = "my-bucket"
-
-  # The compression mechanism to use.
-  #
-  # * required
-  # * type: string
-  # * enum: "gzip" or "none"
-  compression = "gzip"
-  compression = "none"
-
-  # Custom endpoint for use with AWS-compatible services. Providing a value for
-  # this option will make `region` moot.
-  #
-  # * optional
-  # * no default
-  # * type: string
-  # * relevant when region = ""
-  endpoint = "127.0.0.0:5000/path/to/service"
-
-  # The AWS region of the target service. If `endpoint` is provided it will
-  # override this value since the endpoint includes the region.
-  #
-  # * required
-  # * type: string
-  # * required when endpoint = ""
-  region = "us-east-1"
-
-  # The component type. This is a required field that tells Vector which
-  # component to use. The value _must_ be `#{name}`.
-  #
-  # * required
-  # * type: string
-  # * must be: "aws_s3"
-  type = "aws_s3"
-
-  # A list of upstream source or transform IDs. See configuration for more info.
-  #
-  # * required
-  # * type: [string]
-  inputs = ["my-source-id"]
-
-  # Enables/disables the sink healthcheck upon start.
-  #
-  # * optional
-  # * default: true
-  # * type: bool
-  healthcheck = true
-  healthcheck = false
 
   #
   # Metadata
@@ -3931,6 +3931,15 @@ require('custom_module')
   #
 
   [sinks.clickhouse.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -3947,15 +3956,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4245,6 +4245,15 @@ require('custom_module')
   #
 
   [sinks.datadog_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -4261,15 +4270,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -4646,6 +4646,15 @@ require('custom_module')
   #
 
   [sinks.elasticsearch.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -4662,15 +4671,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5011,6 +5011,15 @@ require('custom_module')
   #
 
   [sinks.gcp_cloud_storage.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5027,15 +5036,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5368,6 +5368,15 @@ require('custom_module')
   #
 
   [sinks.gcp_pubsub.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5384,15 +5393,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5667,6 +5667,15 @@ require('custom_module')
   #
 
   [sinks.gcp_stackdriver_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5683,15 +5692,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -5949,6 +5949,15 @@ require('custom_module')
   #
 
   [sinks.honeycomb.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -5965,15 +5974,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -6155,6 +6155,15 @@ require('custom_module')
   #
 
   [sinks.http.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -6171,15 +6180,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -6431,6 +6431,15 @@ require('custom_module')
   #
 
   [sinks.humio_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -6447,15 +6456,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -6595,6 +6595,12 @@ require('custom_module')
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
 
+  # A prefix that will be added to all metric names.
+  #
+  # * required
+  # * type: string
+  namespace = "service"
+
   # The destination bucket for writes into InfluxDB 2.
   #
   # * required
@@ -6617,15 +6623,16 @@ require('custom_module')
   healthcheck = true
   healthcheck = false
 
-  # A prefix that will be added to all metric names.
-  #
-  # * required
-  # * type: string
-  namespace = "service"
-
   #
   # Auth
   #
+
+  # Specifies the destination organization for writes into InfluxDB 2.
+  #
+  # * required
+  # * type: string
+  org = "my-org"
+  org = "33f2cff0a28e5b63"
 
   # Sets the password for authentication if you’ve enabled authentication for the
   # write into InfluxDB 1.
@@ -6651,13 +6658,6 @@ require('custom_module')
   # * type: string
   username = "todd"
   username = "vector-source"
-
-  # Specifies the destination organization for writes into InfluxDB 2.
-  #
-  # * required
-  # * type: string
-  org = "my-org"
-  org = "33f2cff0a28e5b63"
 
   #
   # Batch
@@ -6864,6 +6864,15 @@ require('custom_module')
   #
 
   [sinks.kafka.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -6880,15 +6889,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7088,6 +7088,15 @@ require('custom_module')
   #
 
   [sinks.logdna.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7104,15 +7113,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7336,6 +7336,15 @@ require('custom_module')
   #
 
   [sinks.loki.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7352,15 +7361,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7623,6 +7623,15 @@ require('custom_module')
   #
 
   [sinks.new_relic_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7639,15 +7648,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -7798,6 +7798,15 @@ require('custom_module')
   #
 
   [sinks.papertrail.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -7814,15 +7823,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8090,6 +8090,15 @@ require('custom_module')
   #
 
   [sinks.sematext_logs.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8106,15 +8115,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8274,6 +8274,15 @@ require('custom_module')
   #
 
   [sinks.socket.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8290,15 +8299,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8503,6 +8503,15 @@ require('custom_module')
   #
 
   [sinks.splunk_hec.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8519,15 +8528,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #
@@ -8775,6 +8775,15 @@ require('custom_module')
   #
 
   [sinks.vector.buffer]
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
     # The maximum number of events allowed in the buffer.
     #
     # * optional
@@ -8791,15 +8800,6 @@ require('custom_module')
     # * unit: bytes
     # * required when type = "disk"
     max_size = 104900000
-
-    # The buffer's type and storage mechanism.
-    #
-    # * optional
-    # * default: "memory"
-    # * type: string
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
 
     # The behavior when the buffer becomes full.
     #

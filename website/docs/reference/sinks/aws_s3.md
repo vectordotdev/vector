@@ -43,24 +43,24 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # General
+  type = "aws_s3" # required
+  inputs = ["my-source-id"] # required
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
 
   # Encoding
   encoding.codec = "ndjson" # required
-
-  # General
-  bucket = "my-bucket" # required
-  compression = "gzip" # required
-  region = "us-east-1" # required, required when endpoint = ""
-  type = "aws_s3" # required
-  inputs = ["my-source-id"] # required
-  healthcheck = true # optional, default
 
   # Naming
   key_prefix = "date=%F/" # optional, default
@@ -71,6 +71,16 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # General
+  type = "aws_s3" # required
+  inputs = ["my-source-id"] # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  bucket = "my-bucket" # required
+  compression = "gzip" # required
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+
   # ACL
   acl = "private" # optional, no default
   grant_full_control = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
@@ -83,9 +93,9 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
+  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -97,16 +107,6 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   # Encryption
   server_side_encryption = "AES256" # optional, no default
   ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
-
-  # General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  bucket = "my-bucket" # required
-  compression = "gzip" # required
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  region = "us-east-1" # required, required when endpoint = ""
-  type = "aws_s3" # required
-  inputs = ["my-source-id"] # required
-  healthcheck = true # optional, default
 
   # Metadata
   tags.Tag1 = "Value1" # example
@@ -358,6 +358,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -401,30 +425,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 The maximum size of the buffer on the disk.
 
  See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
 
 
 </Field>
@@ -727,6 +727,30 @@ this option will make [`region`](#region) moot.
 </Field>
 <Field
   common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
@@ -747,30 +771,6 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
 provided it will override this value since the endpoint includes the region.
 
 
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
 
 
 </Field>

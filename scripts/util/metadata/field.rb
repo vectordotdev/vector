@@ -147,14 +147,10 @@ class Field
   end
 
   def <=>(other)
-    if sort? && !other.sort?
-      -1
-    elsif sort? && other.sort?
-      sort <=> other.sort
-    elsif !wildcard? && other.wildcard?
+    if !wildcard? && other.wildcard?
       -1
     else
-      "#{category}#{name}".downcase <=> "#{other.category}#{other.name}".downcase
+      [sort || 99, "#{category}#{name}".downcase] <=> [other.sort || 99, "#{other.category}#{other.name}".downcase]
     end
   end
 

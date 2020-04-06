@@ -46,9 +46,9 @@ The Vector `influxdb_metrics` sink
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
+  namespace = "service" # required
   database = "vector-database" # required
   healthcheck = true # optional, default
-  namespace = "service" # required
 
   # Auth
   password = "${INFLUXDB_PASSWORD}" # optional, no default
@@ -68,9 +68,9 @@ The Vector `influxdb_metrics` sink
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
+  namespace = "service" # required
   database = "vector-database" # required
   healthcheck = true # optional, default
-  namespace = "service" # required
 
   # Auth
   password = "${INFLUXDB_PASSWORD}" # optional, no default
@@ -103,13 +103,13 @@ The Vector `influxdb_metrics` sink
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
   bucket = "vector-bucket" # required
   healthcheck = true # optional, default
-  namespace = "service" # required
 
   # Auth
-  token = "${INFLUXDB_TOKEN}" # required
   org = "my-org" # required
+  token = "${INFLUXDB_TOKEN}" # required
 ```
 
 </TabItem>
@@ -121,13 +121,13 @@ The Vector `influxdb_metrics` sink
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
   bucket = "vector-bucket" # required
   healthcheck = true # optional, default
-  namespace = "service" # required
 
   # Auth
-  token = "${INFLUXDB_TOKEN}" # required
   org = "my-org" # required
+  token = "${INFLUXDB_TOKEN}" # required
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -147,6 +147,78 @@ The Vector `influxdb_metrics` sink
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
+  groups={["v1","v2"]}
+  name={"endpoint"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### endpoint
+
+InfluxDB endpoint to send metrics to.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["service"]}
+  groups={["v1","v2"]}
+  name={"namespace"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### namespace
+
+A prefix that will be added to all metric names.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-org","33f2cff0a28e5b63"]}
+  groups={["v2"]}
+  name={"org"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### org
+
+Specifies the destination organization for writes into InfluxDB 2.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -299,54 +371,6 @@ The maximum age of a batch before it is flushed.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
-  groups={["v1","v2"]}
-  name={"endpoint"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### endpoint
-
-InfluxDB endpoint to send metrics to.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-org","33f2cff0a28e5b63"]}
-  groups={["v2"]}
-  name={"org"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### org
-
-Specifies the destination organization for writes into InfluxDB 2.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={["vector-bucket","4d2225e4d3d49f75"]}
   groups={["v2"]}
   name={"bucket"}
@@ -412,30 +436,6 @@ Sets the target database for the write into InfluxDB 1.
 Enables/disables the sink healthcheck upon start.
 
  See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["service"]}
-  groups={["v1","v2"]}
-  name={"namespace"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### namespace
-
-A prefix that will be added to all metric names.
-
-
 
 
 </Field>

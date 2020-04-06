@@ -43,11 +43,11 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  region = "us-east-1" # required, required when endpoint = ""
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
   healthcheck = true # optional, default
   namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
 ```
 
 </TabItem>
@@ -55,18 +55,18 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # General
+  type = "aws_cloudwatch_metrics" # required
+  inputs = ["my-source-id"] # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  healthcheck = true # optional, default
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
+
   # Batch
   batch.max_events = 20 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
-
-  # General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  region = "us-east-1" # required, required when endpoint = ""
-  type = "aws_cloudwatch_metrics" # required
-  inputs = ["my-source-id"] # required
-  healthcheck = true # optional, default
-  namespace = "service" # required
 ```
 
 </TabItem>
@@ -198,31 +198,6 @@ this option will make [`region`](#region) moot.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  groups={[]}
-  name={"region"}
-  path={null}
-  relevantWhen={{"endpoint":""}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### region
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
-provided it will override this value since the endpoint includes the region.
-
-
-
-
-</Field>
-<Field
-  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -266,6 +241,31 @@ Enables/disables the sink healthcheck upon start.
 A
 [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace)
 that will isolate different metrics from each other.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  groups={[]}
+  name={"region"}
+  path={null}
+  relevantWhen={{"endpoint":""}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
+provided it will override this value since the endpoint includes the region.
 
 
 

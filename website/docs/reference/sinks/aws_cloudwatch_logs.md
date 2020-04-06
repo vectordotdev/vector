@@ -44,18 +44,18 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  # Encoding
-  encoding.codec = "json" # required
-
   # General
+  type = "aws_cloudwatch_logs" # required
+  inputs = ["my-source-id"] # required
   create_missing_group = true # optional, default
   create_missing_stream = true # optional, default
   group_name = "group-name" # required
-  region = "us-east-1" # required, required when endpoint = ""
-  type = "aws_cloudwatch_logs" # required
-  inputs = ["my-source-id"] # required
   healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
   stream_name = "{{ host }}" # required
+
+  # Encoding
+  encoding.codec = "json" # required
 ```
 
 </TabItem>
@@ -63,10 +63,26 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # General
+  type = "aws_cloudwatch_logs" # required
+  inputs = ["my-source-id"] # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  create_missing_group = true # optional, default
+  create_missing_stream = true # optional, default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  group_name = "group-name" # required
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+  stream_name = "{{ host }}" # required
+
+  # Batch
+  batch.max_size = 1049000 # optional, default, bytes
+  batch.timeout_secs = 1 # optional, default, seconds
+
   # Buffer
+  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -74,22 +90,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
-
-  # General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  create_missing_group = true # optional, default
-  create_missing_stream = true # optional, default
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  group_name = "group-name" # required
-  region = "us-east-1" # required, required when endpoint = ""
-  type = "aws_cloudwatch_logs" # required
-  inputs = ["my-source-id"] # required
-  healthcheck = true # optional, default
-  stream_name = "{{ host }}" # required
-
-  # Batch
-  batch.max_size = 1049000 # optional, default, bytes
-  batch.timeout_secs = 1 # optional, default, seconds
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests
@@ -105,6 +105,80 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"batch"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### batch
+
+Configures the sink batching behavior.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={1049000}
+  enumValues={null}
+  examples={[1049000]}
+  groups={[]}
+  name={"max_size"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of a batch, in bytes, before it is flushed.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={1}
+  enumValues={null}
+  examples={[1]}
+  groups={[]}
+  name={"timeout_secs"}
+  path={"batch"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"seconds"}
+  warnings={[]}
+  >
+
+#### timeout_secs
+
+The maximum age of a batch before it is flushed.
+
+ See [Buffers & Batches](#buffers--batches) for more info.
+
+
+</Field>
+</Fields>
+
+</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -128,6 +202,30 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -173,30 +271,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 The maximum size of the buffer on the disk.
 
  See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
 
 
 </Field>
@@ -476,6 +550,30 @@ Logs stream.
 </Field>
 <Field
   common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["us-east-1"]}
@@ -496,104 +594,6 @@ The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpo
 provided it will override this value since the endpoint includes the region.
 
 
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"batch"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### batch
-
-Configures the sink batching behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={1049000}
-  enumValues={null}
-  examples={[1049000]}
-  groups={[]}
-  name={"max_size"}
-  path={"batch"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  warnings={[]}
-  >
-
-#### max_size
-
-The maximum size of a batch, in bytes, before it is flushed.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={1}
-  enumValues={null}
-  examples={[1]}
-  groups={[]}
-  name={"timeout_secs"}
-  path={"batch"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"seconds"}
-  warnings={[]}
-  >
-
-#### timeout_secs
-
-The maximum age of a batch before it is flushed.
-
- See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
 
 
 </Field>

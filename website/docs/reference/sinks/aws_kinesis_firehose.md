@@ -44,15 +44,15 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
-  # Encoding
-  encoding.codec = "json" # required
-
   # General
-  healthcheck = true # optional, default
-  region = "us-east-1" # required, required when endpoint = ""
   type = "aws_kinesis_firehose" # required
   inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
+
+  # Encoding
+  encoding.codec = "json" # required
 ```
 
 </TabItem>
@@ -60,14 +60,23 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # General
+  type = "aws_kinesis_firehose" # required
+  inputs = ["my-source-id"] # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
+  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
+  healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+  stream_name = "my-stream" # required
+
   # Batch
   batch.max_events = 500 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
+  buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
   buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -75,15 +84,6 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
-
-  # General
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  healthcheck = true # optional, default
-  region = "us-east-1" # required, required when endpoint = ""
-  type = "aws_kinesis_firehose" # required
-  inputs = ["my-source-id"] # required
-  stream_name = "my-stream" # required
 
   # Request
   request.in_flight_limit = 5 # optional, default, requests
@@ -198,6 +198,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -239,30 +263,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
 
 
 
