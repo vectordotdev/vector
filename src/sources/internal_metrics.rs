@@ -6,7 +6,7 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::{Future01CompatExt},
+    compat::Future01CompatExt,
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
@@ -15,7 +15,6 @@ use metrics_core::Key;
 use metrics_runtime::{Controller, Measurement};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, time::Duration};
-use stream_cancel::Tripwire;
 use tokio::time::interval;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -31,12 +30,10 @@ impl SourceConfig for InternalMetricsConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let (trigger, tripwire) = Tripwire::new();
-        trigger.disable(); // TODO: don't actually run forever
-        let fut = run(get_controller()?, out, tripwire).boxed().compat();
+        let fut = run(get_controller()?, out, shutdown).boxed().compat();
         Ok(Box::new(fut))
     }
 
@@ -59,14 +56,14 @@ fn get_controller() -> crate::Result<Controller> {
 async fn run(
     controller: Controller,
     mut out: mpsc::Sender<Event>,
-    mut tripwire: Tripwire,
+    mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut interval = interval(Duration::from_secs(2))
         .map(|_| ());
 
     while let Some(()) = interval.next().await {
         // Check for shutdown signal
-        if tripwire.poll().expect("polling tripwire").is_ready() {
+        if shutdown.poll().expect("polling shutdown").is_ready() {
             break;
         }
 
