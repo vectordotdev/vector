@@ -16,6 +16,7 @@ pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;
 pub mod generate;
+#[macro_use]
 pub mod internal_events;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;

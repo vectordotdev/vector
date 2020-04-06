@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     event::Event,
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,

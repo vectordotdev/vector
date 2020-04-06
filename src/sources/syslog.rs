@@ -2,7 +2,6 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    emit,
     event::{self, Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,

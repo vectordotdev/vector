@@ -1,6 +1,5 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    emit,
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,

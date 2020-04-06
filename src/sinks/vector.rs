@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     event::proto,
     internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSink},

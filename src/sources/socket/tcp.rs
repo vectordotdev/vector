@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     event::{self, Event},
     internal_events::TcpEventReceived,
     sources::util::{SocketListenAddr, TcpSource},

@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     internal_events::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,

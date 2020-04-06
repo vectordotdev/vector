@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     event::Event,
     internal_events::UnixSocketEventReceived,
     sources::{util::build_unix_source, Source},

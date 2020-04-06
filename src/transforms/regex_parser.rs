@@ -1,6 +1,5 @@
 use super::Transform;
 use crate::{
-    emit,
     event::{self, Event, Value},
     internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},

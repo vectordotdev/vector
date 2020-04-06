@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
     shutdown::ShutdownSignal,
     topology::config::GlobalOptions,

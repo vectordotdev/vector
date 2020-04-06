@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     stream::StreamExt,

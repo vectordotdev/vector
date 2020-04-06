@@ -1,5 +1,4 @@
 use crate::{
-    emit,
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     topology::config::{DataType, TransformContext},
