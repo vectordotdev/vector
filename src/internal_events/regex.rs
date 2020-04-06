@@ -23,7 +23,7 @@ pub struct RegexFailedMatch<'a> {
 impl InternalEvent for RegexFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "Regex pattern failed to match.",
+            message = "regex pattern failed to match.",
             field = &truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
             rate_limit_secs = 30
         );
@@ -44,7 +44,7 @@ pub struct RegexMissingField<'a> {
 
 impl InternalEvent for RegexMissingField<'_> {
     fn emit_logs(&self) {
-        debug!(message = "Field does not exist.", field = %self.field);
+        debug!(message = "field does not exist.", field = %self.field);
     }
 
     fn emit_metrics(&self) {
