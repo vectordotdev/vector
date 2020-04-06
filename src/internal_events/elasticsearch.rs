@@ -30,7 +30,7 @@ pub struct ElasticSearchMissingKeys {
 impl InternalEvent for ElasticSearchMissingKeys {
     fn emit_logs(&self) {
         warn!(
-            message = "Keys do not exist on the event; Dropping event.",
+            message = "keys do not exist on the event; dropping event.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )

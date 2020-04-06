@@ -10,7 +10,7 @@ pub struct FileEventReceived<'a> {
 impl InternalEvent for FileEventReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "Received one event.",
+            message = "received one event.",
             %self.file,
             rate_limit_secs = 10
         );

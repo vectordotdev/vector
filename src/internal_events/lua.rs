@@ -43,7 +43,7 @@ pub struct LuaScriptError {
 impl InternalEvent for LuaScriptError {
     fn emit_logs(&self) {
         let error = format_error(&self.error);
-        error!(message = "Error in lua script; discarding event.", %error, rate_limit_secs = 30);
+        error!(message = "error in lua script; discarding event.", %error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {

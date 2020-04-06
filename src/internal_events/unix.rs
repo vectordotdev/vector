@@ -83,7 +83,7 @@ pub struct UnixSocketEventReceived {
 
 impl InternalEvent for UnixSocketEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.");
+        trace!(message = "received one event.");
     }
 
     fn emit_metrics(&self) {

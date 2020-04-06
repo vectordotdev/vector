@@ -8,7 +8,7 @@ pub struct UdpEventReceived {
 
 impl InternalEvent for UdpEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.");
+        trace!(message = "received one event.");
     }
 
     fn emit_metrics(&self) {
