@@ -1052,7 +1052,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x0000562af2fc1f70>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x000055c0504bb6b0>"}]}
   >
 
 #### verify_certificate
@@ -1182,8 +1182,9 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 ### TLS
 
-Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
-security. You can enable and adjust TLS behavior via the `tls.*` options.
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -1194,3 +1195,4 @@ security. You can enable and adjust TLS behavior via the `tls.*` options.
 [urls.loki]: https://grafana.com/oss/loki/
 [urls.loki_multi_tenancy]: https://github.com/grafana/loki/blob/master/docs/operations/multi-tenancy.md
 [urls.new_loki_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+loki
+[urls.openssl]: https://www.openssl.org/

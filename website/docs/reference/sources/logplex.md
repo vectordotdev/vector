@@ -263,7 +263,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x0000562af272a858>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x000055c04fc0f0e8>"}]}
   >
 
 #### verify_certificate
@@ -355,10 +355,12 @@ You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 ### TLS
 
-Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
-security. You can enable and adjust TLS behavior via the `tls.*` options.
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [urls.logplex_protocol]: https://github.com/heroku/logplex/blob/master/doc/README.http_drains.md
+[urls.openssl]: https://www.openssl.org/

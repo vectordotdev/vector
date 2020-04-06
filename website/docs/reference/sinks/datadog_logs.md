@@ -667,8 +667,9 @@ The `datadog_logs` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 ### TLS
 
-Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
-security. You can enable and adjust TLS behavior via the `tls.*` options.
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -676,3 +677,4 @@ security. You can enable and adjust TLS behavior via the `tls.*` options.
 [docs.data-model]: /docs/about/data-model/
 [urls.datadog]: https://www.datadoghq.com
 [urls.datadog_logs_endpoints]: https://docs.datadoghq.com/logs/log_collection/?tab=tcpussite#datadog-logs-endpoints
+[urls.openssl]: https://www.openssl.org/

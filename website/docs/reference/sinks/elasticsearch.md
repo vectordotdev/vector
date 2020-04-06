@@ -431,7 +431,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
-  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option":"#<Field:0x0000562af2e6c2b0>"}]}
+  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option":"#<Field:0x000055c05038d860>"}]}
   >
 
 ### compression
@@ -1104,7 +1104,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x0000562af2e9a840>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x000055c0503bfae0>"}]}
   >
 
 #### verify_certificate
@@ -1320,8 +1320,9 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 
 ### TLS
 
-Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
-security. You can enable and adjust TLS behavior via the `tls.*` options.
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 ### Template Syntax
 
@@ -1361,4 +1362,5 @@ You can learn more about the complete syntax in the
 [urls.elasticsearch_id_performance]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
+[urls.openssl]: https://www.openssl.org/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

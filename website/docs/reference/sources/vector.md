@@ -290,7 +290,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x0000562af264e100>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option":"#<Field:0x000055c04fb1ef08>"}]}
   >
 
 #### verify_certificate
@@ -340,8 +340,9 @@ Upstream Vector instances forward data to downstream Vector instances via the TC
 
 ### TLS
 
-Vector uses [Openssl] for TLS protocols for it's battle tested and reliable
-security. You can enable and adjust TLS behavior via the `tls.*` options.
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -349,3 +350,4 @@ security. You can enable and adjust TLS behavior via the `tls.*` options.
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[urls.openssl]: https://www.openssl.org/
