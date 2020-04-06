@@ -67,6 +67,12 @@
   force = true
 
 [[redirects]]
+  from = "https://docs.vector.dev/usage/administration/*"
+  to = "https://vector.dev/docs/administration/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "https://docs.vector.dev/usage/configuration"
   to = "https://vector.dev/docs/setup/configuration/"
   status = 301
