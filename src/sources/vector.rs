@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     emit,
     event::proto,
-    internal_events::{VectorEventReceived, VectorProtoParseError},
+    internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -83,7 +83,7 @@ impl TcpSource for VectorSource {
                 Some(event)
             }
             Err(error) => {
-                emit!(VectorProtoParseError { error });
+                emit!(VectorProtoDecodeError { error });
                 None
             }
         }

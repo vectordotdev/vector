@@ -47,18 +47,18 @@ impl InternalEvent for VectorEventReceived {
 }
 
 #[derive(Debug)]
-pub struct VectorProtoParseError {
+pub struct VectorProtoDecodeError {
     pub error: DecodeError,
 }
 
-impl InternalEvent for VectorProtoParseError {
+impl InternalEvent for VectorProtoDecodeError {
     fn emit_logs(&self) {
-        error!(message = "failed to parse protobuf message", error = %self.error);
+        error!(message = "failed to decode protobuf message", error = %self.error);
     }
 
     fn emit_metrics(&self) {
         counter!(
-            "protobuf_parse_errors", 1,
+            "protobuf_decode_errors", 1,
             "component_kind" => "source",
             "component_type" => "vector",
         );
