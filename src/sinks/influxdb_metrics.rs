@@ -1235,6 +1235,7 @@ mod integration_tests {
         onboarding_v2();
 
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://localhost:9999".to_string(),
@@ -1248,7 +1249,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -1257,6 +1258,7 @@ mod integration_tests {
         onboarding_v2();
 
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://not_exist:9999".to_string(),
@@ -1270,7 +1272,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 
@@ -1385,6 +1387,8 @@ mod integration_tests {
     #[test]
     fn influxdb1_metrics_healthchecks_ok() {
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://localhost:8086".to_string(),
@@ -1399,13 +1403,14 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
         };
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
     #[test]
     fn influxdb1_metrics_healthchecks_fail() {
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://not_exist:8086".to_string(),
@@ -1421,7 +1426,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 }
