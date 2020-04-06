@@ -58,8 +58,7 @@ async fn run(
     mut out: mpsc::Sender<Event>,
     mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut interval = interval(Duration::from_secs(2))
-        .map(|_| ());
+    let mut interval = interval(Duration::from_secs(2)).map(|_| ());
 
     while let Some(()) = interval.next().await {
         // Check for shutdown signal
