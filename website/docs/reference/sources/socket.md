@@ -447,7 +447,7 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `true` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate

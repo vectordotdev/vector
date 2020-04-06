@@ -62,10 +62,9 @@ default = true
 groups = <%= groups.to_toml %>
 description = """\
 If `true` (the default), Vector will validate the TLS certificate of the \
-remote host. Do NOT set this to `false` unless you understand the risks of not \
-verifying the remote certificate.\
+remote host.\
 """
-warnings = [{visibility_level = "option", text = "Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate."}]
+warnings = [{visibility_level = "option", text = "Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."}]
 <%- end -%>
 
 <%- if can_verify_hostname -%>
