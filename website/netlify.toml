@@ -31,7 +31,7 @@
 #
 
 [[redirects]]
-  from = "https://docs.vector.dev/v/*"
+  from = "https://docs.vector.dev/v/:version/*"
   to = "https://docs.vector.dev/:splat"
   status = 301
   force = true
@@ -258,7 +258,7 @@
   status = 301
   force = true
 
-  [[redirects]]
+[[redirects]]
   from = "/releases/"
   to = "/releases/latest/download/"
   status = 302
