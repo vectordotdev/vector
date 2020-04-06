@@ -115,6 +115,12 @@
   force = true
 
 [[redirects]]
+  from = "/docs/configuration"
+  to = "/docs/setup/configuration/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/setup/deployment/roles/"
   to = "/docs/setup/deployment/strategies/"
   status = 301
@@ -213,6 +219,12 @@
 [[redirects]]
   from = "/docs/reference/sources/udp/"
   to = "/docs/reference/sources/socket/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/usage/*"
+  to = "/docs/administration/:splat"
   status = 301
   force = true
 
