@@ -1,0 +1,7 @@
+<Alert icon={false} type="warning" classNames="list--warnings">
+
+<%- warnings.each do |warning| -%>
+* <% if warning.option_name %>`<%= warning.option_name %>` - <% end %><%= warning.text %>
+<%- end -%>
+
+</Alert>

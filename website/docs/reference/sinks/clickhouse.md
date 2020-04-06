@@ -971,14 +971,13 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
@@ -1085,6 +1084,11 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -1096,3 +1100,4 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [urls.gzip]: https://www.gzip.org/
 [urls.new_clickhouse_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse
+[urls.openssl]: https://www.openssl.org/

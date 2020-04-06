@@ -142,7 +142,7 @@ class Templates
   end
 
   def component_warnings(component)
-    render("#{partials_path}/_component_warnings.md", binding).strip
+    warnings(component.warnings)
   end
 
   def config_example(options, array: false, group: nil, key_path: [], table_path: [], &block)
@@ -616,6 +616,10 @@ class Templates
 
   def vector_summary
     render("#{partials_path}/_vector_summary.md", binding).strip
+  end
+
+  def warnings(warnings)
+    render("#{partials_path}/_warnings.md", binding).strip
   end
 
   def write_verb_link(sink)

@@ -568,14 +568,13 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
@@ -665,6 +664,11 @@ with Vector!
 
 The `datadog_logs` sink streams data on a real-time
 event-by-event basis. It does not batch data.
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -672,3 +676,4 @@ event-by-event basis. It does not batch data.
 [docs.data-model]: /docs/about/data-model/
 [urls.datadog]: https://www.datadoghq.com
 [urls.datadog_logs_endpoints]: https://docs.datadoghq.com/logs/log_collection/?tab=tcpussite#datadog-logs-endpoints
+[urls.openssl]: https://www.openssl.org/

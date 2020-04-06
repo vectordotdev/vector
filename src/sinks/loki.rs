@@ -226,7 +226,8 @@ impl HttpSink for LokiConfig {
 async fn healthcheck(config: LokiConfig, resolver: Resolver) -> Result<(), crate::Error> {
     let uri = format!("{}ready", config.endpoint);
 
-    let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let mut client = HttpClient::new(resolver, tls)?;
 
     let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
