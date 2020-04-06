@@ -38,7 +38,7 @@ endpoint][urls.elasticsearch_bulk].
 
 <Alert icon={false} type="warning" classNames="list--warnings">
 
-* AWS hosted Elasticsearch is unable to use compression
+* [`compression`](#compression) - AWS hosted Elasticsearch is unable to use compression
 
 </Alert>
 
@@ -431,7 +431,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
-  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option":"#<Field:0x000055c05038d860>"}]}
+  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"compression"}]}
   >
 
 ### compression
@@ -1104,7 +1104,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x000055c0503bfae0>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate

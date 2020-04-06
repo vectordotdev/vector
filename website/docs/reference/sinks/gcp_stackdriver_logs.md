@@ -1008,7 +1008,7 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option":"#<Field:0x000055c05002e890>"}]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be checked for validity, but the negotiation will continue regardless of the result of that check.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate

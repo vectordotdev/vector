@@ -169,7 +169,7 @@ class Field
 
         new_warnings +=
           warnings.collect do |warning|
-            warning["option"] = self
+            warning["option_name"] = name
             warning
           end
 
