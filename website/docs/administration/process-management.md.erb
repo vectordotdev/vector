@@ -22,7 +22,8 @@ Vector.
 | **Optional**            |                                                                                                                     |  |
 | `-d, --dry-run`         | Vector will [validate configuration][docs.validating] and exit.                                                     |  |
 | `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |  |
-| `-qq`                   | Raises the log level to `error`, the highest level possible.                                                        |  |
+| `-qq`                   | Raises the log level to `error`.                                                        |  |
+| `-qqq`                  | Raises the log level to `off`, the highest level possible. Disables logs.                                                        |  |
 | `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks.                                             |  |
 | `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |  |
 | `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |  |
