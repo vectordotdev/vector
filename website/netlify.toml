@@ -109,8 +109,20 @@
   force = true
 
 [[redirects]]
+  from = "/docs/about/correctness"
+  to = "https://vector.dev/#correctness"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/about/performance"
+  to = "https://vector.dev/#performance"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/components/*"
-  to = "/docs/refernce/:splat"
+  to = "/docs/reference/:splat"
   status = 302
   force = true
 
@@ -135,6 +147,12 @@
 [[redirects]]
   from = "/docs/setup/deployment/roles/service/"
   to = "/docs/setup/deployment/strategies/#service"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/setup/getting-started"
+  to = "/guides/getting-started/"
   status = 301
   force = true
 
