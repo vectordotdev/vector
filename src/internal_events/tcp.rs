@@ -2,11 +2,17 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct TcpConnectionEstablished;
+pub struct TcpConnectionEstablished {
+    pub peer_addr: Option<std::net::SocketAddr>,
+}
 
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
-        debug!(message = "connected");
+        if let Some(peer_addr) = self.peer_addr {
+            debug!(message = "connected", %peer_addr);
+        } else {
+            debug!(message = "connected", peer_addr = "unknown");
+        }
     }
 
     fn emit_metrics(&self) {

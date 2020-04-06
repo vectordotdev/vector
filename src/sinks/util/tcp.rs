@@ -147,7 +147,9 @@ impl TcpSink {
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::Ready(stream)) => {
-                        emit!(TcpConnectionEstablished);
+                        emit!(TcpConnectionEstablished {
+                            peer_addr: stream.peer_addr().ok(),
+                        });
                         self.backoff = Self::fresh_backoff();
                         TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
                     }
