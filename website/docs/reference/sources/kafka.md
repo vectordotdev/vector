@@ -46,7 +46,6 @@ ingests data through [Kafka][urls.kafka] and outputs
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

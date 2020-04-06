@@ -1,28 +1,26 @@
-<%- keys = component.sorted_option_group_keys -%>
-<%- if keys.length > 1 -%>
+<%- if groups.length > 1 -%>
 <Tabs
   block={true}
-  defaultValue="<%= keys.first.parameterize %>"
-  values={<%= keys.collect { |k| {label: k, value: k.parameterize} }.to_json %>}>
-
+  defaultValue="<%= groups.first.label.parameterize %>"
+  values={<%= groups.collect { |group| {label: group.label, value: group.label.parameterize} }.to_json %>}>
 <%- end -%>
-<%- keys.each do |key| -%>
-<%- if keys.length > 1 -%>
-<TabItem value="<%= key.parameterize %>">
+<%- groups.each do |group| -%>
+<%- if groups.length > 1 -%>
+<TabItem value="<%= group.label.parameterize %>">
 
 <%- end -%>
 ```toml title="vector.toml"
 <%=
-  config_example(component.options_list, table_path: [component.type.pluralize, "my_#{component.type}_id"]) do |option|
-    component.option_example_groups.fetch(key).call(option)
+  config_example(component.options_list, group: group.group_name, table_path: [component.type.pluralize, "my_#{component.type}_id"]) do |option|
+    group.option_filter.call(option)
   end
 %>
 ```
-<%- if keys.length > 1 -%>
+<%- if groups.length > 1 -%>
 
 </TabItem>
 <%- end -%>
 <%- end -%>
-<%- if keys.length > 1 -%>
+<%- if groups.length > 1 -%>
 </Tabs>
 <%- end -%>

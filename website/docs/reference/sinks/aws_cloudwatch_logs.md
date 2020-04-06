@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Logs"
 description: "The Vector `aws_cloudwatch_logs` sink batches `log` events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint."
@@ -40,7 +40,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/A
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

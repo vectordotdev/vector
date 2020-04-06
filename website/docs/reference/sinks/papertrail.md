@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Papertrail"
 description: "The Vector `papertrail` sink streams `log` events to Papertrail via Syslog."
@@ -38,7 +38,6 @@ The Vector `papertrail` sink
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

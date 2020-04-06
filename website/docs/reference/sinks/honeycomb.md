@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Honeycomb"
 description: "The Vector `honeycomb` sink batches `log` events to Honeycomb via the batch events API."
@@ -38,7 +38,6 @@ The Vector `honeycomb` sink
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

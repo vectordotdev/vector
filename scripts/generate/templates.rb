@@ -57,6 +57,44 @@ class Templates
   end
 
   def component_config_example(component)
+    groups = []
+
+    if component.option_groups.empty?
+      groups << AccessibleHash.new({
+        label: "Common",
+        group_name: nil,
+        option_filter: lambda do |option|
+          option.common?
+        end
+      })
+
+      groups << AccessibleHash.new({
+        label: "Advanced",
+        group_name: nil,
+        option_filter: lambda do |option|
+          true
+        end
+      })
+    else
+      component.option_groups.each do |group_name|
+        groups << AccessibleHash.new({
+          label: group_name,
+          group_name: group_name,
+          option_filter: lambda do |option|
+            option.group?(group_name) && option.common?
+          end
+        })
+
+        groups << AccessibleHash.new({
+          label: "#{group_name} (adv)",
+          group_name: group_name,
+          option_filter: lambda do |option|
+            option.group?(group_name)
+          end
+        })
+      end
+    end
+
     render("#{partials_path}/_component_config_example.md", binding).strip
   end
 
@@ -104,12 +142,12 @@ class Templates
     render("#{partials_path}/_component_warnings.md", binding).strip
   end
 
-  def config_example(options, array: false, key_path: [], table_path: [], &block)
+  def config_example(options, array: false, group: nil, key_path: [], table_path: [], &block)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    example = ConfigWriters::ExampleWriter.new(options, array: array, key_path: key_path, table_path: table_path, &block)
+    example = ConfigWriters::ExampleWriter.new(options, array: array, group: group, key_path: key_path, table_path: table_path, &block)
     example.to_toml
   end
 

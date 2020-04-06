@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Remove Tags"
 description: "The Vector `remove_tags` transform accepts and outputs `metric` events allowing you to remove one or more metric tags."
 event_types: ["metric"]
@@ -13,6 +13,8 @@ title: "Remove Tags Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `remove_tags` transform
 accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
@@ -28,12 +30,31 @@ remove one or more metric tags.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "remove_tags" # required
   inputs = ["my-source-id"] # required
   tags = ["tag1", "tag2"] # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "remove_tags" # required
+  inputs = ["my-source-id"] # required
+  tags = ["tag1", "tag2"] # required
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

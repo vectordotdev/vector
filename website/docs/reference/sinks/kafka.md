@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -47,7 +47,6 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

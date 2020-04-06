@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "GCP PubSub"
 description: "The Vector `gcp_pubsub` sink batches `log` events to Google Cloud Platform's Pubsub service via the REST Interface."
@@ -39,7 +39,6 @@ Interface][urls.gcp_pubsub_rest].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

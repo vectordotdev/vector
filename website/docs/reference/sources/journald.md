@@ -47,7 +47,6 @@ utility and outputs [`log`][docs.data-model.log] events.
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

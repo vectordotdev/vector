@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Add Tags"
 description: "The Vector `add_tags` transform accepts and outputs `metric` events allowing you to add one or more metric tags."
 event_types: ["metric"]
@@ -13,6 +13,8 @@ title: "Add Tags Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `add_tags` transform
 accepts and outputs [`metric`][docs.data-model.metric] events allowing you to
@@ -28,6 +30,12 @@ add one or more metric tags.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
@@ -38,6 +46,23 @@ add one or more metric tags.
   tags.static_tag = "my value" # example
   tags.env_tag = "${ENV_VAR}" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "add_tags" # required
+  inputs = ["my-source-id"] # required
+
+  # Tags
+  tags.static_tag = "my value" # example
+  tags.env_tag = "${ENV_VAR}" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

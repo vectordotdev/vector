@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -34,7 +34,6 @@ log field's value with a [Regular Expression][urls.regex].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

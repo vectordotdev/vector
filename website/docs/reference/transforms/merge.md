@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Merge"
 description: "The Vector [`merge`](#merge) transform accepts and outputs `log` events allowing you to merge partial log events into a single event."
 event_types: ["log"]
@@ -30,6 +30,12 @@ partial log events into a single event.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "merge" # required
@@ -38,6 +44,21 @@ partial log events into a single event.
   partial_event_marker_field = "_partial" # optional, default
   stream_discriminant_fields = [] # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "merge" # required
+  inputs = ["my-source-id"] # required
+  merge_fields = ["message"] # optional, default
+  partial_event_marker_field = "_partial" # optional, default
+  stream_discriminant_fields = [] # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

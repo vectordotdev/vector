@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Cloudwatch Metrics"
 description: "The Vector `aws_cloudwatch_metrics` sink streams `metric` events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint."
@@ -39,7 +39,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

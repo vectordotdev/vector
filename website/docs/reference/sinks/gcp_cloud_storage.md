@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -39,7 +39,6 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

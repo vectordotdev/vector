@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Metrics"
 description: "The Vector `datadog_metrics` sink batches `metric` events to Datadog's metrics service using HTTP API."
@@ -38,7 +38,6 @@ API](https://docs.datadoghq.com/api/?lang=bash#metrics).
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

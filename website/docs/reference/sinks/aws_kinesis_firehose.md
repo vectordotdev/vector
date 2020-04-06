@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "AWS Kinesis Firehose"
 description: "The Vector `aws_kinesis_firehose` sink batches `log` events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint."
@@ -40,7 +40,6 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

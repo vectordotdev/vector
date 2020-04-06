@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Clickhouse"
 description: "The Vector `clickhouse` sink batches `log` events to Clickhouse via the `HTTP` Interface."
@@ -47,7 +47,6 @@ The Vector `clickhouse` sink
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

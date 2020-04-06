@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` sink streams `metric` events to StatsD metrics service."
@@ -16,6 +16,8 @@ unsupported_operating_systems: []
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `statsd` sink
 [streams](#streaming) [`metric`][docs.data-model.metric] events to
@@ -31,6 +33,12 @@ The Vector `statsd` sink
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   type = "statsd" # required
@@ -39,6 +47,21 @@ The Vector `statsd` sink
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  type = "statsd" # required
+  inputs = ["my-source-id"] # required
+  namespace = "service" # required
+  address = "127.0.0.1:8125" # optional, default
+  healthcheck = true # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

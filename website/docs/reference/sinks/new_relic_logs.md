@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "New Relic Logs"
 description: "The Vector `new_relic_logs` sink batches `log` events to New Relic's log service via their log API."
@@ -39,7 +39,6 @@ API][urls.new_relic_log_api].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

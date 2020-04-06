@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Splunk HEC"
 description: "The Vector `splunk_hec` sink batches `log` events to a Splunk's HTTP Event Collector."
@@ -38,7 +38,6 @@ HTTP Event Collector][urls.splunk_hec].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

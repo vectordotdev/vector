@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Logfmt Parser"
 description: "The Vector `logfmt_parser` transform accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Logfmt Parser Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `logfmt_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to extract
@@ -27,6 +29,12 @@ data from a logfmt-formatted log field.
 -->
 
 ## Configuration
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
@@ -44,6 +52,29 @@ data from a logfmt-formatted log field.
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "logfmt_parser" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

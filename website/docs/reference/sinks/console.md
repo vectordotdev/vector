@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Console"
 description: "The Vector `console` sink streams `log` and `metric` events to standard output streams, such as STDOUT and STDERR."
@@ -16,6 +16,8 @@ unsupported_operating_systems: []
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `console` sink
 [streams](#streaming) [`log`][docs.data-model.log] and
@@ -33,6 +35,12 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
@@ -43,6 +51,26 @@ streams][urls.standard_streams], such as [STDOUT][urls.stdout] and
   # Encoding
   encoding.codec = "json" # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  # General
+  type = "console" # required
+  inputs = ["my-source-id"] # required
+  target = "stdout" # optional, default
+
+  # Encoding
+  encoding.codec = "json" # required
+  encoding.except_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
+  encoding.timestamp_format = "rfc3339" # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

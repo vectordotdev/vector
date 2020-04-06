@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Datadog Logs"
 description: "The Vector `datadog_logs` sink streams `log` events to Datadog's logs via the TCP endpoint."
@@ -39,7 +39,6 @@ endpoint][urls.datadog_logs_endpoints].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"

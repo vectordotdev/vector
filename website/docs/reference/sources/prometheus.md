@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Prometheus"
 description: "The Vector `prometheus` source ingests data through the Prometheus text exposition format and outputs `metric` events."
@@ -35,12 +35,31 @@ format][urls.prometheus_text_based_exposition_format] and outputs
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [sources.my_source_id]
   type = "prometheus" # required
   hosts = ["http://localhost:9090"] # required
   scrape_interval_secs = 15 # optional, default, seconds
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[sources.my_source_id]
+  type = "prometheus" # required
+  hosts = ["http://localhost:9090"] # required
+  scrape_interval_secs = 15 # optional, default, seconds
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

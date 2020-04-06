@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Filter"
 description: "The Vector `filter` transform accepts and outputs `log` events allowing you to select events based on a set of logical conditions."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Filter Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `filter` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to select
@@ -28,6 +30,12 @@ events based on a set of logical conditions.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
@@ -42,6 +50,29 @@ events based on a set of logical conditions.
   condition."message.regex" = " (any|of|these|five|words) " # example
   condition."environment.starts_with" = "staging-" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "filter" # required
+  inputs = ["my-source-id"] # required
+
+  # Condition
+  condition.type = "check_fields" # optional, default
+  condition."message.eq" = "this is the content to match against" # example
+  condition."host.exists" = true # example
+  condition."method.neq" = "POST" # example
+  condition."message.contains" = "foo" # example
+  condition."environment.ends_with" = "-staging" # example
+  condition."message.regex" = " (any|of|these|five|words) " # example
+  condition."environment.starts_with" = "staging-" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

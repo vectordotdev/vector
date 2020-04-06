@@ -14,6 +14,8 @@ title: "AWS EC2 Metadata Transform"
 import Alert from '@site/src/components/Alert';
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `aws_ec2_metadata` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
@@ -39,6 +41,12 @@ logs with AWS EC2 instance metadata.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "aws_ec2_metadata" # required
@@ -48,6 +56,22 @@ logs with AWS EC2 instance metadata.
   namespace = "" # optional, default
   refresh_interval_secs = 10 # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "aws_ec2_metadata" # required
+  inputs = ["my-source-id"] # required
+  fields = ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"] # optional, default
+  host = "http://169.254.169.254" # optional, default
+  namespace = "" # optional, default
+  refresh_interval_secs = 10 # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

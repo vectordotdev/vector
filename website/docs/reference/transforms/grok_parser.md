@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Grok Parser"
 description: "The Vector `grok_parser` transform accepts and outputs `log` events allowing you to parse a log field value with Grok."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Grok Parser Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `grok_parser` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to parse a
@@ -27,6 +29,12 @@ log field value with [Grok][urls.grok].
 -->
 
 ## Configuration
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
@@ -45,6 +53,30 @@ log field value with [Grok][urls.grok].
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "grok_parser" # required
+  inputs = ["my-source-id"] # required
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field
