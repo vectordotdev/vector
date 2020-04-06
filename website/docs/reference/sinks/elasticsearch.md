@@ -38,7 +38,7 @@ endpoint][urls.elasticsearch_bulk].
 
 <Alert icon={false} type="warning" classNames="list--warnings">
 
-* [`compression`](#compression) option - AWS hosted Elasticsearch is unable to use compression
+* AWS hosted Elasticsearch is unable to use compression
 
 </Alert>
 
@@ -431,7 +431,7 @@ The behavior when the buffer becomes full.
   templateable={false}
   type={"string"}
   unit={null}
-  warnings={["AWS hosted Elasticsearch is unable to use compression"]}
+  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option":"#<Field:0x00005614a0466f08>"}]}
   >
 
 ### compression

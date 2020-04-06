@@ -153,14 +153,14 @@ function FieldFooter({defaultValue, enumValues, examples, groups, name, path, re
       <ul className="info">
         {warnings && warnings.length > 0 && warnings.map((warning, idx) => (
           <li key={idx} className="warning">
-            <i className="feather icon-alert-triangle"></i> WARNING: {warning}
+            <i className="feather icon-alert-triangle"></i> WARNING: {warning.text}
           </li>
         ))}
         {relevantWhen ?
           <li>Only {required ? 'required' : 'relevant'} when: <RelevantWhen value={relevantWhen} /></li> :
           null}
         {defaultValue !== undefined ?
-          (defaultValue ?
+          (defaultValue !== null ?
             <li>Default: <Value unit={unit} value={defaultValue} /></li> :
             <li>No default</li>) :
           null}
