@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "InfluxDB Metrics"
 description: "The Vector `influxdb_metrics` sink batches `metric` events to InfluxDB using v1 or v2 HTTP API."
@@ -36,27 +36,8 @@ The Vector `influxdb_metrics` sink
 
 <Tabs
   block={true}
-  defaultValue="v2"
-  values={[{"label":"v2","value":"v2"},{"label":"v1","value":"v1"},{"label":"v2 (adv)","value":"v2-adv"},{"label":"v1 (adv)","value":"v1-adv"}]}>
-
-<TabItem value="v2">
-
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  # General
-  type = "influxdb_metrics" # required
-  inputs = ["my-source-id"] # required
-  bucket = "vector-bucket" # required
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
-  namespace = "service" # required
-  healthcheck = true # optional, default
-
-  # auth
-  org = "Organization" # required
-  token = "${INFLUXDB_TOKEN}" # required
-```
-
-</TabItem>
+  defaultValue="v1"
+  values={[{"label":"v1","value":"v1"},{"label":"v1 (adv)","value":"v1-adv"},{"label":"v2","value":"v2"},{"label":"v2 (adv)","value":"v2-adv"}]}>
 <TabItem value="v1">
 
 ```toml title="vector.toml"
@@ -65,35 +46,39 @@ The Vector `influxdb_metrics` sink
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
   database = "vector-database" # required
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   healthcheck = true # optional, default
 
-  # auth
+  # Auth
   password = "${INFLUXDB_PASSWORD}" # optional, no default
   username = "todd" # optional, no default
 
-  # persistence
+  # Persistence
   consistency = "any" # optional, no default
   retention_policy_name = "autogen" # optional, no default
 ```
 
 </TabItem>
-<TabItem value="v2-adv">
+<TabItem value="v1-adv">
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
-  bucket = "vector-bucket" # required
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  database = "vector-database" # required
+  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com" # required
   namespace = "service" # required
   healthcheck = true # optional, default
 
-  # auth
-  org = "Organization" # required
-  token = "${INFLUXDB_TOKEN}" # required
+  # Auth
+  password = "${INFLUXDB_PASSWORD}" # optional, no default
+  username = "todd" # optional, no default
+
+  # Persistence
+  consistency = "any" # optional, no default
+  retention_policy_name = "autogen" # optional, no default
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -110,25 +95,39 @@ The Vector `influxdb_metrics` sink
 ```
 
 </TabItem>
-<TabItem value="v1-adv">
+<TabItem value="v2">
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   # General
   type = "influxdb_metrics" # required
   inputs = ["my-source-id"] # required
-  database = "vector-database" # required
+  bucket = "vector-bucket" # required
   endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
   namespace = "service" # required
   healthcheck = true # optional, default
 
-  # auth
-  password = "${INFLUXDB_PASSWORD}" # optional, no default
-  username = "todd" # optional, no default
+  # Auth
+  org = "my-org" # required
+  token = "${INFLUXDB_TOKEN}" # required
+```
 
-  # persistence
-  consistency = "any" # optional, no default
-  retention_policy_name = "autogen" # optional, no default
+</TabItem>
+<TabItem value="v2-adv">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  # General
+  type = "influxdb_metrics" # required
+  inputs = ["my-source-id"] # required
+  bucket = "vector-bucket" # required
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com" # required
+  namespace = "service" # required
+  healthcheck = true # optional, default
+
+  # Auth
+  org = "my-org" # required
+  token = "${INFLUXDB_TOKEN}" # required
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -226,7 +225,7 @@ The maximum age of a batch before it is flushed.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["https://us-west-2-1.aws.cloud2.influxdata.com","http://localhost:8086/"]}
+  examples={["http://localhost:8086/","https://us-west-2-1.aws.cloud1.influxdata.com","https://us-west-2-1.aws.cloud2.influxdata.com"]}
   groups={["v1","v2"]}
   name={"endpoint"}
   path={null}
@@ -370,7 +369,7 @@ A prefix that will be added to all metric names.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["Organization","33f2cff0a28e5b63"]}
+  examples={["my-org","33f2cff0a28e5b63"]}
   groups={["v2"]}
   name={"org"}
   path={null}

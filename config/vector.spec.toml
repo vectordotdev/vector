@@ -6507,8 +6507,9 @@ end
   #
   # * required
   # * type: string
-  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
   endpoint = "http://localhost:8086/"
+  endpoint = "https://us-west-2-1.aws.cloud1.influxdata.com"
+  endpoint = "https://us-west-2-1.aws.cloud2.influxdata.com"
 
   # A prefix that will be added to all metric names.
   #
@@ -6525,14 +6526,14 @@ end
   healthcheck = false
 
   #
-  # auth
+  # Auth
   #
 
   # Specifies the destination organization for writes into InfluxDB 2.
   #
   # * required
   # * type: string
-  org = "Organization"
+  org = "my-org"
   org = "33f2cff0a28e5b63"
 
   # Authentication token for InfluxDB 2.
@@ -6561,7 +6562,7 @@ end
   username = "vector-source"
 
   #
-  # persistence
+  # Persistence
   #
 
   # Sets the write consistency for the point for InfluxDB 1.

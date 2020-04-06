@@ -13,6 +13,8 @@ title: "GeoIP Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector [`geoip`](#geoip) transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
@@ -29,6 +31,12 @@ databases.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "geoip" # required
@@ -37,6 +45,21 @@ databases.
   source = "ip_address" # required
   target = "geoip" # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "geoip" # required
+  inputs = ["my-source-id"] # required
+  database = "/path/to/GeoLite2-City.mmdb" # required
+  source = "ip_address" # required
+  target = "geoip" # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

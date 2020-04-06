@@ -45,31 +45,8 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
 
 <Tabs
   block={true}
-  defaultValue="unix"
-  values={[{"label":"unix","value":"unix"},{"label":"udp","value":"udp"},{"label":"tcp","value":"tcp"},{"label":"unix (adv)","value":"unix-adv"},{"label":"udp (adv)","value":"udp-adv"},{"label":"tcp (adv)","value":"tcp-adv"}]}>
-
-<TabItem value="unix">
-
-```toml title="vector.toml"
-[sources.my_source_id]
-  type = "socket" # required
-  mode = "tcp" # required
-  path = "/path/to/socket" # required, required when mode = "unix"
-  max_length = 102400 # optional, default, bytes
-```
-
-</TabItem>
-<TabItem value="udp">
-
-```toml title="vector.toml"
-[sources.my_source_id]
-  type = "socket" # required
-  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
-  mode = "tcp" # required
-  max_length = 102400 # optional, default, bytes
-```
-
-</TabItem>
+  defaultValue="tcp"
+  values={[{"label":"tcp","value":"tcp"},{"label":"tcp (adv)","value":"tcp-adv"},{"label":"udp","value":"udp"},{"label":"udp (adv)","value":"udp-adv"},{"label":"unix","value":"unix"},{"label":"unix (adv)","value":"unix-adv"}]}>
 <TabItem value="tcp">
 
 ```toml title="vector.toml"
@@ -78,36 +55,6 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
   address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
   max_length = 102400 # optional, default, bytes
-```
-
-</TabItem>
-<TabItem value="unix-adv">
-
-```toml title="vector.toml"
-[sources.my_source_id]
-  # General
-  type = "socket" # required
-  mode = "tcp" # required
-  path = "/path/to/socket" # required, required when mode = "unix"
-  max_length = 102400 # optional, default, bytes
-
-  # Context
-  host_key = "host" # optional, default
-```
-
-</TabItem>
-<TabItem value="udp-adv">
-
-```toml title="vector.toml"
-[sources.my_source_id]
-  # General
-  type = "socket" # required
-  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
-  mode = "tcp" # required
-  max_length = 102400 # optional, default, bytes
-
-  # Context
-  host_key = "host" # optional, default
 ```
 
 </TabItem>
@@ -132,6 +79,58 @@ ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp],
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default, relevant when mode = "tcp"
   tls.key_path = "/path/to/host_certificate.key" # optional, no default, relevant when mode = "tcp"
   tls.verify_certificate = false # optional, default, relevant when mode = "tcp"
+```
+
+</TabItem>
+<TabItem value="udp">
+
+```toml title="vector.toml"
+[sources.my_source_id]
+  type = "socket" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "udp" # required
+  max_length = 102400 # optional, default, bytes
+```
+
+</TabItem>
+<TabItem value="udp-adv">
+
+```toml title="vector.toml"
+[sources.my_source_id]
+  # General
+  type = "socket" # required
+  address = "0.0.0.0:9000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "udp" # required
+  max_length = 102400 # optional, default, bytes
+
+  # Context
+  host_key = "host" # optional, default
+```
+
+</TabItem>
+<TabItem value="unix">
+
+```toml title="vector.toml"
+[sources.my_source_id]
+  type = "socket" # required
+  mode = "unix" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+  max_length = 102400 # optional, default, bytes
+```
+
+</TabItem>
+<TabItem value="unix-adv">
+
+```toml title="vector.toml"
+[sources.my_source_id]
+  # General
+  type = "socket" # required
+  mode = "unix" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+  max_length = 102400 # optional, default, bytes
+
+  # Context
+  host_key = "host" # optional, default
 ```
 
 </TabItem>

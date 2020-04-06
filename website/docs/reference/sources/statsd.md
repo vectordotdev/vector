@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Statsd"
 description: "The Vector `statsd` source ingests data through the StatsD UDP protocol and outputs `metric` events."
@@ -42,11 +42,29 @@ outputs [`metric`][docs.data-model.metric] events.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [sources.my_source_id]
   type = "statsd" # required
   address = "127.0.0.1:8126" # required
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[sources.my_source_id]
+  type = "statsd" # required
+  address = "127.0.0.1:8126" # required
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

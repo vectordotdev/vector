@@ -92,9 +92,9 @@ module ConfigWriters
       end
     end
 
-    attr_reader :array, :block, :fields, :key_path, :table_path, :values
+    attr_reader :array, :block, :fields, :group, :key_path, :table_path, :values
 
-    def initialize(fields, array: false, key_path: [], table_path: [], values: nil, &block)
+    def initialize(fields, array: false, group: nil, key_path: [], table_path: [], values: nil, &block)
       if !fields.is_a?(Array)
         raise ArgumentError.new("fields must be an array")
       end
@@ -105,6 +105,7 @@ module ConfigWriters
 
       @array = array
       @fields = fields.sort_by(&:config_file_sort_token)
+      @group = group
       @key_path = key_path
       @table_path = table_path
       @block = block

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Swimlanes"
 description: "The Vector `swimlanes` transform accepts and outputs `log` events allowing you to route events across parallel streams using logical filters."
 event_types: ["log"]
@@ -30,6 +30,12 @@ events across parallel streams using logical filters.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
@@ -45,6 +51,30 @@ events across parallel streams using logical filters.
     "message.regex" = " (any|of|these|five|words) " # example
     "environment.starts_with" = "staging-" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "swimlanes" # required
+  inputs = ["my-source-id"] # required
+
+  # Lanes
+  [transforms.my_transform_id.lanes.`[swimlane-id]`]
+    type = "check_fields" # optional, default
+    "message.eq" = "this is the content to match against" # example
+    "host.exists" = true # example
+    "method.neq" = "POST" # example
+    "message.contains" = "foo" # example
+    "environment.ends_with" = "-staging" # example
+    "message.regex" = " (any|of|these|five|words) " # example
+    "environment.starts_with" = "staging-" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or UDS socket."
@@ -37,65 +37,14 @@ The Vector `socket` sink
 
 <Tabs
   block={true}
-  defaultValue="unix"
-  values={[{"label":"unix","value":"unix"},{"label":"udp","value":"udp"},{"label":"tcp","value":"tcp"},{"label":"unix (adv)","value":"unix-adv"},{"label":"udp (adv)","value":"udp-adv"},{"label":"tcp (adv)","value":"tcp-adv"}]}>
-
-<TabItem value="unix">
-
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  mode = "tcp" # required
-  path = "/path/to/socket" # required, required when mode = "unix"
-```
-
-</TabItem>
-<TabItem value="udp">
-
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
-  mode = "tcp" # required
-```
-
-</TabItem>
+  defaultValue="tcp"
+  values={[{"label":"tcp","value":"tcp"},{"label":"tcp (adv)","value":"tcp-adv"},{"label":"udp","value":"udp"},{"label":"udp (adv)","value":"udp-adv"},{"label":"unix","value":"unix"},{"label":"unix (adv)","value":"unix-adv"}]}>
 <TabItem value="tcp">
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
-```
-
-</TabItem>
-<TabItem value="unix-adv">
-
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  # General
-  mode = "tcp" # required
-  path = "/path/to/socket" # required, required when mode = "unix"
-
-  # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
-  buffer.when_full = "block" # optional, default
-```
-
-</TabItem>
-<TabItem value="udp-adv">
-
-```toml title="vector.toml"
-[sinks.my_sink_id]
-  # General
-  address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
-  mode = "tcp" # required
-
-  # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
-  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>
@@ -121,6 +70,56 @@ The Vector `socket` sink
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
   tls.verify_hostname = true # optional, default
+```
+
+</TabItem>
+<TabItem value="udp">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "udp" # required
+```
+
+</TabItem>
+<TabItem value="udp-adv">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  # General
+  address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
+  mode = "udp" # required
+
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
+```
+
+</TabItem>
+<TabItem value="unix">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  mode = "unix" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+```
+
+</TabItem>
+<TabItem value="unix-adv">
+
+```toml title="vector.toml"
+[sinks.my_sink_id]
+  # General
+  mode = "unix" # required
+  path = "/path/to/socket" # required, required when mode = "unix"
+
+  # Buffer
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>

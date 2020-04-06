@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Add Fields"
 description: "The Vector `add_fields` transform accepts and outputs `log` events allowing you to add one or more log fields."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Add Fields Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `add_fields` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to add one
@@ -27,6 +29,12 @@ or more log fields.
 -->
 
 ## Configuration
+
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
@@ -45,6 +53,30 @@ or more log fields.
   fields.parent.child_field = "child_value" # example
   fields.list_field = ["first", "second", "third"] # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "add_fields" # required
+  inputs = ["my-source-id"] # required
+
+  # Fields
+  fields.string_field = "string value" # example
+  fields.env_var_field = "${ENV_VAR}" # example
+  fields.templated_field = "{{ my_other_field }}" # example
+  fields.int_field = 1 # example
+  fields.float_field = 1.2 # example
+  fields.bool_field = true # example
+  fields.timestamp_field = 1979-05-27T00:32:00Z # example
+  fields.parent.child_field = "child_value" # example
+  fields.list_field = ["first", "second", "third"] # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

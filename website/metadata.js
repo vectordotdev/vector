@@ -24753,7 +24753,7 @@ module.exports = {
     "influxdb_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"https://us-west-2-1.aws.cloud2.influxdata.com\" # required\n  namespace = \"service\" # required\n\n  # auth\n  org = \"Organization\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
+        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",

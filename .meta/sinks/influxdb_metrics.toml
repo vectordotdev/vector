@@ -59,7 +59,9 @@ write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_
 [sinks.influxdb_metrics.options.endpoint]
 type = "string"
 common = true
-examples = ["https://us-west-2-1.aws.cloud2.influxdata.com", "http://localhost:8086/"]
+examples.all = ["http://localhost:8086/"]
+examples.v1 = ["https://us-west-2-1.aws.cloud1.influxdata.com"]
+examples.v2 = ["https://us-west-2-1.aws.cloud2.influxdata.com"]
 groups = ["v1", "v2"]
 required = true
 sort = 1
@@ -67,9 +69,9 @@ description = "InfluxDB endpoint to send metrics to."
 
 [sinks.influxdb_metrics.options.org]
 type = "string"
-category = "auth"
+category = "Auth"
 common = true
-examples = ["Organization", "33f2cff0a28e5b63"]
+examples = ["my-org", "33f2cff0a28e5b63"]
 groups = ["v2"]
 required = true
 description = "Specifies the destination organization for writes into InfluxDB 2."
@@ -84,7 +86,7 @@ description = "The destination bucket for writes into InfluxDB 2."
 
 [sinks.influxdb_metrics.options.token]
 type = "string"
-category = "auth"
+category = "Auth"
 common = true
 examples = ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 groups = ["v2"]
@@ -101,7 +103,7 @@ description = "Sets the target database for the write into InfluxDB 1."
 
 [sinks.influxdb_metrics.options.consistency]
 type = "string"
-category = "persistence"
+category = "Persistence"
 common = true
 examples = ["any", "one", "quorum", "all"]
 groups = ["v1"]
@@ -110,7 +112,7 @@ description = "Sets the write consistency for the point for InfluxDB 1."
 
 [sinks.influxdb_metrics.options.retention_policy_name]
 type = "string"
-category = "persistence"
+category = "Persistence"
 common = true
 examples = ["autogen", "one_day_only"]
 groups = ["v1"]
@@ -119,7 +121,7 @@ description = "Sets the target retention policy for the write into InfluxDB 1."
 
 [sinks.influxdb_metrics.options.username]
 type = "string"
-category = "auth"
+category = "Auth"
 common = true
 examples = ["todd", "vector-source"]
 groups = ["v1"]
@@ -128,7 +130,7 @@ description = "Sets the username for authentication if you’ve enabled authenti
 
 [sinks.influxdb_metrics.options.password]
 type = "string"
-category = "auth"
+category = "Auth"
 common = true
 examples = ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 groups = ["v1"]

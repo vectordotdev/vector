@@ -1,6 +1,43 @@
 #encoding: utf-8
 
 class Field
+  # This classes was introduced to handle value grouping without breaking
+  # the current Array API.
+  #
+  # We introduced "groups" for component options. For example, the
+  # `influxdb_metrics` sink groups options by "v1" and "v2". This signals
+  # which options are supported across each InfluxDB version. The problem
+  # is that some of the option values differ based on the version being used.
+  # This class allows definitions to group example values in a backwards
+  # compatible way.
+  class Examples < Array
+    def initialize(examples)
+      groups = {}
+      array = []
+
+      if examples.is_a?(Hash)
+        groups = examples
+
+        examples.values.each do |value|
+          array += value
+        end
+      elsif examples.is_a?(Array)
+        groups = {"all" => examples}
+        array = examples
+      else
+        raise ArgumentError.new("Unsupported examples type: #{examples.class.name}")
+      end
+
+      @groups = groups
+
+      super(array)
+    end
+
+    def fetch_group_values!(group)
+      @groups.key?(group) ? @groups.fetch(group) : self
+    end
+  end
+
   include Comparable
 
   OBJECT_TYPES = ["struct", "table"]
@@ -30,7 +67,7 @@ class Field
     @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
-    @examples = (hash["examples"] || []).freeze
+    @examples = Examples.new(hash["examples"] || []).freeze
     @field_path_notation = hash["field_path_notation"] == true
     @groups = (hash["groups"] || []).freeze
     @name = hash.fetch("name")
@@ -43,6 +80,8 @@ class Field
     @type = hash.fetch("type")
     @unit = hash["unit"]
     @warnings = (hash["warnings"] || []).freeze
+
+    # category
 
     @category = hash["category"] || ((@children.to_h.values.empty?) ? "General" : @name.humanize)
 
@@ -58,12 +97,12 @@ class Field
 
     if wildcard? && !object?
       if !@examples.any? { |example| example.is_a?(Hash) }
-        raise "#{@name}#examples must be a hash with name/value keys when the name is \"*\""
+        raise ArgumentError.new("#{@name}#examples must be a hash with name/value keys when the name is \"*\"")
       end
     end
 
-    if @examples.any? && !@enum.nil? && !wildcard?
-      raise ArgumentError.new("#{@name}.examples must not be supplied if enum is supplied")
+    if @examples.any? && !@enum.nil? && !wildcard? && @examples != @enum.keys
+      raise ArgumentError.new("#{@name}.examples is invalid, remove it or match it exactly with the enum values")
     end
 
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
@@ -74,23 +113,26 @@ class Field
 
     if @examples.empty?
       if !@enum.nil?
-        @examples = @enum.keys
+        @examples = Examples.new(@enum.keys)
       elsif !@default.nil?
-        @examples = [@default]
+        @examples = Examples.new([@default])
         if @type == "bool"
           @examples.push(!@default)
         end
       elsif @type == "bool"
-        @examples = [true, false]
+        @examples = Examples.new([true, false])
       end
     end
 
     # Coercion
 
     if @type == "timestamp"
-      @examples = @examples.collect do |example|
-        DateTime.iso8601(example)
-      end
+      @examples =
+        Examples.new(
+          @examples.collect do |example|
+            DateTime.iso8601(example)
+          end
+        )
     end
 
     # Requirements
@@ -211,8 +253,12 @@ class Field
   end
 
   def group?(group_name)
-    groups.any? do |group|
-      group.downcase == group_name.downcase
+    if group_name.nil?
+      true
+    else
+      groups.any? do |group|
+        group.downcase == group_name.downcase
+      end
     end
   end
 

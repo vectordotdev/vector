@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log"]
@@ -30,6 +30,12 @@ transform events with a full embedded [Lua][urls.lua] engine.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "lua" # required
@@ -48,6 +54,31 @@ transform events with a full embedded [Lua][urls.lua] engine.
   search_dirs = ["/etc/vector/lua"] # optional, no default
   version = "1" # optional, default
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  type = "lua" # required
+  inputs = ["my-source-id"] # required
+  source = """
+  require("script") # a `script.lua` file must be in your [`search_dirs`](#search_dirs)
+
+  if event["host"] == nil then
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname = string.gsub(hostname, "\n$", "")
+    event["host"] = hostname
+  end
+  """ # required
+  search_dirs = ["/etc/vector/lua"] # optional, no default
+  version = "1" # optional, default
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field

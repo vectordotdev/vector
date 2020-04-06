@@ -45,7 +45,6 @@ accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
