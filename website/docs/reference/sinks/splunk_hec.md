@@ -893,7 +893,9 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
 host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+verifying the remote certificate.Note: The certificate will be checked for
+validity, but the negotiation will continue regardless of the result of that
+check.
 
 
 

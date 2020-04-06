@@ -433,7 +433,8 @@ dns_servers = ["0.0.0.0:53"]
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
-    # will ignore the presence of a client certificate.
+    # will ignore the presence of a client certificate.Note: This will cause
+    # OpenSSL to not request a certificate from the client.
     #
     # * optional
     # * default: false
@@ -709,7 +710,8 @@ dns_servers = ["0.0.0.0:53"]
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
-    # will ignore the presence of a client certificate.
+    # will ignore the presence of a client certificate.Note: This will cause
+    # OpenSSL to not request a certificate from the client.
     #
     # * optional
     # * default: false
@@ -866,7 +868,8 @@ dns_servers = ["0.0.0.0:53"]
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
-    # will ignore the presence of a client certificate.
+    # will ignore the presence of a client certificate.Note: This will cause
+    # OpenSSL to not request a certificate from the client.
     #
     # * optional
     # * default: false
@@ -956,7 +959,8 @@ dns_servers = ["0.0.0.0:53"]
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
-    # will ignore the presence of a client certificate.
+    # will ignore the presence of a client certificate.Note: This will cause
+    # OpenSSL to not request a certificate from the client.
     #
     # * optional
     # * default: false
@@ -1124,7 +1128,8 @@ dns_servers = ["0.0.0.0:53"]
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
-    # will ignore the presence of a client certificate.
+    # will ignore the presence of a client certificate.Note: This will cause
+    # OpenSSL to not request a certificate from the client.
     #
     # * optional
     # * default: false
@@ -1214,7 +1219,8 @@ dns_servers = ["0.0.0.0:53"]
 
     # If `true`, Vector will require a TLS certificate from the connecting host and
     # terminate the connection if it is not valid. If `false` (the default), Vector
-    # will ignore the presence of a client certificate.
+    # will ignore the presence of a client certificate.Note: This will cause
+    # OpenSSL to not request a certificate from the client.
     #
     # * optional
     # * default: false
@@ -4016,7 +4022,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -4267,7 +4275,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -4740,7 +4750,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -5167,7 +5179,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -5439,7 +5453,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -5766,7 +5782,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -6247,7 +6265,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -7428,7 +7448,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -8296,7 +8318,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -8582,7 +8606,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
@@ -8761,7 +8787,9 @@ end
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
+    # not verifying the remote certificate.Note: The certificate will be checked
+    # for validity, but the negotiation will continue regardless of the result of
+    # that check.
     #
     # * optional
     # * default: true
