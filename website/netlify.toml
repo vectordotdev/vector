@@ -31,6 +31,12 @@
 #
 
 [[redirects]]
+  from = "https://docs.vector.dev/v/*"
+  to = "https://docs.vector.dev/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "https://docs.vector.dev/correctness"
   to = "https://vector.dev/#correctness"
   status = 301
