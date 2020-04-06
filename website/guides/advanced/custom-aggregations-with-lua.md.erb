@@ -6,8 +6,8 @@ author_github: https://github.com/a-rodin
 tags: ["type: guide", "domain: transforms", "transform: lua"]
 ---
 
-While Vector's built-in [transforms][docs.reference.transforms] are fast, sometimes they are not are not expressive
-enough for you needs. In such cases the [`lua`][docs.reference.transforms.lua] transform comes to rescue, letting you
+While Vector's built-in [transforms][docs.reference.transforms] are fast, sometimes they are not expressive
+enough for your needs. In such cases the [`lua`][docs.reference.transforms.lua] transform comes to rescue, letting you
 define custom transformation logic.
 
 This guide walks through various ways of defining an aggregating transform component that takes incoming log events,
@@ -16,7 +16,7 @@ counts them, and emits [`counter`][docs.about.data-model.metric#counter] metrics
 ## Architectural Overview
 
 Lua is an interpreted language embedded into Vector. When a `lua` transform is created, it starts an instance
-of Lua interpreter. As a consequence, different transforms are isolated and cannot interrupt each other.
+of the Lua interpreter. As a consequence, different transforms are isolated and cannot interrupt each other.
 
 The execution model is asynchronous, with two key concepts: _hooks_ and _timer handlers_. Both of them are
 user-defined Lua functions which are called by Vector at certain events.
@@ -126,7 +126,7 @@ hooks.shutdown = """
 
 One could plug it into a [pipeline][docs.about.concepts#pipelines] and it would work!
 
-However, this code could and should be refactored. Hold on to the next section to see way in which it could be done.
+However, this code could and should be refactored. Hold on to the next section to see how it could be done.
 
 ## Reduce Duplication
 
@@ -226,7 +226,7 @@ common functionality between different scripted transforms using [loadable modul
 There are many ways to use modules in Lua. The simplest one is to just use [`require`][urls.lua_require] function to
 evaluate code from a file, setting up some global variables.
 
-With this approach the config from the previous section becomes splitted into two files:
+With this approach the config from the previous section becomes split into two files:
 
 ```lua title="aggregator.lua"
 function init()
