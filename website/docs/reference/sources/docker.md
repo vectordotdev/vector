@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Docker"
 description: "The Vector `docker` source ingests data through the Docker engine daemon and outputs `log` events."
@@ -261,11 +261,9 @@ verifying the remote certificate.
 
 ## Fields
 
-The `docker` source ingests data through the [Docker][urls.docker] [engine daemon][urls.docker_daemon] and outputs [`log`][docs.data-model.log] events.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "container_created_at": "2019-11-01T21:15:47+00:00",
   "container_id": "9b6247364a03",
   "container_name": "evil_ptolemy",
@@ -274,10 +272,9 @@ For example:
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "stream": "stdout",
   "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

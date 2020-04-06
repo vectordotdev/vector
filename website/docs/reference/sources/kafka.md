@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -496,17 +496,14 @@ begins with `^`.
 
 ## Fields
 
-The `kafka` source ingests data through [Kafka][urls.kafka] and outputs [`log`][docs.data-model.log] events.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

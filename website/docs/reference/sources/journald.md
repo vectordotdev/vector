@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "Journald"
 description: "The Vector `journald` source ingests data through Systemd's Journald utility and outputs `log` events."
@@ -204,19 +204,16 @@ them a valid service unit name.
 
 ## Fields
 
-The `journald` source ingests data through [Systemd's][urls.systemd] [Journald][urls.journald] utility and outputs [`log`][docs.data-model.log] events.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "_SYSTEMD_UNIT": "ntpd.service",
   "host": "my.host.com",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

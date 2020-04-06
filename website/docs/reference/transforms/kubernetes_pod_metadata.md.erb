@@ -37,12 +37,7 @@ docs][urls.kubernetes_authorization] for more info.
 <%= permissions(component.permissions_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.fields.log -%>
-## Fields
-
-<%= component_fields(component, component.fields.log, heading_depth: 3) %>
-
-<%- end -%>
+<%= component_fields(component, heading_depth: 2) -%>
 <%- if component.examples.any? -%>
 ## Examples
 

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector [`file`](#file) source ingests data through one or more local files and outputs `log` events."
@@ -604,19 +604,16 @@ checkpoint.
 
 ## Fields
 
-The [`file`](#file) source ingests data through one or more local files and outputs [`log`][docs.data-model.log] events.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "file": "/var/log/nginx.log",
   "host": "my.host.com",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

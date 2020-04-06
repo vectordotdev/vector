@@ -26,12 +26,7 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.fields.metric -%>
-## Fields
-
-<%= component_output(component, component.fields.metric, heading_depth: 3) %>
-
-<%- end -%>
+<%= component_fields(component, heading_depth: 2) -%>
 <%- if component.examples.any? -%>
 ## Examples
 

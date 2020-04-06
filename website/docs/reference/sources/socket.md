@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` source ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs `log` events."
@@ -468,18 +468,15 @@ will ignore the presence of a client certificate.
 
 ## Fields
 
-The `socket` source ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs [`log`][docs.data-model.log] events.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "host": "my.host.com",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field
