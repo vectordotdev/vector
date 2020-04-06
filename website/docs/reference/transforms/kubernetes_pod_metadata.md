@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Kubernetes Pod Metadata"
 description: "The Vector `kubernetes_pod_metadata` transform accepts and outputs `log` events allowing you to enrich Kubernetes logs with Pod metadata."
 event_types: ["log"]
@@ -259,11 +259,9 @@ order to retrieve Kubernetes metadata.
 
 ## Fields
 
-The `kubernetes_pod_metadata` transform accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "kubernetes": {
     "annotations": {
       "kubectl.kubernetes.io/last-applied-configuration": "..."
@@ -284,10 +282,9 @@ For example:
     "service_account_name": "default",
     "subdomain": "net"
   }
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

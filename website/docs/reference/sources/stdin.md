@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "at_least_once"
 component_title: "STDIN"
 description: "The Vector `stdin` source ingests data through standard input (STDIN) and outputs `log` events."
@@ -116,18 +116,15 @@ The maxiumum bytes size of a message before it is discarded.
 
 ## Fields
 
-The `stdin` source ingests data through [standard input (STDIN)][urls.stdin] and outputs [`log`][docs.data-model.log] events.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "host": "my.host.com",
   "message": "Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100",
   "timestamp": "2019-11-01T21:15:47+00:00"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

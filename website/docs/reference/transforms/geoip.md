@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "GeoIP"
 description: "The Vector [`geoip`](#geoip) transform accepts and outputs `log` events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases."
 event_types: ["log"]
@@ -119,11 +119,9 @@ The default field to insert the resulting GeoIP data into. See
 
 ## Fields
 
-The [`geoip`](#geoip) transform accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "geoip": {
     "city_name": "New York",
     "continent_code": "AF",
@@ -133,10 +131,9 @@ For example:
     "postal_code": "07094",
     "timezone": "America/New_York"
   }
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field

@@ -68,9 +68,8 @@ class Templates
     render("#{partials_path}/_component_examples.md", binding).strip
   end
 
-  def component_fields(component, event_type, breakout_top_keys: false, heading_depth: 3, root_key: nil)
-    fields = event_type.fields ? event_type.fields.to_h.values.sort : []
-    render("#{partials_path}/_component_fields.md", binding).strip
+  def component_fields(component, heading_depth: 2)
+    render("#{partials_path}/_component_fields.md", binding)
   end
 
   def component_header(component)
@@ -212,7 +211,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields, root_key: nil)
+  def fields_example(fields, event_type, root_key: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end

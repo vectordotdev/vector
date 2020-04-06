@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "AWS EC2 Metadata"
 description: "The Vector `aws_ec2_metadata` transform accepts and outputs `log` events allowing you to enrich logs with AWS EC2 instance metadata."
 event_types: ["log"]
@@ -150,11 +150,9 @@ The interval in seconds at which the EC2 Metadata api will be called.
 
 ## Fields
 
-The `aws_ec2_metadata` transform accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich logs with AWS EC2 instance metadata.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "ami-id": "ami-00068cd7555f543d5",
   "availability-zone": "54.234.246.107",
   "instance-id": "i-096fba6d03d36d262",
@@ -166,10 +164,9 @@ For example:
   "role-name": "some_iam_role",
   "subnet-id": "subnet-9d6713b9",
   "vpc-id": "vpc-a51da4dc"
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field
