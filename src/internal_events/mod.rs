@@ -1,7 +1,9 @@
 mod blackhole;
 mod elasticsearch;
 mod file;
+#[cfg(feature = "transforms-lua")]
 mod lua;
+#[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
 mod syslog;
@@ -13,7 +15,9 @@ mod vector;
 pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+#[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
+#[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
 pub use self::syslog::*;
