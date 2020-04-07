@@ -3,7 +3,7 @@ name = "vector"
 version = "0.9.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
-description = "A High-Performance Logs, Metrics, and Events Router"
+description = "A lightweight and ultra-fast tool for building observability pipelines"
 homepage = "https://vector.dev"
 license-file = "LICENSE"
 readme = "README.md"
@@ -47,11 +47,14 @@ tracing-limit = { path = "lib/tracing-limit" }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat"] }
-tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
+tokio01 = { package = "tokio", version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std"] }
+tokio-codec = "0.1.0"
+tokio-openssl = "0.3.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
-tokio-threadpool = "0.1.16"
-tokio-tls = "0.2.1"
+tokio-compat = { version = "0.1", features = ["rt-full"] }
+async-trait = "0.1"
 
 # Tracing
 tracing = "0.1.9"
@@ -75,7 +78,6 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
-tower-hyper = "0.1"
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -94,12 +96,11 @@ smpl_jwt = { version = "0.4.0", optional = true }
 derivative = "1.0"
 chrono = "0.4.6"
 rand = "0.5.5"
-regex = "1.0.5"
+regex = "1.3.5"
 bytes = { version = "0.4.10", features = ["serde"] }
 stream-cancel = "0.4.3"
 hyper = "0.12.35"
 hyper-openssl = "0.7"
-hyper-tls = "0.3.2"
 native-tls = "0.2.3"
 openssl = "0.10.26"
 openssl-probe = "0.1.2"
@@ -110,18 +111,19 @@ indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
+syslog = "5"
 syslog_loose = { version = "0.2.0", optional = true }
 tokio-uds = { version = "0.2.5", optional = true }
 derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.2.1"
-rdkafka = { version = "0.23.1", features = ["ssl"], optional = true }
+rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.1.5"
 seahash = { version = "3.0.6", optional = true }
 jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
-rlua = { git = "https://github.com/timberio/rlua", optional = true }
+rlua = { git = "https://github.com/kyren/rlua", optional = true }
 num_cpus = "1.10.0"
 bytesize = { version = "1.0.0", optional = true }
 glob = "0.2.11"
@@ -141,13 +143,17 @@ inventory = "0.1"
 maxminddb = { version = "0.13.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0", optional = true }
 colored = "1.9"
-warp = { version = "0.1.20", optional = true }
+# Forked version to support graceful shutdown with custom tls impl
+warp = { version = "0.1", git = "https://github.com/timberio/warp", branch = "0.1.x", default-features = false, optional = true }
 evmap = { version = "7", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
 getset = "0.1.0"
+lru = "0.4.3"
 k8s-openapi = { version = "0.5.1", features = ["v1_15"], optional = true }
+bloom = "0.3.2"
+pulsar = { version = "0.3.0", optional = true }
 lucetc = { version = "0.6.1", optional = true }
 lucet-runtime = { version = "0.6.1", optional = true }
 lucet-wasi = { version = "0.6.1", optional = true }
@@ -181,6 +187,7 @@ trust-dns-server = "0.17.0"
 trust-dns = "0.17.0"
 trust-dns-proto = "0.8.0"
 dirs = "2.0.2"
+tokio-test = "0.2"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -211,6 +218,7 @@ modules = ["lucetc", "lucet-runtime", "lucet-wasi", "foreign_modules/host"]
 sources = [
   "sources-docker",
   "sources-file",
+  "sources-http",
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes",
@@ -221,17 +229,20 @@ sources = [
   "sources-statsd",
   "sources-stdin",
   "sources-syslog",
+  "sources-tls",
   "sources-vector",
 ]
+sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]
-sources-logplex = ["warp"]
+sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
-sources-socket = ["bytesize", "listenfd", "tokio-uds"]
-sources-splunk_hec = ["bytesize", "warp"]
+sources-http = ["warp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio-uds", "sources-tls"]
+sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = []
 sources-stdin = ["bytesize"]
 sources-syslog = ["sources-socket", "syslog_loose"]
@@ -245,7 +256,9 @@ transforms = [
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
   "transforms-concat",
+  "transforms-dedupe",
   "transforms-field_filter",
+  "transforms-filter",
   "transforms-geoip",
   "transforms-grok_parser",
   "transforms-json_parser",
@@ -261,6 +274,7 @@ transforms = [
   "transforms-sampler",
   "transforms-split",
   "transforms-swimlanes",
+  "transforms-tag_cardinality_limit",
   "transforms-tokenizer",
 ]
 transforms-add_fields = []
@@ -269,11 +283,13 @@ transforms-ansi_stripper = ["strip-ansi-escapes"]
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
+transforms-dedupe = []
+transforms-filter = []
 transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
-transforms-kubernetes = ["k8s-openapi"]
+transforms-kubernetes = ["k8s-openapi","evmap","sources-kubernetes"]
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
@@ -285,6 +301,7 @@ transforms-rename_fields = []
 transforms-sampler = ["seahash"]
 transforms-split = []
 transforms-swimlanes = []
+transforms-tag_cardinality_limit = []
 transforms-tokenizer = ["nom"]
 
 # Sinks
@@ -297,10 +314,11 @@ sinks = [
   "sinks-blackhole",
   "sinks-clickhouse",
   "sinks-console",
-  "sinks-datadog_metrics",
+  "sinks-datadog",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
+  "sinks-honeycomb",
   "sinks-http",
   "sinks-humio_logs",
   "sinks-influxdb_metrics",
@@ -308,12 +326,14 @@ sinks = [
   "sinks-logdna",
   "sinks-loki",
   "sinks-new_relic_logs",
+  "sinks-papertrail",
   "sinks-prometheus",
   "sinks-sematext_logs",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-statsd",
   "sinks-vector",
+  "sinks-pulsar"
 ]
 sinks-aws_cloudwatch_logs = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sts", "rusoto_cloudwatch"]
@@ -323,10 +343,11 @@ sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts", "r
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
-sinks-datadog_metrics = []
+sinks-datadog = []
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
+sinks-honeycomb = ["sinks-http"]
 sinks-http = ["bytesize"]
 sinks-humio_logs = ["sinks-splunk_hec"]
 sinks-influxdb_metrics = []
@@ -337,9 +358,11 @@ sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext_logs = ["sinks-elasticsearch"]
 sinks-socket = ["tokio-uds"]
+sinks-papertrail = ["sinks-socket"]
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = []
 sinks-vector = []
+sinks-pulsar = ["pulsar"]
 
 # Identifies that the build is a nightly build
 nightly = []
@@ -360,6 +383,7 @@ docker = [
   "s3-integration-tests",
   "influxdb-integration-tests",
   "splunk-integration-tests",
+  "pulsar-integration-tests",
 ]
 clickhouse-integration-tests = []
 cloudwatch-logs-integration-tests = []
@@ -375,9 +399,10 @@ kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
 influxdb-integration-tests = []
+pulsar-integration-tests = []
 
 kubernetes = ["kubernetes-integration-tests"]
-kubernetes-integration-tests = []
+kubernetes-integration-tests = ["uuid"]
 
 disable-resolv-conf = []
 

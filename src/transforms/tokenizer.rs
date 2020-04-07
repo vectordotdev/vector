@@ -101,7 +101,9 @@ impl Transform for Tokenizer {
             for ((name, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
             {
                 match conversion.convert(value.as_bytes().into()) {
-                    Ok(value) => event.as_mut_log().insert(name.clone(), value),
+                    Ok(value) => {
+                        event.as_mut_log().insert(name.clone(), value);
+                    }
                     Err(error) => {
                         debug!(
                             message = "Could not convert types.",

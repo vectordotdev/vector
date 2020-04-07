@@ -1,6 +1,7 @@
 use crate::{
     event::Event,
-    kafka::KafkaTlsConfig,
+    kafka::{KafkaCompression, KafkaTlsConfig},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -25,12 +26,13 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
     topics: Vec<String>,
     group_id: String,
+    compression: Option<KafkaCompression>,
     #[serde(default = "default_auto_offset_reset")]
     auto_offset_reset: String,
     #[serde(default = "default_session_timeout_ms")]
@@ -77,6 +79,7 @@ impl SourceConfig for KafkaSourceConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         kafka_source(self.clone(), out)
@@ -127,7 +130,9 @@ fn kafka_source(
                                 Some(Err(e)) => {
                                     return Err(error!(message = "Cannot extract key", error = ?e))
                                 }
-                                Some(Ok(key)) => event.as_mut_log().insert(key_field.clone(), key),
+                                Some(Ok(key)) => {
+                                    event.as_mut_log().insert(key_field.clone(), key);
+                                }
                             }
                         }
                         consumer_ref.store_offset(&msg).map_err(
@@ -208,12 +213,10 @@ mod test {
             auto_offset_reset: "earliest".to_string(),
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
-            host_key: None,
             key_field: Some("message_key".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
-            librdkafka_options: None,
-            tls: None,
+            ..Default::default()
         }
     }
 
@@ -280,12 +283,10 @@ mod integration_test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
-            host_key: None,
             key_field: Some("message_key".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
-            librdkafka_options: None,
-            tls: None,
+            ..Default::default()
         };
 
         let mut rt = runtime();

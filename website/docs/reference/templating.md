@@ -7,7 +7,7 @@ status: beta
 Vector supports a template syntax for select configuration options. This allows
 you to use event fields when configuring Vector:
 
-```
+```text
 field = "application_id={{ application_id }}/date=%F/"
 ```
 
@@ -33,8 +33,8 @@ We can accomplish this with the
   key_prefix = "application_id={{ application_id }}/date=%F/"
 ```
 
-Notice that Vector allows direct field references as well as `strptime`
-modifiers. If we were to run the following [`log` event][docs.data-model.log]
+Notice that Vector allows direct field references as well as `strftime`
+specifiers. If we were to run the following [`log` event][docs.data-model.log]
 though Vector:
 
 ```json
@@ -47,7 +47,7 @@ though Vector:
 
 The value of the `key_prefix` option would equal:
 
-```
+```text
 application_id=1/date=2020-02-14
 ```
 
@@ -59,16 +59,20 @@ log data.
 ### Event Fields
 
 Individual [`log` event][docs.data-model.log] fields can be access with the
-`{{...}}` syntax:
+`{{<field-path-notation>}}` syntax:
 
 ```toml
-option = "{{ field_name }}"
+option = "{{ field_path_notation }}"
 ```
 
-### Strptime Specifiers
+Vector's [field notation][docs.reference.field-path-notation] is simple. It uses
+`.` to target nested fields and `[<index>]` to target array values. Learn more
+in the [field notation docs][docs.reference.field-path-notation].
+
+### Strftime Specifiers
 
 In addition to directly accessing fields, Vector offers a shortcut for injecting
-[strptime specifiers][urls.strptime_specifiers]:
+[strftime specifiers][urls.strptime_specifiers]:
 
 ```toml
 options = "year=%Y/month=%m/day=%d/"
@@ -78,7 +82,33 @@ The value is based off of the [`timestamp` field][docs.data-model.log#timestamp]
 and the name of this field can be changed via the
 [global `timestamp_key` option][docs.global-options#timestamp_key].
 
+### Escaping
+
+You can escape this syntax by prefixing the character with a `\`. For example,
+you can escape the event field syntax like so:
+
+```toml
+option = "\{{ field_name }}"
+```
+
+And strptime specified like so:
+
+```toml
+options = "year=\%Y/month=\%m/day=\%d/"
+```
+
+Each value above will be treated _literally_.
+
 ## How It Works
+
+### Array Values
+
+Array values can be accessed using Vector's
+[field notation syntax][docs.reference.field-path-notation]:
+
+```text
+option = "{{ parent.child[0] }}"
+```
 
 ### Fallback Values
 
@@ -98,29 +128,27 @@ end
 """
 ```
 
-### Nested Fields
-
-Nested fields can be accessed using the `.` syntax:
-
-```
-option = "{{ parent.child }}"
-```
-
 ### Missing Fields
 
 If a field is missing, a blank string will be inserted in it's place. Vector
 will not error, drop the event, or log anything.
 
-### Fields That Support Templating
+### Nested Fields
 
-...
+Nested fields can be accessed using Vector's
+[field notation syntax][docs.reference.field-path-notation]:
+
+```text
+option = "{{ parent.child }}"
+```
 
 
 [docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.global-options#timestamp_key]: /docs/reference/global-options/#timestamp_key
+[docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.sinks.aws_s3#key_prefix]: /docs/reference/sinks/aws_s3/#key_prefix
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
 [docs.transforms.lua]: /docs/reference/transforms/lua/
 [urls.issue_1692]: https://github.com/timberio/vector/issues/1692
-[urls.strptime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

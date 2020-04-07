@@ -1,16 +1,19 @@
 use crate::{
+    dns::Resolver,
     event::metric::{Metric, MetricValue},
     sinks::util::{
-        http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
-        BatchEventsConfig, MetricBuffer, SinkExt, TowerRequestConfig,
+        http::{
+            Error as HttpError, HttpBatchService, HttpClient, HttpRetryLogic,
+            Response as HttpResponse,
+        },
+        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
-use futures01::{Future, Poll};
+use futures01::{Future, Poll, Sink};
 use http::{Method, StatusCode, Uri};
 use hyper;
-use hyper_tls::HttpsConnector;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -45,7 +48,7 @@ enum ConfigError {
 #[derive(Clone)]
 struct InfluxDBSvc {
     config: InfluxDBConfig,
-    inner: HttpService,
+    inner: HttpBatchService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -152,8 +155,8 @@ inventory::submit! {
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let healthcheck = InfluxDBSvc::healthcheck(self.clone(), cx.resolver())?;
         let sink = InfluxDBSvc::new(self.clone(), cx)?;
-        let healthcheck = InfluxDBSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
     }
 
@@ -177,7 +180,8 @@ impl InfluxDBSvc {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = settings.write_uri(endpoint)?;
-        let http_service = HttpService::new(cx.resolver(), move |body: Vec<u8>| {
+
+        let build_request = move |body: Vec<u8>| {
             let mut builder = hyper::Request::builder();
             builder.method(Method::POST);
             builder.uri(uri.clone());
@@ -185,7 +189,9 @@ impl InfluxDBSvc {
             builder.header("Content-Type", "text/plain");
             builder.header("Authorization", format!("Token {}", token));
             builder.body(body).unwrap()
-        });
+        };
+
+        let http_service = HttpBatchService::new(cx.resolver(), None, build_request);
 
         let influxdb_http_service = InfluxDBSvc {
             config,
@@ -193,15 +199,24 @@ impl InfluxDBSvc {
         };
 
         let sink = request
-            .batch_sink(HttpRetryLogic, influxdb_http_service, cx.acker())
-            .batched_with_min(MetricBuffer::new(), &batch);
+            .batch_sink(
+                HttpRetryLogic,
+                influxdb_http_service,
+                MetricBuffer::new(),
+                batch,
+                cx.acker(),
+            )
+            .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
 
         Ok(Box::new(sink))
     }
 
     // V1: https://docs.influxdata.com/influxdb/v1.7/tools/api/#ping-http-endpoint
     // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
-    fn healthcheck(config: InfluxDBConfig) -> crate::Result<super::Healthcheck> {
+    fn healthcheck(
+        config: InfluxDBConfig,
+        resolver: Resolver,
+    ) -> crate::Result<super::Healthcheck> {
         let settings = InfluxDBSvc::influxdb_settings(config.clone())?;
 
         let endpoint = config.endpoint.clone();
@@ -210,11 +225,10 @@ impl InfluxDBSvc {
 
         let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client = hyper::Client::builder().build(https);
+        let mut client = HttpClient::new(resolver, None)?;
 
         let healthcheck = client
-            .request(request)
+            .call(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 StatusCode::OK => Ok(()),
@@ -1221,6 +1235,7 @@ mod integration_tests {
         onboarding_v2();
 
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://localhost:9999".to_string(),
@@ -1234,7 +1249,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
@@ -1243,6 +1258,7 @@ mod integration_tests {
         onboarding_v2();
 
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://not_exist:9999".to_string(),
@@ -1256,7 +1272,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 
@@ -1371,6 +1387,8 @@ mod integration_tests {
     #[test]
     fn influxdb1_metrics_healthchecks_ok() {
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
+
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://localhost:8086".to_string(),
@@ -1385,13 +1403,14 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
         };
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap();
     }
 
     #[test]
     fn influxdb1_metrics_healthchecks_fail() {
         let mut rt = Runtime::new().unwrap();
+        let cx = SinkContext::new_test(rt.executor());
         let config = InfluxDBConfig {
             namespace: "ns".to_string(),
             endpoint: "http://not_exist:8086".to_string(),
@@ -1407,7 +1426,7 @@ mod integration_tests {
             request: Default::default(),
         };
 
-        let healthcheck = InfluxDBSvc::healthcheck(config).unwrap();
+        let healthcheck = InfluxDBSvc::healthcheck(config, cx.resolver()).unwrap();
         rt.block_on(healthcheck).unwrap_err();
     }
 }

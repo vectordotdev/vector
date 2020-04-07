@@ -16,14 +16,17 @@ use crate::{
     dns::Resolver,
     event::{self, Event, Value},
     runtime::FutureExt,
-    sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::{BatchBytesConfig, TowerRequestConfig, UriSerde},
+    sinks::util::http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        BatchBytesConfig, TowerRequestConfig, UriSerde,
+    },
     template::Template,
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
-use futures::compat::Future01CompatExt;
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -34,7 +37,7 @@ type Labels = Vec<(String, String)>;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    encoding: Encoding,
+    encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<String>,
     labels: HashMap<String, Template>,
@@ -55,7 +58,7 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Derivative)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 enum Encoding {
@@ -86,7 +89,8 @@ impl SinkConfig for LokiConfig {
             batch_settings,
             Some(tls),
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
         let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
 
@@ -107,6 +111,7 @@ impl HttpSink for LokiConfig {
     type Output = Vec<(Labels, (i64, String))>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -137,7 +142,7 @@ impl HttpSink for LokiConfig {
                 .remove(&event::log_schema().timestamp_key());
         }
 
-        let event = match &self.encoding {
+        let event = match &self.encoding.codec {
             Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
 
@@ -221,11 +226,12 @@ impl HttpSink for LokiConfig {
 async fn healthcheck(config: LokiConfig, resolver: Resolver) -> Result<(), crate::Error> {
     let uri = format!("{}ready", config.endpoint);
 
-    let client = https_client(resolver, TlsSettings::from_options(&None)?)?;
+    let tls = TlsSettings::from_options(&config.tls)?;
+    let mut client = HttpClient::new(resolver, tls)?;
 
     let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let res = client.request(req).compat().await?;
+    let res = client.send(req).await?;
 
     if res.status() != http::StatusCode::OK {
         return Err(format!("A non-successful status returned: {}", res.status()).into());

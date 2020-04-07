@@ -2,17 +2,21 @@
 
 <%= component_header(component) %>
 
-## Configuration
-
-<%= component_config_example(component) %>
-
 <%- if component.requirements.any? -%>
 ## Requirements
 
 <%= component_requirements(component) %>
 
 <%- end -%>
-## Options
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
@@ -68,6 +72,12 @@ Things to note about the output:
 2. The `bytes_in`, `timestamp`, `status`, and `bytes_out` fields were coerced.
 
 
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
@@ -106,7 +116,7 @@ syntax, but lacks a few features like look around and backreferences.
 
 You can name Regex captures with the `<name>` syntax. For example:
 
-```
+```text
 ^(?P<timestamp>\w*) (?P<level>\w*) (?P<message>.*)$
 ```
 
@@ -131,7 +141,7 @@ Regex flags can be toggled with the `(?flags)` syntax. The available flags are:
 
 For example, to enable the case-insensitive flag you can write:
 
-```
+```text
 (?i)Hello world
 ```
 

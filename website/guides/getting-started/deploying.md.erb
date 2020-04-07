@@ -1,0 +1,59 @@
+---
+$schema: "/.meta/.schemas/guides.json"
+title: Deploying Vector
+description: How to deploy Vector to your target environment
+series_position: 3
+author_github: https://github.com/binarylogic
+tags: ["type: tutorial", "domain: operations"]
+---
+
+What good is Vector if you can't deploy it?! Fortunately, deploying Vector is
+easy. Vector is written in [Rust][urls.rust] and compiles to a single static
+binary. Meaning there are no dependencies or runtime, making the actual act of
+installing Vector as easy as copying the binary to your target host. Beyond
+that, you'll want to think strategically about _how_ you deploy Vector. This is
+where the magic lies and this is precisely what this guide will touch on.
+
+## Basic Concepts
+
+Before we get into the [installation tutorial](#tutorial), let's touch on some
+basic Vector deployment concepts. We've had the fortunate opportunity of working
+with many different companies deploying Vector, and all of their approaches
+can be broken down into two basic concepts: [strategies](#strategies) and
+[topologies](#topologies).
+
+### Strategies
+
+Strategies refer to data collection on a _single_ host. It's the very first
+thing you'll think about when deploying Vector. For example, are you
+operationally proficient and comfortable installing Vector directly on each of
+your host? Or are you an app developer only concerned with data collection for
+your service? Each context requires a different deployment strategy! To solve
+this, we've broken down deploying Vector into three basic strategies. These
+are best explained with diagrams, and [covered in more detail][docs.strategies]
+in our docs.
+
+<%= strategies(metadata.installation.strategies_list) %>
+
+### Topologies
+
+Topologies refer to the high-level network that your Vector instances create
+to get data from A to B -- the zoomed out perspective. This, again, is largely
+dependent on your environment and downstream storages. We've broken these
+down into three basic examples. Use these as _guidelines_ to form your own
+topology. These are best explained with diagrams, and [covered in more
+detail][docs.topologies] in our docs.
+
+<%= topologies() %>
+
+## Tutorial
+
+Now it's time to get to business! This tutorial will walk through the simple
+act of deploying Vector within your environment.
+
+<%= installation_tutorial(
+  metadata.installation.interfaces_list,
+  [metadata.installation.strategies.daemon],
+  show_deployment_strategy: false,
+  heading_depth: 3
+) %>

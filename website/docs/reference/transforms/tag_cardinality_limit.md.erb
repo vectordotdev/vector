@@ -1,0 +1,97 @@
+<%- component = metadata.transforms.tag_cardinality_limit -%>
+
+<%= component_header(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Intended Usage
+
+This transform is intended to be used as a protection mechanism to prevent
+upstream mistakes. Such as a developer accidentally adding a `request_id`
+tag. When this is happens, it is recommended to fix the upstream error as soon
+as possible. This is because Vector's cardinality cache is held in memory and it
+will be erased when Vector is restarted. This will cause new tag values to pass
+through until the cardinality limit is reached again. For normal usage this
+should not be a common problem since Vector processes are normally long-lived.
+
+### Memory Utilization
+
+This transform stores in memory a copy of the key for every tag on every metric
+event seen by this transform.  In mode `exact`, a copy of every distinct
+value *for each key* is also kept in memory, until `value_limit` distinct values
+have been seen for a given key, at which point new values for that key will be
+rejected.  So to estimate the memory usage of this transform in mode `exact`
+you can use the following formula:
+
+```text
+(number of distinct field names in the tags for your metrics * average length of
+the field names for the tags) + (number of distinct field names in the tags of
+your metrics * `value_limit` * average length of the values of tags for your
+metrics)
+```
+
+In mode `probabilistic`, rather than storing all values seen for each key, each
+distinct key has a bloom filter which can probabilistically determine whether
+a given value has been seen for that key.  The formula for estimating memory
+usage in mode `probabilistic` is:
+
+```text
+(number of distinct field names in the tags for your metrics * average length of
+the field names for the tags) + (number of distinct field names in the tags of
+-your metrics * `cache_size_per_tag`)
+```
+
+The `cache_size_per_tag` option controls the size of the bloom filter used
+for storing the set of acceptable values for any single key. The larger the
+bloom filter the lower the false positive rate, which in our case means the less
+likely we are to allow a new tag value that would otherwise violate a
+configured limit. If you want to know the exact false positive rate for a given
+`cache_size_per_tag` and `value_limit`, there are many free online bloom filter
+calculators that can answer this. The formula is generally presented in terms of
+'n', 'p', 'k', and 'm' where 'n' is the number of items in the filter
+(`value_limit` in our case), 'p' is the probability of false positives (what we
+want to solve for), 'k' is the number of hash functions used internally, and 'm'
+is the number of bits in the bloom filter. You should be able to provide values
+for just 'n' and 'm' and get back the value for 'p' with an optimal 'k' selected
+for you.   Remember when converting from `value_limit` to the 'm' value to plug
+into the calculator that `value_limit` is in bytes, and 'm' is often presented
+in bits (1/8 of a byte).
+
+### Restarts
+
+This transform's cache is held in memory, and therefore, restarting Vector
+will reset the cache. This means that new values will be passed through until
+the cardinality limit is reached again. See [intended usage](#intended-usage)
+for more info.

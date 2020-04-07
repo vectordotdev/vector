@@ -60,3 +60,11 @@ impl From<Uri> for UriSerde {
         Self(t)
     }
 }
+
+impl std::ops::Deref for UriSerde {
+    type Target = Uri;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}

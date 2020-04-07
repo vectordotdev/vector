@@ -8,11 +8,12 @@ input_types = ["log"]
 output_types = ["log"]
 requirements = {}
 
-<%= render("_partials/_component_options.toml", type: "transform", name: "ansi_stripper") %>
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "ansi_stripper") %>
 
 [transforms.ansi_stripper.options.field]
 type = "string"
 common = true
 default = "message"
-required = true
+examples = ["message", "parent.child", "array[0]"]
+field_path_notation = true
 description = "The target field to strip ANSI escape sequences from."

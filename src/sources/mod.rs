@@ -5,6 +5,8 @@ use snafu::Snafu;
 pub mod docker;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(feature = "sources-http")]
+pub mod http;
 #[cfg(feature = "sources-journald")]
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]

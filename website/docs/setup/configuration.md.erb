@@ -15,9 +15,7 @@ vector --config /etc/vector/vector.toml
 
 ## Example
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 <%= File.read("#{Dir.pwd}/../config/examples/docs_example.toml") %>
 ```
 
@@ -25,7 +23,7 @@ The key thing to notice above is the use of the `inputs` option. This connects
 Vector's component to create a pipeline. For a simple introduction, please
 refer to the:
 
-<Jump to="[[[docs.guides.getting-started]]]">Getting Started Guide</Jump>
+<Jump to="[[[guides.getting-started.your-first-pipeline]]]">Getting Started Guide</Jump>
 
 ## Reference
 
@@ -56,9 +54,7 @@ found at `/etc/vector/vector.toml`.
 Vector will interpolate environment variables within your configuration file
 with the following syntax:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [transforms.add_host]
   type = "add_fields"
 
@@ -90,9 +86,7 @@ interpolation:
 
 For example:
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
+```toml title="vector.toml"
 [sinks.es_cluster]
   type  = "elasticsearch"
   index = "user-{{ user_id }}-%Y-%m-%d"

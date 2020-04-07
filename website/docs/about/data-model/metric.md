@@ -1,8 +1,12 @@
 ---
+last_modified_on: "2020-04-05"
 title: Metric Event
 description: A detailed guide on Vector's internal metric data model.
 ---
 
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
+import Jump from '@site/src/components/Jump';
 import SVG from 'react-inlinesvg';
 
 <SVG src="/img/data-model-metric.svg" />
@@ -163,13 +167,7 @@ import TabItem from '@theme/TabItem';
 The metric data model is comprised of 6 types: [`aggregated_histogram`](#aggregated_histogram), [`aggregated_summary`](#aggregated_summary), [`counter`](#counter), [`distribution`](#distribution), [`gauge`](#gauge), [`set`](#set).
 You'll notice that certain fields are shared across all types.
 
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -183,17 +181,18 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### kind
 
-The metric value kind. This determines how the value is merged downstream if metrics are aggregated.
+The metric value kind. This determines how the value is merged downstream if
+metrics are aggregated.
+
 
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -207,6 +206,7 @@ The metric value kind. This determines how the value is merged downstream if met
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### name
@@ -214,9 +214,9 @@ The metric value kind. This determines how the value is merged downstream if met
 The metric name.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -230,16 +230,18 @@ The metric name.
   templateable={false}
   type={"map"}
   unit={null}
+  warnings={[]}
   >
 
 ### tags
 
-Tags that add additional metadata or context to the metric. These are simple key/value pairs in `string` format and cannot be nested.
+Tags that add additional metadata or context to the metric. These are simple
+key/value pairs in `string` format and cannot be nested.
+
+
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -253,16 +255,18 @@ Tags that add additional metadata or context to the metric. These are simple key
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
 
-The metric timestamp, representing when the metric was created/ingested within Vector.
+The metric timestamp, representing when the metric was created/ingested within
+Vector.
+
+
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -276,15 +280,17 @@ The metric timestamp, representing when the metric was created/ingested within V
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 ### type
 
-A metric must be one of 6 types.
+The metric value. The value is an enumeration and will be comprised of
+different attributes depending on the value type.
+
+
 
 <Fields filters={false}>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -298,15 +304,18 @@ A metric must be one of 6 types.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### aggregated_histogram
 
-Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually things like request durations or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples observations (usually
+things like request durations or response sizes) and counts them in
+configurable buckets. It also provides a sum of all observed values.
+
+
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -320,6 +329,7 @@ Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### buckets
@@ -327,9 +337,9 @@ Also called a "timer". A [`aggregated_histogram`](#aggregated_histogram) samples
 The buckets contained within this histogram.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -343,6 +353,7 @@ The buckets contained within this histogram.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ##### count
@@ -350,9 +361,9 @@ The buckets contained within this histogram.
 The total number of values contained within the histogram.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -366,6 +377,7 @@ The total number of values contained within the histogram.
   templateable={false}
   type={"[int]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### counts
@@ -373,9 +385,9 @@ The total number of values contained within the histogram.
 The number of values contained within each bucket.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -389,6 +401,7 @@ The number of values contained within each bucket.
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sum
@@ -396,14 +409,12 @@ The number of values contained within each bucket.
 The sum of all values contained within the histogram.
 
 
+
+
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -417,16 +428,19 @@ The sum of all values contained within the histogram.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### aggregated_summary
 
-Similar to a histogram, a summary samples observations (usually things like request durations and response sizes). While it also provides a total count of observations and a sum of all observed values, it calculates configurable quantiles over a sliding time window.
+Similar to a histogram, a summary samples observations (usually things like
+request durations and response sizes). While it also provides a total count of
+observations and a sum of all observed values, it calculates configurable
+quantiles over a sliding time window.
+
 
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -440,6 +454,7 @@ Similar to a histogram, a summary samples observations (usually things like requ
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ##### count
@@ -447,9 +462,9 @@ Similar to a histogram, a summary samples observations (usually things like requ
 The total number of values contained within the summary.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -463,16 +478,17 @@ The total number of values contained within the summary.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### quantiles
 
-The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
+The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
+
+
 
 
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -486,6 +502,7 @@ The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sum
@@ -493,9 +510,9 @@ The quantiles contained within the summary, where where 0 ≤ quantile ≤ 1.
 The sum of all values contained within the summary.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -509,6 +526,7 @@ The sum of all values contained within the summary.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### values
@@ -516,14 +534,12 @@ The sum of all values contained within the summary.
 The values contained within the summary that align with the [`quantiles`](#quantiles).
 
 
+
+
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -537,15 +553,17 @@ The values contained within the summary that align with the [`quantiles`](#quant
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### counter
 
-A single value that can _only_ be incremented or reset to zero value, it cannot be decremented.
+A single value that can _only_ be incremented or reset to zero value, it cannot
+be decremented.
+
+
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -559,6 +577,7 @@ A single value that can _only_ be incremented or reset to zero value, it cannot 
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### value
@@ -566,14 +585,12 @@ A single value that can _only_ be incremented or reset to zero value, it cannot 
 The value to increment the counter by. Can only be positive.
 
 
+
+
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -587,15 +604,16 @@ The value to increment the counter by. Can only be positive.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### distribution
 
 A distribution represents a distribution of sampled values.
 
+
+
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -609,6 +627,7 @@ A distribution represents a distribution of sampled values.
   templateable={false}
   type={"[int]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sample_rates
@@ -616,9 +635,9 @@ A distribution represents a distribution of sampled values.
 The rate at which each individual value was sampled.
 
 
+
+
 </Field>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -632,6 +651,7 @@ The rate at which each individual value was sampled.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### values
@@ -639,14 +659,12 @@ The rate at which each individual value was sampled.
 The list of values contained within the distribution.
 
 
+
+
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -660,15 +678,18 @@ The list of values contained within the distribution.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### gauge
 
-A gauge represents a point-in-time value that can increase and decrease. Vector's internal gauge type represents changes to that value. Gauges should be used to track fluctuations in values, like current memory or CPU usage.
+A gauge represents a point-in-time value that can increase and decrease.
+Vector's internal gauge type represents changes to that value. Gauges should be
+used to track fluctuations in values, like current memory or CPU usage.
+
+
 
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -682,6 +703,7 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### value
@@ -689,14 +711,12 @@ A gauge represents a point-in-time value that can increase and decrease. Vector'
 A specific point-in-time value for the gauge.
 
 
+
+
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
@@ -710,15 +730,16 @@ A specific point-in-time value for the gauge.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### set
 
 A set represents a count of unique values, AKA the cardinality.
 
+
+
 <Fields filters={false}>
-
-
 <Field
   common={true}
   defaultValue={null}
@@ -732,6 +753,7 @@ A set represents a count of unique values, AKA the cardinality.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### values
@@ -739,26 +761,20 @@ A set represents a count of unique values, AKA the cardinality.
 The list of unique values.
 
 
+
+
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 </Field>
-
-
 </Fields>
 
 ## Components
 
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/components/?metric=true">View all metric compatible components</Jump>
+<Jump to="/components/?event-types[]=metric">View all metric compatible components</Jump>
 
 
 

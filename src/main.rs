@@ -3,7 +3,7 @@ extern crate tracing;
 
 use futures01::{future, Future, Stream};
 use std::{
-    cmp::{max, min},
+    cmp::max,
     fs::File,
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -156,27 +156,9 @@ impl std::str::FromStr for LogFormat {
     }
 }
 
-fn get_version() -> String {
-    #[cfg(feature = "nightly")]
-    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
-    #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
-
-    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
-    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
-        .unwrap()
-        .format("%Y-%m-%d");
-    let built_string = if let Some(commit_hash) = commit_hash {
-        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
-    } else {
-        built_info::TARGET.into()
-    };
-    format!("{} ({})", pkg_version, built_string)
-}
-
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let version = get_version();
+    let version = vector::get_version();
     let app = Opts::clap().version(&version[..]).global_settings(&[
         AppSettings::ColoredHelp,
         AppSettings::InferSubcommands,
@@ -193,21 +175,24 @@ fn main() {
             2..=255 => "trace",
         },
         1 => "warn",
-        2..=255 => "error",
+        2 => "error",
+        3..=255 => "off",
     };
 
-    let levels = if let Ok(level) = std::env::var("LOG") {
-        level
-    } else {
-        [
-            format!("vector={}", level),
-            format!("codec={}", level),
-            format!("file_source={}", level),
-            format!("tower_limit=trace"),
-            format!("rdkafka={}", level),
-        ]
-        .join(",")
-        .to_string()
+    let levels = match std::env::var("LOG").ok() {
+        Some(level) => level,
+        None => match level {
+            "off" => "off".to_string(),
+            _ => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("file_source={}", level),
+                format!("tower_limit=trace"),
+                format!("rdkafka={}", level),
+            ]
+            .join(",")
+            .to_string(),
+        },
     };
 
     let color = match opts.color.clone().unwrap_or(Color::Auto) {
@@ -245,8 +230,8 @@ fn main() {
     info!("Log level {:?} is enabled.", level);
 
     if let Some(threads) = opts.threads {
-        if threads < 1 || threads > 4 {
-            error!("The `threads` argument must be between 1 and 4 (inclusive).");
+        if threads < 1 {
+            error!("The `threads` argument must be greater or equal to 1.");
             std::process::exit(exitcode::CONFIG);
         }
     }
@@ -285,8 +270,7 @@ fn main() {
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
-        let num_threads = min(4, threads);
-        runtime::Runtime::with_thread_count(num_threads).expect("Unable to create async runtime")
+        runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
     };
 
     let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();

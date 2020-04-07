@@ -11,7 +11,7 @@ across various targets. The purpose of these images is to:
 
 Building images is simple:
 
-```
+```bash
 ./build.sh
 ```
 

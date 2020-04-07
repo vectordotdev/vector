@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::Bytes;
@@ -38,6 +39,7 @@ impl SourceConfig for StdinConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         Ok(stdin_source(
@@ -118,7 +120,7 @@ mod tests {
     use futures01::sync::mpsc;
     use futures01::Async::*;
     use std::io::Cursor;
-    use tokio::runtime::current_thread::Runtime;
+    use tokio01::runtime::current_thread::Runtime;
 
     #[test]
     fn stdin_create_event() {

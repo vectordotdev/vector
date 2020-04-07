@@ -1,17 +1,27 @@
 [sinks.prometheus]
 title = "Prometheus"
+noun = "Prometheus"
 beta = true
 common = true
 delivery_guarantee = "best_effort"
+<%= render("_partials/descriptions/_prometheus.toml") %>
 egress_method = "exposing"
+features = [
+  "Expose an endpoint that Prometheus can scrape for metrics data.",
+  "Automatically aggregate metrics at the edge for improved performance.",
+]
 function_category = "transmit"
 healthcheck = false
 input_types = ["metric"]
-min_version = "1.0"
-requirements = {}
+requirements.prometheus = ">= 1.0"
 write_to_description = "[Prometheus][urls.prometheus] metrics service"
 
-<%= render("_partials/_component_options.toml", type: "sink", name: "prometheus") %>
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "sink",
+  name: "prometheus",
+  healthcheck: false
+) %>
 
 [sinks.prometheus.options.address]
 type = "string"
@@ -33,7 +43,6 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-required = true
 unit = "seconds"
 description = """\
 Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms.\
@@ -42,18 +51,17 @@ Default buckets to use for aggregating [distribution][docs.data-model.metric#dis
 [sinks.prometheus.options.flush_period_secs]
 type = "int"
 default = 60
-required = true
 unit = "seconds"
 description = """\
 Time interval between [set][docs.data-model.metric#set] values are reset.\
 """
 
-[[sinks.prometheus.output.examples]]
+[[sinks.prometheus.examples]]
 label = "Histograms"
 body = """\
 Given the following histogram metric events:
 
-```json
+```json title="Example histogram metrics"
 [
   {
     "name": "response_time_s",
@@ -78,7 +86,7 @@ Given the following histogram metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP response_time_s response_time_s
 # TYPE response_time_s histogram
 response_time_s_bucket{le="0.005"} 0
@@ -98,12 +106,12 @@ response_time_s_count 2
 ```\
 """
 
-[[sinks.prometheus.output.examples]]
+[[sinks.prometheus.examples]]
 label = "Counters"
 body = """
 Given the following counter metric events:
 
-```json
+```json title="Example counter metrics"
 [
   {
     "name": "logins",
@@ -125,19 +133,19 @@ Given the following counter metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP logins logins
 # TYPE logins counter
 logins 4
 ```\
 """
 
-[[sinks.prometheus.output.examples]]
+[[sinks.prometheus.examples]]
 label = "Gauges"
 body = """\
 Given the following gauge metric events:
 
-```json
+```json title="Example gauge metrics"
 [
   {
     "name": "memory_rss",
@@ -160,7 +168,7 @@ Given the following gauge metric events:
 
 This sink will output the following:
 
-```text
+```text title="Example sink output"
 # HELP memory_rss memory_rss
 # TYPE memory_rss gauge
 memory_rss 225

@@ -18,6 +18,33 @@
       "x.y.equals" = 456
       "x.z.equals" = 789
 
+[transforms.add_fields_array]
+  inputs = []
+  type = "add_fields"
+  [transforms.add_fields_array.fields]
+    "a[0]" = 0
+    "a[1]" = "1"
+    "a[2]" = 2.0
+
+    "b[2]" = "two"
+    "b[0]" = 0
+[[tests]]
+  name = "add_fields_array"
+  [tests.input]
+    insert_at = "add_fields_array"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_fields_array"
+    [[tests.outputs.conditions]]
+      "a[0].equals" = 0
+      "a[1].equals" = "1"
+      "a[2].equals" = 2.0
+
+      "b[0].equals" = 0
+      "b[1].equals" = "<null>"
+      "b[2].equals" = "two"
+
 [transforms.add_fields_scalar_then_nested_1]
   inputs = []
   type = "add_fields"

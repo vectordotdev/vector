@@ -1,9 +1,3 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
 
 import React from 'react';
 
@@ -126,7 +120,11 @@ function Footer() {
                 )}
               </div>
             )}
-            {copyright}
+            {copyright}<br />
+            <small>
+              <a href="https://github.com/timberio/vector/security/policy">Security Policy</a>&nbsp;&bull;&nbsp;
+              <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
+            </small>
           </div>
         )}
       </div>

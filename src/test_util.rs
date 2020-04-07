@@ -1,7 +1,8 @@
 use crate::runtime::Runtime;
-use crate::Event;
+use crate::{event::LogEvent, Event};
 
 use futures01::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::collections::HashMap;
@@ -9,15 +10,15 @@ use std::fs::File;
 use std::io::Read;
 use std::iter;
 use std::mem;
-use std::net::SocketAddr;
+use std::net::{Shutdown, SocketAddr};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
-use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::util::FutureExt;
-use tokio_tls::TlsConnector;
+use tokio01::codec::{FramedRead, FramedWrite, LinesCodec};
+use tokio01::net::{TcpListener, TcpStream};
+use tokio01::util::FutureExt;
+use tokio_openssl::SslConnectorExt;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -30,6 +31,7 @@ macro_rules! assert_downcast_matches {
 }
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
+
 pub fn next_addr() -> SocketAddr {
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -64,7 +66,12 @@ pub fn send_lines(
                 .forward(out)
                 .and_then(|(_source, sink)| {
                     let socket = sink.into_inner().into_inner();
-                    tokio::io::shutdown(socket).map_err(|e| panic!("{:}", e))
+                    // In tokio 0.1 `AsyncWrite::shutdown` for `TcpStream` is a noop.
+                    // See https://docs.rs/tokio-tcp/0.1.4/src/tokio_tcp/stream.rs.html#917
+                    // Use `TcpStream::shutdown` instead - it actually does something.
+                    socket
+                        .shutdown(Shutdown::Both)
+                        .map_err(|e| panic!("{:}", e))
                 })
                 .map(|_| ())
         })
@@ -77,18 +84,16 @@ pub fn send_lines_tls(
 ) -> impl Future<Item = (), Error = ()> {
     let lines = futures01::stream::iter_ok::<_, ()>(lines);
 
-    let connector: TlsConnector = native_tls::TlsConnector::builder()
-        .danger_accept_invalid_certs(true)
-        .danger_accept_invalid_hostnames(true)
-        .build()
-        .expect("Failed to build TLS connector")
-        .into();
+    let mut connector =
+        SslConnector::builder(SslMethod::tls()).expect("Failed to create TLS builder");
+    connector.set_verify(SslVerifyMode::NONE);
+    let connector = connector.build();
 
     TcpStream::connect(&addr)
         .map_err(|e| panic!("{:}", e))
         .and_then(move |socket| {
             connector
-                .connect(&host, socket)
+                .connect_async(&host, socket)
                 .map_err(|e| panic!("{:}", e))
                 .and_then(|stream| {
                     let out = FramedWrite::new(stream, LinesCodec::new())
@@ -104,7 +109,7 @@ pub fn send_lines_tls(
                             // and tests will be checking that contents
                             // are received anyways.
                             stream.get_mut().shutdown().ok();
-                            //tokio::io::shutdown(stream).map_err(|e| panic!("{:}", e))
+                            //tokio01::io::shutdown(stream).map_err(|e| panic!("{:}", e))
                             Ok(())
                         })
                         .map(|_| ())
@@ -147,11 +152,11 @@ pub fn random_nested_events_with_stream(
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
     random_events_with_stream_generic(count, move || {
-        let mut log = Event::new_empty_log().into_log();
+        let mut log = LogEvent::new();
 
         let tree = random_pseudonested_map(len, breadth, depth);
         for (k, v) in tree.into_iter() {
-            log.insert(k, v)
+            log.insert(k, v);
         }
 
         Event::Log(log)
@@ -197,6 +202,7 @@ pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = V
 }
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
     file.read_to_string(&mut output).unwrap();
@@ -235,6 +241,15 @@ pub fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| std::net::TcpStream::connect(addr).is_ok())
 }
 
+pub fn wait_for_atomic_usize<T, F>(val: T, unblock: F)
+where
+    T: AsRef<AtomicUsize>,
+    F: Fn(usize) -> bool,
+{
+    let val = val.as_ref();
+    wait_for(|| unblock(val.load(Ordering::SeqCst)))
+}
+
 pub fn shutdown_on_idle(runtime: Runtime) {
     block_on(
         runtime
@@ -242,6 +257,64 @@ pub fn shutdown_on_idle(runtime: Runtime) {
             .timeout(std::time::Duration::from_secs(10)),
     )
     .unwrap()
+}
+
+#[derive(Debug)]
+pub struct CollectN<S>
+where
+    S: Stream,
+{
+    stream: Option<S>,
+    remaining: usize,
+    items: Option<Vec<S::Item>>,
+}
+
+impl<S: Stream> CollectN<S> {
+    pub fn new(s: S, n: usize) -> Self {
+        Self {
+            stream: Some(s),
+            remaining: n,
+            items: Some(Vec::new()),
+        }
+    }
+}
+
+impl<S> Future for CollectN<S>
+where
+    S: Stream,
+{
+    type Item = (S, Vec<S::Item>);
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
+        let stream = self.stream.take();
+        if stream.is_none() {
+            panic!("Stream is missing");
+        }
+        let mut stream = stream.unwrap();
+
+        loop {
+            if self.remaining == 0 {
+                return Ok(Async::Ready((stream, self.items.take().unwrap())));
+            }
+            match stream.poll() {
+                Ok(Async::Ready(Some(e))) => {
+                    self.items.as_mut().unwrap().push(e);
+                    self.remaining -= 1;
+                }
+                Ok(Async::Ready(None)) => {
+                    return Ok(Async::Ready((stream, self.items.take().unwrap())));
+                }
+                Ok(Async::NotReady) => {
+                    self.stream.replace(stream);
+                    return Ok(Async::NotReady);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -286,25 +359,25 @@ where
     }
 }
 
-pub struct Receiver {
-    handle: futures01::sync::oneshot::SpawnHandle<Vec<String>, ()>,
+pub struct Receiver<T> {
+    handle: futures01::sync::oneshot::SpawnHandle<Vec<T>, ()>,
     count: Arc<AtomicUsize>,
     trigger: Trigger,
     _runtime: Runtime,
 }
 
-impl Receiver {
+impl<T> Receiver<T> {
     pub fn count(&self) -> usize {
         self.count.load(Ordering::Relaxed)
     }
 
-    pub fn wait(self) -> Vec<String> {
+    pub fn wait(self) -> Vec<T> {
         self.trigger.cancel();
         self.handle.wait().unwrap()
     }
 }
 
-pub fn receive(addr: &SocketAddr) -> Receiver {
+pub fn receive(addr: &SocketAddr) -> Receiver<String> {
     let runtime = runtime();
 
     let listener = TcpListener::bind(addr).unwrap();
@@ -326,6 +399,35 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
         .collect();
 
     let handle = futures01::sync::oneshot::spawn(lines, &runtime.executor());
+    Receiver {
+        handle,
+        count,
+        trigger,
+        _runtime: runtime,
+    }
+}
+
+pub fn receive_events<S>(stream: S) -> Receiver<Event>
+where
+    S: Stream<Item = Event> + Send + 'static,
+    <S as Stream>::Error: std::fmt::Debug,
+{
+    let runtime = runtime();
+
+    let count = Arc::new(AtomicUsize::new(0));
+    let count_clone = Arc::clone(&count);
+
+    let (trigger, tripwire) = Tripwire::new();
+
+    let events = stream
+        .take_until(tripwire)
+        .inspect(move |_| {
+            count_clone.fetch_add(1, Ordering::Relaxed);
+        })
+        .map_err(|e| panic!("{:?}", e))
+        .collect();
+
+    let handle = futures01::sync::oneshot::spawn(events, &runtime.executor());
     Receiver {
         handle,
         count,

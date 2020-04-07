@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
 };
@@ -186,6 +187,7 @@ impl SourceConfig for FileConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -277,7 +279,7 @@ pub fn file_source(
 
         let span = current_span();
         let span2 = span.clone();
-        tokio::spawn(
+        tokio01::spawn(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
@@ -346,7 +348,7 @@ mod tests {
     };
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
-    use tokio::util::FutureExt;
+    use tokio01::util::FutureExt;
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {

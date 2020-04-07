@@ -1,0 +1,19 @@
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="distributed"
+  values={[
+    {value: "distributed", label: "Distributed"},
+    {value: "centralized", label: "Centralized"},
+    {value: "stream-based", label: "Stream-based"},
+  ]}>
+<TabItem value="distributed">
+<SVG src="/img/topologies-distributed.svg" />
+</TabItem>
+<TabItem value="centralized">
+<SVG src="/img/topologies-centralized.svg" />
+</TabItem>
+<TabItem value="stream-based">
+<SVG src="/img/topologies-stream-based.svg" />
+</TabItem>
+</Tabs>
