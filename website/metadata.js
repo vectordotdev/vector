@@ -10,6 +10,15 @@ module.exports = {
       "description": "Go beyond the basics, become a Vector pro, and extract the full potential of Vector.",
       "guides": [
         {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
+          "id": "/advanced/custom-aggregations-with-lua",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/custom-aggregations-with-lua.md",
+          "series_position": null,
+          "title": "Custom Aggregations with Lua"
+        },
+        {
           "author_github": "https://github.com/Jeffail",
           "description": null,
           "id": "/advanced/managing-complex-configs",
@@ -24753,7 +24762,7 @@ module.exports = {
     "influxdb_metrics": {
       "beta": true,
       "config_examples": {
-        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
+        "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
       },
       "delivery_guarantee": "at_least_once",
       "description": "InfluxDB is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
@@ -25802,6 +25811,7 @@ module.exports = {
   "team": [
     {
       "avatar": "https://github.com/a-rodin.png",
+      "bio": "Alexander is a Senior Engineer at <a href=\"https://timber.io\">Timber.io</a> and a member of the <a href=\"/community#team\">core Vector team</a>. He created <a href=\"https://alexanderrodin.com/qstardict\">QStarDict</a>, a dictionary application written in C++.",
       "github": "https://github.com/a-rodin",
       "id": "alex",
       "keybase": "https://keybase.io/arodin",
@@ -26332,7 +26342,7 @@ module.exports = {
     "log_to_metric": {
       "beta": false,
       "config_examples": {
-        "toml": "[transforms.out]\n  # General\n  type = \"log_to_metric\" # required\n  inputs = [\"in\"] # required\n\n  # Metrics\n  metrics.type = \"counter\" # required\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required"
+        "toml": "[transforms.out]\n  # General\n  type = \"log_to_metric\" # required\n  inputs = [\"in\"] # required\n\n  # Metrics\n  metrics.field = \"duration\" # required\n  metrics.name = \"duration_total\" # required\n  metrics.type = \"counter\" # required"
       },
       "delivery_guarantee": null,
       "description": null,
@@ -26407,12 +26417,13 @@ module.exports = {
     "lua": {
       "beta": true,
       "config_examples": {
-        "toml": "[transforms.out]\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  source = \"\"\"\n  require(\"script\") # a `script.lua` file must be in your `search_dirs`\n\n  if event[\"host\"] == nil then\n    local f = io.popen (\"/bin/hostname\")\n    local hostname = f:read(\"*a\") or \"\"\n    f:close()\n    hostname = string.gsub(hostname, \"\\n$\", \"\")\n    event[\"host\"] = hostname\n  end\n  \"\"\" # required"
+        "toml": "[transforms.out]\n  # General\n  type = \"lua\" # required\n  inputs = [\"in\"] # required\n  version = \"2\" # required\n\n  # Hooks\n  hooks.process = \"\"\"\n  function (event, emit)\n    event.log.field = \"value\" -- set value of a field\n    event.log.another_field = nil -- remove field\n    event.log.first, event.log.second = nil, event.log.first -- rename field\n\n    -- Very important! Emit the processed event.\n    emit(event)\n  end\n  \"\"\""
       },
       "delivery_guarantee": null,
       "description": null,
       "event_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "features": [
 
@@ -26420,7 +26431,8 @@ module.exports = {
       "function_category": "program",
       "id": "lua_transform",
       "inpuut_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "logo_path": null,
       "name": "lua",
@@ -26428,12 +26440,13 @@ module.exports = {
 
       ],
       "output_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to transform events with a full embedded Lua engine.",
+      "short_description": "Accepts log and metric events and allows you to transform events with a full embedded Lua engine.",
       "status": "beta",
       "title": "Lua",
       "type": "transform",

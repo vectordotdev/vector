@@ -270,16 +270,16 @@ order to retrieve Kubernetes metadata.
     "host_ip": "192.168.99.106",
     "hostname": "host",
     "ip": "172.17.0.5",
-    "labels": {
-      "release": "stable"
-    },
     "name": "nginx",
     "namespace": "default",
     "node_name": "minikube",
     "priority": 0,
     "priority_class_name": "system-node-critical",
     "service_account_name": "default",
-    "subdomain": "net"
+    "subdomain": "net",
+    "labels": {
+      "release": "stable"
+    }
   }
   // ...
 }
@@ -463,59 +463,6 @@ The IP address allocated to the Pod where the log originated.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"labels"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### labels
-
-[Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
-of the Pod where the log originated.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"release":"stable"},{"tier":"frontend"}]}
-  groups={[]}
-  name={"`[label-key]`"}
-  path={"labels"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"*"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[label-key]`
-
-Each individual label will be added as a key. If you need to remove or alter
-these labels then we recommend the [`remove_felds`
-transform][docs.transforms.remove_fields].
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={["nginx"]}
   groups={[]}
   name={"name"}
@@ -686,6 +633,59 @@ The subdomain of the Pod where the log originated.
 
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"labels"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### labels
+
+[Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+of the Pod where the log originated.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"release":"stable"},{"tier":"frontend"}]}
+  groups={[]}
+  name={"`[label-key]`"}
+  path={"labels"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[label-key]`
+
+Each individual label will be added as a key. If you need to remove or alter
+these labels then we recommend the [`remove_felds`
+transform][docs.transforms.remove_fields].
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 </Fields>

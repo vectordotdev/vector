@@ -335,6 +335,7 @@ Checks whether a string field starts with a string argument.
 <Tabs
   block={true}
   defaultValue="ifelse"
+  select={false}
   values={[{"label":"If/Else","value":"ifelse"},{"label":"Splitting","value":"splitting"}]}>
 
 <TabItem value="ifelse">

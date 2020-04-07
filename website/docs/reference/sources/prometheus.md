@@ -117,6 +117,7 @@ The interval between scrapes, in seconds.
 <Tabs
   block={true}
   defaultValue="counter"
+  select={false}
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"}]}>
 
 <TabItem value="counter">

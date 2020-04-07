@@ -52,8 +52,8 @@ ingests data through one or more local files and outputs
 [sources.my_source_id]
   # General
   type = "file" # required
-  include = ["/var/log/nginx/*.log"] # required
   ignore_older = 86400 # optional, no default, seconds
+  include = ["/var/log/nginx/*.log"] # required
   start_at_beginning = false # optional, default
 
   # Priority
@@ -67,11 +67,11 @@ ingests data through one or more local files and outputs
 [sources.my_source_id]
   # General
   type = "file" # required
-  include = ["/var/log/nginx/*.log"] # required
   data_dir = "/var/lib/vector" # optional, no default
   exclude = ["/var/log/nginx/*.[0-9]*.log"] # optional, no default
   glob_minimum_cooldown = 1000 # optional, default, milliseconds
   ignore_older = 86400 # optional, no default, seconds
+  include = ["/var/log/nginx/*.log"] # required
   max_line_bytes = 102400 # optional, default, bytes
   start_at_beginning = false # optional, default
 
@@ -79,77 +79,26 @@ ingests data through one or more local files and outputs
   file_key = "file" # optional, default
   host_key = "host" # optional, default
 
-  # Priority
-  max_read_bytes = 2048 # optional, default, bytes
-  oldest_first = false # optional, default
-
   # Fingerprinting
   fingerprinting.strategy = "checksum" # optional, default
   fingerprinting.fingerprint_bytes = 256 # optional, default, bytes, relevant when strategy = "checksum"
   fingerprinting.ignored_header_bytes = 0 # optional, default, bytes, relevant when strategy = "checksum"
 
   # Multiline
-  multiline.condition_pattern = "^[\\s]+" # required
-  multiline.mode = "continue_through" # required
   multiline.start_pattern = "^[^\\s]" # required
+  multiline.mode = "continue_through" # required
+  multiline.condition_pattern = "^[\\s]+" # required
   multiline.timeout_ms = 1000 # required, milliseconds
+
+  # Priority
+  max_read_bytes = 2048 # optional, default, bytes
+  oldest_first = false # optional, default
 ```
 
 </TabItem>
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["/var/lib/vector"]}
-  groups={[]}
-  name={"data_dir"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### data_dir
-
-The directory used to persist file checkpoint positions. By default, the
-[global [`data_dir`](#data_dir) option][docs.global-options#data_dir] is used. Please make
-sure the Vector project has write permissions to this dir.
-
- See [Checkpointing](#checkpointing) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["/var/log/nginx/*.[0-9]*.log"]]}
-  groups={[]}
-  name={"exclude"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### exclude
-
-Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes
-precedence over the [`include` option](#include).*
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={"file"}
@@ -169,6 +118,32 @@ precedence over the [`include` option](#include).*
 ### file_key
 
 The key name added to each event with the full path of the file.
+
+ See [Context](#context) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host"]}
+  groups={[]}
+  name={"host_key"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### host_key
+
+The key name added to each event representing the current host. This can also
+be globally set via the [global [`host_key`](#host_key)
+option][docs.reference.global-options#host_key].
 
  See [Context](#context) for more info.
 
@@ -277,6 +252,57 @@ fingerprint. This is helpful if all files share a common header.
 </Field>
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["/var/lib/vector"]}
+  groups={[]}
+  name={"data_dir"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### data_dir
+
+The directory used to persist file checkpoint positions. By default, the
+[global [`data_dir`](#data_dir) option][docs.global-options#data_dir] is used. Please make
+sure the Vector project has write permissions to this dir.
+
+ See [Checkpointing](#checkpointing) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["/var/log/nginx/*.[0-9]*.log"]]}
+  groups={[]}
+  name={"exclude"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### exclude
+
+Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes
+precedence over the [`include` option](#include).*
+
+
+
+
+</Field>
+<Field
+  common={false}
   defaultValue={1000}
   enumValues={null}
   examples={[1000]}
@@ -297,32 +323,6 @@ Delay between file discovery calls. This controls the interval at which Vector
 searches for files.
 
  See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"host"}
-  enumValues={null}
-  examples={["host"]}
-  groups={[]}
-  name={"host_key"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### host_key
-
-The key name added to each event representing the current host. This can also
-be globally set via the [global [`host_key`](#host_key)
-option][docs.reference.global-options#host_key].
-
- See [Context](#context) for more info.
 
 
 </Field>
@@ -400,27 +400,28 @@ protects against malformed lines or tailing incorrect files.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={2048}
+  common={true}
+  defaultValue={false}
   enumValues={null}
-  examples={[2048]}
+  examples={[false,true]}
   groups={[]}
-  name={"max_read_bytes"}
+  name={"start_at_beginning"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"int"}
-  unit={"bytes"}
+  type={"bool"}
+  unit={null}
   warnings={[]}
   >
 
-### max_read_bytes
+### start_at_beginning
 
-An approximate limit on the amount of data read from a single file at a given
-time.
+For files with a stored checkpoint at startup, setting this option to `true`
+will tell Vector to read from the beginning of the file instead of the stored
+checkpoint.
 
-
+ See [Read Position](#read-position) for more info.
 
 
 </Field>
@@ -549,6 +550,31 @@ the buffered message is guaraneed to be flushed, even if incomplete.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={2048}
+  enumValues={null}
+  examples={[2048]}
+  groups={[]}
+  name={"max_read_bytes"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+### max_read_bytes
+
+An approximate limit on the amount of data read from a single file at a given
+time.
+
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={false}
   enumValues={null}
@@ -570,32 +596,6 @@ Instead of balancing read capacity fairly across all watched files, prioritize
 draining the oldest files before moving on to read data from younger files.
 
  See [File Read Order](#file-read-order) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"start_at_beginning"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### start_at_beginning
-
-For files with a stored checkpoint at startup, setting this option to `true`
-will tell Vector to read from the beginning of the file instead of the stored
-checkpoint.
-
- See [Read Position](#read-position) for more info.
 
 
 </Field>

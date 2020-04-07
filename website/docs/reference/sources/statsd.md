@@ -98,6 +98,7 @@ UDP socket address to bind to.
 <Tabs
   block={true}
   defaultValue="counter"
+  select={false}
   values={[{"label":"Counter","value":"counter"},{"label":"Gauge","value":"gauge"},{"label":"Set","value":"set"},{"label":"Timer","value":"timer"}]}>
 
 <TabItem value="counter">

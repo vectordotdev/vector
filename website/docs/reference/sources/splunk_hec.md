@@ -104,6 +104,33 @@ The address to accept connections on.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["A94A8FE5CCB19BA61C4C08"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+If supplied, incoming requests must supply this token in the `Authorization`
+header, just as a client would if it was communicating with the Splunk HEC
+endpoint directly. If _not_ supplied, the `Authorization` header will be
+ignored and requests will not be authenticated.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -279,33 +306,6 @@ will not request a certificate from the client.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["A94A8FE5CCB19BA61C4C08"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-If supplied, incoming requests must supply this token in the `Authorization`
-header, just as a client would if it was communicating with the Splunk HEC
-endpoint directly. If _not_ supplied, the `Authorization` header will be
-ignored and requests will not be authenticated.
-
-
-
 
 </Field>
 </Fields>

@@ -48,11 +48,8 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   inputs = ["my-source-id"] # required
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  region = "us-east-1" # required, required when endpoint = ""
   healthcheck = true # optional, default
-
-  # Naming
-  key_prefix = "date=%F/" # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
@@ -64,6 +61,9 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
   # Encoding
   encoding.codec = "ndjson" # required
+
+  # Naming
+  key_prefix = "date=%F/" # optional, default
 ```
 
 </TabItem>
@@ -74,12 +74,12 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   # General
   type = "aws_s3" # required
   inputs = ["my-source-id"] # required
+  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   bucket = "my-bucket" # required
   compression = "gzip" # required
-  region = "us-east-1" # required, required when endpoint = ""
-  assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
 
   # ACL
   acl = "private" # optional, no default
@@ -88,27 +88,14 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   grant_read_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
   grant_write_acp = "79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be" # optional, no default
 
-  # Encryption
-  server_side_encryption = "AES256" # optional, no default
-  ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
-
-  # Naming
-  filename_append_uuid = true # optional, default
-  filename_extension = "log" # optional, default
-  filename_time_format = "%s" # optional, default
-  key_prefix = "date=%F/" # optional, default
-
-  # Storage
-  storage_class = "STANDARD" # optional, no default
-
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 300 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -117,8 +104,18 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   encoding.only_fields = ["timestamp", "message", "host"] # optional, no default
   encoding.timestamp_format = "rfc3339" # optional, default
 
+  # Encryption
+  server_side_encryption = "AES256" # optional, no default
+  ssekms_key_id = "abcd1234" # optional, no default, relevant when server_side_encryption = "aws:kms"
+
   # Metadata
   tags.Tag1 = "Value1" # example
+
+  # Naming
+  filename_append_uuid = true # optional, default
+  filename_extension = "log" # optional, default
+  filename_time_format = "%s" # optional, default
+  key_prefix = "date=%F/" # optional, default
 
   # Request
   request.in_flight_limit = 50 # optional, default, requests
@@ -128,6 +125,9 @@ endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
+
+  # Storage
+  storage_class = "STANDARD" # optional, no default
 ```
 
 </TabItem>
@@ -163,9 +163,9 @@ ACL][urls.aws_s3_canned_acl].
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
   groups={[]}
-  name={"assume_role"}
+  name={"grant_full_control"}
   path={null}
   relevantWhen={null}
   required={false}
@@ -175,11 +175,87 @@ ACL][urls.aws_s3_canned_acl].
   warnings={[]}
   >
 
-### assume_role
+### grant_full_control
 
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP
+permissions on the created objects.
 
- See [AWS Authentication](#aws-authentication) for more info.
+ See [Cross account object writing](#cross-account-object-writing) and [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
+  name={"grant_read"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### grant_read
+
+Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and
+their metadata.
+
+ See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
+  name={"grant_read_acp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### grant_read_acp
+
+Allows the named [grantee][urls.aws_s3_grantee] to read the created objects'
+ACL.
+
+ See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
+  groups={[]}
+  name={"grant_write_acp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### grant_write_acp
+
+Allows the named [grantee][urls.aws_s3_grantee] to write the created objects'
+ACL.
+
+ See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 
 
 </Field>
@@ -261,30 +337,6 @@ The maximum age of a batch before it is flushed.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["my-bucket"]}
-  groups={[]}
-  name={"bucket"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### bucket
-
-The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"buffer"}
@@ -304,6 +356,30 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -353,30 +429,6 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -401,30 +453,6 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### compression
-
-The compression mechanism to use.
-
-
-
 
 </Field>
 <Field
@@ -552,6 +580,129 @@ How to format event timestamps.
 <Field
   common={false}
   defaultValue={null}
+  enumValues={{"AES256":"256-bit Advanced Encryption Standard","aws:kms":"AWS managed key encryption"}}
+  examples={["AES256","aws:kms"]}
+  groups={[]}
+  name={"server_side_encryption"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### server_side_encryption
+
+The server-side encryption algorithm used when storing these objects.
+
+ See [Server-side encryption (SSE)](#server-side-encryption-sse) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["abcd1234"]}
+  groups={[]}
+  name={"ssekms_key_id"}
+  path={null}
+  relevantWhen={{"server_side_encryption":"aws:kms"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### ssekms_key_id
+
+If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`, this specifies the ID of
+the AWS Key Management Service (AWS KMS) symmetrical customer managed customer
+master key (CMK) that will used for the created objects. If not specified,
+Amazon S3 uses the AWS managed CMK in AWS to protect the data.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-bucket"]}
+  groups={[]}
+  name={"bucket"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### bucket
+
+The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+The compression mechanism to use.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
   enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
@@ -572,6 +723,105 @@ this option will make [`region`](#region) moot.
 
 
 
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["us-east-1"]}
+  groups={[]}
+  name={"region"}
+  path={null}
+  relevantWhen={{"endpoint":""}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### region
+
+The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
+provided it will override this value since the endpoint includes the region.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tags"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tags
+
+The tag-set for the object.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Tag1":"Value1"}]}
+  groups={[]}
+  name={"`[tag-name]`"}
+  path={"tags"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[tag-name]`
+
+A custom tag to be added to the created objects.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -649,130 +899,6 @@ specifiers][urls.strptime_specifiers] are supported.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
-  groups={[]}
-  name={"grant_full_control"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### grant_full_control
-
-Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP
-permissions on the created objects.
-
- See [Cross account object writing](#cross-account-object-writing) and [Object access control list (ACL)](#object-access-control-list-acl) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
-  groups={[]}
-  name={"grant_read"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### grant_read
-
-Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and
-their metadata.
-
- See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
-  groups={[]}
-  name={"grant_read_acp"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### grant_read_acp
-
-Allows the named [grantee][urls.aws_s3_grantee] to read the created objects'
-ACL.
-
- See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be","person@email.com","http://acs.amazonaws.com/groups/global/AllUsers"]}
-  groups={[]}
-  name={"grant_write_acp"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### grant_write_acp
-
-Allows the named [grantee][urls.aws_s3_grantee] to write the created objects'
-ACL.
-
- See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-<Field
   common={true}
   defaultValue={"date=%F/"}
   enumValues={null}
@@ -795,31 +921,6 @@ your objects, and it's important to end this value with a `/` if you want this
 to be the root S3 "folder".
 
  See [Object naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["us-east-1"]}
-  groups={[]}
-  name={"region"}
-  path={null}
-  relevantWhen={{"endpoint":""}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### region
-
-The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
-provided it will override this value since the endpoint includes the region.
-
-
 
 
 </Field>
@@ -1026,57 +1127,6 @@ duplicate data downstream.
 <Field
   common={false}
   defaultValue={null}
-  enumValues={{"AES256":"256-bit Advanced Encryption Standard","aws:kms":"AWS managed key encryption"}}
-  examples={["AES256","aws:kms"]}
-  groups={[]}
-  name={"server_side_encryption"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### server_side_encryption
-
-The server-side encryption algorithm used when storing these objects.
-
- See [Server-side encryption (SSE)](#server-side-encryption-sse) for more info.
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["abcd1234"]}
-  groups={[]}
-  name={"ssekms_key_id"}
-  path={null}
-  relevantWhen={{"server_side_encryption":"aws:kms"}}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### ssekms_key_id
-
-If [`server_side_encryption`](#server_side_encryption) has the value `"aws.kms"`, this specifies the ID of
-the AWS Key Management Service (AWS KMS) symmetrical customer managed customer
-master key (CMK) that will used for the created objects. If not specified,
-Amazon S3 uses the AWS managed CMK in AWS to protect the data.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
   enumValues={{"STANDARD":"The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class.","REDUCED_REDUNDANCY":"Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. ","INTELLIGENT_TIERING":"Stores objects in two access tiers: one tier that is optimized for frequent access and another lower-cost tier that is optimized for infrequently accessed data.","STANDARD_IA":"Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class).","ONEZONE_IA":"Amazon S3 stores the object data in only one Availability Zone.","GLACIER":"Use for archives where portions of the data might need to be retrieved in minutes.","DEEP_ARCHIVE":"Use for archiving data that rarely needs to be accessed."}}
   examples={["STANDARD","REDUCED_REDUNDANCY","INTELLIGENT_TIERING","STANDARD_IA","ONEZONE_IA","GLACIER","DEEP_ARCHIVE"]}
   groups={[]}
@@ -1098,56 +1148,6 @@ for more details.
 
  See [Storage class](#storage-class) for more info.
 
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"tags"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### tags
-
-The tag-set for the object.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"Tag1":"Value1"}]}
-  groups={[]}
-  name={"`[tag-name]`"}
-  path={"tags"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[tag-name]`
-
-A custom tag to be added to the created objects.
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 </Fields>

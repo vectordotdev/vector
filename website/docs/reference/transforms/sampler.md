@@ -40,8 +40,8 @@ events with a configurable rate.
 [transforms.my_transform_id]
   type = "sampler" # required
   inputs = ["my-source-id"] # required
-  rate = 10 # required
   pass_list = ["[error]", "field2"] # optional, no default
+  rate = 10 # required
 ```
 
 </TabItem>
@@ -51,9 +51,9 @@ events with a configurable rate.
 [transforms.my_transform_id]
   type = "sampler" # required
   inputs = ["my-source-id"] # required
-  rate = 10 # required
   key_field = "message" # optional, no default
   pass_list = ["[error]", "field2"] # optional, no default
+  rate = 10 # required
 ```
 
 </TabItem>

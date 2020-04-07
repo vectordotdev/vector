@@ -4,6 +4,12 @@ avatar = "https://github.com/a-rodin.png"
 github = "https://github.com/a-rodin"
 keybase = "https://keybase.io/arodin"
 name = "Alexander"
+bio = """\
+Alexander is a Senior Engineer at <a href="https://timber.io">Timber.io</a> \
+and a member of the <a href="/community#team">core Vector team</a>. He created \
+<a href="https://alexanderrodin.com/qstardict">QStarDict</a>, a dictionary \
+application written in C++.\
+"""
 
 [[team]]
 id = "ana"

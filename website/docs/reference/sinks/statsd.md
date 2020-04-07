@@ -43,9 +43,9 @@ The Vector `statsd` sink
 [sinks.my_sink_id]
   type = "statsd" # required
   inputs = ["my-source-id"] # required
-  namespace = "service" # required
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
+  namespace = "service" # required
 ```
 
 </TabItem>
@@ -55,9 +55,9 @@ The Vector `statsd` sink
 [sinks.my_sink_id]
   type = "statsd" # required
   inputs = ["my-source-id"] # required
-  namespace = "service" # required
   address = "127.0.0.1:8125" # optional, default
   healthcheck = true # optional, default
+  namespace = "service" # required
 ```
 
 </TabItem>

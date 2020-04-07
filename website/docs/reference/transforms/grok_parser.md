@@ -41,9 +41,9 @@ log field value with [Grok][urls.grok].
   # General
   type = "grok_parser" # required
   inputs = ["my-source-id"] # required
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
 
   # Types
   types.status = "int" # example
@@ -62,9 +62,9 @@ log field value with [Grok][urls.grok].
   # General
   type = "grok_parser" # required
   inputs = ["my-source-id"] # required
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # required
 
   # Types
   types.status = "int" # example

@@ -54,10 +54,10 @@ The Vector `clickhouse` sink
   # General
   type = "clickhouse" # required
   inputs = ["my-source-id"] # required
-  host = "http://localhost:8123" # required
-  table = "mytable" # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
+  host = "http://localhost:8123" # required
+  table = "mytable" # required
 
   # requests
   compression = "none" # optional, default
@@ -71,13 +71,10 @@ The Vector `clickhouse` sink
   # General
   type = "clickhouse" # required
   inputs = ["my-source-id"] # required
-  host = "http://localhost:8123" # required
-  table = "mytable" # required
   database = "mydatabase" # optional, no default
   healthcheck = true # optional, default
-
-  # requests
-  compression = "none" # optional, default
+  host = "http://localhost:8123" # required
+  table = "mytable" # required
 
   # Auth
   auth.strategy = "basic" # required
@@ -89,9 +86,9 @@ The Vector `clickhouse` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -107,6 +104,9 @@ The Vector `clickhouse` sink
   request.retry_initial_backoff_secs = 1 # optional, default, seconds
   request.retry_max_duration_secs = 10 # optional, default, seconds
   request.timeout_secs = 30 # optional, default, seconds
+
+  # requests
+  compression = "none" # optional, default
 
   # TLS
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
@@ -318,6 +318,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -365,30 +389,6 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -413,55 +413,6 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
-  examples={["none","gzip"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### compression
-
-The compression strategy used to compress the encoded event data before
-outputting.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["mydatabase"]}
-  groups={[]}
-  name={"database"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### database
-
-The database that contains the stable that data will be inserted into.
-
-
-
 
 </Field>
 <Field
@@ -564,6 +515,30 @@ How to format event timestamps.
 </Field>
 <Field
   common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["mydatabase"]}
+  groups={[]}
+  name={"database"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### database
+
+The database that contains the stable that data will be inserted into.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
@@ -605,6 +580,30 @@ Enables/disables the sink healthcheck upon start.
 ### host
 
 The host url of the [Clickhouse][urls.clickhouse] server.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["mytable"]}
+  groups={[]}
+  name={"table"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### table
+
+The table that data will be inserted into.
 
 
 
@@ -812,23 +811,24 @@ duplicate data downstream.
 </Field>
 <Field
   common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["mytable"]}
+  defaultValue={"none"}
+  enumValues={{"none":"The payload will not be compressed.","gzip":"The payload will be compressed in [Gzip][urls.gzip] format before being sent."}}
+  examples={["none","gzip"]}
   groups={[]}
-  name={"table"}
+  name={"compression"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-### table
+### compression
 
-The table that data will be inserted into.
+The compression strategy used to compress the encoded event data before
+outputting.
 
 
 

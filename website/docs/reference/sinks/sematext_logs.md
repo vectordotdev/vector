@@ -44,8 +44,8 @@ The Vector `sematext_logs` sink
 [sinks.my_sink_id]
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN}" # required
   healthcheck = true # optional, default
+  token = "${SEMATEXT_TOKEN}" # required
 ```
 
 </TabItem>
@@ -56,19 +56,19 @@ The Vector `sematext_logs` sink
   # General
   type = "sematext_logs" # required
   inputs = ["my-source-id"] # required
-  token = "${SEMATEXT_TOKEN}" # required
   healthcheck = true # optional, default
   host = "http://127.0.0.1" # optional, no default
   region = "na" # optional, no default
+  token = "${SEMATEXT_TOKEN}" # required
 
   # Batch
   batch.max_size = 10490000 # optional, default, bytes
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -189,6 +189,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -232,30 +256,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 The maximum size of the buffer on the disk.
 
  See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
 
 
 </Field>
@@ -459,6 +459,30 @@ not set.
 
 </Field>
 <Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["${SEMATEXT_TOKEN}","some-sematext-token"]}
+  groups={[]}
+  name={"token"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### token
+
+The token that will be used to write to Sematext.
+
+
+
+
+</Field>
+<Field
   common={false}
   defaultValue={null}
   enumValues={null}
@@ -656,30 +680,6 @@ duplicate data downstream.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["${SEMATEXT_TOKEN}","some-sematext-token"]}
-  groups={[]}
-  name={"token"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### token
-
-The token that will be used to write to Sematext.
-
-
-
 
 </Field>
 </Fields>

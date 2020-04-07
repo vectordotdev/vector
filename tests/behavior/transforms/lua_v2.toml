@@ -2,8 +2,11 @@
   inputs = []
   type = "lua"
   version = "2"
-  source = """
-    event.log.a, event.log.b = nil, event.log.a
+  hooks.process = """
+    function (event, emit)
+      event.log.a, event.log.b = nil, event.log.a
+      emit(event)
+    end
   """
 [[tests]]
   name = "lua_v2_log"
@@ -18,12 +21,39 @@
       "a.exists" = false
       "b.equals" = "example value"
 
-[transforms.lua_v2_metric]
+[transforms.lua_v2_source]
   inputs = []
   type = "lua"
   version = "2"
   source = """
-    event.metric.counter.value = event.metric.counter.value + 1
+  function hook_process (event, emit)
+    event.log.inserted_field = "inserted value"
+    emit(event)
+  end
+  """
+  hooks.process = "hook_process"
+[[tests]]
+  name = "lua_v2_source"
+  [tests.input]
+    insert_at = "lua_v2_source"
+    type = "log"
+    [tests.input.log_fields]
+      some_field = "some value"
+  [[tests.outputs]]
+    extract_from = "lua_v2_source"
+    [[tests.outputs.conditions]]
+      "some_field.equals" = "some value"
+      "inserted_field.equals" = "inserted value"
+
+[transforms.lua_v2_metric]
+  inputs = []
+  type = "lua"
+  version = "2"
+  hooks.process = """
+    function (event, emit)
+      event.metric.counter.value = event.metric.counter.value + 1
+      emit(event)
+    end
   """
 [[tests]]
   name = "lua_v2_metric"
@@ -44,14 +74,17 @@
   inputs = []
   type = "lua"
   version = "2"
-  source = """
-    event.log = nil
-    event.metric = {
-      name = "example metric",
-      counter = {
-        value = 1.0
+  hooks.process = """
+    function (event, emit)
+      event.log = nil
+      event.metric = {
+        name = "example metric",
+        counter = {
+          value = 1.0
+        }
       }
-    }
+      emit(event)
+    end
   """
 [[tests]]
   name = "lua_v2_log_to_metric"
@@ -69,11 +102,14 @@
   inputs = []
   type = "lua"
   version = "2"
-  source = """
-    event.metric = nil
-    event.log = {
-      field = "example value"
-    }
+  hooks.process = """
+    function (event, emit)
+      event.metric = nil
+      event.log = {
+        field = "example value"
+      }
+      emit(event)
+    end
   """
 [[tests]]
   name = "lua_v2_metric_to_log"
