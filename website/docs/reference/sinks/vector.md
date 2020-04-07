@@ -500,6 +500,7 @@ If you'd like to disable health checks for this sink you can set the
 
 The `vector` sink streams data on a real-time
 event-by-event basis. It does not batch data.
+
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested

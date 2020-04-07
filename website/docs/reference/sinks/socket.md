@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or UDS socket."
@@ -716,6 +716,7 @@ If you'd like to disable health checks for this sink you can set the
 
 The `socket` sink streams data on a real-time
 event-by-event basis. It does not batch data.
+
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
