@@ -203,7 +203,7 @@ class Component
         toml: config_example(:toml)
       },
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
-      description: description,
+      description: (description ? description.remove_markdown_links : nil),
       event_types: event_types,
       features: features,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
@@ -212,7 +212,7 @@ class Component
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
       service_providers: service_providers,
-      short_description: short_description,
+      short_description: (short_description ? short_description.remove_markdown_links : nil),
       status: status,
       title: title,
       type: type,
