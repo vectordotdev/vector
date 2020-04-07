@@ -197,9 +197,17 @@ See [motivation](#motivation).
 1. What are some of the details that set Vector's Kubernetes integration apart?
    This is for marketing purposes and also helps us "raise the bar".
 
+### From Mike
+
+1. What significantly different k8s cluster "flavors" are there? Which ones do
+   we want to test against? Some clusters use `docker`, some use `CRI-O`,
+   [etc][container_runtimes]. Some even use [gVisor] or [Firecracker]. There
+   might be differences in how different container runtimes handle logs.
+
 ## Plan Of Attack
 
 - [ ] Agree on minimal Kubernetes version.
+- [ ] Agree on a list of Kubernetes cluster flavors we want to test against.
 - [ ] Setup a proper testing suite for k8s.
   - [ ] Support for customizable k8s clusters. See [issue#2170].
   - [ ] Look into [issue#2225] and see if we can include it as part of this
@@ -223,8 +231,10 @@ See [motivation](#motivation).
 - [ ] Release `0.10.0` and announce.
 
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
+[container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [filebeat k8s integration]: https://www.elastic.co/guide/en/beats/filebeat/master/running-on-kubernetes.html
+[firecracker]: https://github.com/firecracker-microvm/firecracker
 [fluentbit k8s integration]: https://docs.fluentbit.io/manual/installation/kubernetes
 [fluentbit_daemonset]: https://raw.githubusercontent.com/fluent/fluent-bit-kubernetes-logging/master/output/elasticsearch/fluent-bit-ds.yaml
 [fluentbit_installation]: https://docs.fluentbit.io/manual/installation/kubernetes#installation
@@ -232,6 +242,7 @@ See [motivation](#motivation).
 [fluentd k8s integration]: https://docs.fluentd.org/v/0.12/articles/kubernetes-fluentd
 [fluentd_daemonset]: https://github.com/fluent/fluentd-kubernetes-daemonset/blob/master/fluentd-daemonset-papertrail.yaml
 [guide_example]: https://vector.dev/guides/integrate/sources/syslog/aws_kinesis_firehose/
+[gvisor]: https://github.com/google/gvisor
 [honeycomb integration]: https://docs.honeycomb.io/getting-data-in/integrations/kubernetes/
 [influx helm charts]: https://github.com/influxdata/helm-charts
 [issue#1293]: https://github.com/timberio/vector/issues/1293
