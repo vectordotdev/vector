@@ -45,7 +45,7 @@ Kubernetes logs and metrics to any destination you please.
 
 #### How This Guide Works
 
-Our recommended strategy deploys Vector as a Kubernetes [daemonset]. This is
+Our recommended strategy deploys Vector as a Kubernetes [DaemonSet]. This is
 the most efficient means of collecting Kubernetes observability data since
 Vector is guaranteed to deploy _once_ on each of your Nodes. In addition,
 we'll use the [`kubernetes_pod_metadata` transform][kubernetes_pod_metadata_transform]
@@ -162,6 +162,8 @@ See [motivation](#motivation).
 
 ## Outstanding Questions
 
+### From Ben
+
 1. What is the minimal Kubernetes version that we want to support. See
    [this comment][kubernetes_version_comment].
 1. What is the best to avoid Vector from ingesting it's own logs? I'm assuming
@@ -192,7 +194,7 @@ See [motivation](#motivation).
 1. How are we collecting Kubernetes system events? Is that outside of the
    scope of this RFC? And why does this take an entirely different path?
    (ref [issue#1293])
-1. What are some of the details that sets Vector's Kubernetes integration apart?
+1. What are some of the details that set Vector's Kubernetes integration apart?
    This is for marketing purposes and also helps us "raise the bar".
 
 ## Plan Of Attack
