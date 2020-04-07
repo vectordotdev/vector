@@ -282,7 +282,7 @@ mod test {
     }
 
     #[test]
-    fn doesnt_allow_any_into_log_or_metric() {
+    fn allows_any_into_log_or_metric() {
         let mut graph = Graph::default();
         graph.add_source("any_source", DataType::Any);
         graph.add_transform(
@@ -308,16 +308,7 @@ mod test {
             vec!["any_source", "log_to_any"],
         );
 
-        assert_eq!(
-            Err(vec![
-                "Data type mismatch between any_source (Any) and log_sink (Log)".into(),
-                "Data type mismatch between any_source (Any) and log_to_any (Log)".into(),
-                "Data type mismatch between any_source (Any) and metric_sink (Metric)".into(),
-                "Data type mismatch between log_to_any (Any) and log_sink (Log)".into(),
-                "Data type mismatch between log_to_any (Any) and metric_sink (Metric)".into(),
-            ]),
-            graph.typecheck()
-        );
+        assert_eq!(graph.typecheck(), Ok(()));
     }
 
     #[test]
