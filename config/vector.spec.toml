@@ -1908,7 +1908,7 @@ dns_servers = ["0.0.0.0:53"]
       region = "us-east-1"
       status = "{{status}}"
 
-# Accepts and outputs `log` events allowing you to extract data from a logfmt-formatted log field.
+# Accepts and outputs `log` events allowing you to parse a log field's value in the logfmt format.
 [transforms.logfmt_parser]
   #
   # General

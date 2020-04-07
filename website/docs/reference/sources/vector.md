@@ -308,12 +308,6 @@ will not request a certificate from the client.
 </Field>
 </Fields>
 
-## Output
-
-The `vector` source is a pass-through source and is intended to accept data
-from an upstream [`vector` sink][docs.sinks.vector]. Datta is not changed or
-augmented.
-
 ## How It Works
 
 ### Encoding

@@ -1,7 +1,7 @@
 [transforms.logfmt_parser]
 title = "Logfmt Parser"
 allow_you_to_description = """\
-extract data from a logfmt-formatted log field\
+parse a log field's value in the [logfmt][urls.logfmt] format\
 """
 beta = true
 common = true
@@ -27,3 +27,48 @@ default = true
 description = "If the specified `field` should be dropped (removed) after parsing."
 
 <%= render("_partials/fields/_types_options.toml", namespace: "transforms.logfmt_parser.options", common: true) %>
+
+[[transforms.logfmt_parser.examples]]
+label = "Heroku 5424"
+body = """\
+Given the following Heroku router log line:
+
+```json
+{
+  "message": "at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"
+}
+```
+
+And the following configuration:
+
+```toml
+[transforms.<transform-id>]
+type = "logfmt"
+field = "message"
+
+types.bytes = "int"
+```
+
+A [`log` event][docs.data-model.log] will be output with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "at": "info",
+  "method": "GET",
+  "path": "/",
+  "host": "myapp.herokuapp.com",
+  "request_id": "8601b555-6a83-4c12-8269-97c8e32cdb22",
+  "fwd": "204.204.204.204",
+  "dyno": "web.1",
+  "connect": "1ms",
+  "service": "18ms",
+  "status": "200",
+  "bytes": 13,
+  "tls_version": "tls1.1",
+  "protocol": "http"
+}
+```
+
+Note that the `bytes` field was coerced into an `int` via the `types` option.
+"""

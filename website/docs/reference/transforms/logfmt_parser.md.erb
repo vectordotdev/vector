@@ -36,3 +36,34 @@
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
+
+### Key/Value Parsing
+
+This transform can be used for key/value parsing. [Logfmt][urls.logfmt] refers
+to a _loosely_ defined spec that parses a key/value pair delimited by a `=`
+character.
+
+### Quoting
+
+Values can be quoted to capture spaces, and quotes can be escaped with `\`.
+For example
+
+```
+key1="value with spaces" key2="value with spaces and \""
+```
+
+Would result in the following `log` event:
+
+```json title="log event"
+{
+  "key1": "value with spaces",
+  "key2": "value with spaces and \""
+}
+```
+
+### Supported Formats
+
+Currently, the `logfmt_parser` only supports the _loosely_ defined format
+described by [logfmt][urls.logfmt]. This means only key/value pairs delimited
+with a `=`. If you need support for other delimited please consider contributing
+to Vector or using the [`lua` transform][docs.transforms.lua].
