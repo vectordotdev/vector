@@ -67,11 +67,15 @@ pub struct UnixSocketEventSent {
 
 impl InternalEvent for UnixSocketEventSent {
     fn emit_metrics(&self) {
-        counter!("unix_socket_events_sent", 1,
+        counter!("events_processed", 1,
             "component_kind" => "sink",
+            "component_type" => "socket",
+            "mode" => "unix",
         );
-        counter!("unix_socket_bytes_sent", self.byte_size as u64,
+        counter!("bytes_processed", self.byte_size as u64,
             "component_kind" => "sink",
+            "component_type" => "socket",
+            "mode" => "unix",
         );
     }
 }
@@ -87,12 +91,12 @@ impl InternalEvent for UnixSocketEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_received", 1,
+        counter!("events_processed", 1,
             "component_kind" => "source",
             "component_type" => "socket",
             "mode" => "unix",
         );
-        counter!("bytes_received", self.byte_size as u64,
+        counter!("bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
             "component_type" => "socket",
             "mode" => "unix",

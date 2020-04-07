@@ -18,12 +18,12 @@ impl InternalEvent for FileEventReceived<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "events_received", 1,
+            "events_processed", 1,
             "component_kind" => "source",
             "component_type" => "file",
         );
         counter!(
-            "bytes_received", self.byte_size as u64,
+            "bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
             "component_type" => "file",
         );

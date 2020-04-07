@@ -10,12 +10,12 @@ pub struct VectorEventSent {
 impl InternalEvent for VectorEventSent {
     fn emit_metrics(&self) {
         counter!(
-            "events_sent", 1,
+            "events_processed", 1,
             "component_kind" => "sink",
             "component_type" => "vector",
         );
         counter!(
-            "bytes_sent", self.byte_size as u64,
+            "bytes_processed", self.byte_size as u64,
             "component_kind" => "sink",
             "component_type" => "vector",
         );
@@ -34,12 +34,12 @@ impl InternalEvent for VectorEventReceived {
 
     fn emit_metrics(&self) {
         counter!(
-            "events_received", 1,
+            "events_processed", 1,
             "component_kind" => "sink",
             "component_type" => "vector",
         );
         counter!(
-            "bytes_received", self.byte_size as u64,
+            "bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
             "component_type" => "vector",
         );

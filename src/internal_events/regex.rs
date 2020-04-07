@@ -30,9 +30,10 @@ impl InternalEvent for RegexFailedMatch<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("failed_match", 1,
+        counter!("processing_error", 1,
             "component_kind" => "transform",
             "component_type" => "regex_parser",
+            "error_type" => "failed_match",
         );
     }
 }
@@ -48,9 +49,10 @@ impl InternalEvent for RegexMissingField<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("missing_field_error", 1,
+        counter!("processing_error", 1,
             "component_kind" => "transform",
             "component_type" => "regex_parser",
+            "error_type" => "missing_field",
         );
     }
 }

@@ -7,6 +7,7 @@ pub struct PrometheusRequestCompleted;
 
 impl InternalEvent for PrometheusRequestCompleted {
     fn emit_metrics(&self) {
+        // TODO: make this a timer
         counter!("requests_completed", 1,
             "component_kind" => "source",
             "component_type" => "prometheus",

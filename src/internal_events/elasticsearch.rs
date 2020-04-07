@@ -10,12 +10,12 @@ pub struct ElasticSearchEventReceived {
 impl InternalEvent for ElasticSearchEventReceived {
     fn emit_metrics(&self) {
         counter!(
-            "events_received", 1,
+            "events_processed", 1,
             "component_kind" => "sink",
             "component_type" => "elasticsearch",
         );
         counter!(
-            "bytes_received", self.byte_size as u64,
+            "bytes_processed", self.byte_size as u64,
             "component_kind" => "sink",
             "component_type" => "elasticsearch",
         );

@@ -101,10 +101,10 @@ impl InternalEvent for TcpEventSent {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_events_sent", 1,
+        counter!("events_processed", 1,
             "component_kind" => "sink",
         );
-        counter!("tcp_bytes_sent", self.byte_size as u64,
+        counter!("bytes_processed", self.byte_size as u64,
             "component_kind" => "sink",
         );
     }
@@ -121,12 +121,12 @@ impl InternalEvent for TcpEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_received", 1,
+        counter!("events_processed", 1,
             "component_kind" => "source",
             "component_type" => "socket",
             "mode" => "tcp",
         );
-        counter!("bytes_received", self.byte_size as u64,
+        counter!("bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
             "component_type" => "socket",
             "mode" => "tcp",

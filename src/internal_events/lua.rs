@@ -1,19 +1,12 @@
 use super::InternalEvent;
 use crate::transforms::lua::v1::format_error;
-use metrics::{counter, gauge, timing};
-use std::time::Duration;
+use metrics::{counter, gauge};
 
 #[derive(Debug)]
-pub struct LuaEventProcessed {
-    pub duration: Duration,
-}
+pub struct LuaEventProcessed;
 
 impl InternalEvent for LuaEventProcessed {
     fn emit_metrics(&self) {
-        timing!("processing_duration", self.duration,
-            "component_kind" => "transform",
-            "component_type" => "lua",
-        );
         counter!("events_processed", 1,
             "component_kind" => "transform",
             "component_type" => "lua",
@@ -47,7 +40,7 @@ impl InternalEvent for LuaScriptError {
     }
 
     fn emit_metrics(&self) {
-        counter!("script_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "lua",
         );
