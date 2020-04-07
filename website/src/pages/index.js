@@ -49,7 +49,7 @@ const features = [
     icon: 'codepen',
     description: (
       <>
-        Vector aims to be the single, and only, tool needed to get data from A to B, <Link to="/docs/setup/deployment">deploying</Link> as an <Link to="/docs/setup/deployment/roles/agent">agent</Link> or <Link to="/docs/setup/deployment/roles/service">service</Link>.
+        Vector aims to be the single, and only, tool needed to get data from A to B, <Link to="/docs/setup/deployment/">deploying</Link> as an <Link to="/docs/setup/deployment/roles/daemon/">daemon</Link>, or <Link to="/docs/setup/deployment/roles/sidecar/">sidecar</Link>, or <Link to="/docs/setup/deployment/roles/service/">service</Link>.
       </>
     ),
   },
@@ -58,7 +58,7 @@ const features = [
     icon: 'shuffle',
     description: (
       <>
-        Vector supports <Link to="/docs/about/data-model/log">logs</Link>, <Link to="/docs/about/data-model/metric">metrics</Link>, and <Link to="/docs/about/data-model#event">events</Link>, making it easy to collect and process <i>all</i> observability data.
+        Vector supports <Link to="/docs/about/data-model/log/">logs</Link>, <Link to="/docs/about/data-model/metric/">metrics</Link>, and <Link to="/docs/about/data-model/#event">events</Link>, making it easy to collect and process <i>all</i> observability data.
       </>
     ),
   },
@@ -67,7 +67,7 @@ const features = [
     icon: 'code',
     description: (
       <>
-        <Link to="/components?functions[]=program">Programmable transforms</Link> give you the full power of programmable runtimes. Handle complex use cases without limitation.
+        <Link to="/components/?functions[]=program">Programmable transforms</Link> give you the full power of programmable runtimes. Handle complex use cases without limitation.
       </>
     ),
   },
@@ -76,7 +76,7 @@ const features = [
     icon: 'shield',
     description: (
       <>
-        Guarantees matter, and Vector is <Link to="/docs/about/guarantees">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
+        Guarantees matter, and Vector is <Link to="/docs/about/guarantees/">clear on it's guarantees</Link>, helping you to make the appropriate trade offs for your use case.
       </>
     ),
   },
@@ -323,19 +323,19 @@ function Topologies() {
           <TabItem value="distributed">
             <div className={styles.topology}>
               <SVG src="/img/topologies-distributed.svg" className={styles.topologyDiagram} />
-              <Link to="/docs/setup/deployment/topologies#distributed">Learn more about the distributed topology</Link>
+              <Link to="/docs/setup/deployment/topologies/#distributed">Learn more about the distributed topology</Link>
             </div>
           </TabItem>
           <TabItem value="centralized">
             <div className={styles.topology}>
               <SVG src="/img/topologies-centralized.svg" className={styles.topologyDiagram} />
-              <Link to="/docs/setup/deployment/topologies#centralized">Learn more about the centralized topology</Link>
+              <Link to="/docs/setup/deployment/topologies/#centralized">Learn more about the centralized topology</Link>
             </div>
           </TabItem>
           <TabItem value="stream-based">
             <div className={styles.topology}>
               <SVG src="/img/topologies-stream-based.svg" className={styles.topologyDiagram} />
-              <Link to="/docs/setup/deployment/topologies#stream-based">Learn more about the stream-based topology</Link>
+              <Link to="/docs/setup/deployment/topologies/#stream-based">Learn more about the stream-based topology</Link>
             </div>
           </TabItem>
         </Tabs>
@@ -352,11 +352,11 @@ function InstallationSection() {
         <div className="sub-title">Fully static, no dependencies, no runtime, memory safe</div>
 
         <div className={styles.installationPlatforms}>
-          <Link to="/docs/setup/installation/containers/docker"><SVG src="/img/docker.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems"><SVG src="/img/linux.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/raspbian"><SVG src="/img/raspbian.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/windows"><SVG src="/img/windows.svg" /></Link>
-          <Link to="/docs/setup/installation/operating-systems/macos"><SVG src="/img/apple.svg" /></Link>
+          <Link to="/docs/setup/installation/containers/docker/"><SVG src="/img/docker.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/"><SVG src="/img/linux.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/raspbian/"><SVG src="/img/raspbian.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/windows/"><SVG src="/img/windows.svg" /></Link>
+          <Link to="/docs/setup/installation/operating-systems/macos/"><SVG src="/img/apple.svg" /></Link>
         </div>
 
         <div className={styles.installationChecks}>
@@ -432,7 +432,7 @@ function Home() {
           </p>
           <div className="hero--buttons">
             <Link to="https://github.com/timberio/vector/" className="button button--primary"><i className="feather icon-github"></i> View on Github</Link>
-            <Link to="/download" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
+            <Link to="/download/" className="button button--primary">Download<span className="version"> v{latest_release.version}</span></Link>
           </div>
           <Diagram className={styles.indexHeroDiagram} width="100%" />
           <p className="hero--subsubtitle">
