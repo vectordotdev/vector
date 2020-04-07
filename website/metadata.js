@@ -25256,7 +25256,8 @@ module.exports = {
       "delivery_guarantee": "best_effort",
       "description": null,
       "event_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "features": [
         "Send data to another downstream Vector instance."
@@ -25264,7 +25265,8 @@ module.exports = {
       "function_category": "transmit",
       "id": "vector_sink",
       "input_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "logo_path": "/img/logos/vector.svg",
       "name": "vector",
@@ -25277,7 +25279,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Streams log events to another downstream `vector` source.",
+      "short_description": "Streams log and metric events to another downstream `vector` source.",
       "status": "beta",
       "title": "Vector",
       "type": "sink",
