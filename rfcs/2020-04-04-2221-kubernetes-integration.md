@@ -136,6 +136,31 @@ TODO: fill in
 
 ## Design considerations
 
+### Minimal supported Kubernetes version
+
+The minimal supported Kubernetes version is the earliest released version of
+Kubernetes that we intend to support at full capacity.
+
+We use minimal supported Kubernetes version (or MSKV for short), in the
+following ways:
+
+- to communicate to our users what versions of Kubernetes Vector will work on;
+- to run our Kubernetes test suite against Kubernetes clusters starting from
+  this version;
+- to track what Kubernetes API feature level we can use when developing Vector
+  code.
+
+We can change MSKV over time, but we have to notify our users accordingly.
+
+There has to be one "root" location where current MSKV for the whole Vector
+project is specified, and it should be a single source of truth for all the
+decisions that involve MSKV, as well as documentation. A good candidate for
+such location is a file at `.meta` dir of the Vector repo. `.meta/mskv` for
+instance.
+
+For the moment, the discussion on the initial MSKV is in progress. The proposed
+version is Kubernetes `1.14`.
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
