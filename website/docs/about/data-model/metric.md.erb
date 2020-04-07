@@ -144,8 +144,9 @@ import TabItem from '@theme/TabItem';
 
 ## Schema
 
-The metric data model is comprised of 6 types: `aggregated_histogram`, `aggregated_summary`, `counter`, `distribution`, `gauge`, `set`.
-You'll notice that certain fields are shared across all types.
+The metric data model is comprised of 6 types: `aggregated_histogram`,  `aggregated_summary`, `counter`, `distribution`, `gauge`, `set`. A metric event contains a map named after one of these types at the top level. This map contains corresponding numeric values.
+
+In addition, all kinds of metric events have the following top level fields: `name`, `timestamp`, `kind`, `tags`.
 
 <%= fields(metadata.data_model.metric.schema_list, heading_depth: 3) %>
 
