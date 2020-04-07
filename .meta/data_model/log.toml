@@ -29,6 +29,26 @@ field name via the \
 the source-level `timestamp_key` option for relevant sources.
 """
 
+[data_model.log.schema.source]
+type = "string"
+examples = ["/var/log/myapp/logfile.log","197.23.0.8"]
+description = """\
+The address, name of a file, container name, pod name, or other sources \
+from which the log originates. Change this field name via the \
+[global `source_key` option][docs.reference.global-options#source_key] or the \
+source-level `source_key` option for relevant sources.
+"""
+
+[data_model.log.schema.source_type]
+type = "string"
+examples = ["file","socket","http","kubernetes"]
+description = """\
+The official `type` of Vector's source component from which the log originates. \
+Change this field name via the \
+[global `source_type_key` option][docs.reference.global-options#source_type_key] \
+or the source-level `source_type_key` option for relevant sources.
+"""
+
 [data_model.log.schema."`[custom-key]`"]
 type = "*"
 examples = [
