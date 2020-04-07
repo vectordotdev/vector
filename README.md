@@ -138,6 +138,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
 * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
+* **Smart timestamp coercion** - All [parsing transforms][urls.vector_parsing_transforms] implement a [`types` option][docs.transforms.regex_parser#types] that can automatically parse timestamps.
 * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
 * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
@@ -253,6 +254,7 @@ Or use your own [preferred method][docs.installation].
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
 [docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
+[docs.transforms.regex_parser#types]: https://vector.dev/docs/reference/transforms/regex_parser/#types
 [docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
 [docs.transforms.swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes/
 [docs.transforms]: https://vector.dev/docs/reference/transforms/

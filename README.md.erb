@@ -115,6 +115,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
 * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
+* **Smart timestamp coercion** - All [parsing transforms][urls.vector_parsing_transforms] implement a [`types` option][docs.transforms.regex_parser#types] that can automatically parse timestamps.
 * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
 * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
