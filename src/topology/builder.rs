@@ -172,15 +172,8 @@ pub fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        let input_rx: Box<dyn Stream<Item = Event, Error = ()> + Send> =
-            Box::new(input_rx.filter(move |event| match (event, input_type) {
-                (_, DataType::Any) => true,
-                (Event::Log(_), DataType::Log) => true,
-                (Event::Metric(_), DataType::Metric) => true,
-                _ => false,
-            }));
         let transform = transform
-            .transform_stream(input_rx)
+            .transform_stream(filter_event_type(input_rx, input_type))
             .forward(output)
             .map(|_| ());
         let task = Task::new(&name, &typetag, transform);
@@ -221,13 +214,7 @@ pub fn build_pieces(
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
-        let rx = rx.filter(move |event| match (event, input_type) {
-            (_, DataType::Any) => true,
-            (Event::Log(_), DataType::Log) => true,
-            (Event::Metric(_), DataType::Metric) => true,
-            _ => false,
-        });
-        let sink = rx.forward(sink).map(|_| ());
+        let sink = filter_event_type(rx, input_type).forward(sink).map(|_| ());
         let task = Task::new(&name, &typetag, sink);
 
         let healthcheck_task = if enable_healthcheck {
@@ -282,4 +269,24 @@ fn capitalize(s: &str) -> String {
         r.make_ascii_uppercase();
     }
     s
+}
+
+fn filter_event_type<S>(
+    stream: S,
+    data_type: DataType,
+) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
+where
+    S: Stream<Item = Event, Error = ()> + Send + 'static,
+{
+    match data_type {
+        DataType::Any => Box::new(stream), // it's possible to not call any comparing function if any type is supported
+        DataType::Log => Box::new(stream.filter(|event| match event {
+            Event::Log(_) => true,
+            _ => false,
+        })),
+        DataType::Metric => Box::new(stream.filter(|event| match event {
+            Event::Metric(_) => true,
+            _ => false,
+        })),
+    }
 }
