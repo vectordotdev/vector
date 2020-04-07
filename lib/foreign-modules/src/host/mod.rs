@@ -31,14 +31,3 @@
 //! }
 //! ```
 
-pub trait Archetype {}
-pub mod archetypes {
-    use crate::host::Archetype;
-
-    pub struct Sink;
-    impl Archetype for Sink {}
-    pub struct Source;
-    impl Archetype for Source {}
-    pub struct Transform;
-    impl Archetype for Transform {}
-}

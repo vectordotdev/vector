@@ -121,7 +121,7 @@ impl<Archetype> WasmModule<Archetype> {
 }
 
 
-impl WasmModule<foreign_modules::host::archetypes::Transform> {
+impl WasmModule<foreign_modules::roles::Transform> {
     #[instrument]
     pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
         event!(Level::TRACE, "processing");
