@@ -297,3 +297,11 @@ Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
 and reliable security. You can enable and adjust TLS behavior via the `tls.*`
 options.
 <%- end -%>
+<%- if component.options.key?("types") -%>
+
+### Value Coercion
+
+Values can be coerced upon extraction via the `types.*` options. This functions
+exactly like the [`coercer` transform][docs.transforms.coercer] except that its
+coupled within this transform for convenience.
+<%- end -%>

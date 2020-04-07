@@ -26408,7 +26408,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to extract data from a logfmt-formatted log field.",
+      "short_description": "Accepts log events and allows you to parse a log field's value in the logfmt format.",
       "status": "beta",
       "title": "Logfmt Parser",
       "type": "transform",
