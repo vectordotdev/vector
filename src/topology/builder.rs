@@ -1,9 +1,9 @@
 use super::{
-    config::{SinkContext, TransformContext},
+    config::{DataType, SinkContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
 };
-use crate::{buffers, dns::Resolver, runtime, shutdown::SourceShutdownCoordinator};
+use crate::{buffers, dns::Resolver, event::Event, runtime, shutdown::SourceShutdownCoordinator};
 use futures01::{
     future::{lazy, Either},
     sync::mpsc,
@@ -158,6 +158,7 @@ pub fn build_pieces(
             exec: exec.clone(),
         };
 
+        let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(cx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
@@ -171,6 +172,13 @@ pub fn build_pieces(
 
         let (output, control) = Fanout::new();
 
+        let input_rx: Box<dyn Stream<Item = Event, Error = ()> + Send> =
+            Box::new(input_rx.filter(move |event| match (event, input_type) {
+                (_, DataType::Any) => true,
+                (Event::Log(_), DataType::Log) => true,
+                (Event::Metric(_), DataType::Metric) => true,
+                _ => false,
+            }));
         let transform = transform
             .transform_stream(input_rx)
             .forward(output)
@@ -188,6 +196,7 @@ pub fn build_pieces(
         let enable_healthcheck = sink.healthcheck;
 
         let typetag = sink.inner.sink_type();
+        let input_type = sink.inner.input_type();
 
         let buffer = sink.buffer.build(&config.global.data_dir, &name);
         let (tx, rx, acker) = match buffer {
@@ -212,6 +221,12 @@ pub fn build_pieces(
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
+        let rx = rx.filter(move |event| match (event, input_type) {
+            (_, DataType::Any) => true,
+            (Event::Log(_), DataType::Log) => true,
+            (Event::Metric(_), DataType::Metric) => true,
+            _ => false,
+        });
         let sink = rx.forward(sink).map(|_| ());
         let task = Task::new(&name, &typetag, sink);
 

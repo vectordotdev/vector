@@ -100,7 +100,7 @@ impl Graph {
                     | (Node::Source { ty: ty1 }, Node::Transform { in_ty: ty2, .. })
                     | (Node::Transform { out_ty: ty1, .. }, Node::Transform { in_ty: ty2, .. })
                     | (Node::Transform { out_ty: ty1, .. }, Node::Sink { ty: ty2, .. }) => {
-                        if ty1 != ty2 && ty2 != DataType::Any {
+                        if ty1 != ty2 && ty1 != DataType::Any && ty2 != DataType::Any {
                             errors.push(format!(
                                 "Data type mismatch between {} ({:?}) and {} ({:?})",
                                 x, ty1, y, ty2

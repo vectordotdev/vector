@@ -1,5 +1,5 @@
 use crate::{event::Event, transforms::Transform};
-use futures01::{stream, sync::mpsc::Receiver as FutureReceiver, Future, Stream as FutureStream};
+use futures01::{stream, Future, Stream as FutureStream};
 use std::time::Duration;
 use tokio01::timer::Interval;
 
@@ -71,7 +71,7 @@ where
 
     fn transform_stream(
         mut self: Box<Self>,
-        input_rx: FutureReceiver<Event>,
+        input_rx: Box<dyn FutureStream<Item = Event, Error = ()> + Send>,
     ) -> Box<dyn FutureStream<Item = Event, Error = ()> + Send>
     where
         Self: 'static,
