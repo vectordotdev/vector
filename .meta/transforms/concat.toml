@@ -37,7 +37,7 @@ For both start and end negative values are counted from the end of the \
 string.\
 """
 
-[[transforms.concat.output.log.examples]]
+[[transforms.concat.examples]]
 label = "Generic"
 body = """\
 Given the following input log event:

@@ -32,7 +32,7 @@ examples = ["service"]
 required = true
 description = "A prefix that will be added to all metric names."
 
-[[sinks.statsd.output.examples]]
+[[sinks.statsd.examples]]
 label = "Generic"
 body = """\
 ```text

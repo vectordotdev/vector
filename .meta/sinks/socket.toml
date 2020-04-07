@@ -33,6 +33,9 @@ write_to_description = "a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP
 [sinks.socket.options.mode]
 type = "string"
 common = true
+examples.tcp = ["tcp"]
+examples.udp = ["udp"]
+examples.unix = ["unix"]
 groups = ["tcp", "udp", "unix"]
 required = true
 description = "The type of socket to use."

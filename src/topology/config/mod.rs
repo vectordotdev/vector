@@ -118,7 +118,7 @@ impl GlobalOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
     Any,
     Log,

@@ -1,3 +1,11 @@
+//! Topology contains all topology based types.
+//!
+//! Topology is broken up into two main sections. The first
+//! section contains all the main topology types include `Topology`
+//! and the ability to start, stop and reload a config. The second
+//! part contains config related items including config traits for
+//! each type of component.
+
 pub mod builder;
 pub mod config;
 mod fanout;

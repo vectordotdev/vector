@@ -9,6 +9,7 @@ description = """\
 The component type. This is a required field that tells Vector which component \
 to use. The value _must_ be `#{name}`.\
 """
+sort = -2
 
 [<%= type.pluralize %>.<%= name %>.options.type.enum]
 <%= name %> = "The name of this component"
@@ -24,6 +25,7 @@ description = """\
 A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. \
 See [configuration][docs.configuration] for more info.\
 """
+sort = -1
 <%- end -%>
 
 <%- if healthcheck %>

@@ -2,7 +2,6 @@ require "erb"
 
 require "active_support/core_ext/string/output_safety"
 
-require_relative "templates/config_schema"
 require_relative "templates/config_spec"
 require_relative "templates/integration_guide"
 require_relative "templates/interface_start"
@@ -56,7 +55,49 @@ class Templates
     links.join(", ")
   end
 
-  def component_config_example(component)
+  def component_config_example(component, advanced: true)
+    groups = []
+
+    if component.option_groups.empty?
+      groups << AccessibleHash.new({
+        label: "Common",
+        group_name: nil,
+        option_filter: lambda do |option|
+          !advanced || option.common?
+        end
+      })
+
+      if advanced
+        groups << AccessibleHash.new({
+          label: "Advanced",
+          group_name: nil,
+          option_filter: lambda do |option|
+            true
+          end
+        })
+      end
+    else
+      component.option_groups.each do |group_name|
+        groups << AccessibleHash.new({
+          label: group_name,
+          group_name: group_name,
+          option_filter: lambda do |option|
+            option.group?(group_name) && (!advanced || option.common?)
+          end
+        })
+
+        if advanced
+          groups << AccessibleHash.new({
+            label: "#{group_name} (adv)",
+            group_name: group_name,
+            option_filter: lambda do |option|
+              option.group?(group_name)
+            end
+          })
+        end
+      end
+    end
+
     render("#{partials_path}/_component_config_example.md", binding).strip
   end
 
@@ -64,14 +105,16 @@ class Templates
     render("#{partials_path}/_component_default.md.erb", binding).strip
   end
 
-  def component_header(component)
-    render("#{partials_path}/_component_header.md", binding).strip
+  def component_examples(component)
+    render("#{partials_path}/_component_examples.md", binding).strip
   end
 
-  def component_output(component, output, breakout_top_keys: false, heading_depth: 3, root_key: nil)
-    examples = output.examples
-    fields = output.fields ? output.fields.to_h.values.sort : []
-    render("#{partials_path}/_component_output.md", binding).strip
+  def component_fields(component, heading_depth: 2)
+    render("#{partials_path}/_component_fields.md", binding)
+  end
+
+  def component_header(component)
+    render("#{partials_path}/_component_header.md", binding).strip
   end
 
   def component_requirements(component)
@@ -98,25 +141,17 @@ class Templates
     render("#{partials_path}/_components_table.md", binding).strip
   end
 
-  def config_example(options, array: false, key_path: [], table_path: [], &block)
-    if !options.is_a?(Array)
-      raise ArgumentError.new("Options must be an Array")
-    end
-
-    example = ConfigWriters::ExampleWriter.new(options, array: array, key_path: key_path, table_path: table_path, &block)
-    example.to_toml
+  def component_warnings(component)
+    warnings(component.warnings)
   end
 
-  def config_schema(options, opts = {})
+  def config_example(options, array: false, group: nil, key_path: [], table_path: [], &block)
     if !options.is_a?(Array)
       raise ArgumentError.new("Options must be an Array")
     end
 
-    opts[:titles] = true unless opts.key?(:titles)
-
-    options = options.sort_by(&:config_file_sort_token)
-    schema = ConfigSchema.new(options)
-    render("#{partials_path}/_config_schema.toml", binding).strip
+    example = ConfigWriters::ExampleWriter.new(options, array: array, group: group, key_path: key_path, table_path: table_path, &block)
+    example.to_toml
   end
 
   def config_spec(options, opts = {})
@@ -126,7 +161,6 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
-    options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
     content = render("#{partials_path}/_config_spec.toml", binding).strip
 
@@ -205,7 +239,7 @@ class Templates
     render("#{partials_path}/_fields.md", binding).strip
   end
 
-  def fields_example(fields, root_key: nil)
+  def fields_example(fields, event_type, root_key: nil)
     if !fields.is_a?(Array)
       raise ArgumentError.new("Fields must be an Array")
     end
@@ -388,11 +422,7 @@ class Templates
   end
 
   def outputs_link(component)
-    if component.output.to_h.any?
-      "[outputs #{event_types(component.output_types).to_sentence} events](#output)"
-    else
-      "outputs #{event_type_links(component.output_types).to_sentence} events"
-    end
+    "outputs #{event_type_links(component.output_types).to_sentence} events"
   end
 
   def permissions(permissions, heading_depth: nil)
@@ -586,6 +616,10 @@ class Templates
 
   def vector_summary
     render("#{partials_path}/_vector_summary.md", binding).strip
+  end
+
+  def warnings(warnings)
+    render("#{partials_path}/_warnings.md", binding).strip
   end
 
   def write_verb_link(sink)

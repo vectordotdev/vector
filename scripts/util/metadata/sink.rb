@@ -1,7 +1,6 @@
 #encoding: utf-8
 
 require_relative "component"
-require_relative "output"
 
 class Sink < Component
   attr_reader :delivery_guarantee,
@@ -9,7 +8,6 @@ class Sink < Component
     :input_types,
     :healthcheck,
     :noun,
-    :output,
     :service_limits_short_link,
     :tls,
     :write_to_description
@@ -28,12 +26,6 @@ class Sink < Component
 
     if @write_to_description.strip[-1] == "."
       raise("#{self.class.name}#write_to_description cannot not end with a period")
-    end
-
-    # output
-
-    if hash["output"]
-      @output = Output.new(hash["output"])
     end
   end
 

@@ -38,7 +38,7 @@ endpoint directly. If _not_ supplied, the `Authorization` header will be \
 ignored and requests will not be authenticated.\
 """
 
-[[sources.splunk_hec.output.log.examples]]
+[[sources.splunk_hec.examples]]
 label = "Text"
 body = """\
 Given the following input:
@@ -59,7 +59,7 @@ A log event will be output with the following structure:
 ```\
 """
 
-[sources.splunk_hec.output.log.fields.message]
+[sources.splunk_hec.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -67,7 +67,7 @@ description = """\
 The raw log message, unaltered.\
 """
 
-[sources.splunk_hec.output.log.fields.splunk_channel]
+[sources.splunk_hec.fields.log.fields.splunk_channel]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
@@ -75,7 +75,7 @@ description = """\
 The Splunk channel, value of the `X-Splunk-Request-Channel` header.\
 """
 
-[sources.splunk_hec.output.log.fields.timestamp]
+[sources.splunk_hec.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

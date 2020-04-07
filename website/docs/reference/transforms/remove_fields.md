@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 component_title: "Remove Fields"
 description: "The Vector `remove_fields` transform accepts and outputs `log` events allowing you to remove one or more log fields."
 event_types: ["log"]
@@ -34,7 +34,6 @@ one or more log fields.
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -51,8 +50,8 @@ one or more log fields.
 [transforms.my_transform_id]
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
-  fields = ["field1", "field2", "parent.child"] # required
   drop_empty = false # optional, default
+  fields = ["field1", "field2", "parent.child"] # required
 ```
 
 </TabItem>
@@ -72,6 +71,7 @@ one or more log fields.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_empty
@@ -96,6 +96,7 @@ empty.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields

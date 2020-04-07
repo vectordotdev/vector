@@ -50,7 +50,7 @@ from unrelated sources from mixing together, as this affects partial \
 event processing.\
 """
 
-[[transforms.merge.output.log.examples]]
+[[transforms.merge.examples]]
 label = "Default"
 body = """\
 Given the following _default_ configuration:
@@ -107,7 +107,7 @@ Notice that `custom_string_field` and `custom_int_field` were not overridden. \
 This is because they were not listed in the `merge_fields` option.\
 """
 
-[[transforms.merge.output.log.examples]]
+[[transforms.merge.examples]]
 label = "With Merge Fields"
 body = """\
 Given the following configuration:

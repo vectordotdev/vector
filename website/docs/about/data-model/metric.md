@@ -175,6 +175,7 @@ You'll notice that certain fields are shared across all types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### kind
@@ -199,6 +200,7 @@ metrics are aggregated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### name
@@ -222,6 +224,7 @@ The metric name.
   templateable={false}
   type={"map"}
   unit={null}
+  warnings={[]}
   >
 
 ### tags
@@ -246,6 +249,7 @@ key/value pairs in `string` format and cannot be nested.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
@@ -270,6 +274,7 @@ Vector.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 ### type
@@ -293,6 +298,7 @@ different attributes depending on the value type.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### aggregated_histogram
@@ -317,6 +323,7 @@ configurable buckets. It also provides a sum of all observed values.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### buckets
@@ -340,6 +347,7 @@ The buckets contained within this histogram.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ##### count
@@ -363,6 +371,7 @@ The total number of values contained within the histogram.
   templateable={false}
   type={"[int]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### counts
@@ -386,6 +395,7 @@ The number of values contained within each bucket.
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sum
@@ -412,6 +422,7 @@ The sum of all values contained within the histogram.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### aggregated_summary
@@ -437,6 +448,7 @@ quantiles over a sliding time window.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ##### count
@@ -460,6 +472,7 @@ The total number of values contained within the summary.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### quantiles
@@ -483,6 +496,7 @@ The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sum
@@ -506,6 +520,7 @@ The sum of all values contained within the summary.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### values
@@ -532,6 +547,7 @@ The values contained within the summary that align with the [`quantiles`](#quant
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### counter
@@ -555,6 +571,7 @@ be decremented.
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### value
@@ -581,6 +598,7 @@ The value to increment the counter by. Can only be positive.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### distribution
@@ -603,6 +621,7 @@ A distribution represents a distribution of sampled values.
   templateable={false}
   type={"[int]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sample_rates
@@ -626,6 +645,7 @@ The rate at which each individual value was sampled.
   templateable={false}
   type={"[double]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### values
@@ -652,6 +672,7 @@ The list of values contained within the distribution.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### gauge
@@ -676,6 +697,7 @@ used to track fluctuations in values, like current memory or CPU usage.
   templateable={false}
   type={"double"}
   unit={null}
+  warnings={[]}
   >
 
 ##### value
@@ -702,6 +724,7 @@ A specific point-in-time value for the gauge.
   templateable={false}
   type={"struct"}
   unit={null}
+  warnings={[]}
   >
 
 #### set
@@ -724,6 +747,7 @@ A set represents a count of unique values, AKA the cardinality.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ##### values

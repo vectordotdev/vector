@@ -10,7 +10,7 @@ features = [
 ]
 function_category = "transmit"
 healthcheck = true
-input_types = ["log"]
+input_types = ["log", "metric"]
 requirements = {}
 write_to_description = "another downstream [`vector` source][docs.sources.vector]"
 

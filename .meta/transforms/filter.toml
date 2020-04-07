@@ -21,7 +21,7 @@ messages that pass all conditions will be forwarded.\
 
 <%= render("_partials/fields/_conditions_options.toml", namespace: "transforms.filter.options.condition.children") %>
 
-[[transforms.filter.output.log.examples]]
+[[transforms.filter.examples]]
 label = "Hostname Matching"
 body = """\
 The `filter` transform is a simple conditional match, forwarding only those messages that pass all the conditions.

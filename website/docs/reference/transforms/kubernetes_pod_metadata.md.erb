@@ -8,6 +8,12 @@
 <%= component_requirements(component) %>
 
 <%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
@@ -31,10 +37,13 @@ docs][urls.kubernetes_authorization] for more info.
 <%= permissions(component.permissions_list, heading_depth: 3) %>
 
 <%- end -%>
-## Output
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
 
-<%= component_output(component, component.output.log, root_key: "kubernetes", heading_depth: 3) %>
+<%= component_examples(component) %>
 
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

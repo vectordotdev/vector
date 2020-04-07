@@ -1,6 +1,47 @@
 #encoding: utf-8
 
 class Field
+  # This classes was introduced to handle value grouping without breaking
+  # the current Array API.
+  #
+  # We introduced "groups" for component options. For example, the
+  # `influxdb_metrics` sink groups options by "v1" and "v2". This signals
+  # which options are supported across each InfluxDB version. The problem
+  # is that some of the option values differ based on the version being used.
+  # This class allows definitions to group example values in a backwards
+  # compatible way.
+  class Examples < Array
+    def initialize(examples)
+      groups = {}
+      array = []
+
+      if examples.is_a?(Hash)
+        groups = examples
+
+        examples.values.each do |value|
+          array += value
+        end
+      elsif examples.is_a?(Array)
+        groups = {"all" => examples}
+        array = examples
+      else
+        raise ArgumentError.new("Unsupported examples type: #{examples.class.name}")
+      end
+
+      @groups = groups
+
+      super(array)
+    end
+
+    def fetch_group_values!(group)
+      @groups.key?(group) ? @groups.fetch(group) : self
+    end
+
+    def inspect
+      "Fields::Examples<groups=#{@groups.inspect} array=#{super}>"
+    end
+  end
+
   include Comparable
 
   OBJECT_TYPES = ["struct", "table"]
@@ -21,7 +62,8 @@ class Field
     :templateable,
     :toml_display,
     :type,
-    :unit
+    :unit,
+    :warnings
 
   def initialize(hash)
     @children = (hash["children"] || {}).to_struct_with_name(constructor: self.class)
@@ -29,7 +71,7 @@ class Field
     @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
-    @examples = (hash["examples"] || []).freeze
+    @examples = Examples.new(hash["examples"] || []).freeze
     @field_path_notation = hash["field_path_notation"] == true
     @groups = (hash["groups"] || []).freeze
     @name = hash.fetch("name")
@@ -41,6 +83,9 @@ class Field
     @toml_display = hash["toml_display"]
     @type = hash.fetch("type")
     @unit = hash["unit"]
+    @warnings = (hash["warnings"] || []).collect(&:to_struct).freeze
+
+    # category
 
     @category = hash["category"] || ((@children.to_h.values.empty?) ? "General" : @name.humanize)
 
@@ -56,12 +101,12 @@ class Field
 
     if wildcard? && !object?
       if !@examples.any? { |example| example.is_a?(Hash) }
-        raise "#{@name}#examples must be a hash with name/value keys when the name is \"*\""
+        raise ArgumentError.new("#{@name}#examples must be a hash with name/value keys when the name is \"*\"")
       end
     end
 
-    if @examples.any? && !@enum.nil? && !wildcard?
-      raise ArgumentError.new("#{@name}.examples must not be supplied if enum is supplied")
+    if @examples.any? && !@enum.nil? && !wildcard? && @examples != @enum.keys
+      raise ArgumentError.new("#{@name}.examples is invalid, remove it or match it exactly with the enum values")
     end
 
     if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
@@ -72,23 +117,26 @@ class Field
 
     if @examples.empty?
       if !@enum.nil?
-        @examples = @enum.keys
+        @examples = Examples.new(@enum.keys)
       elsif !@default.nil?
-        @examples = [@default]
+        @examples = Examples.new([@default])
         if @type == "bool"
           @examples.push(!@default)
         end
       elsif @type == "bool"
-        @examples = [true, false]
+        @examples = Examples.new([true, false])
       end
     end
 
     # Coercion
 
     if @type == "timestamp"
-      @examples = @examples.collect do |example|
-        DateTime.iso8601(example)
-      end
+      @examples =
+        Examples.new(
+          @examples.collect do |example|
+            DateTime.iso8601(example)
+          end
+        )
     end
 
     # Requirements
@@ -99,14 +147,10 @@ class Field
   end
 
   def <=>(other)
-    if sort? && !other.sort?
-      -1
-    elsif sort? && other.sort?
-      sort <=> other.sort
-    elsif !wildcard? && other.wildcard?
+    if !wildcard? && other.wildcard?
       -1
     else
-      name <=> other.name
+      [sort || 99, "#{category}#{name}".downcase] <=> [other.sort || 99, "#{other.category}#{other.name}".downcase]
     end
   end
 
@@ -116,6 +160,27 @@ class Field
     else
       !common?
     end
+  end
+
+  def all_warnings
+    @all_warnings ||=
+      begin
+        new_warnings = []
+
+        new_warnings +=
+          warnings.collect do |warning|
+            warning["option_name"] = name
+            warning
+          end
+
+        new_warnings +=
+          children_list.collect do |child|
+            child.all_warnings
+          end.
+          flatten
+
+        new_warnings.freeze
+      end
   end
 
   def array?
@@ -148,39 +213,6 @@ class Field
     @common_children ||= children.select(&:common?)
   end
 
-  def config_file_sort_token
-    first =
-      if object?
-        2
-      elsif required?
-        0
-      else
-        1
-      end
-
-    second =
-      case category
-      when "General"
-        "AA #{category}"
-      when "Requests"
-        "ZZ #{category}"
-      else
-        category
-      end
-
-    third =
-      case name
-      when "inputs"
-        "AAB #{name}"
-      when "strategy", "type"
-        "AAA #{name}"
-      else
-        name
-      end
-
-    [first, second, third]
-  end
-
   def context?
     category.downcase == "context"
   end
@@ -201,8 +233,12 @@ class Field
   end
 
   def group?(group_name)
-    groups.any? do |group|
-      group.downcase == group_name.downcase
+    if group_name.nil?
+      true
+    else
+      groups.any? do |group|
+        group.downcase == group_name.downcase
+      end
     end
   end
 

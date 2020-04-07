@@ -423,10 +423,33 @@ impl Field {
 #[cfg(test)]
 mod tests {
     use super::Field;
+    use crate::event::Event;
+    use std::collections::BTreeMap;
 
     #[test]
     fn field_name() {
         assert_eq!("priority_class_name", &Field::PriorityClassName.name());
+    }
+
+    #[test]
+    fn label_with_dot() {
+        let field = Field::Labels;
+        let mut labels = BTreeMap::new();
+
+        labels.insert("kubectl.io/some".to_owned(), "Label".to_owned());
+
+        let (key, value) = field.collection(&labels);
+
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert(key, value);
+
+        assert_eq!(
+            event
+                .as_log()
+                .get(&(Field::with_prefix("labels") + r#".kubectl\.io/some"#).into())
+                .unwrap(),
+            &"Label".into()
+        );
     }
 }
 
@@ -434,7 +457,9 @@ mod tests {
 mod integration_tests {
     #![cfg(feature = "kubernetes-integration-tests")]
 
-    use crate::sources::kubernetes::test::{echo, logs, start_vector, user_namespace, Kube};
+    use crate::sources::kubernetes::test::{
+        echo, info_vector_logs, logs, start_vector, user_namespace, Kube,
+    };
     use crate::test_util::{random_string, wait_for};
     use kube::api::RawApi;
     use uuid::Uuid;
@@ -529,11 +554,15 @@ data:
         CONFIG_MAP_YAML_WITH_METADATA.replace(FIELD_MARKER, replace.as_str())
     }
 
-    #[test]
-    fn kube_metadata() {
-        let namespace = format!("kube-metadata-{}", Uuid::new_v4());
+    /// Starts a vector with metadata transform with `fields` and an echo.
+    /// Calls test function once for log of started echo.
+    fn metadata_test(
+        namespace: &str,
+        fields: Vec<&str>,
+        test: impl Fn(&serde_json::Value) -> bool,
+    ) {
+        let namespace = format!("{}-{}", namespace, Uuid::new_v4());
         let message = random_string(300);
-        let field = "node_name";
         let user_namespace = user_namespace(namespace.as_str());
         let binding_name = binding_name(namespace.as_str());
 
@@ -554,7 +583,7 @@ data:
             &kube,
             &user_namespace,
             None,
-            metadata_config_map(Some(vec![field])).as_str(),
+            metadata_config_map(Some(fields)).as_str(),
         );
 
         // Start echo
@@ -565,17 +594,91 @@ data:
             // If any daemon logged message, done.
             for line in logs(&kube, &vector) {
                 if line
-                    .get(crate::event::log_schema().kubernetes_key().as_ref())
-                    .and_then(|kube| kube.get(field))
-                    .is_some()
+                    .get(crate::event::log_schema().message_key().as_ref())
+                    .and_then(|value| value.as_str())
+                    == Some(&message)
                 {
-                    // DONE
-                    return true;
+                    if test(&line) {
+                        // DONE
+                        return true;
+                    } else {
+                        info!(?line);
+                        info_vector_logs(&kube, &vector);
+                        panic!("Test failed");
+                    }
                 } else {
                     debug!(namespace=namespace.as_str(),log=%line);
                 }
             }
             false
+        });
+    }
+
+    #[test]
+    fn kube_metadata() {
+        metadata_test("kube-metadata", vec!["node_name"], |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .and_then(|kube| kube.get("node_name"))
+                .is_some()
+        });
+    }
+
+    #[test]
+    fn kube_labels() {
+        metadata_test("kube-labels", vec!["labels"], |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .and_then(|kube| kube.get("labels"))
+                .and_then(|labels| labels.get("vector.test/label"))
+                .and_then(|value| value.as_str())
+                == Some("echo")
+        });
+    }
+
+    #[test]
+    fn kube_annotations() {
+        metadata_test("kube-annotations", vec!["annotations"], |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .and_then(|kube| kube.get("annotations"))
+                .and_then(|labels| labels.get("vector.test/annotation"))
+                .and_then(|value| value.as_str())
+                == Some("echo")
+        });
+    }
+
+    #[test]
+    fn kube_all_metadata_present() {
+        let all_fields = vec![
+            "name",
+            "namespace",
+            "creation_timestamp",
+            // "deletion_timestamp", // This field isn't usually present since logs usually come before the pod is deleted
+            "labels",
+            "annotations",
+            "node_name",
+            "hostname",
+            "priority",
+            // "priority_class_name", // Requiers createing PriorityClass which would add more complexity.
+            "service_account_name",
+            "subdomain",
+            "host_ip",
+            // "ip", // Requiers either creating a Service or allocating static ip which would clash with other tests.
+        ];
+        metadata_test("kube-all-metadata", all_fields.clone(), move |value| {
+            value
+                .get(crate::event::log_schema().kubernetes_key().as_ref())
+                .map(|kube| {
+                    for field in all_fields.iter() {
+                        if kube.get(field).is_none() {
+                            error!(message = "Field missing in log event.", field);
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .unwrap_or(false)
         });
     }
 }

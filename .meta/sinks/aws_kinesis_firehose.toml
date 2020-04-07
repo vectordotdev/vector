@@ -64,7 +64,7 @@ examples = ["my-stream"]
 required = true
 description = "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Firehose delivery stream."
 
-[[sinks.aws_kinesis_firehose.output.examples]]
+[[sinks.aws_kinesis_firehose.examples]]
 label = "Generic"
 body = """\
 ```http

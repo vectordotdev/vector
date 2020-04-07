@@ -32,7 +32,7 @@ default = 15
 unit = "seconds"
 description = "The interval between scrapes, in seconds."
 
-[[sources.prometheus.output.metric.examples]]
+[[sources.prometheus.examples]]
 label = "Counter"
 body = """\
 Given the following input:
@@ -60,7 +60,7 @@ A metric event will be output with the following structure:
 ```\
 """
 
-[[sources.prometheus.output.metric.examples]]
+[[sources.prometheus.examples]]
 label = "Gauge"
 body = """\
 Given the following input:

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 component_title: "Tokenizer"
 description: "The Vector `tokenizer` transform accepts and outputs `log` events allowing you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 event_types: ["log"]
@@ -13,6 +13,8 @@ title: "Tokenizer Transform"
 
 import Fields from '@site/src/components/Fields';
 import Field from '@site/src/components/Field';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 The Vector `tokenizer` transform
 accepts and outputs [`log`][docs.data-model.log] events allowing you to
@@ -29,14 +31,20 @@ characters, and zip the tokens into ordered field names.
 
 ## Configuration
 
+<Tabs
+  block={true}
+  defaultValue="common"
+  values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
+<TabItem value="common">
+
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   # General
   type = "tokenizer" # required
   inputs = ["my-source-id"] # required
-  field_names = ["timestamp", "level", "message", "parent.child"] # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
 
   # Types
   types.status = "int" # example
@@ -46,6 +54,30 @@ characters, and zip the tokens into ordered field names.
   types.timestamp = "timestamp|%a %b %e %T %Y" # example
   types.parent.child = "int" # example
 ```
+
+</TabItem>
+<TabItem value="advanced">
+
+```toml title="vector.toml"
+[transforms.my_transform_id]
+  # General
+  type = "tokenizer" # required
+  inputs = ["my-source-id"] # required
+  drop_field = true # optional, default
+  field = "message" # optional, default
+  field_names = ["timestamp", "level", "message", "parent.child"] # required
+
+  # Types
+  types.status = "int" # example
+  types.duration = "float" # example
+  types.success = "bool" # example
+  types.timestamp = "timestamp|%F" # example
+  types.timestamp = "timestamp|%a %b %e %T %Y" # example
+  types.parent.child = "int" # example
+```
+
+</TabItem>
+</Tabs>
 
 <Fields filters={true}>
 <Field
@@ -61,6 +93,7 @@ characters, and zip the tokens into ordered field names.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### drop_field
@@ -84,6 +117,7 @@ If `true` the [`field`](#field) will be dropped after parsing.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### field
@@ -107,6 +141,7 @@ The log field to tokenize.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### field_names
@@ -130,6 +165,7 @@ The log field names assigned to the resulting tokens, in order.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### types
@@ -153,6 +189,7 @@ coerce log fields into their proper types.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`

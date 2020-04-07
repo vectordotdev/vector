@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-06"
 component_title: "Kubernetes Pod Metadata"
 description: "The Vector `kubernetes_pod_metadata` transform accepts and outputs `log` events allowing you to enrich Kubernetes logs with Pod metadata."
 event_types: ["log"]
@@ -18,7 +18,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 The Vector `kubernetes_pod_metadata` transform
-accepts and [outputs `log` events](#output) allowing you to enrich
+accepts and outputs [`log`][docs.data-model.log] events allowing you to enrich
 [Kubernetes][urls.kubernetes] logs with Pod metadata.
 
 <!--
@@ -45,7 +45,6 @@ accepts and [outputs `log` events](#output) allowing you to enrich
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -86,6 +85,7 @@ accepts and [outputs `log` events](#output) allowing you to enrich
   templateable={false}
   type={"int"}
   unit={"seconds"}
+  warnings={[]}
   >
 
 ### cache_ttl
@@ -109,6 +109,7 @@ How many seconds will the metadata be available after its Pod has been deleted.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### fields
@@ -135,6 +136,7 @@ option][docs.reference.global-options#kubernetes_key]. See
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### max_retry_timeout
@@ -160,6 +162,7 @@ allowed.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### node_name
@@ -186,6 +189,7 @@ you. Setting this to a static value will take priority over `VECTOR_NODE_NAME`.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### pod_uid
@@ -214,6 +218,7 @@ Field containg Pod UID to which log belongs.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### VECTOR_NODE_NAME
@@ -251,13 +256,11 @@ order to retrieve Kubernetes metadata.
 </Field>
 </Fields>
 
-## Output
+## Fields
 
-The `kubernetes_pod_metadata` transform accepts and [outputs `log` events](#output) allowing you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.
-For example:
-
-```javascript
+```javascript title="example log event"
 {
+  // ...
   "kubernetes": {
     "annotations": {
       "kubectl.kubernetes.io/last-applied-configuration": "..."
@@ -267,21 +270,20 @@ For example:
     "host_ip": "192.168.99.106",
     "hostname": "host",
     "ip": "172.17.0.5",
-    "labels": {
-      "release": "stable"
-    },
     "name": "nginx",
     "namespace": "default",
     "node_name": "minikube",
     "priority": 0,
     "priority_class_name": "system-node-critical",
     "service_account_name": "default",
-    "subdomain": "net"
+    "subdomain": "net",
+    "labels": {
+      "release": "stable"
+    }
   }
+  // ...
 }
 ```
-
-More detail on the output schema is below.
 
 <Fields filters={true}>
 <Field
@@ -297,6 +299,7 @@ More detail on the output schema is below.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### annotations
@@ -320,6 +323,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[annotation-key]`
@@ -348,6 +352,7 @@ transform][docs.transforms.remove_fields].
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### creation_timestamp
@@ -371,6 +376,7 @@ Timestamp representing when the Pod was created.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### deletion_timestamp
@@ -394,6 +400,7 @@ Timestamp representing when the Pod was deleted.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host_ip
@@ -417,6 +424,7 @@ The IP address of the host that the Pod is assigned where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### hostname
@@ -440,6 +448,7 @@ The hostname of the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### ip
@@ -448,57 +457,6 @@ The IP address allocated to the Pod where the log originated.
 
 
 
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"labels"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### labels
-
-[Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
-of the Pod where the log originated.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"release":"stable"},{"tier":"frontend"}]}
-  groups={[]}
-  name={"`[label-key]`"}
-  path={"labels"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"*"}
-  unit={null}
-  >
-
-#### `[label-key]`
-
-Each individual label will be added as a key. If you need to remove or alter
-these labels then we recommend the [`remove_felds`
-transform][docs.transforms.remove_fields].
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -514,6 +472,7 @@ transform][docs.transforms.remove_fields].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### name
@@ -538,6 +497,7 @@ the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### namespace
@@ -562,6 +522,7 @@ the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### node_name
@@ -585,6 +546,7 @@ The name of the node where the log originated.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### priority
@@ -610,6 +572,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### priority_class_name
@@ -635,6 +598,7 @@ of the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### service_account_name
@@ -660,6 +624,7 @@ used to run the Pod where the log originated.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### subdomain
@@ -668,6 +633,59 @@ The subdomain of the Pod where the log originated.
 
 
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"labels"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### labels
+
+[Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+of the Pod where the log originated.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"release":"stable"},{"tier":"frontend"}]}
+  groups={[]}
+  name={"`[label-key]`"}
+  path={"labels"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"*"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[label-key]`
+
+Each individual label will be added as a key. If you need to remove or alter
+these labels then we recommend the [`remove_felds`
+transform][docs.transforms.remove_fields].
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 </Fields>
@@ -743,6 +761,7 @@ root of the event.
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
+[docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.global-options#kubernetes_key]: /docs/reference/global-options/#kubernetes_key
 [docs.transforms.kubernetes_pod_metadata#kubernetes-rbac]: /docs/reference/transforms/kubernetes_pod_metadata/#kubernetes-rbac
 [docs.transforms.kubernetes_pod_metadata#permissions]: /docs/reference/transforms/kubernetes_pod_metadata/#permissions

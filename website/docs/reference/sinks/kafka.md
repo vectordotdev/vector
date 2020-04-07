@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` sink streams `log` events to Apache Kafka via the Kafka protocol."
@@ -47,7 +47,6 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -56,10 +55,10 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   type = "kafka" # required
   inputs = ["my-source-id"] # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
-  key_field = "user_id" # required
-  topic = "topic-1234" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
+  key_field = "user_id" # required
+  topic = "topic-1234" # required
 
   # Encoding
   encoding.codec = "json" # required
@@ -74,12 +73,12 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   type = "kafka" # required
   inputs = ["my-source-id"] # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
-  key_field = "user_id" # required
-  topic = "topic-1234" # required
   compression = "none" # optional, default
   healthcheck = true # optional, default
+  key_field = "user_id" # required
   message_timeout_ms = 300000 # optional, default
   socket_timeout_ms = 60000 # optional, default
+  topic = "topic-1234" # required
 
   # Advanced
   librdkafka_options."client.id" = "${ENV_VAR}" # example
@@ -87,9 +86,9 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -99,9 +98,9 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # TLS
+  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
-  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
@@ -110,336 +109,6 @@ Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["10.14.22.123:9092,10.14.23.332:9092"]}
-  groups={[]}
-  name={"bootstrap_servers"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### bootstrap_servers
-
-A comma-separated list of host and port pairs that are the addresses of the
-Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-initially to bootstrap itself.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"buffer"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### buffer
-
-Configures the sink specific buffer behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={500}
-  enumValues={null}
-  examples={[500]}
-  groups={[]}
-  name={"max_events"}
-  path={"buffer"}
-  relevantWhen={{"type":"memory"}}
-  required={false}
-  templateable={false}
-  type={"int"}
-  unit={"events"}
-  >
-
-#### max_events
-
-The maximum number of [events][docs.data-model] allowed in the buffer.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[104900000]}
-  groups={[]}
-  name={"max_size"}
-  path={"buffer"}
-  relevantWhen={{"type":"disk"}}
-  required={true}
-  templateable={false}
-  type={"int"}
-  unit={"bytes"}
-  >
-
-#### max_size
-
-The maximum size of the buffer on the disk.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"block"}
-  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
-  examples={["block","drop_newest"]}
-  groups={[]}
-  name={"when_full"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### when_full
-
-The behavior when the buffer becomes full.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
-  examples={["none","gzip","lz4","snappy","zstd"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### compression
-
-Compression codec to use for compressing message sets
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"encoding"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-### encoding
-
-Configures the encoding specific sink behavior.
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
-  examples={["json","text"]}
-  groups={[]}
-  name={"codec"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### codec
-
-The encoding codec used to serialize the events before outputting.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"except_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  >
-
-#### except_fields
-
-Prevent the sink from encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["timestamp","message","host"]]}
-  groups={[]}
-  name={"only_fields"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  >
-
-#### only_fields
-
-Limit the sink to only encoding the specified labels.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"rfc3339"}
-  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
-  examples={["rfc3339","unix"]}
-  groups={[]}
-  name={"timestamp_format"}
-  path={"encoding"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### timestamp_format
-
-How to format event timestamps.
-
-
-
-
-</Field>
-</Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"healthcheck"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  >
-
-### healthcheck
-
-Enables/disables the sink healthcheck upon start.
-
- See [Health Checks](#health-checks) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["user_id"]}
-  groups={[]}
-  name={"key_field"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### key_field
-
-The log field name to use for the topic key. If unspecified, the key will be
-randomly generated. If the field does not exist on the log, a blank value will
-be used.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -453,6 +122,7 @@ be used.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### librdkafka_options
@@ -476,6 +146,7 @@ details.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### `[field-name]`
@@ -491,6 +162,350 @@ The options and their values. Accepts `string` values.
 </Field>
 <Field
   common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"buffer"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### buffer
+
+Configures the sink specific buffer behavior.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={500}
+  enumValues={null}
+  examples={[500]}
+  groups={[]}
+  name={"max_events"}
+  path={"buffer"}
+  relevantWhen={{"type":"memory"}}
+  required={false}
+  templateable={false}
+  type={"int"}
+  unit={"events"}
+  warnings={[]}
+  >
+
+#### max_events
+
+The maximum number of [events][docs.data-model] allowed in the buffer.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[104900000]}
+  groups={[]}
+  name={"max_size"}
+  path={"buffer"}
+  relevantWhen={{"type":"disk"}}
+  required={true}
+  templateable={false}
+  type={"int"}
+  unit={"bytes"}
+  warnings={[]}
+  >
+
+#### max_size
+
+The maximum size of the buffer on the disk.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"block"}
+  enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
+  examples={["block","drop_newest"]}
+  groups={[]}
+  name={"when_full"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### when_full
+
+The behavior when the buffer becomes full.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"encoding"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### encoding
+
+Configures the encoding specific sink behavior.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"json":"Each event is encoded into JSON and the payload is represented as a JSON array.","text":"Each event is encoded into text via the [`message`](#message) key and the payload is new line delimited."}}
+  examples={["json","text"]}
+  groups={[]}
+  name={"codec"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### codec
+
+The encoding codec used to serialize the events before outputting.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"except_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### except_fields
+
+Prevent the sink from encoding the specified labels.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["timestamp","message","host"]]}
+  groups={[]}
+  name={"only_fields"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### only_fields
+
+Limit the sink to only encoding the specified labels.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"rfc3339"}
+  enumValues={{"rfc3339":"Format as an RFC3339 string","unix":"Format as a unix timestamp, can be parsed as a Clickhouse DateTime"}}
+  examples={["rfc3339","unix"]}
+  groups={[]}
+  name={"timestamp_format"}
+  path={"encoding"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### timestamp_format
+
+How to format event timestamps.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["10.14.22.123:9092,10.14.23.332:9092"]}
+  groups={[]}
+  name={"bootstrap_servers"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### bootstrap_servers
+
+A comma-separated list of host and port pairs that are the addresses of the
+Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+initially to bootstrap itself.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"none":"No compression","gzip":"[Gzip](https://www.gnu.org/software/gzip/) standard DEFLATE compression","lz4":"High speed [LZ4 compression](https://lz4.github.io/lz4/)","snappy":"High speed [Snappy compression](https://google.github.io/snappy/), developed by Google. Slower than LZ4 but higher compression.","zstd":"[Zstandard compression](https://zstd.net), developed at Facebook. Faster than gzip at similar compression ratios."}}
+  examples={["none","gzip","lz4","snappy","zstd"]}
+  groups={[]}
+  name={"compression"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### compression
+
+Compression codec to use for compressing message sets
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"healthcheck"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### healthcheck
+
+Enables/disables the sink healthcheck upon start.
+
+ See [Health Checks](#health-checks) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["user_id"]}
+  groups={[]}
+  name={"key_field"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### key_field
+
+The log field name to use for the topic key. If unspecified, the key will be
+randomly generated. If the field does not exist on the log, a blank value will
+be used.
+
+
+
+
+</Field>
+<Field
+  common={false}
   defaultValue={300000}
   enumValues={null}
   examples={[150000,450000]}
@@ -502,6 +517,7 @@ The options and their values. Accepts `string` values.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### message_timeout_ms
@@ -525,11 +541,36 @@ Local message timeout.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### socket_timeout_ms
 
 Default timeout for network requests.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["topic-1234"]}
+  groups={[]}
+  name={"topic"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topic
+
+The Kafka topic name to write events to.
 
 
 
@@ -548,6 +589,7 @@ Default timeout for network requests.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### tls
@@ -570,6 +612,7 @@ Configures the TLS options for connections from this sink.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 #### enabled
@@ -593,6 +636,7 @@ Enable TLS during connections to the remote.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### ca_path
@@ -617,6 +661,7 @@ Absolute path to an additional CA certificate file, in DER or PEM format
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### crt_path
@@ -642,6 +687,7 @@ PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive,
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_pass
@@ -666,6 +712,7 @@ Pass phrase used to unlock the encrypted key file. This has no effect unless
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### key_path
@@ -680,30 +727,8 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 </Fields>
 
 </Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["topic-1234"]}
-  groups={[]}
-  name={"topic"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### topic
-
-The Kafka topic name to write events to.
-
-
-
-
-</Field>
 </Fields>
+
 
 ## How It Works
 
@@ -770,6 +795,12 @@ If you'd like to disable health checks for this sink you can set the
 The `kafka` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+options.
+
 ### librdkafka
 
 The `kafka` sink uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
@@ -790,3 +821,4 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [urls.kafka_protocol]: https://kafka.apache.org/protocol
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.openssl]: https://www.openssl.org/

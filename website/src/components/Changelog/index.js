@@ -13,7 +13,7 @@ const AnchoredH4 = Heading('h4');
 
 function Commit({commit, setSearchTerm}) {
   return (
-    <div className="section">
+    <li>
       <div className="badges">
         {commit.breaking_change && <span className="badge badge--danger"><i className="feather icon-alert-triangle"></i> breaking</span>}
         {commit.pr_number && (<span className="badge badge--secondary" style={{minWidth: "65px", textAlign: "center"}}>
@@ -27,7 +27,7 @@ function Commit({commit, setSearchTerm}) {
         <span className="badge badge--primary badge--small link" onClick={() => setSearchTerm(commit.scope.name)}>{commit.scope.name}</span>&nbsp;
         {commit.description}
       </AnchoredH4>
-    </div>
+    </li>
   );
 }
 
@@ -37,18 +37,18 @@ function Commits({commits, groupBy, setSearchTerm}) {
     const groupKeys = sortCommitTypes(Object.keys(groupedCommits));
 
     return(
-      <div className="section-list">
+      <ul className="connected-list">
         {groupKeys.map((groupKey, catIdx) => (
-          <div className="section" key={catIdx}>
+          <li key={catIdx}>
             <AnchoredH3 id={groupKey}>{pluralize(commitTypeName(groupKey), groupedCommits[groupKey].length, true)}</AnchoredH3>
-            <div className="section-list section-list--compact section-list--hover">
+            <ul className="connected-list connected-list--compact connected-list--hover">
               {groupedCommits[groupKey].map((commit, commitIdx) => (
                 <Commit key={commitIdx} commit={commit} setSearchTerm={setSearchTerm} />
               ))}
-            </div>
-          </div>
+            </ul>
+          </li>
         ))}
-      </div>
+      </ul>
     );
   } else {
     return (

@@ -91,7 +91,7 @@ description = """\
 Maximum time the broker may wait to fill the response.
 """
 
-[sources.kafka.output.log.fields.message]
+[sources.kafka.fields.log.fields.message]
 type = "string"
 examples = ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 required = true
@@ -99,7 +99,7 @@ description = """\
 The raw event message, unaltered.
 """
 
-[sources.kafka.output.log.fields.timestamp]
+[sources.kafka.fields.log.fields.timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true

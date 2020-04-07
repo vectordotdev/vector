@@ -8,6 +8,12 @@
 <%= component_requirements(component) %>
 
 <%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 ```toml title="vector.toml"
@@ -338,6 +344,12 @@ sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 </TabItem>
 </Tabs>
 
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

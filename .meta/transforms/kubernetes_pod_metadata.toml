@@ -96,37 +96,37 @@ order to retrieve Kubernetes metadata.\
 # output
 #
 
-[transforms.kubernetes_pod_metadata.output.log]
+[transforms.kubernetes_pod_metadata.fields.log]
 global_log_schema_key = "kubernetes"
 
-[transforms.kubernetes_pod_metadata.output.log.fields.name]
+[transforms.kubernetes_pod_metadata.fields.log.fields.name]
 type = "string"
 examples = ["nginx"]
 description = "[Name][http://kubernetes.io/docs/user-guide/identifiers#names] of the Pod where the log originated."
 
-[transforms.kubernetes_pod_metadata.output.log.fields.namespace]
+[transforms.kubernetes_pod_metadata.fields.log.fields.namespace]
 type = "string"
 examples = ["default","telemetry","kube-system"]
 description = "[Namespace][http://kubernetes.io/docs/user-guide/namespaces] of the Pod where the log originated."
 
-[transforms.kubernetes_pod_metadata.output.log.fields.creation_timestamp]
+[transforms.kubernetes_pod_metadata.fields.log.fields.creation_timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47+00:00"]
 description = "Timestamp representing when the Pod was created."
 
-[transforms.kubernetes_pod_metadata.output.log.fields.deletion_timestamp]
+[transforms.kubernetes_pod_metadata.fields.log.fields.deletion_timestamp]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47+00:00"]
 description = "Timestamp representing when the Pod was deleted."
 
-[transforms.kubernetes_pod_metadata.output.log.fields.labels]
+[transforms.kubernetes_pod_metadata.fields.log.fields.labels]
 type = "table"
 description = """\
 [Labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) \
 of the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.labels.children."`[label-key]`"]
+[transforms.kubernetes_pod_metadata.fields.log.fields.labels.children."`[label-key]`"]
 type = "*"
 examples = [
   {release = "stable"},
@@ -138,14 +138,14 @@ these labels then we recommend the [`remove_felds` \
 transform][docs.transforms.remove_fields].
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.annotations]
+[transforms.kubernetes_pod_metadata.fields.log.fields.annotations]
 type = "table"
 description = """\
 [Annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/) \
 of the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.annotations.children."`[annotation-key]`"]
+[transforms.kubernetes_pod_metadata.fields.log.fields.annotations.children."`[annotation-key]`"]
 type = "*"
 examples = [
   {"kubectl.kubernetes.io/last-applied-configuration" = "..."},
@@ -156,21 +156,21 @@ alter these labels then we recommend the [`remove_felds` \
 transform][docs.transforms.remove_fields].
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.node_name]
+[transforms.kubernetes_pod_metadata.fields.log.fields.node_name]
 type = "string"
 examples = ["minikube"]
 description = """\
 The name of the node where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.hostname]
+[transforms.kubernetes_pod_metadata.fields.log.fields.hostname]
 type = "string"
 examples = ["host"]
 description = """\
 The hostname of the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.priority]
+[transforms.kubernetes_pod_metadata.fields.log.fields.priority]
 type = "int"
 examples = [0]
 description = """\
@@ -178,7 +178,7 @@ The [priority](https://kubernetes.io/docs/concepts/configuration/pod-priority-pr
 of the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.priority_class_name]
+[transforms.kubernetes_pod_metadata.fields.log.fields.priority_class_name]
 type = "string"
 examples = ["system-node-critical","system-cluster-critical"]
 description = """\
@@ -186,7 +186,7 @@ The [priority class](https://kubernetes.io/docs/concepts/configuration/pod-prior
 of the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.service_account_name]
+[transforms.kubernetes_pod_metadata.fields.log.fields.service_account_name]
 type = "string"
 examples = ["default"]
 description = """\
@@ -194,21 +194,21 @@ The name of the [ServiceAccount][https://kubernetes.io/docs/tasks/configure-pod-
 used to run the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.subdomain]
+[transforms.kubernetes_pod_metadata.fields.log.fields.subdomain]
 type = "string"
 examples = ["net"]
 description = """\
 The subdomain of the Pod where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.host_ip]
+[transforms.kubernetes_pod_metadata.fields.log.fields.host_ip]
 type = "string"
 examples = ["192.168.99.106"]
 description = """\
 The IP address of the host that the Pod is assigned where the log originated.\
 """
 
-[transforms.kubernetes_pod_metadata.output.log.fields.ip]
+[transforms.kubernetes_pod_metadata.fields.log.fields.ip]
 type = "string"
 examples = ["172.17.0.5"]
 description = """\

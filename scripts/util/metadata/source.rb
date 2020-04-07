@@ -4,12 +4,12 @@ require "ostruct"
 
 require_relative "component"
 require_relative "field"
-require_relative "output"
+require_relative "fields"
 
 class Source < Component
   attr_reader :delivery_guarantee,
+    :fields,
     :noun,
-    :output,
     :output_types,
     :link_name,
     :strategies,
@@ -21,23 +21,22 @@ class Source < Component
     # Init
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
+    @fields = OpenStruct.new
     @noun = hash.fetch("noun")
-    @output = OpenStruct.new
-    @log_fields = (hash["log_fields"] || {}).to_struct_with_name(constructor: Field)
     @output_types = hash.fetch("output_types")
     @strategies = hash["strategies"] || []
     @through_description = hash.fetch("through_description")
 
-    # output
+    # fields
 
-    output = hash["output"] || {}
+    fields = hash["fields"] || {}
 
-    if output["log"]
-      @output.log = Output.new(output["log"])
+    if fields["log"]
+      @fields.log = Fields.new(fields["log"])
     end
 
-    if output["metric"]
-      @output.metric = Output.new(output["metric"])
+    if fields["metric"]
+      @fields.metric = Fields.new(fields["metric"])
     end
 
     # through_description
