@@ -8727,7 +8727,7 @@ require('custom_module')
   # * type: string
   namespace = "service"
 
-# Streams `log` events to another downstream `vector` source.
+# Streams `log` and `metric` events to another downstream `vector` source.
 [sinks.vector]
   #
   # General

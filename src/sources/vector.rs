@@ -56,7 +56,7 @@ impl SourceConfig for VectorConfig {
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn source_type(&self) -> &'static str {
@@ -97,6 +97,10 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
+        event::{
+            metric::{MetricKind, MetricValue},
+            Metric,
+        },
         sinks::vector::VectorSinkConfig,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
@@ -133,6 +137,13 @@ mod test {
             Event::from("sink"),
             Event::from("and"),
             Event::from("source"),
+            Event::Metric(Metric {
+                name: String::from("also test a metric"),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Counter { value: 1.0 },
+            }),
         ];
 
         let _ = rt
