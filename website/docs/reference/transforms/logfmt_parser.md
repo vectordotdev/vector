@@ -121,7 +121,7 @@ If the specified [`field`](#field) should be dropped (removed) after parsing.
 
 The log field to parse.
 
- See [Field Notation Syntax](#field-notation-syntax) for more info.
+ See [Field Notation Syntax](#field-notation-syntax) and [Format Specification](#format-specification) for more info.
 
 
 </Field>
@@ -182,9 +182,17 @@ supported for the `timestamp` type.
 
 ## Examples
 
+<Tabs
+  block={true}
+  defaultValue="heroku-router-log"
+  select={false}
+  values={[{"label":"Heroku Router Log","value":"heroku-router-log"},{"label":"Loosely Structured","value":"loosely-structured"}]}>
+
+<TabItem value="heroku-router-log">
+
 Given the following Heroku router log line:
 
-```json
+```json title="log event"
 {
   "message": "at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"
 }
@@ -192,17 +200,19 @@ Given the following Heroku router log line:
 
 And the following configuration:
 
-```toml
+```toml title="vector.toml"
 [transforms.<transform-id>]
 type = "logfmt"
 field = "message"
+drop_field = true
 
 types.bytes = "int"
+types.status = "int"
 ```
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
 
-```javascript
+```javascript title="log event"
 {
   // ... existing fields
   "at": "info",
@@ -214,14 +224,60 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "dyno": "web.1",
   "connect": "1ms",
   "service": "18ms",
-  "status": "200",
+  "status": 200,
   "bytes": 13,
   "tls_version": "tls1.1",
   "protocol": "http"
 }
 ```
 
-Note that the `bytes` field was coerced into an `int` via the [`types`](#types) option.
+A couple of things to note:
+
+1. The `bytes` and `status` fields were coerced into `int`s via the [`types`](#types) options.
+2. The `message` field was dropped due to setting [`drop_field`](#drop_field) to `true`.
+
+</TabItem>
+
+<TabItem value="loosely-structured">
+
+The `logfmt_parser` will also parse loosely structured key/value pairs. For
+example, given the following `log` event:
+
+```json title="log event"
+{
+  "message": "info | Sent 200 in 54.2ms duration=54.2ms status=200"
+```
+
+And the following configuration:
+
+```toml title="vector.toml"
+[transforms.<transform-id>]
+type = "logfmt"
+field = "message"
+drop_field = false # keep the field since it contains other data
+
+types.status = "int"
+```
+
+A [`log` event][docs.data-model.log] will be output with the following structure:
+
+```javascript title="log event"
+{
+  // ... existing fields
+  "message": "info | Sent 200 in 54.2ms duration=54.2ms status=200",
+  "duration": "54.2ms",
+  "status": 200
+  ""
+}
+```
+
+A couple of things to note:
+
+1. The `status` field was coerced into an `int` via the [`types`](#types) option.
+2. The `message` field was _kept_ due to setting [`drop_field`](#drop_field) to `false`.
+
+</TabItem>
+</Tabs>
 
 ## How It Works
 
@@ -259,13 +315,41 @@ enabling access to root-level, nested, and array field values. For example:
 You can learn more about Vector's field notation in the
 [field notation reference][docs.reference.field-path-notation].
 
+### Format Specification
+
+[Logfmt][urls.logfmt] is, unfortunately, a very loosely defined format. There
+is no official specification for the format and Vector makes a best effort to
+parse key/value pairs delimited with a `=`. It works by splitting the [`field`](#field)'s
+value on non-quoted white-space and then splitting each token by a non-quoted
+`=` character. This makes the parsing process somewhat flexible in that the
+string does not need to be strictly formatted.
+
+For example, the following log line:
+
+```js title="log event"
+{
+  "message": "Hello world duration=2s user-agent=\"Firefox/47.3 Mozilla/5.0\""
+}
+```
+
+Will be successfully parsed into:
+
+```js title="log event"
+{
+  "message": "Hello world duration=2s user-agent=\"Firefox/47.3 Mozilla/5.0\"",
+  "duration": "2s",
+  "user-agent": "Firefox/47.3 Mozilla/5.0"
+}
+```
+
 ### Key/Value Parsing
 
 This transform can be used for key/value parsing. [Logfmt][urls.logfmt] refers
 to a _loosely_ defined spec that parses a key/value pair delimited by a `=`
-character.
+character. This section, and it's keywords, is primarily added to assist users
+in finding this transform for these terms.
 
-### Quoting
+### Quoting Values
 
 Values can be quoted to capture spaces, and quotes can be escaped with `\`.
 For example
@@ -283,13 +367,6 @@ Would result in the following `log` event:
 }
 ```
 
-### Supported Formats
-
-Currently, the `logfmt_parser` only supports the _loosely_ defined format
-described by [logfmt][urls.logfmt]. This means only key/value pairs delimited
-with a `=`. If you need support for other delimited please consider contributing
-to Vector or using the [`lua` transform][docs.transforms.lua].
-
 ### Value Coercion
 
 Values can be coerced upon extraction via the `types.*` options. This functions
@@ -301,7 +378,6 @@ coupled within this transform for convenience.
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
-[docs.transforms.lua]: /docs/reference/transforms/lua/
 [urls.logfmt]: https://brandur.org/logfmt
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers
 [urls.vector_programmable_transforms]: https://vector.dev/components?functions%5B%5D=program
