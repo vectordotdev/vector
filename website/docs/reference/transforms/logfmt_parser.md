@@ -270,7 +270,7 @@ character.
 Values can be quoted to capture spaces, and quotes can be escaped with `\`.
 For example
 
-```
+```text
 key1="value with spaces" key2="value with spaces and \""
 ```
 
