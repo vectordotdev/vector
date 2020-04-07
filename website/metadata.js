@@ -24005,7 +24005,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_cloudwatch_logs\" # required\n  inputs = [\"in\"] # required\n  group_name = \"group-name\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"{{ host }}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
+      "description": "Amazon CloudWatch is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
       "event_types": [
         "log"
       ],
@@ -24032,7 +24032,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "short_description": "Batches log events to [Amazon Web Service's CloudWatch Logs service][urls.aws_cloudwatch_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).",
+      "short_description": "Batches log events to Amazon Web Service's CloudWatch Logs service via the `PutLogEvents` API endpoint.",
       "status": "prod-ready",
       "title": "AWS Cloudwatch Logs",
       "type": "sink",
@@ -24047,7 +24047,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"aws_cloudwatch_metrics\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\""
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
+      "description": "Amazon CloudWatch is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform.",
       "event_types": [
         "metric"
       ],
@@ -24073,7 +24073,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "short_description": "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html).",
+      "short_description": "Streams metric events to Amazon Web Service's CloudWatch Metrics service via the `PutMetricData` API endpoint.",
       "status": "beta",
       "title": "AWS Cloudwatch Metrics",
       "type": "sink",
@@ -24088,7 +24088,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_firehose\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.",
+      "description": "Amazon Kinesis Data Firehose is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk.",
       "event_types": [
         "log"
       ],
@@ -24114,7 +24114,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "short_description": "Batches log events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html).",
+      "short_description": "Batches log events to Amazon Web Service's Kinesis Data Firehose via the `PutRecordBatch` API endpoint.",
       "status": "prod-ready",
       "title": "AWS Kinesis Firehose",
       "type": "sink",
@@ -24129,7 +24129,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_kinesis_streams\" # required\n  inputs = [\"in\"] # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n  stream_name = \"my-stream\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.",
+      "description": "Amazon Kinesis Data Streams is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data.",
       "event_types": [
         "log"
       ],
@@ -24155,7 +24155,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "short_description": "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).",
+      "short_description": "Batches log events to Amazon Web Service's Kinesis Data Stream service via the `PutRecords` API endpoint.",
       "status": "prod-ready",
       "title": "AWS Kinesis Data Streams",
       "type": "sink",
@@ -24170,7 +24170,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"aws_s3\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  region = \"us-east-1\" # required, required when endpoint = \"\"\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",
+      "description": "Amazon Simple Storage Service (Amazon S3) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data.",
       "event_types": [
         "log"
       ],
@@ -24198,7 +24198,7 @@ module.exports = {
       "service_providers": [
         "AWS"
       ],
-      "short_description": "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).",
+      "short_description": "Batches log events to Amazon Web Service's S3 service via the `PutObject` API endpoint.",
       "status": "prod-ready",
       "title": "AWS S3",
       "type": "sink",
@@ -24281,7 +24281,7 @@ module.exports = {
       "service_providers": [
         "Yandex"
       ],
-      "short_description": "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].",
+      "short_description": "Batches log events to Clickhouse via the `HTTP` Interface.",
       "status": "beta",
       "title": "Clickhouse",
       "type": "sink",
@@ -24322,7 +24322,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Streams log and metric events to [standard output streams][urls.standard_streams], such as [STDOUT][urls.stdout] and [STDERR][urls.stderr].",
+      "short_description": "Streams log and metric events to standard output streams, such as STDOUT and STDERR.",
       "status": "prod-ready",
       "title": "Console",
       "type": "sink",
@@ -24337,7 +24337,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"datadog_logs\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY_ENV_VAR}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
+      "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
       "event_types": [
         "log"
       ],
@@ -24364,7 +24364,7 @@ module.exports = {
       "service_providers": [
         "Datadog"
       ],
-      "short_description": "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints].",
+      "short_description": "Streams log events to Datadog's logs via the TCP endpoint.",
       "status": "beta",
       "title": "Datadog Logs",
       "type": "sink",
@@ -24379,7 +24379,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"datadog_metrics\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${DATADOG_API_KEY}\" # required\n  namespace = \"service\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
+      "description": "Datadog is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform.",
       "event_types": [
         "metric"
       ],
@@ -24405,7 +24405,7 @@ module.exports = {
       "service_providers": [
         "Datadog"
       ],
-      "short_description": "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).",
+      "short_description": "Batches metric events to Datadog's metrics service using HTTP API.",
       "status": "beta",
       "title": "Datadog Metrics",
       "type": "sink",
@@ -24420,7 +24420,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"elasticsearch\" # required\n  inputs = [\"in\"] # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.",
+      "description": "Elasticsearch is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch.",
       "event_types": [
         "log"
       ],
@@ -24448,7 +24448,7 @@ module.exports = {
         "AWS",
         "Elastic"
       ],
-      "short_description": "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint][urls.elasticsearch_bulk].",
+      "short_description": "Batches log events to Elasticsearch via the `_bulk` API endpoint.",
       "status": "prod-ready",
       "title": "Elasticsearch",
       "type": "sink",
@@ -24502,7 +24502,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"gcp_cloud_storage\" # required\n  inputs = [\"in\"] # required\n  bucket = \"my-bucket\" # required\n  compression = \"gzip\" # required\n  credentials_path = \"/path/to/credentials.json\" # required\n\n  # Encoding\n  encoding.codec = \"ndjson\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",
+      "description": "Google Cloud Storage is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data.",
       "event_types": [
         "log"
       ],
@@ -24533,7 +24533,7 @@ module.exports = {
       "service_providers": [
         "GCP"
       ],
-      "short_description": "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).",
+      "short_description": "Batches log events to Google Cloud Platform's Cloud Storage service via the XML Interface.",
       "status": "beta",
       "title": "GCP Cloud Storage (GCS)",
       "type": "sink",
@@ -24548,7 +24548,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"gcp_pubsub\" # required\n  inputs = [\"in\"] # required\n  project = \"vector-123456\" # required\n  topic = \"this-is-a-topic\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform.",
+      "description": "GCP Pub/Sub is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform.",
       "event_types": [
         "log"
       ],
@@ -24575,7 +24575,7 @@ module.exports = {
       "service_providers": [
         "GCP"
       ],
-      "short_description": "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest].",
+      "short_description": "Batches log events to Google Cloud Platform's Pubsub service via the REST Interface.",
       "status": "beta",
       "title": "GCP PubSub",
       "type": "sink",
@@ -24590,7 +24590,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"gcp_stackdriver_logs\" # required\n  inputs = [\"in\"] # required\n  credentials_path = \"/path/to/credentials.json\" # required\n  log_id = \"vector-logs\" # required\n  project_id = \"vector-123456\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.",
+      "description": "Stackdriver is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software, and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications performant and available.",
       "event_types": [
         "log"
       ],
@@ -24617,7 +24617,7 @@ module.exports = {
       "service_providers": [
         "GCP"
       ],
-      "short_description": "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest].",
+      "short_description": "Batches log events to Google Cloud Platform's Stackdriver Logging service via the REST Interface.",
       "status": "beta",
       "title": "GCP Stackdriver Logs",
       "type": "sink",
@@ -24632,7 +24632,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"honeycomb\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${HONEYCOMB_API_KEY}\" # required\n  dataset = \"my-honeycomb-dataset\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.",
+      "description": "Honeycomb provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together.",
       "event_types": [
         "log"
       ],
@@ -24658,7 +24658,7 @@ module.exports = {
       "service_providers": [
         "Honeycomb"
       ],
-      "short_description": "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch].",
+      "short_description": "Batches log events to Honeycomb via the batch events API.",
       "status": "beta",
       "title": "Honeycomb",
       "type": "sink",
@@ -24700,7 +24700,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Batches log events to a generic [HTTP][urls.http] endpoint.",
+      "short_description": "Batches log events to a generic HTTP endpoint.",
       "status": "prod-ready",
       "title": "HTTP",
       "type": "sink",
@@ -24715,7 +24715,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"humio_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${HUMIO_TOKEN}\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.",
+      "description": "Humio is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data.",
       "event_types": [
         "log"
       ],
@@ -24741,7 +24741,7 @@ module.exports = {
       "service_providers": [
         "Humio"
       ],
-      "short_description": "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec].",
+      "short_description": "Batches log events to Humio via the HEC API.",
       "status": "beta",
       "title": "Humio Logs",
       "type": "sink",
@@ -24756,7 +24756,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"influxdb_metrics\" # required\n  inputs = [\"in\"] # required\n  bucket = \"vector-bucket\" # required\n  database = \"vector-database\" # required\n  endpoint = \"http://localhost:8086/\" # required\n  namespace = \"service\" # required\n\n  # Auth\n  org = \"my-org\" # required\n  token = \"${INFLUXDB_TOKEN}\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
+      "description": "InfluxDB is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics.",
       "event_types": [
         "metric"
       ],
@@ -24782,7 +24782,7 @@ module.exports = {
       "service_providers": [
         "InfluxData"
       ],
-      "short_description": "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API.",
+      "short_description": "Batches metric events to InfluxDB using v1 or v2 HTTP API.",
       "status": "beta",
       "title": "InfluxDB Metrics",
       "type": "sink",
@@ -24797,7 +24797,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"kafka\" # required\n  inputs = [\"in\"] # required\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  key_field = \"user_id\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
+      "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
       "event_types": [
         "log"
       ],
@@ -24825,7 +24825,7 @@ module.exports = {
         "AWS",
         "Confluent"
       ],
-      "short_description": "Streams log events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].",
+      "short_description": "Streams log events to Apache Kafka via the Kafka protocol.",
       "status": "prod-ready",
       "title": "Kafka",
       "type": "sink",
@@ -24840,7 +24840,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"logdna\" # required\n  inputs = [\"in\"] # required\n  api_key = \"${LOGDNA_API_KEY}\" # required\n  hostname = \"${HOSTNAME}\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface.",
+      "description": "LogDNA is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface.",
       "event_types": [
         "log"
       ],
@@ -24866,7 +24866,7 @@ module.exports = {
       "service_providers": [
         "LogDNA"
       ],
-      "short_description": "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API.",
+      "short_description": "Batches log events to LogDna's HTTP Ingestion API.",
       "status": "beta",
       "title": "LogDNA",
       "type": "sink",
@@ -24881,7 +24881,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"loki\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"http://localhost:3100\" # required\n\n  # Labels\n  labels.key = \"value\" # example\n  labels.key = \"{{ event_field }}\" # example"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by [Prometheus][urls.prometheus]. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.",
+      "description": "Loki is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by Prometheus. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream.",
       "event_types": [
         "log"
       ],
@@ -24908,7 +24908,7 @@ module.exports = {
       "service_providers": [
         "Grafana"
       ],
-      "short_description": "Batches log events to [Loki][urls.loki].",
+      "short_description": "Batches log events to Loki.",
       "status": "beta",
       "title": "Loki",
       "type": "sink",
@@ -24923,7 +24923,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"new_relic_logs\" # required\n  inputs = [\"in\"] # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[New Relic][urls.new_relic] is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services.",
+      "description": "New Relic is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services.",
       "event_types": [
         "log"
       ],
@@ -24949,7 +24949,7 @@ module.exports = {
       "service_providers": [
         "New Relic"
       ],
-      "short_description": "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api].",
+      "short_description": "Batches log events to New Relic's log service via their log API.",
       "status": "beta",
       "title": "New Relic Logs",
       "type": "sink",
@@ -24964,7 +24964,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"papertrail\" # required\n  inputs = [\"in\"] # required\n  endpoint = \"logs.papertrailapp.com:12345\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time.",
+      "description": "Papertrail is a web-based log aggregation application used by developers and IT team to search and view logs in real time.",
       "event_types": [
         "log"
       ],
@@ -24990,7 +24990,7 @@ module.exports = {
       "service_providers": [
         "Papertrail"
       ],
-      "short_description": "Streams log events to [Papertrail][urls.papertrail] via [Syslog][urls.papertrail_syslog].",
+      "short_description": "Streams log events to Papertrail via Syslog.",
       "status": "beta",
       "title": "Papertrail",
       "type": "sink",
@@ -25005,7 +25005,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"prometheus\" # required\n  inputs = [\"in\"] # required\n  address = \"0.0.0.0:9598\" # required\n  namespace = \"service\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
+      "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
       "event_types": [
         "metric"
       ],
@@ -25029,7 +25029,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Exposes metric events to [Prometheus][urls.prometheus] metrics service.",
+      "short_description": "Exposes metric events to Prometheus metrics service.",
       "status": "beta",
       "title": "Prometheus",
       "type": "sink",
@@ -25044,7 +25044,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"pulsar\" # required\n  inputs = [\"in\"] # required\n  address = \"127.0.0.1:6650\" # required\n  topic = \"topic-1234\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.",
+      "description": "Pulsar is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data.",
       "event_types": [
         "log"
       ],
@@ -25069,7 +25069,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol].",
+      "short_description": "Streams log events to Apache Pulsar via the Pulsar protocol.",
       "status": "beta",
       "title": "Apache Pulsar",
       "type": "sink",
@@ -25084,7 +25084,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"sematext_logs\" # required\n  inputs = [\"in\"] # required\n  token = \"${SEMATEXT_TOKEN}\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Sematext][urls.sematext] is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time.",
+      "description": "Sematext is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time.",
       "event_types": [
         "log"
       ],
@@ -25110,7 +25110,7 @@ module.exports = {
       "service_providers": [
         "Sematext"
       ],
-      "short_description": "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es].",
+      "short_description": "Batches log events to Sematext via the Elasticsearch API.",
       "status": "beta",
       "title": "Sematext Logs",
       "type": "sink",
@@ -25149,7 +25149,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket.",
+      "short_description": "Streams log events to a socket, such as a TCP, UDP, or UDS socket.",
       "status": "prod-ready",
       "title": "Socket",
       "type": "sink",
@@ -25164,7 +25164,7 @@ module.exports = {
         "toml": "[sinks.out]\n  # General\n  type = \"splunk_hec\" # required\n  inputs = [\"in\"] # required\n  host = \"http://my-splunk-host.com\" # required\n  token = \"${SPLUNK_HEC_TOKEN}\" # required\n\n  # Encoding\n  encoding.codec = \"json\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
+      "description": "The Splunk HTTP Event Collector (HEC) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
       "event_types": [
         "log"
       ],
@@ -25191,7 +25191,7 @@ module.exports = {
       "service_providers": [
         "Splunk"
       ],
-      "short_description": "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec].",
+      "short_description": "Batches log events to a Splunk's HTTP Event Collector.",
       "status": "prod-ready",
       "title": "Splunk HEC",
       "type": "sink",
@@ -25206,7 +25206,7 @@ module.exports = {
         "toml": "[sinks.out]\n  type = \"statsd\" # required\n  inputs = [\"in\"] # required\n  namespace = \"service\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node.",
+      "description": "StatsD is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by Etsy in Node.",
       "event_types": [
         "metric"
       ],
@@ -25230,7 +25230,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Streams metric events to [StatsD][urls.statsd] metrics service.",
+      "short_description": "Streams metric events to StatsD metrics service.",
       "status": "prod-ready",
       "title": "Statsd",
       "type": "sink",
@@ -25268,7 +25268,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Streams log events to another downstream [`vector` source][docs.sources.vector].",
+      "short_description": "Streams log events to another downstream `vector` source.",
       "status": "beta",
       "title": "Vector",
       "type": "sink",
@@ -25285,7 +25285,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"docker\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Docker][urls.docker] is an open platform for developing, shipping, and running\napplications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.",
+      "description": "Docker is an open platform for developing, shipping, and running\napplications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker’s methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production.",
       "event_types": [
         "log"
       ],
@@ -25311,7 +25311,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through the [Docker][urls.docker] [engine daemon][urls.docker_daemon] and outputs log events.",
+      "short_description": "Ingests data through the Docker engine daemon and outputs log events.",
       "status": "beta",
       "through_description": "the Docker engine daemon",
       "title": "Docker",
@@ -25393,7 +25393,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through the [HTTP protocol][urls.http] and outputs log events.",
+      "short_description": "Ingests data through the HTTP protocol and outputs log events.",
       "status": "beta",
       "through_description": "the HTTP protocol",
       "title": "HTTP",
@@ -25408,7 +25408,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"journald\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data.",
+      "description": "Journald is a utility for accessing log data across a variety of system services. It was introduce with Systemd to help system administrator collect, access, and route log data.",
       "event_types": [
         "log"
       ],
@@ -25432,7 +25432,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through [Systemd's][urls.systemd] [Journald][urls.journald] utility and outputs log events.",
+      "short_description": "Ingests data through Systemd's Journald utility and outputs log events.",
       "status": "beta",
       "through_description": "Systemd's Journald utility",
       "title": "Journald",
@@ -25448,7 +25448,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"kafka\" # required\n  bootstrap_servers = \"10.14.22.123:9092,10.14.23.332:9092\" # required\n  group_id = \"consumer-group-name\" # required\n  topics = [\"^(prefix1|prefix2)-.+\", \"topic-1\", \"topic-2\"] # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Apache Kafka][urls.kafka] is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
+      "description": "Apache Kafka is an open source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. This makes it an excellent candidate for durably storing logs and metrics data.",
       "event_types": [
         "log"
       ],
@@ -25474,7 +25474,7 @@ module.exports = {
         "AWS",
         "Confluent"
       ],
-      "short_description": "Ingests data through [Kafka][urls.kafka] and outputs log events.",
+      "short_description": "Ingests data through Kafka and outputs log events.",
       "status": "beta",
       "through_description": "Kafka",
       "title": "Kafka",
@@ -25489,7 +25489,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"logplex\" # required\n  address = \"0.0.0.0:80\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "[Heroku’s Logplex][urls.logplex] router is responsible for collating and distributing the log entries generated by Heroku apps and other components of the Heroku platform. It makes these entries available through the Logplex public API and the Heroku command-line tool.",
+      "description": "Heroku’s Logplex router is responsible for collating and distributing the log entries generated by Heroku apps and other components of the Heroku platform. It makes these entries available through the Logplex public API and the Heroku command-line tool.",
       "event_types": [
         "log"
       ],
@@ -25513,7 +25513,7 @@ module.exports = {
       "service_providers": [
         "Heroku"
       ],
-      "short_description": "Ingests data through the [Heroku Logplex HTTP Drain protocol][urls.logplex_protocol] and outputs log events.",
+      "short_description": "Ingests data through the Heroku Logplex HTTP Drain protocol and outputs log events.",
       "status": "beta",
       "through_description": "the Heroku Logplex HTTP Drain protocol",
       "title": "Heroku Logplex",
@@ -25528,7 +25528,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"prometheus\" # required\n  hosts = [\"http://localhost:9090\"] # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
+      "description": "Prometheus is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points.",
       "event_types": [
         "metric"
       ],
@@ -25553,7 +25553,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through the [Prometheus text exposition format][urls.prometheus_text_based_exposition_format] and outputs metric events.",
+      "short_description": "Ingests data through the Prometheus text exposition format and outputs metric events.",
       "status": "beta",
       "through_description": "the Prometheus text exposition format",
       "title": "Prometheus",
@@ -25592,7 +25592,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events.",
+      "short_description": "Ingests data through a socket, such as a TCP, UDP, or UDS socket and outputs log events.",
       "status": "prod-ready",
       "through_description": "a socket, such as a TCP, UDP, or UDS socket",
       "title": "Socket",
@@ -25607,7 +25607,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"splunk_hec\" # required"
       },
       "delivery_guarantee": "at_least_once",
-      "description": "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
+      "description": "The Splunk HTTP Event Collector (HEC) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application.",
       "event_types": [
         "log"
       ],
@@ -25632,7 +25632,7 @@ module.exports = {
       "service_providers": [
         "Splunk"
       ],
-      "short_description": "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events.",
+      "short_description": "Ingests data through the Splunk HTTP Event Collector protocol and outputs log events.",
       "status": "beta",
       "through_description": "the Splunk HTTP Event Collector protocol",
       "title": "Splunk HEC",
@@ -25647,7 +25647,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"statsd\" # required\n  address = \"127.0.0.1:8126\" # required"
       },
       "delivery_guarantee": "best_effort",
-      "description": "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node.",
+      "description": "StatsD is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by Etsy in Node.",
       "event_types": [
         "metric"
       ],
@@ -25671,7 +25671,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and outputs metric events.",
+      "short_description": "Ingests data through the StatsD UDP protocol and outputs metric events.",
       "status": "prod-ready",
       "through_description": "the StatsD UDP protocol",
       "title": "Statsd",
@@ -25710,7 +25710,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events.",
+      "short_description": "Ingests data through standard input (STDIN) and outputs log events.",
       "status": "prod-ready",
       "through_description": "standard input (STDIN)",
       "title": "STDIN",
@@ -25725,7 +25725,7 @@ module.exports = {
         "toml": "[sources.in]\n  type = \"syslog\" # required\n  address = \"0.0.0.0:514\" # required, required when mode = \"tcp\" or mode = \"udp\"\n  mode = \"tcp\" # required\n  path = \"/path/to/socket\" # required, required when mode = \"unix\""
       },
       "delivery_guarantee": "best_effort",
-      "description": "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.",
+      "description": "Syslog stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is primarily used to collect various device logs from several different machines in a central location for monitoring and review.",
       "event_types": [
         "log"
       ],
@@ -25749,7 +25749,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through the [Syslog protocol][urls.syslog_5424] and outputs log events.",
+      "short_description": "Ingests data through the Syslog protocol and outputs log events.",
       "status": "prod-ready",
       "through_description": "the Syslog protocol",
       "title": "Syslog",
@@ -25789,7 +25789,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events.",
+      "short_description": "Ingests data through another upstream `vector` sink and outputs log and metric events.",
       "status": "beta",
       "through_description": "another upstream `vector` sink",
       "title": "Vector",
@@ -26247,7 +26247,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to parse a log field value with [Grok][urls.grok].",
+      "short_description": "Accepts log events and allows you to parse a log field value with Grok.",
       "status": "prod-ready",
       "title": "Grok Parser",
       "type": "transform",
@@ -26321,7 +26321,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to enrich [Kubernetes][urls.kubernetes] logs with Pod metadata.",
+      "short_description": "Accepts log events and allows you to enrich Kubernetes logs with Pod metadata.",
       "status": "beta",
       "title": "Kubernetes Pod Metadata",
       "type": "transform",
@@ -26433,7 +26433,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to transform events with a full embedded [Lua][urls.lua] engine.",
+      "short_description": "Accepts log events and allows you to transform events with a full embedded Lua engine.",
       "status": "beta",
       "title": "Lua",
       "type": "transform",
@@ -26507,7 +26507,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex].",
+      "short_description": "Accepts log events and allows you to parse a log field's value with a Regular Expression.",
       "status": "prod-ready",
       "title": "Regex Parser",
       "type": "transform",
