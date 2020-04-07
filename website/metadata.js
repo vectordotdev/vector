@@ -26446,7 +26446,7 @@ module.exports = {
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to transform events with a full embedded Lua engine.",
+      "short_description": "Accepts log and metric events and allows you to transform events with a full embedded Lua engine.",
       "status": "beta",
       "title": "Lua",
       "type": "transform",

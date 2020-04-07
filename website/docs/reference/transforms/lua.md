@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -591,7 +591,7 @@ event = {
       host = "my.host.example"
     },
     counter = {
-      value: 24.2
+      value = 24.2
     }
   }
 }
@@ -687,7 +687,7 @@ event = {
     timestamp = os.date("!*t"),
     kind = "absolute",
     tags = {
-      host: "my.host.example"
+      host = "my.host.example"
     },
     aggregated_sumary = {
       quantiles = {0.1, 0.25, 0.5, 0.9, 0.99, 1.0},
