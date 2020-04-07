@@ -1,5 +1,5 @@
 use prost::Message;
-use foreign_modules::guest::{get, insert};
+use foreign_modules::guest::hostcall::{get, insert};
 
 pub mod items {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));

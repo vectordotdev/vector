@@ -4,10 +4,7 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     foreign_modules::{WasmModuleConfig, WasmModule},
 };
-use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
-use lazy_static::lazy_static;
 use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -29,7 +26,6 @@ inventory::submit! {
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-
         Ok(Box::new(Wasm::new(self.clone())?))
     }
 
@@ -62,7 +58,7 @@ impl Wasm {
 }
 
 impl Transform for Wasm {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
         self.module.process(event.clone()).unwrap_or(None)
     }
 }

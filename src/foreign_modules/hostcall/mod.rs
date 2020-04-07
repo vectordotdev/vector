@@ -11,7 +11,7 @@ use std::ffi::{CStr, CString};
 use std::io::Write;
 use std::os::raw::c_char;
 use std::str::FromStr;
-use tracing::{event, Level, instrument};
+use tracing::{event, Level};
 
 
 #[lucet_hostcall]

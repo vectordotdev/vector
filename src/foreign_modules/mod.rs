@@ -11,7 +11,6 @@ use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::Bindings;
 use lucetc::{Lucetc, LucetcOpts};
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{instrument, Level};

@@ -445,8 +445,10 @@ WASM is still **very young**. We will be early adopters and will pay a high adop
 ourselves using unstable functionality of some crates, including a non-trivial amount of `unsafe`, which may lead to
 unforseen consequences.
 
-Our **binary size will bloom**. While only proofs of concept are complete, we could see our binary size grow by over 30
-MB (TODO).
+Our **binary size will bloom**. We currently (in unoptimized POC implementations) see our binary size grow by over 60
+MB. The Lucet team is aware of this issue, and in some preliminary discussions this binary size increase is unexpected and
+we expect it to improve. If this does not improve, we can consider adopting `wasmtime`, lucet's sister JIT implementation
+which has a smaller binary footprint.
 
 Our team will need to diagnose, support, and evolve an arguably rather **complex API** for WASM modules to work
 correctly. This will mean we'll have to think of our system very abstractly, and has many questions around API stability
@@ -467,9 +469,13 @@ Since this is a broad reaching feature with a number of green sky ideas, we shou
 We should support modules so broadly?
 
 * As sinks? For this we should consider how we handle batching, partitioning, etc, more.
+  - **Temporary Conclusion:** Held off on deciding. Some interest.
 * As sources? This requires thinking about how we can do event sourcing.
+  - **Temporary Conclusion:** Held off on deciding. Some interest.
 * What about the idea of codecs being separate?
+  - **Temporary Conclusion:** Held off on deciding. Some interest.
 * This RFC makes some provisions for a future Event refactor, is it possible that this might happen?
+  - **Temporary Conclusion:** Held off on deciding. Some interest.
 
 
 ### Consider supporting a blessed compiler
@@ -481,6 +487,10 @@ introduce this feature.
 During investigation of the initial POC we determined that our most desirable "blessed" language would be
 AssemblyScript, unfortunately, it's currently not able to run inside Lucet. Work is ongoing and we expect it to be
 possible soon.
+
+**Temporary Conclusion:** AssemblyScript and other languages we evaluated did not provide a way to package themselves as
+WASM modules, making it hard to integrate with them. We are planning to revisit this at a later date when the ecosystem
+is more mature.
 
 
 ### Consider API tradeoffs
@@ -496,6 +506,9 @@ RFC. The current structure of the `Event` type is already discussed in
 We should also consider if we want to change how we handle codecs, since it is likely that WASM module use cases will
 include wanting to add codec support to already existing sources.
 
+**Temporary Conclusion:** We will adopt hostcalls for the time being to allow for a minimal POC. We would like to
+investigate these choices later, and we will make a decision before stabilizing WASM modules.
+
 
 ### Consider Packaging Approach
 
@@ -510,10 +523,17 @@ A couple good questions to consider:
 * Should a user import `vector::...` to use the Vector guest API in their Rust module?
 * Vector's internal API is largely undocumented and kind of a mess. Should we hide/clean the irrelevant stuff?
 
+**Conclusion:** We are including a workspace member `foreign_modules` in the `lib/foreign-modules` directory.
+This may be renamed and/or published in the future.
+
+
 ### Consider observability
 
 How can we let users see what's happening in WASM modules? Can we use tracing somehow? Lucet supports tracing, perhaps
 we could hook in somehow?
+
+**Conclusion:** Preliminary results show we may be able to allow guests to write with the current tracing subscriber.
+
 
 ### Consider Platform Support
 
@@ -535,20 +555,26 @@ Platform support:
   + https://github.com/bytecodealliance/lucet/pull/419
   + https://github.com/bytecodealliance/lucet/pull/437
 
+**Temporary Conclusion:** The Lucet team desires to support other platforms in the near future. Since the lion's share
+of Vector usage is on X86_64 Linux, and this platform is already supported, we decided to adopt Lucet for now. We could
+consider adopting `wasmtime` in the future if lucet does not eventually reach it in terms of platform parity.
+
+
 ## Plan of attack
 
 Incremental steps that execute this change.
 
-- v0.1: Draft accepted, forming basis for the RFC, and demoing a POC of how a theoretical user could use this
+- v0.1: (Done) This draft forms the groundwork for this RFC, and demos a POC of how a theoretical user could use this
   for a protobuf decoding transform, and permitting the first `wasm` transform test to pass.
-- v0.2: This RFC is amended to include Sinks and Sources information.
-- v0.3: This RFC is amended to include information about possible codec changes.
-- v0.4: The POC of the initial transform has it's v1
-- v0.5: We have benchmarks of the initial transform POC.
-- v0.6: Guest API expanded to support majority of Event API.
-- v0.7: We talk to a couple known users who would be interested in this feature and let them test it out.
-- v0.8: Source and Sink implementation POCs made.
-- v0.9: Final APIs specced and tested. Source, Sink, Transform POCs are in tree and running as tests/benches.
+- v0.2: The POC of the initial transform has it's v1
+- v0.3: We have benchmarks of the initial transform POC.
+- v0.4: Compile artifact caching is implemented, so Vector doesn't unnecessarily recompile wasm modules.
+- v0.5: Guest API expanded to support majority of Event API.
+- v0.6: We talk to a couple known users who would be interested in this feature and let them test it out.
+- v0.7: This RFC is amended to include Sinks and Sources information.
+- v0.8: This RFC is amended to include information about possible codec changes.
+- v0.9: Source and Sink implementation POCs made.
+- v0.10: Final APIs specced and tested. Source, Sink, Transform POCs are in tree and running as tests/benches.
 - v1.0: This RFC is complete and we announce with the above guide.
 
 Note: This can be filled out during the review process.

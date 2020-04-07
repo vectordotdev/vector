@@ -12,10 +12,9 @@
 //! pub extern "C" fn process() -> bool {
 //! ```
 
-
 use crate::{Role, roles};
 
-mod hostcall;
+pub mod hostcall;
 
 #[derive(Default)]
 #[must_use]

@@ -14,9 +14,10 @@ pub enum Error {
     Utf8 { source: std::str::Utf8Error, },
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 
+/// Get a field from the event type.
 pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
     let field_str = field.as_ref();
     let field_cstring = CString::new(field_str)
@@ -48,7 +49,6 @@ pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     let field_str = field.as_ref();
     let field_cstring = CString::new(field_str)
         .context(Nul)?;
-    println!("insert::field_cstring: {:?}", field_cstring);
     let field_ptr = field_cstring.as_ptr();
 
     let value = value.into();
@@ -56,7 +56,7 @@ pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
         .context(Codec)?;
     let value_cstring = CString::new(value_serialized)
         .context(Nul)?;
-    println!("insert::value_cstring: {:?}", value_cstring);
+
     let value_ptr = value_cstring.as_ptr();
     unsafe { Ok(ffi::insert(field_ptr, value_ptr)) }
 }
