@@ -246,6 +246,7 @@ example, given the following `log` event:
 ```json title="log event"
 {
   "message": "info | Sent 200 in 54.2ms duration=54.2ms status=200"
+}
 ```
 
 And the following configuration:
@@ -267,7 +268,6 @@ A [`log` event][docs.data-model.log] will be output with the following structure
   "message": "info | Sent 200 in 54.2ms duration=54.2ms status=200",
   "duration": "54.2ms",
   "status": 200
-  ""
 }
 ```
 
