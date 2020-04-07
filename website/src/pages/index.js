@@ -49,7 +49,7 @@ const features = [
     icon: 'codepen',
     description: (
       <>
-        Vector aims to be the single, and only, tool needed to get data from A to B, <Link to="/docs/setup/deployment/">deploying</Link> as an <Link to="/docs/setup/deployment/roles/daemon/">daemon</Link>, or <Link to="/docs/setup/deployment/roles/sidecar/">sidecar</Link>, or <Link to="/docs/setup/deployment/roles/service/">service</Link>.
+        Vector aims to be the single, and only, tool needed to get data from A to B, <Link to="/docs/setup/deployment/">deploying</Link> as an <Link to="/docs/setup/deployment/roles/daemon/">daemon</Link>, <Link to="/docs/setup/deployment/roles/sidecar/">sidecar</Link>, or <Link to="/docs/setup/deployment/roles/service/">service</Link>.
       </>
     ),
   },
