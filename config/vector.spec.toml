@@ -5089,7 +5089,7 @@ require('custom_module')
   # Predefined ACLs.
   #
   # * optional
-  # * no default
+  # * default: "projectPrivate"
   # * type: string
   # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
   acl = "authenticatedRead"
