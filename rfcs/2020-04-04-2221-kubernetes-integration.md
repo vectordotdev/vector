@@ -134,6 +134,8 @@ TODO: insert diagram
 
 TODO: fill in
 
+## Design considerations
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
