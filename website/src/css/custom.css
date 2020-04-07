@@ -2115,6 +2115,7 @@ html[data-theme="dark"] {
   --ifm-panel-background: var(--ifm-color-emphasis-50);
   --ifm-panel-background-rgb: 37, 37, 50;
   --ifm-panel-background-solid: #252532;
+  --ifm-panel-background-solid-light: #323242;
   --ifm-panel-box-shadow: none;
   --ifm-panel-box-shadow-active: 0 0px 10px 0px rgba( var(--ifm-color-primary-rgb), 0.5 );
 }

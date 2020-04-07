@@ -103,6 +103,12 @@
 #
 
 [[redirects]]
+  from = "/blog/tags/announcement/"
+  to = "/blog/tags/type-announcement/"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/docs/"
   to = "/docs/about/what-is-vector/"
   status = 302
