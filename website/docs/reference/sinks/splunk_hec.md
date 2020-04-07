@@ -1037,7 +1037,7 @@ should supply to the [`host`](#host) and [`token`](#token) options.
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
-and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
 
 

@@ -301,9 +301,44 @@ certain characters as special. These characters will be discarded:
 
 ### Value Coercion
 
-Values can be coerced upon extraction via the `types.*` options. This functions
+Values can be coerced upon extraction via the [`types.*`](#types) options. This functions
 exactly like the [`coercer` transform][docs.transforms.coercer] except that its
 coupled within this transform for convenience.
+
+#### Timestamps
+
+You can coerce values into timestamps via the `timestamp` type:
+
+```toml title="vector.toml"
+# ...
+types.first_timestamp = "timestamp" # best effort parsing
+types.second_timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%z" # ISO8601
+# ...
+```
+
+As noted above, if you do not specify a specific `strftime` format, Vector
+will make a best effort attempt to parse the timestamp against the following
+common formats:
+
+| Format               | Description                                  |
+|:---------------------|:---------------------------------------------|
+| **Without Timezone** |                                              |
+| `%F %T`              | YYYY-MM-DD HH:MM:SS                          |
+| `%v %T`              | DD-Mmm-YYYY HH:MM:SS                         |
+| `FT%T`               | ISO 8601 / RFC 3339 without TZ               |
+| `m/%d/%Y:%T`         | US common date format                        |
+| `a, %d %b %Y %T`     | RFC 822/2822 without TZ                      |
+| `a %d %b %T %Y`      | `date` command output without TZ             |
+| `A %d %B %T %Y`      | `date` command output without TZ, long names |
+| `a %b %e %T %Y`      | ctime format                                 |
+| **With Timezone**    |                                              |
+| `%+`                 | ISO 8601 / RFC 3339                          |
+| `%a %d %b %T %Z %Y`  | `date` command output                        |
+| `%a %d %b %T %z %Y`  | `date` command output, numeric TZ            |
+| `%a %d %b %T %#z %Y` | `date` command output, numeric TZ            |
+| **UTC Formats**      |                                              |
+| `%s`                 | UNIX timestamp                               |
+| `%FT%TZ`             | ISO 8601 / RFC 3339 UTC                      |
 
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables

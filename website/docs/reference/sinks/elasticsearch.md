@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -1320,7 +1320,7 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 ### TLS
 
 Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
-and reliable security. You can enable and adjust TLS behavior via the `tls.*`
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
 options.
 
 ### Template Syntax
