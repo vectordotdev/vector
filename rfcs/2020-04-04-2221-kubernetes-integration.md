@@ -183,6 +183,67 @@ production-ready. But it also has to be portable, in a sense that it should work
 without tweaking with as much cluster setups as possible.
 We should support both `kubectl create` and `kubectl apply` flows.
 
+### Reading container logs
+
+#### Kubernetes logging architecture
+
+Kubernetes does not directly control the logging, as the actual implementation
+of the logging mechanisms is a domain of the container runtime.
+That said, Kubernetes requires container runtime to fulfill a certain contract,
+and allowing it to enforce desired behavior.
+
+Kubernetes tries to store logs at consistent filesystem paths for any container
+runtime. In particular, `kubelet` is responsible of configuring the container
+runtime it controls to put the log at the right place.
+Log file format can vary per container runtime, and we have to support all the
+formats that Kubernetes itself supports.
+
+Generally, most Kubernetes setups will put the logs at the `kubelet`-configured
+locations in a .
+
+There is [official documentation][k8s_log_path_location_docs] at Kubernetes
+project regarding logging. I had a misconception that it specifies reading these
+log files as an explicitly supported way of consuming the logs, however, I
+couldn't find a confirmation of that when I checked.
+Nonetheless, Kubernetes log files is a de-facto well-settled interface, that we
+should be able to use reliably.
+
+#### File locations
+
+We can read container logs directly from the host filesystem. Kubernetes stores
+logs such that they're accessible from the following locations:
+
+- [`/var/log/pods`][var_log_pods_src];
+- `/var/log/containers` - legacy location, kept for backward compatibility
+  with pre `1.14` clusters.
+
+To make our lives easier, here's a [link][build_container_logs_directory_src] to
+the part of the k8s source that's responsible for building the path to the log
+file. If we encounter issues, this would be a good starting point to unwrap the
+k8s code.
+
+#### Log file format
+
+As already been mentioned above, log formats can vary, but there are certain
+invariants that are imposed on the container runtimes by the implementation of
+Kubernetes itself.
+
+A particularity interesting piece of code is the [`ReadLogs`][k8s_src_read_logs]
+function - it is responsible for reading container logs. We should carefully
+inspect it to gain knowledge on the edge cases. To achieve the best
+compatibility, we can base our log files consumption procedure on the logic
+implemented by that function.
+
+Based on the [`parseFuncs`][k8s_src_parse_funcs] (that
+[`ReadLogs`][k8s_src_read_logs] uses), it's evident that k8s supports the
+following formats:
+
+- Docker [JSON File logging driver] format - which is essentially a simple
+  [`JSONLines`][jsonlines] (aka `ndjson`) format;
+- [CRI format][cri_log_format].
+
+We have to support both formats.
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
@@ -314,3 +375,11 @@ See [motivation](#motivation).
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
+[var_log_pods_src]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
+[build_container_logs_directory_src]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
+[k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
+[jsonlines]: http://jsonlines.org/
+[k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
+[k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
+[json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
+[cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
