@@ -352,7 +352,7 @@ function InstallationSection() {
         <div className="sub-title">Fully static, no dependencies, no runtime, memory safe</div>
 
         <div className={styles.installationPlatforms}>
-          <Link to="/docs/setup/installation/containers/docker/"><SVG src="/img/docker.svg" /></Link>
+          <Link to="/docs/setup/installation/platforms/docker/"><SVG src="/img/docker.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems/"><SVG src="/img/linux.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems/raspbian/"><SVG src="/img/raspbian.svg" /></Link>
           <Link to="/docs/setup/installation/operating-systems/windows/"><SVG src="/img/windows.svg" /></Link>
