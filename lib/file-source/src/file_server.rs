@@ -55,11 +55,11 @@ pub struct FileServer {
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
 impl FileServer {
-    pub fn run<F: Future + Unpin>(
+    pub fn run(
         self,
         mut chans: impl Sink<(Bytes, String), Error = ()> + Unpin,
-        mut shutdown: F,
-    ) -> Option<F::Output> {
+        mut shutdown: impl Future + Unpin,
+    ) {
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
@@ -269,7 +269,7 @@ impl FileServer {
             let result = block_on(stream.forward(&mut chans));
             if result.is_err() {
                 debug!("Output channel closed.");
-                return None;
+                return;
             }
 
             // When no lines have been read we kick the backup_cap up by twice,
@@ -292,7 +292,7 @@ impl FileServer {
                 shutdown,
                 Delay::new(time::Duration::from_millis(backoff as u64)),
             )) {
-                Either::Left((output, _)) => return Some(output),
+                Either::Left((_, _)) => return,
                 Either::Right((_, future)) => shutdown = future,
             }
         }

@@ -298,22 +298,18 @@ pub fn file_source(
                 .instrument(span),
         );
 
-        let (trigger_server, tripwire_source) = Tripwire::new();
         let (trigger_source, tripwire_server) = Tripwire::new();
         let span = info_span!("file_server");
         thread::spawn(move || {
             let _enter = span.enter();
-            let _ = file_server.run(
+            file_server.run(
                 Compat01As03Sink::new(tx.sink_map_err(drop)),
-                shutdown.select2(tripwire_server).compat(),
+                tripwire_server.compat(),
             );
-            // File server can end on it's own without any shutdown, so we need to
-            // properly signal this to the topology.
-            drop(trigger_server);
         });
 
-        // File source should also end if this is dropped so we need to stop the file server.
-        tripwire_source.map(|_| drop(trigger_source))
+        // Once shutdown happens or is dropped, file server will be tripped.
+        shutdown.map(|_| drop(trigger_source))
     }))
 }
 
