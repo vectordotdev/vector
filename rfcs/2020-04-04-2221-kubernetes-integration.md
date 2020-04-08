@@ -347,7 +347,9 @@ See [motivation](#motivation).
 - [ ] Release `0.10.0` and announce.
 
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
+[build_container_logs_directory_src]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+[cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
 [filebeat k8s integration]: https://www.elastic.co/guide/en/beats/filebeat/master/running-on-kubernetes.html
 [firecracker]: https://github.com/firecracker-microvm/firecracker
@@ -375,18 +377,16 @@ See [motivation](#motivation).
 [issue#2223]: https://github.com/timberio/vector/issues/2223
 [issue#2224]: https://github.com/timberio/vector/issues/2224
 [issue#2225]: https://github.com/timberio/vector/issues/2225
+[json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
+[jsonlines]: http://jsonlines.org/
+[k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
+[k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
+[k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
-[vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
-[var_log_pods_src]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
-[build_container_logs_directory_src]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
-[k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
-[jsonlines]: http://jsonlines.org/
-[k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
-[k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
-[json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
-[cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
+[var_log_pods_src]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
+[vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
