@@ -241,6 +241,14 @@ following formats:
 
 We have to support both formats.
 
+### Helm Chart Repository
+
+We should not just maintain a Helm Chart, we also should offer Helm repo to make
+installations easily upgradable.
+
+Everything we need to do to achieve this is outlined at the
+[The Chart Repository Guide].
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
@@ -310,6 +318,7 @@ See [motivation](#motivation).
    we want to test against? Some clusters use `docker`, some use `CRI-O`,
    [etc][container_runtimes]. Some even use [gVisor] or [Firecracker]. There
    might be differences in how different container runtimes handle logs.
+1. How do we want to approach Helm Chart Repository management.
 
 ## Plan Of Attack
 
@@ -380,3 +389,4 @@ See [motivation](#motivation).
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
+[the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
