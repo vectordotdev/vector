@@ -1029,7 +1029,7 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          cron: "0 14 * * *"
+          cron: "0 9 * * *"
           <<: *master-filters
 
     jobs:
