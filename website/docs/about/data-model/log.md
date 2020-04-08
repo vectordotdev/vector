@@ -143,7 +143,7 @@ source-level `message_key` option for relevant sources.
 
 </Field>
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/var/log/myapp/logfile.log","197.23.0.8","/api/v1/pods/some-name"]}
@@ -151,7 +151,7 @@ source-level `message_key` option for relevant sources.
   name={"source"}
   path={null}
   relevantWhen={null}
-  required={false}
+  required={true}
   templateable={false}
   type={"string"}
   unit={null}
