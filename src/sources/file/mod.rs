@@ -187,7 +187,7 @@ impl SourceConfig for FileConfig {
         &self,
         name: &str,
         globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
@@ -204,7 +204,7 @@ impl SourceConfig for FileConfig {
             Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
         }
 
-        Ok(file_source(self, data_dir, out))
+        Ok(file_source(self, data_dir, shutdown, out))
     }
 
     fn output_type(&self) -> DataType {
@@ -219,6 +219,7 @@ impl SourceConfig for FileConfig {
 pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
+    shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
@@ -305,8 +306,9 @@ pub fn file_source(
         });
 
         // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,
-        // so it needs to be held onto until the future we return is dropped.
-        future::empty().inspect(|_| drop(shutdown_tx))
+        // so it needs to be held onto until shutdown has started. This will also stop the message
+        // processing task once file server drops it's sender end of the channel.
+        shutdown.map(|_| drop(shutdown_tx))
     }))
 }
 
