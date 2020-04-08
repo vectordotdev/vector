@@ -1536,7 +1536,7 @@ dns_servers = ["0.0.0.0:53"]
     # * type: [string]
     match = ["field1", "parent.child_field"]
 
-# Accepts and outputs `log` events allowing you to select events based on a set of logical conditions.
+# Accepts and outputs `log` and `metric` events allowing you to select events based on a set of logical conditions.
 [transforms.filter]
   #
   # General
