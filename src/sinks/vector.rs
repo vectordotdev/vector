@@ -1,5 +1,6 @@
 use crate::{
     event::proto,
+    internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSink},
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -71,11 +72,15 @@ enum HealthcheckError {
 
 fn encode_event(event: Event) -> Option<Bytes> {
     let event = proto::EventWrapper::from(event);
-    let event_len = event.encoded_len() as u32;
+    let event_len = event.encoded_len();
     let full_len = event_len + 4;
 
-    let mut out = BytesMut::with_capacity(full_len as usize);
-    out.put_u32_be(event_len);
+    emit!(VectorEventSent {
+        byte_size: full_len
+    });
+
+    let mut out = BytesMut::with_capacity(full_len);
+    out.put_u32_be(event_len as u32);
     event.encode(&mut out).unwrap();
     Some(out.freeze())
 }

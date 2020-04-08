@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    internal_events::TcpEventReceived,
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
 };
@@ -54,6 +55,7 @@ impl TcpSource for RawTcpSource {
     }
 
     fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
+        let byte_size = frame.len();
         let mut event = Event::from(frame);
 
         let host_key = if let Some(key) = &self.config.host_key {
@@ -68,6 +70,8 @@ impl TcpSource for RawTcpSource {
             message = "Received one event.",
             event = field::debug(&event)
         );
+        emit!(TcpEventReceived { byte_size });
+
         Some(event)
     }
 }
