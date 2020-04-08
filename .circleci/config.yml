@@ -537,7 +537,8 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Build & verify Docker
-          environment: "linux/amd64,linux/arm64,linux/arm"
+          environment:
+            PLATFORM: "linux/amd64,linux/arm64,linux/arm"
           command: |
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
@@ -725,6 +726,8 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Release Docker
+          environment:
+            PLATFORM: "linux/amd64,linux/arm64,linux/arm"
           command: |
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
@@ -1029,7 +1032,7 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          cron: "0 9 * * *"
+          cron: "0 14 * * *"
           <<: *master-filters
 
     jobs:
