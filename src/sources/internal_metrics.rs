@@ -72,7 +72,7 @@ async fn run(
             .send_all(futures01::stream::iter_ok(metrics))
             .compat()
             .await
-            .expect("sending??");
+            .map_err(|error| error!(message = "error sending internal metrics", %error))?;
         out = sink;
     }
 
