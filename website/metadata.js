@@ -26164,7 +26164,8 @@ module.exports = {
       "delivery_guarantee": null,
       "description": null,
       "event_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "features": [
 
@@ -26172,7 +26173,8 @@ module.exports = {
       "function_category": "filter",
       "id": "filter_transform",
       "inpuut_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "logo_path": null,
       "name": "filter",
@@ -26180,12 +26182,13 @@ module.exports = {
 
       ],
       "output_types": [
-        "log"
+        "log",
+        "metric"
       ],
       "service_providers": [
 
       ],
-      "short_description": "Accepts log events and allows you to select events based on a set of logical conditions.",
+      "short_description": "Accepts log and metric events and allows you to select events based on a set of logical conditions.",
       "status": "beta",
       "title": "Filter",
       "type": "transform",

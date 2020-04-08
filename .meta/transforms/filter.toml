@@ -4,8 +4,8 @@ allow_you_to_description = "select events based on a set of logical conditions"
 beta = true
 common = true
 function_category = "filter"
-input_types = ["log"]
-output_types = ["log"]
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
 requirements = {}
 
 <%= render("_partials/fields/_component_options.toml", type: "transform", name: "filter") %>
