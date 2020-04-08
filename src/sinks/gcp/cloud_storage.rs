@@ -94,7 +94,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 enum GcsPredefinedAcl {
     AuthenticatedRead,
     BucketOwnerFullControl,
