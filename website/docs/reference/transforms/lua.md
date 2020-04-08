@@ -187,7 +187,7 @@ break backward compatibility.
 ### search_dirs
 
 A list of directories to search when loading a Lua file via the `require`
-function. If not specified, the modules would looked up in the directories of
+function. If not specified, the modules are looked up in the directories of
 Vector's configs.
 
  See [Search Directories](#search-directories) for more info.
