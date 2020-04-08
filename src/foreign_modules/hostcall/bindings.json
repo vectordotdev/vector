@@ -3,7 +3,10 @@
       "foo": "foo",
       "get": "get",
       "insert": "insert",
-      "hint_field_length": "hint_field_length"
+      "hint_field_length": "hint_field_length",
+      "register_transform": "register_transform",
+      "register_sink": "register_sink",
+      "register_source": "register_source"
   },
   "wasi_snapshot_preview1": {
     "args_get": "__wasi_args_get",

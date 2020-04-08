@@ -3,8 +3,11 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use std::str;
 use snafu::{Snafu, ResultExt};
+use super::Registration;
+use crate::{Role, roles};
 
 #[derive(Debug, Snafu)]
+#[repr(C)]
 pub enum Error {
     #[snafu(display("Codec error: {}", source))]
     Codec { source: serde_json::error::Error, },
@@ -12,10 +15,11 @@ pub enum Error {
     Nul { source: std::ffi::NulError, },
     #[snafu(display("UTF-8 error: {}", source))]
     Utf8 { source: std::str::Utf8Error, },
+    #[snafu(display("Foreign Module error"))]
+    Foreign,
 }
 
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// Get a field from the event type.
 pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
@@ -61,12 +65,57 @@ pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     unsafe { Ok(ffi::insert(field_ptr, value_ptr)) }
 }
 
-mod ffi {
-    use std::os::raw::c_char;
+pub fn register_transform(mut registration: Registration<roles::Transform>) -> Result<()> {
+    let _result = unsafe { ffi::register_transform(&mut registration as *mut Registration<roles::Transform>) };
+    Ok(())
+}
+
+pub fn register_sink(mut registration: Registration<roles::Sink>) -> Result<()> {
+    let _result = unsafe { ffi::register_sink(&mut registration as *mut Registration<roles::Sink>) };
+    Ok(())
+}
+
+pub fn register_source(mut registration: Registration<roles::Source>) -> Result<()> {
+    let _result= unsafe { ffi::register_source(&mut registration as *mut Registration<roles::Source>) };
+    Ok(())
+}
+
+
+pub mod ffi {
+    use crate::guest::Registration;
+    use crate::{Role, roles};
+    use super::Result;
+
+    #[must_use]
+    #[repr(C)]
+    pub enum FfiResult<T, E> {
+        Ok(T),
+        Err(E),
+    }
+
+    impl<T, E> Into<Result<T, super::Error>> for FfiResult<T, E> {
+        fn into(self) -> Result<T, super::Error> {
+            match self {
+                FfiResult::Ok(t) => Ok(t),
+                FfiResult::Err(e) => Err(super::Error::Foreign),
+            }
+        }
+    }
 
     extern "C" {
-        pub(super) fn get(field_ptr: *const c_char, output_ptr: *const c_char) -> usize;
-        pub(super) fn insert(field_ptr: *const c_char, value_ptr: *const c_char);
-        pub(super) fn hint_field_length(field_ptr: *const c_char) -> usize;
+        pub(super) fn get(field_ptr: *const i8, output_ptr: *const i8) -> usize;
+        pub(super) fn insert(field_ptr: *const i8, value_ptr: *const i8);
+        pub(super) fn hint_field_length(field_ptr: *const i8) -> usize;
+
+        // Foreign items can't be generic, so we expose specialized ones.
+        pub(super) fn register_transform(
+            registration_ptr: *const Registration<roles::Transform>
+        ) -> u32;
+        pub(super) fn register_sink(
+            registration_ptr: *const Registration<roles::Sink>
+        ) -> u32;
+        pub(super) fn register_source(
+            registration_ptr: *const Registration<roles::Source>
+        ) -> u32;
     }
 }

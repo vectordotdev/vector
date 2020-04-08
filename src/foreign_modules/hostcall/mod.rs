@@ -12,6 +12,7 @@ use std::io::Write;
 use std::os::raw::c_char;
 use std::str::FromStr;
 use tracing::{event, Level};
+use foreign_modules::{Role, guest::{Registration, hostcall::ffi::FfiResult}, roles};
 
 
 #[lucet_hostcall]
@@ -99,4 +100,35 @@ pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *cons
     event.as_mut_log().insert(key_str, value_val);
 
     event!(Level::TRACE, "returning from hostcall");
+}
+
+#[lucet_hostcall]
+#[no_mangle]
+unsafe fn register_transform(vmctx: &mut Vmctx, registration_ptr: *const Registration<roles::Transform>) -> u32 {
+    event!(Level::TRACE, "recieved hostcall");
+
+    let mut heap = vmctx.heap_mut();
+    let registration = heap[registration_ptr as usize..].as_mut_ptr() as *mut Registration<roles::Transform>;
+
+    event!(Level::TRACE, "returning from hostcall");
+    Default::default()
+}
+
+#[lucet_hostcall]
+#[no_mangle]
+unsafe fn register_sink(vmctx: &mut Vmctx, registration_ptr: *const Registration<roles::Sink>) -> u32 {
+    unimplemented!();
+    Default::default()
+}
+
+#[lucet_hostcall]
+#[no_mangle]
+unsafe fn register_source(vmctx: &mut Vmctx, registration_ptr: *const Registration<roles::Source>) -> u32 {
+    event!(Level::TRACE, "recieved hostcall");
+
+    let mut heap = vmctx.heap_mut();
+    let registration = heap[registration_ptr as usize..].as_mut_ptr() as *mut Registration<roles::Source>;
+
+    event!(Level::TRACE, "returning from hostcall");
+    Default::default()
 }

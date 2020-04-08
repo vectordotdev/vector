@@ -1,12 +1,28 @@
 use prost::Message;
-use foreign_modules::guest::hostcall::{get, insert};
+use foreign_modules::guest::{hostcall::{get, insert}, Registration};
+use foreign_modules::roles;
+use foreign_modules::guest::hostcall::ffi::FfiResult;
 
 pub mod items {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));
 }
 
 #[no_mangle]
-pub extern "C" fn process() -> bool {
+pub extern "C" fn init() -> usize {
+    Registration::<roles::Transform>::default()
+        .set_wasi(true)
+        .register();
+    Default::default()
+}
+
+#[no_mangle]
+pub extern "C" fn shutdown() -> usize {
+    // Nothing here! :)
+    Default::default()
+}
+
+#[no_mangle]
+pub extern "C" fn process() -> usize {
     let result = get("test");
     match result.unwrap() {
         Some(value) => {
@@ -24,5 +40,5 @@ pub extern "C" fn process() -> bool {
         }
     };
     let result = get("processed");
-    true
+    Default::default()
 }

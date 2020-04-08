@@ -5,39 +5,50 @@
 //!
 //! ```rust
 //! #[no_mangle]
-//! pub extern "C" fn init(&mut self) -> Result<Option<AbstractEvent>, AbstractError>;
+//! pub extern "C" fn init() -> Result<usize, usize> {}
 //! #[no_mangle]
-//! pub extern "C" fn shutdown(&mut self) -> Result<(), AbstractError>;
+//! pub extern "C" fn shutdown() -> Result<usize, usize> {}
 //! #[no_mangle]
-//! pub extern "C" fn process() -> bool {
+//! pub extern "C" fn process() -> Result<usize, usize> {}
 //! ```
 
 use crate::{Role, roles};
+use serde::{Serialize, Deserialize};
+use serde::de::DeserializeOwned;
 
 pub mod hostcall;
 
-#[derive(Default)]
+/// A module registration.
+#[derive(Default, Serialize, Deserialize)]
 #[must_use]
-pub struct Registration<R> where R: Role { role: R, }
+#[repr(C)]
+pub struct Registration<R> where R: Role + Serialize + DeserializeOwned {
+    #[serde(bound(deserialize = "R: DeserializeOwned"))]
+    role: R,
+    wasi: bool,
+}
 
-impl<R> Registration<R> where R: Role {
-    pub fn blanket_option(&mut self, _: usize) -> &mut Self { unimplemented!() }
-    /* ... */
-
-    pub fn register(&mut self) -> Result<(), usize> { unimplemented!() }
+impl<R> Registration<R> where R: Role + Serialize + DeserializeOwned  {
+    pub fn set_wasi(mut self, enabled: bool) -> Self {
+        self.wasi = enabled;
+        self
+    }
 }
 
 impl Registration<roles::Transform> {
-    pub fn transform_only_option(&mut self, _: usize) -> &mut Self { unimplemented!() }
-    /* ... */
+    pub fn register(self) -> Result<(), hostcall::Error> {
+        hostcall::register_transform(self)
+    }
 }
 
 impl Registration<roles::Sink> {
-    pub fn sink_only_option(&mut self, _: usize) -> &mut Self { unimplemented!() }
-    /* ... */
+    pub fn register(self) -> Result<(), hostcall::Error> {
+        hostcall::register_sink(self)
+    }
 }
 
 impl Registration<roles::Source> {
-    pub fn sink_only_option(&mut self, _: usize) -> &mut Self { unimplemented!() }
-    /* ... */
+    pub fn register(self) -> Result<(), hostcall::Error> {
+        hostcall::register_source(self)
+    }
 }

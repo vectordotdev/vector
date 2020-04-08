@@ -65,12 +65,10 @@ impl Transform for Wasm {
 
 #[cfg(test)]
 mod tests {
-    use super::{WasmConfig, Wasm};
+    use super::{Wasm};
     use crate::{event::Event, transforms::Transform, topology::config::TransformConfig, event::LogEvent};
-    use indexmap::IndexMap;
     use std::collections::HashMap;
-    use string_cache::DefaultAtom as Atom;
-    use serde_json::{json, Value};
+    use serde_json::{Value};
     use std::{fs, io::Read, path::Path};
 
     fn parse_config(s: &str) -> crate::Result<Wasm> {

@@ -15,6 +15,7 @@ guest = []
 [dependencies]
 # Mutual:
 serde_json = "1.0.51"
+serde = "1.0.106"
 tracing = "0.1.13"
 snafu = "0.6.6"
 

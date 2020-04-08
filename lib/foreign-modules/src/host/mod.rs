@@ -12,21 +12,28 @@
 //! #[lucet_hostcall]
 //! #[no_mangle]
 //! #[instrument(skip(vmctx))]
-//! unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> usize {
+//! unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const u8) -> usize {
 //!     unimplemented!()
 //! }
 //!
 //! #[lucet_hostcall]
 //! #[no_mangle]
 //! #[instrument(skip(vmctx))]
-//! unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) -> usize {
+//! unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const u8, value_ptr: *const u8) -> usize {
 //!     unimplemented!()
 //! }
 //!
 //! #[lucet_hostcall]
 //! #[no_mangle]
 //! #[instrument(skip(vmctx))]
-//! unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
+//! unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const u8, value_ptr: *const u8) {
+//!     unimplemented!()
+//! }
+//!
+//! #[lucet_hostcall]
+//! #[no_mangle]
+//! #[instrument(skip(vmctx))]
+//! unsafe fn register(vmctx: &mut Vmctx, registration_ptr: *const u8) {
 //!     unimplemented!()
 //! }
 //! ```

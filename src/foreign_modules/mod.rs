@@ -95,6 +95,7 @@ impl<Archetype> WasmModule<Archetype> {
 
         fs::create_dir_all(&config.artifact_cache)?;
         compile(&config.path, &output_file)?;
+
         // load the compiled Lucet module
         let module = DlModule::load(&output_file).unwrap();
 
@@ -106,15 +107,19 @@ impl<Archetype> WasmModule<Archetype> {
                 ..Limits::default()
             },
         )?;
+
         // instantiate the module in the memory region
         let instance = region.new_instance_builder(module).build()?;
-
-        let wasm_module = Self {
+        let mut wasm_module = Self {
             config,
             instance,
             archetype: Default::default(),
         };
         event!(Level::TRACE, "instantiated");
+
+        event!(Level::TRACE, "registering");
+        let _worked = wasm_module.instance.run("init", &[])?;
+        event!(Level::TRACE, "registered");
         Ok(wasm_module)
     }
 }
@@ -163,7 +168,9 @@ fn protobuf() -> Result<()> {
     json_fixture.write(event_string.as_bytes());
 
     // Run the test.
+    println!("NOT BUILT");
     let mut module = WasmModule::build(WasmModuleConfig::new("target/wasm32-wasi/release/protobuf.wasm", "cache", ))?;
+    println!("BUILT");
     let out = module.process(event.clone())?;
 
     let retval = out.unwrap();
