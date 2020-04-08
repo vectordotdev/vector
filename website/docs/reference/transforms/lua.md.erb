@@ -277,8 +277,9 @@ end
 ### Search Directories
 
 Vector provides a `search_dirs` option that allows you to specify absolute
-paths that will searched when using the [Lua `require`
-function][urls.lua_require].
+paths that will be searched when using the [Lua `require`
+function][urls.lua_require]. If this option is not set, the directories of
+the [configuration files][docs.setup.configuration] will be used instead.
 
 ### Lua Version
 
