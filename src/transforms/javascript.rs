@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::{
     event::{Event, Value},
-    runtime::TaskExecutor,
     topology::config::{DataType, TransformConfig, TransformContext},
 };
 use lazy_static::lazy_static;
