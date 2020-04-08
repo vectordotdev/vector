@@ -80,7 +80,6 @@ TODO: insert diagram
     kind: ConfigMap
     metadata:
       name: vector-config
-      namespace: logging
       labels:
         k8s-app: vector
     data:
@@ -118,9 +117,9 @@ TODO: insert diagram
     `ClusterRoleBinding`:
 
     ```shell
-    kubectl create namespace logging
-    kubectl apply -f vector-configmap.yaml
-    kubectl apply -f https://packages.timber.io/vector/latest/kubernetes/vector.yaml
+    kubectl create namespace vector
+    kubectl apply --namespace vector -f vector-configmap.yaml
+    kubectl apply --namespace vector -f https://packages.timber.io/vector/latest/kubernetes/vector.yaml
     ```
 
     - _See [outstanding questions 3, 4, 5, 6, and 7](#outstanding-questions)._
