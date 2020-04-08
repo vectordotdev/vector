@@ -214,10 +214,10 @@ logs such that they're accessible from the following locations:
 - `/var/log/containers` - legacy location, kept for backward compatibility
   with pre `1.14` clusters.
 
-To make our lives easier, here's a [link][build_container_logs_directory_src] to
-the part of the k8s source that's responsible for building the path to the log
-file. If we encounter issues, this would be a good starting point to unwrap the
-k8s code.
+To make our lives easier, here's a [link][k8s_src_build_container_logs_directory]
+to the part of the k8s source that's responsible for building the path to the
+log file. If we encounter issues, this would be a good starting point to unwrap
+the k8s code.
 
 #### Log file format
 
@@ -347,7 +347,6 @@ See [motivation](#motivation).
 - [ ] Release `0.10.0` and announce.
 
 [bonzai logging operator]: https://github.com/banzaicloud/logging-operator
-[build_container_logs_directory_src]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [container_runtimes]: https://kubernetes.io/docs/setup/production-environment/container-runtimes/
 [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 [daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
@@ -380,6 +379,7 @@ See [motivation](#motivation).
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
+[k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
 [k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
 [k8s_src_var_log_pods]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
