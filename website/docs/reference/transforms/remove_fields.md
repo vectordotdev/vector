@@ -50,8 +50,8 @@ one or more log fields.
 [transforms.my_transform_id]
   type = "remove_fields" # required
   inputs = ["my-source-id"] # required
-  fields = ["field1", "field2", "parent.child"] # required
   drop_empty = false # optional, default
+  fields = ["field1", "field2", "parent.child"] # required
 ```
 
 </TabItem>

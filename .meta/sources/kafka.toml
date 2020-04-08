@@ -47,9 +47,9 @@ The consumer group name to be used to consume events from Kafka.
 [sources.kafka.options.key_field]
 type = "string"
 common = true
-examples = ["topic"]
+examples = ["message_key"]
 description = """\
-The log field name to use for the topic key. If unspecified, the key would not \
+The log field name to use for the Kafka message key. If unspecified, the key would not \
 be added to the log event. If the message has null key, then this field would \
 not be added to the log event.\
 """

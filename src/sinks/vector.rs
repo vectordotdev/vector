@@ -55,7 +55,7 @@ impl SinkConfig for VectorSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {

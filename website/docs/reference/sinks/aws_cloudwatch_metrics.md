@@ -45,9 +45,9 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
   namespace = "service" # required
   region = "us-east-1" # required, required when endpoint = ""
-  healthcheck = true # optional, default
 ```
 
 </TabItem>
@@ -58,11 +58,11 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
   # General
   type = "aws_cloudwatch_metrics" # required
   inputs = ["my-source-id"] # required
-  namespace = "service" # required
-  region = "us-east-1" # required, required when endpoint = ""
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
+  namespace = "service" # required
+  region = "us-east-1" # required, required when endpoint = ""
 
   # Batch
   batch.max_events = 20 # optional, default, events
@@ -73,30 +73,6 @@ endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_P
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -169,6 +145,30 @@ The maximum age of a batch before it is flushed.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
 
 </Field>
 <Field

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Syslog"
 description: "The Vector `syslog` source ingests data through the Syslog protocol and outputs `log` events."
@@ -64,9 +64,9 @@ ingests data through the [Syslog protocol][urls.syslog_5424] and outputs
   # General
   type = "syslog" # required
   address = "0.0.0.0:514" # required, required when mode = "tcp" or mode = "udp"
+  max_length = 102400 # optional, default, bytes
   mode = "tcp" # required
   path = "/path/to/socket" # required, required when mode = "unix"
-  max_length = 102400 # optional, default, bytes
 
   # Context
   host_key = "host" # optional, default
@@ -84,31 +84,6 @@ ingests data through the [Syslog protocol][urls.syslog_5424] and outputs
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["0.0.0.0:514","systemd","systemd#2"]}
-  groups={[]}
-  name={"address"}
-  path={null}
-  relevantWhen={{"mode":["tcp","udp"]}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### address
-
-The TCP or UDP address to listen for connections on, or "systemd#N" to use the
-Nth socket passed by systemd socket activation.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={"host"}
@@ -132,6 +107,31 @@ be globally set via the [global [`host_key`](#host_key)
 option][docs.reference.global-options#host_key].
 
  See [Context](#context) for more info.
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["0.0.0.0:514","systemd","systemd#2"]}
+  groups={[]}
+  name={"address"}
+  path={null}
+  relevantWhen={{"mode":["tcp","udp"]}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### address
+
+The TCP or UDP address to listen for connections on, or "systemd#N" to use the
+Nth socket passed by systemd socket activation.
+
+
 
 
 </Field>
@@ -369,14 +369,14 @@ PEM format (PKCS#8).
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` will cause OpenSSL to not request a certificate from the client","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true`, Vector will require a TLS certificate from the connecting host and
 terminate the connection if it is not valid. If `false` (the default), Vector
-will ignore the presence of a client certificate.
+will not request a certificate from the client.
 
 
 
@@ -721,6 +721,12 @@ key. If you find this happening often, we recommend using the
 ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
 requesting support for your specific format.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
@@ -728,5 +734,6 @@ requesting support for your specific format.
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.openssl]: https://www.openssl.org/
 [urls.syslog_3164]: https://tools.ietf.org/html/rfc3164
 [urls.syslog_5424]: https://tools.ietf.org/html/rfc5424

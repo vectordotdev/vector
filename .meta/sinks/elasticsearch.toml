@@ -111,7 +111,7 @@ type = "string"
 common = true
 required = false
 default = "none"
-warnings = ["AWS hosted Elasticsearch is unable to use compression"]
+warnings = [{visibility_level = "component", text = "AWS hosted Elasticsearch is unable to use compression"}]
 description = """\
 The compression mechanism to use.\
 """

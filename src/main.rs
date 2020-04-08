@@ -175,21 +175,24 @@ fn main() {
             2..=255 => "trace",
         },
         1 => "warn",
-        2..=255 => "error",
+        2 => "error",
+        3..=255 => "off",
     };
 
-    let levels = if let Ok(level) = std::env::var("LOG") {
-        level
-    } else {
-        [
-            format!("vector={}", level),
-            format!("codec={}", level),
-            format!("file_source={}", level),
-            format!("tower_limit=trace"),
-            format!("rdkafka={}", level),
-        ]
-        .join(",")
-        .to_string()
+    let levels = match std::env::var("LOG").ok() {
+        Some(level) => level,
+        None => match level {
+            "off" => "off".to_string(),
+            _ => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("file_source={}", level),
+                format!("tower_limit=trace"),
+                format!("rdkafka={}", level),
+            ]
+            .join(",")
+            .to_string(),
+        },
     };
 
     let color = match opts.color.clone().unwrap_or(Color::Auto) {

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Elasticsearch"
 description: "The Vector `elasticsearch` sink batches `log` events to Elasticsearch via the `_bulk` API endpoint."
@@ -38,7 +38,7 @@ endpoint][urls.elasticsearch_bulk].
 
 <Alert icon={false} type="warning" classNames="list--warnings">
 
-* [`compression`](#compression) option - AWS hosted Elasticsearch is unable to use compression
+* [`compression`](#compression) - AWS hosted Elasticsearch is unable to use compression
 
 </Alert>
 
@@ -85,9 +85,9 @@ endpoint][urls.elasticsearch_bulk].
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -321,6 +321,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -368,30 +392,6 @@ The maximum size of the buffer on the disk.
 
 </Field>
 <Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
-
-
-</Field>
-<Field
   common={false}
   defaultValue={"block"}
   enumValues={{"block":"Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge.","drop_newest":"Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."}}
@@ -416,56 +416,6 @@ The behavior when the buffer becomes full.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"none"}
-  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
-  examples={["gzip","none"]}
-  groups={[]}
-  name={"compression"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={["AWS hosted Elasticsearch is unable to use compression"]}
-  >
-
-### compression
-
-The compression mechanism to use.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={"_doc"}
-  enumValues={null}
-  examples={["_doc"]}
-  groups={[]}
-  name={"doc_type"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### doc_type
-
-The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <=
-6.X. If you are using >= 7.0 you do not need to set this option since
-Elasticsearch has removed it.
-
-
-
 
 </Field>
 <Field
@@ -567,53 +517,53 @@ How to format event timestamps.
 
 </Field>
 <Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
+  common={true}
+  defaultValue={"none"}
+  enumValues={{"gzip":"GZIP compression","none":"No compression"}}
+  examples={["gzip","none"]}
   groups={[]}
-  name={"headers"}
+  name={"compression"}
   path={null}
   relevantWhen={null}
   required={false}
   templateable={false}
-  type={"table"}
+  type={"string"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"compression"}]}
   >
 
-### headers
+### compression
 
-Options for custom headers.
+The compression mechanism to use.
 
 
 
-<Fields filters={false}>
+
+</Field>
 <Field
-  common={true}
-  defaultValue={null}
+  common={false}
+  defaultValue={"_doc"}
   enumValues={null}
-  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  examples={["_doc"]}
   groups={[]}
-  name={"`[header-name]`"}
-  path={"headers"}
+  name={"doc_type"}
+  path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
   warnings={[]}
   >
 
-#### `[header-name]`
+### doc_type
 
-A custom header to be added to each outgoing Elasticsearch request.
+The [`doc_type`](#doc_type) for your index data. This is only relevant for Elasticsearch <=
+6.X. If you are using >= 7.0 you do not need to set this option since
+Elasticsearch has removed it.
 
 
 
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -715,6 +665,56 @@ Index name to write events to.
 
  See [Document Conflicts](#document-conflicts) and [Template Syntax](#template-syntax) for more info.
 
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"headers"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### headers
+
+Options for custom headers.
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]}
+  groups={[]}
+  name={"`[header-name]`"}
+  path={"headers"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[header-name]`
+
+A custom header to be added to each outgoing Elasticsearch request.
+
+
+
+
+</Field>
+</Fields>
 
 </Field>
 <Field
@@ -1104,14 +1104,13 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
@@ -1318,6 +1317,12 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 ### Template Syntax
 
 The [`index`](#index) options
@@ -1356,4 +1361,5 @@ You can learn more about the complete syntax in the
 [urls.elasticsearch_id_performance]: https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
+[urls.openssl]: https://www.openssl.org/
 [urls.strptime_specifiers]: https://docs.rs/chrono/0.4.11/chrono/format/strftime/index.html#specifiers

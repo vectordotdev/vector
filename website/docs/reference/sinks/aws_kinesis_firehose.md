@@ -47,9 +47,9 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   # General
   type = "aws_kinesis_firehose" # required
   inputs = ["my-source-id"] # required
+  healthcheck = true # optional, default
   region = "us-east-1" # required, required when endpoint = ""
   stream_name = "my-stream" # required
-  healthcheck = true # optional, default
 
   # Encoding
   encoding.codec = "json" # required
@@ -63,20 +63,20 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
   # General
   type = "aws_kinesis_firehose" # required
   inputs = ["my-source-id"] # required
-  region = "us-east-1" # required, required when endpoint = ""
-  stream_name = "my-stream" # required
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   healthcheck = true # optional, default
+  region = "us-east-1" # required, required when endpoint = ""
+  stream_name = "my-stream" # required
 
   # Batch
   batch.max_events = 500 # optional, default, events
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -99,30 +99,6 @@ endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecord
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={["arn:aws:iam::123456789098:role/my_role"]}
-  groups={[]}
-  name={"assume_role"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### assume_role
-
-The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
-
- See [AWS Authentication](#aws-authentication) for more info.
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -222,6 +198,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -263,30 +263,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
 
 
 
@@ -445,6 +421,30 @@ How to format event timestamps.
   common={false}
   defaultValue={null}
   enumValues={null}
+  examples={["arn:aws:iam::123456789098:role/my_role"]}
+  groups={[]}
+  name={"assume_role"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### assume_role
+
+The ARN of an [IAM role][urls.aws_iam_role] to assume at startup.
+
+ See [AWS Authentication](#aws-authentication) for more info.
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
   examples={["127.0.0.0:5000/path/to/service"]}
   groups={[]}
   name={"endpoint"}
@@ -510,6 +510,31 @@ Enables/disables the sink healthcheck upon start.
 
 The [AWS region][urls.aws_regions] of the target service. If [`endpoint`](#endpoint) is
 provided it will override this value since the endpoint includes the region.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["my-stream"]}
+  groups={[]}
+  name={"stream_name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### stream_name
+
+The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
+Firehose delivery stream.
 
 
 
@@ -713,31 +738,6 @@ duplicate data downstream.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["my-stream"]}
-  groups={[]}
-  name={"stream_name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### stream_name
-
-The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis
-Firehose delivery stream.
-
-
-
 
 </Field>
 </Fields>

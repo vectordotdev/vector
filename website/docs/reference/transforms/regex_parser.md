@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 component_title: "Regex Parser"
 description: "The Vector `regex_parser` transform accepts and outputs `log` events allowing you to parse a log field's value with a Regular Expression."
 event_types: ["log"]
@@ -41,9 +41,9 @@ log field's value with a [Regular Expression][urls.regex].
   # General
   type = "regex_parser" # required
   inputs = ["my-source-id"] # required
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   drop_field = true # optional, default
   field = "message" # optional, default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
 
   # Types
   types.status = "int" # example
@@ -62,10 +62,10 @@ log field's value with a [Regular Expression][urls.regex].
   # General
   type = "regex_parser" # required
   inputs = ["my-source-id"] # required
-  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   drop_field = true # optional, default
   field = "message" # optional, default
   overwrite_target = true # optional, default
+  regex = "^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$" # required
   target_field = "root_field" # optional, no default
 
   # Types
@@ -259,11 +259,11 @@ supported for the `timestamp` type.
 </Field>
 </Fields>
 
-## Output
+## Examples
 
 Given the following log line:
 
-```json
+```json title="log event"
 {
   "message": "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
 }
@@ -271,7 +271,7 @@ Given the following log line:
 
 And the following configuration:
 
-```toml
+```toml title="vector.toml"
 [transforms.<transform-id>]
   type = "regex_parser"
   field = "message"
@@ -286,7 +286,7 @@ And the following configuration:
 
 A [`log` event][docs.data-model.log] will be output with the following structure:
 
-```javascript
+```javascript title="log event"
 {
   // ... existing fields
   "bytes_in": 5667,
@@ -303,7 +303,6 @@ Things to note about the output:
 
 1. The `message` field was overwritten.
 2. The `bytes_in`, `timestamp`, `status`, and `bytes_out` fields were coerced.
-
 
 ## How It Works
 
@@ -407,10 +406,57 @@ More info can be found in the [Regex grouping and flags
 documentation][urls.regex_grouping_and_flags].
 
 
+
+
+
+
+### Value Coercion
+
+Values can be coerced upon extraction via the [`types.*`](#types) options. This functions
+exactly like the [`coercer` transform][docs.transforms.coercer] except that its
+coupled within this transform for convenience.
+
+#### Timestamps
+
+You can coerce values into timestamps via the `timestamp` type:
+
+```toml title="vector.toml"
+# ...
+types.first_timestamp = "timestamp" # best effort parsing
+types.second_timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%z" # ISO8601
+# ...
+```
+
+As noted above, if you do not specify a specific `strftime` format, Vector
+will make a best effort attempt to parse the timestamp against the following
+common formats:
+
+| Format               | Description                                  |
+|:---------------------|:---------------------------------------------|
+| **Without Timezone** |                                              |
+| `%F %T`              | YYYY-MM-DD HH:MM:SS                          |
+| `%v %T`              | DD-Mmm-YYYY HH:MM:SS                         |
+| `FT%T`               | ISO 8601 / RFC 3339 without TZ               |
+| `m/%d/%Y:%T`         | US common date format                        |
+| `a, %d %b %Y %T`     | RFC 822/2822 without TZ                      |
+| `a %d %b %T %Y`      | `date` command output without TZ             |
+| `A %d %B %T %Y`      | `date` command output without TZ, long names |
+| `a %b %e %T %Y`      | ctime format                                 |
+| **With Timezone**    |                                              |
+| `%+`                 | ISO 8601 / RFC 3339                          |
+| `%a %d %b %T %Z %Y`  | `date` command output                        |
+| `%a %d %b %T %z %Y`  | `date` command output, numeric TZ            |
+| `%a %d %b %T %#z %Y` | `date` command output, numeric TZ            |
+| **UTC Formats**      |                                              |
+| `%s`                 | UNIX timestamp                               |
+| `%FT%TZ`             | ISO 8601 / RFC 3339 UTC                      |
+
+
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.monitoring#logs]: /docs/administration/monitoring/#logs
 [docs.reference.field-path-notation]: /docs/reference/field-path-notation/
+[docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [pages.index#performance]: /#performance
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.regex_grouping_and_flags]: https://docs.rs/regex/1.3.6/regex/#grouping-and-flags

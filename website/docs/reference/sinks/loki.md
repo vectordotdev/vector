@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Loki"
 description: "The Vector `loki` sink batches `log` events to Loki."
@@ -80,9 +80,9 @@ The Vector `loki` sink
   batch.timeout_secs = 1 # optional, default, seconds
 
   # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.type = "memory" # optional, default
   buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
   buffer.when_full = "block" # optional, default
 
   # Encoding
@@ -316,6 +316,30 @@ Configures the sink specific buffer behavior.
 <Fields filters={false}>
 <Field
   common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={[]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
+<Field
+  common={true}
   defaultValue={500}
   enumValues={null}
   examples={[500]}
@@ -359,30 +383,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 The maximum size of the buffer on the disk.
 
  See [Buffers & Batches](#buffers--batches) for more info.
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={[]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
-
-
 
 
 </Field>
@@ -584,6 +584,84 @@ Enables/disables the sink healthcheck upon start.
 
 </Field>
 <Field
+  common={false}
+  defaultValue={false}
+  enumValues={null}
+  examples={[false,true]}
+  groups={[]}
+  name={"remove_label_fields"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### remove_label_fields
+
+If this is set to `true` then when labels are collected from events those
+fields will also get removed from the event.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={true}
+  enumValues={null}
+  examples={[true,false]}
+  groups={[]}
+  name={"remove_timestamp"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"bool"}
+  unit={null}
+  warnings={[]}
+  >
+
+### remove_timestamp
+
+If this is set to `true` then the timestamp will be removed from the event.
+This is useful because Loki uses the timestamp to index the event.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some_tenant_id"]}
+  groups={[]}
+  name={"tenant_id"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### tenant_id
+
+The tenant id that will be sent with every request, by default this is not
+required since a proxy should set this header. When running Loki locally a
+tenant id is not required either.
+
+You can read more about tenant id's [here][urls.loki_multi_tenancy]
+
+
+
+
+</Field>
+<Field
   common={true}
   defaultValue={null}
   enumValues={null}
@@ -635,56 +713,6 @@ A key-value pair for labels.
 
 </Field>
 </Fields>
-
-</Field>
-<Field
-  common={false}
-  defaultValue={false}
-  enumValues={null}
-  examples={[false,true]}
-  groups={[]}
-  name={"remove_label_fields"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### remove_label_fields
-
-If this is set to `true` then when labels are collected from events those
-fields will also get removed from the event.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={true}
-  enumValues={null}
-  examples={[true,false]}
-  groups={[]}
-  name={"remove_timestamp"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"bool"}
-  unit={null}
-  warnings={[]}
-  >
-
-### remove_timestamp
-
-If this is set to `true` then the timestamp will be removed from the event.
-This is useful because Loki uses the timestamp to index the event.
-
-
-
 
 </Field>
 <Field
@@ -891,34 +919,6 @@ duplicate data downstream.
   common={false}
   defaultValue={null}
   enumValues={null}
-  examples={["some_tenant_id"]}
-  groups={[]}
-  name={"tenant_id"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### tenant_id
-
-The tenant id that will be sent with every request, by default this is not
-required since a proxy should set this header. When running Loki locally a
-tenant id is not required either.
-
-You can read more about tenant id's [here][urls.loki_multi_tenancy]
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
   examples={[]}
   groups={[]}
   name={"tls"}
@@ -1052,14 +1052,13 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
@@ -1181,6 +1180,12 @@ Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 `retry_backoff_secs` options.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
@@ -1190,3 +1195,4 @@ attempts and backoff rate with the [`retry_attempts`](#retry_attempts) and
 [urls.loki]: https://grafana.com/oss/loki/
 [urls.loki_multi_tenancy]: https://github.com/grafana/loki/blob/master/docs/operations/multi-tenancy.md
 [urls.new_loki_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+loki
+[urls.openssl]: https://www.openssl.org/

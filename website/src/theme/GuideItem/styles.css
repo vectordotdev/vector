@@ -22,7 +22,12 @@
   position: relative;
 }
 
-.guide-item > article > header {
+.guide-item > article > div {
+  height: 100%;
+  position: relative;
+}
+
+.guide-item > article > div > header {
   border-bottom: 0px none;
   margin-bottom: 0;
   min-height: 50%;
@@ -32,7 +37,7 @@
   width: 100%;
 }
 
-.guide-item > article > header > .category {
+.guide-item > article > div > header > .category {
   color: var(--ifm-heading-color);
   font-size: 0.75em;
   font-weight: 500;
@@ -40,7 +45,7 @@
   text-transform: uppercase;
 }
 
-.guide-item > article > header > h2 {
+.guide-item > article > div > header > h2 {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   display: -webkit-box;
@@ -53,27 +58,27 @@
   overflow: hidden;
 }
 
-.guide-item > article > footer {
+.guide-item > article > div > footer {
   padding: 1em 1.25em;
   position: absolute;
   bottom: 0;
   width: 100%;
 }
 
-.guide-item > article > footer > .logo {
+.guide-item > article > div > footer > .logo {
   margin-right: 10px;
 }
 
-.guide-item > article > footer > div.logo {
+.guide-item > article > div > footer > div.logo {
   font-size: 2.5em;
 }
 
-.guide-item > article > footer > svg.logo {
+.guide-item > article > div > footer > svg.logo {
   height: 3em;
   width: 3em;
 }
 
-.guide-item > article > footer > .action {
+.guide-item > article > div > footer > .action {
   font-size: 0.75em;
   font-weight: 600;
   margin-top: 0.5em;
@@ -117,11 +122,16 @@
   transform-origin: 0 50%;
 }
 
-.guide-item:hover > article > header > * {
+.guide-item:hover > article {
+  background-image: linear-gradient(to right, var(--ifm-panel-background-solid), var(--ifm-panel-background-solid-light) );
   color: inherit;
 }
 
-.guide-item:hover > article > footer > .action {
+.guide-item:hover > article > div > header > * {
+  color: inherit;
+}
+
+.guide-item:hover > article > div > footer > .action {
   opacity: 1;
   top: 0;
 }

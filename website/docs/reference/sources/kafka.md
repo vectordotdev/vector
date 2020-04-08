@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-08"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -53,8 +53,8 @@ ingests data through [Kafka][urls.kafka] and outputs
   type = "kafka" # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   group_id = "consumer-group-name" # required
+  key_field = "message_key" # optional, no default
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
-  key_field = "topic" # optional, no default
 ```
 
 </TabItem>
@@ -64,14 +64,14 @@ ingests data through [Kafka][urls.kafka] and outputs
 [sources.my_source_id]
   # General
   type = "kafka" # required
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
-  group_id = "consumer-group-name" # required
-  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
   auto_offset_reset = "largest" # optional, default
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   fetch_wait_max_ms = 100 # optional, default, milliseconds
-  key_field = "topic" # optional, no default
+  group_id = "consumer-group-name" # required
+  key_field = "message_key" # optional, no default
   session_timeout_ms = 10000 # optional, default, milliseconds
   socket_timeout_ms = 60000 # optional, default, milliseconds
+  topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
 
   # Advanced
   librdkafka_options."client.id" = "${ENV_VAR}" # example
@@ -79,9 +79,9 @@ ingests data through [Kafka][urls.kafka] and outputs
   librdkafka_options."socket.send.buffer.bytes" = "100" # example
 
   # TLS
+  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
-  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
 ```
@@ -90,6 +90,57 @@ ingests data through [Kafka][urls.kafka] and outputs
 </Tabs>
 
 <Fields filters={true}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"librdkafka_options"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### librdkafka_options
+
+Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
+details.
+
+
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
+  groups={[]}
+  name={"`[field-name]`"}
+  path={"librdkafka_options"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### `[field-name]`
+
+The options and their values. Accepts `string` values.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
 <Field
   common={false}
   defaultValue={"largest"}
@@ -194,7 +245,7 @@ The consumer group name to be used to consume events from Kafka.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["topic"]}
+  examples={["message_key"]}
   groups={[]}
   name={"key_field"}
   path={null}
@@ -208,63 +259,12 @@ The consumer group name to be used to consume events from Kafka.
 
 ### key_field
 
-The log field name to use for the topic key. If unspecified, the key would not
-be added to the log event. If the message has null key, then this field would
-not be added to the log event.
+The log field name to use for the Kafka message key. If unspecified, the key
+would not be added to the log event. If the message has null key, then this
+field would not be added to the log event.
 
 
 
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"librdkafka_options"}
-  path={null}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  warnings={[]}
-  >
-
-### librdkafka_options
-
-Advanced options. See [librdkafka documentation][urls.lib_rdkafka_config] for
-details.
-
-
-
-<Fields filters={false}>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"client.id":"${ENV_VAR}"},{"fetch.error.backoff.ms":"1000"},{"socket.send.buffer.bytes":"100"}]}
-  groups={[]}
-  name={"`[field-name]`"}
-  path={"librdkafka_options"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### `[field-name]`
-
-The options and their values. Accepts `string` values.
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -310,6 +310,31 @@ The Kafka session timeout in milliseconds.
 ### socket_timeout_ms
 
 Default timeout for network requests.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
+  groups={[]}
+  name={"topics"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### topics
+
+The Kafka topics names to read events from. Regex is supported if the topic
+begins with `^`.
 
 
 
@@ -466,31 +491,6 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
 </Fields>
 
 </Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["^(prefix1|prefix2)-.+","topic-1","topic-2"]]}
-  groups={[]}
-  name={"topics"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  warnings={[]}
-  >
-
-### topics
-
-The Kafka topics names to read events from. Regex is supported if the topic
-begins with `^`.
-
-
-
-
-</Field>
 </Fields>
 
 ## Fields
@@ -566,6 +566,12 @@ will be replaced before being evaluated.
 You can learn more in the
 [Environment Variables][docs.configuration#environment-variables] section.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 ### librdkafka
 
 The `kafka` source uses [`lib_rdkafka`][urls.lib_rdkafka] under the hood. This
@@ -579,3 +585,4 @@ this dependency is packaged with Vector, meaning you do not need to install it.
 [urls.kafka]: https://kafka.apache.org/
 [urls.lib_rdkafka]: https://github.com/edenhill/librdkafka
 [urls.lib_rdkafka_config]: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+[urls.openssl]: https://www.openssl.org/

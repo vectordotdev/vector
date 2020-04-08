@@ -159,7 +159,7 @@ class Component
   end
 
   def option_groups
-    @option_groups ||= options_list.collect(&:groups).flatten.uniq.sort
+    @option_groups ||= options_list.collect(&:groups).flatten.uniq
   end
 
   def partition_options
@@ -203,7 +203,7 @@ class Component
         toml: config_example(:toml)
       },
       delivery_guarantee: (respond_to?(:delivery_guarantee, true) ? delivery_guarantee : nil),
-      description: description,
+      description: (description ? description.remove_markdown_links : nil),
       event_types: event_types,
       features: features,
       function_category: (respond_to?(:function_category, true) ? function_category : nil),
@@ -212,7 +212,7 @@ class Component
       name: name,
       operating_systems: (transform? ? [] : operating_systems),
       service_providers: service_providers,
-      short_description: short_description,
+      short_description: (short_description ? short_description.remove_markdown_links : nil),
       status: status,
       title: title,
       type: type,
@@ -220,26 +220,15 @@ class Component
     }
   end
 
-  def to_toml_example(common: true)
-    example_options = options_list.sort_by(&:config_file_sort_token)
-    example_options = common ? example_options.select(&:common?) : example_options
-
-    option_examples =
-      included_options.collect do |option|
-        option.to_toml_example(common: common)
-      end
-
-    <<~EOF
-    [#{type.pluralize}.my_#{type}_id]
-    #{option_examples.join}
-    EOF
-  end
-
   def transform?
     type == "transform"
   end
 
   def warnings
-    @warnings ||= options_list.collect { |option| option.all_warnings }.flatten.freeze
+    @warnings ||= options_list.
+      collect { |option| option.all_warnings }.
+      flatten.
+      select { |warning| warning.visibility_level == "component" }.
+      freeze
   end
 end

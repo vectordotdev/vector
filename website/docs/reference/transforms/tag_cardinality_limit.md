@@ -41,8 +41,8 @@ metrics services.
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
   inputs = ["my-source-id"] # required
-  mode = "exact" # required
   limit_exceeded_action = "drop_tag" # optional, default
+  mode = "exact" # required
   value_limit = 500 # optional, default
 ```
 
@@ -53,9 +53,9 @@ metrics services.
 [transforms.my_transform_id]
   type = "tag_cardinality_limit" # required
   inputs = ["my-source-id"] # required
-  mode = "exact" # required
   cache_size_per_tag = 5120000 # optional, default, bytes, relevant when mode = "probabilistic"
   limit_exceeded_action = "drop_tag" # optional, default
+  mode = "exact" # required
   value_limit = 500 # optional, default
 ```
 

@@ -4,44 +4,261 @@ allow_you_to_description = "transform events with a full embedded [Lua][urls.lua
 beta = true
 common = true
 function_category = "program"
-input_types = ["log"]
-output_types = ["log"]
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
 requirements = {}
 
-<%= render("_partials/fields/_component_options.toml", type: "transform", name: "lua") %>
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "transform",
+  name: "lua",
+  groups: ["simple", "inline", "module"]
+) %>
 
 [transforms.lua.options.version]
 type = "string"
 common = true
-required = false
-description = "transform API version"
-default = "1"
-enum = { 1 = "transform API version 1" }
-
-[transforms.lua.options.source]
-type = "string"
-common = true
-examples = [
-"""\
-require("script") # a `script.lua` file must be in your `search_dirs`
-
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\\n$", "")
-  event["host"] = hostname
-end\
+description = """\
+Transform API version. Specifying this version ensures that Vector does not \
+break backward compatibility.\
 """
-]
+enum = { 2 = "Lua transform API version 2" }
+groups = ["simple", "inline", "module"]
 required = true
-description = "The inline Lua source to evaluate."
+sort = 1
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
+common = false
 examples = [["/etc/vector/lua"]]
-common = true
+groups = ["module"]
+required = false
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
+"""
+sort = 2
+
+[transforms.lua.options.source]
+type = "string"
+category = "Source Code"
+common = false
+examples.module = [
+"""\
+-- external file with hooks and timers defined
+require('custom_module')\
+"""
+]
+groups = ["module"]
+required = false
+description = """\
+The source which is evaluated when the transform is created.\
+"""
+sort = 5
+
+[transforms.lua.options.hooks]
+type = "table"
+category = "Hooks"
+common = true
+groups = ["simple", "inline", "module"]
+required = true
+description = "Configures hooks handlers."
+sort = 3
+
+[transforms.lua.options.hooks.children.init]
+type = "string"
+common = false
+description = """\
+A function which is called when the first event comes, before calling \
+`hooks.process`\
+"""
+examples.inline = [
+"""\
+function (emit)
+  count = 0 -- initialize state by setting a global variable
+end\
+"""
+]
+examples.module = ["init"]
+groups = ["inline", "module"]
+required = false
+sort = 1
+
+[transforms.lua.options.hooks.children.process]
+type = "string"
+common = true
+description = """\
+A function which is called for each incoming event. It can produce new events \
+using `emit` function.\
+"""
+examples.simple = [
+"""\
+function (event, emit)
+  event.log.field = "value" -- set value of a field
+  event.log.another_field = nil -- remove field
+  event.log.first, event.log.second = nil, event.log.first -- rename field
+
+  -- Very important! Emit the processed event.
+  emit(event)
+end\
+"""
+]
+examples.inline = [
+"""\
+function (event, emit)
+  count = count + 1 -- increment the counter and exit
+end\
+"""
+]
+examples.module = ["process"]
+groups = ["simple", "inline", "module"]
+required = true
+sort = 2
+
+[transforms.lua.options.hooks.children.shutdown]
+type = "string"
+common = false
+description = """\
+A function which is called when Vector is stopped. It can produce new events \
+using `emit` function.\
+"""
+examples.inline = [
+"""\
+function (emit)
+  emit {
+    metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = counter
+      }
+    }
+  }
+end\
+"""
+]
+examples.module = ["shutdown"]
+groups = ["inline", "module"]
+required = false
+sort = 3
+
+[transforms.lua.options.timers]
+type = "[table]"
+category = "Timers"
+common = false
+groups = ["inline", "module"]
+required = false
+description = """\
+Configures timers which are executed periodically at given interval.\
+"""
+sort = 4
+
+[transforms.lua.options.timers.children.handler]
+type = "string"
+common = false
+examples.inline = [
+"""\
+function (emit)
+  emit {
+    metric = {
+      name = "event_counter",
+      kind = "incremental",
+      timestamp = os.date("!*t"),
+      counter = {
+        value = counter
+      }
+    }
+  }
+  counter = 0
+end\
+"""
+]
+examples.module = ["timer_handler"]
+groups = ["inline", "module"]
+required = true
+description = """\
+Defines a handler function which is executed periodially at `interval_seconds`. \
+It can produce new events using `emit` function.\
+"""
+
+[transforms.lua.options.timers.children.interval_seconds]
+type = "integer"
+common = false
+examples = [1, 10, 30]
+groups = ["inline", "module"]
+required = true
+unit = "seconds"
+description = """\
+Defines the interval at which the timer handler would be executed.\
+"""
+
+[[transforms.lua.examples]]
+label = "Add, rename, & remove log fields"
+body = """\
+The following examples demonstrates how to add, rename, and remove a \
+[`log`][docs.data-model.log] event's fields:
+
+```toml title="vector.toml"
+# ...
+hooks.process = \"\"\"
+function (event, emit)
+  -- Add root level field
+  event.log.field = "new value"
+
+  -- Add nested field
+  event.log.nested.field = "nested value"
+
+  -- Rename field
+  event.log.new_field = event.log.old_field
+  event.log.old_field = nil
+
+  -- Remove fields
+  event.log.field = nil
+
+  emit(event)
+end
+\"\"\"
+```\
+"""
+
+[[transforms.lua.examples]]
+label = "Add, rename, & remove metric tags"
+body = """\
+The following examples demonstrates how to add, rename, and remove a
+[`metric`][docs.data-model.log] events's tags:
+
+```toml title="vector.toml"
+# ...
+hooks.process = \"\"\"
+function (event, emit)
+  -- Add tag
+  event.metric.tags.tag = "new value"
+
+  -- Rename tag
+  event.metric.tags.new_tag = event.log.old_tag
+  event.metric.tags.old_tag = nil
+
+  -- Remove tag
+  event.metric.tags.tag = nil
+
+  emit(event)
+end
+\"\"\"
+```\
+"""
+
+[[transforms.lua.examples]]
+label = "Drop event"
+body = """\
+Drop an event entirely. Supply this as the `hooks.process` value:
+
+```toml title="vector.toml"
+# ...
+hooks.process = \"\"\"
+function (event, emit)
+  -- Drop event entirely by not calling the `emit` function
+end
+\"\"\"
+```
 """

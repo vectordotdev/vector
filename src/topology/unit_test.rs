@@ -1240,8 +1240,7 @@ mod tests {
       name = "foometric"
       [tests.input.metric.tags]
         tagfoo = "valfoo"
-      [tests.input.metric.value]
-        type = "counter"
+      [tests.input.metric.counter]
         value = 100.0
 
   [[tests.outputs]]

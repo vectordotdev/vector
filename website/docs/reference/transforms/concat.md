@@ -52,8 +52,8 @@ accepts and outputs [`log`][docs.data-model.log] events allowing you to concat
   type = "concat" # required
   inputs = ["my-source-id"] # required
   items = ["first[..3]", "second[-5..]", "third[3..6]"] # required
-  target = "root_field_name" # required
   joiner = " " # optional, default
+  target = "root_field_name" # required
 ```
 
 </TabItem>

@@ -147,6 +147,7 @@ sources from mixing together, as this affects partial event processing.
 <Tabs
   block={true}
   defaultValue="default"
+  select={false}
   values={[{"label":"Default","value":"default"},{"label":"With Merge Fields","value":"with-merge-fields"}]}>
 
 <TabItem value="default">

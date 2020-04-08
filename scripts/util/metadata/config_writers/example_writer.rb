@@ -9,8 +9,12 @@ module ConfigWriters
         writer.table(full_path, array: array)
       end
 
-      fields.group_by(&:category).each do |category, category_fields|
-        if categories.size > 1
+      sorted_categories = fields.collect(&:category).uniq
+
+      sorted_categories.each do |category|
+        category_fields = fields.select { |field| field.category == category }
+
+        if sorted_categories.size > 1
           writer.category(category)
         end
 
@@ -22,7 +26,7 @@ module ConfigWriters
             child_table_path = field_table_style == :normal ? (full_path + [field.name]) : table_path
             child_key_path = field_table_style == :normal ? [] : (key_path + [field.name])
             child_values = @values[field.name.to_sym]
-            child_writer = build_child_writer(field.children_list, array: field.array?, key_path: child_key_path, table_path: child_table_path, values: child_values)
+            child_writer = build_child_writer(field.children_list, array: field.array?, group: group, key_path: child_key_path, table_path: child_table_path, values: child_values)
             toml = child_writer.to_toml(table_style: field_table_style)
 
             if toml != ""

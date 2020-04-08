@@ -36,6 +36,10 @@ class Field
     def fetch_group_values!(group)
       @groups.key?(group) ? @groups.fetch(group) : self
     end
+
+    def inspect
+      "Fields::Examples<groups=#{@groups.inspect} array=#{super}>"
+    end
   end
 
   include Comparable
@@ -79,7 +83,7 @@ class Field
     @toml_display = hash["toml_display"]
     @type = hash.fetch("type")
     @unit = hash["unit"]
-    @warnings = (hash["warnings"] || []).freeze
+    @warnings = (hash["warnings"] || []).collect(&:to_struct).freeze
 
     # category
 
@@ -143,14 +147,10 @@ class Field
   end
 
   def <=>(other)
-    if sort? && !other.sort?
-      -1
-    elsif sort? && other.sort?
-      sort <=> other.sort
-    elsif !wildcard? && other.wildcard?
+    if !wildcard? && other.wildcard?
       -1
     else
-      name <=> other.name
+      [sort || 99, "#{category}#{name}".downcase] <=> [other.sort || 99, "#{other.category}#{other.name}".downcase]
     end
   end
 
@@ -164,10 +164,23 @@ class Field
 
   def all_warnings
     @all_warnings ||=
-      (
-        warnings.collect { |warning| "`#{name}` option - #{warning}" } +
-          children_list.collect { |child| child.all_warnings }.flatten
-      ).freeze
+      begin
+        new_warnings = []
+
+        new_warnings +=
+          warnings.collect do |warning|
+            warning["option_name"] = name
+            warning
+          end
+
+        new_warnings +=
+          children_list.collect do |child|
+            child.all_warnings
+          end.
+          flatten
+
+        new_warnings.freeze
+      end
   end
 
   def array?
@@ -198,39 +211,6 @@ class Field
 
   def common_children
     @common_children ||= children.select(&:common?)
-  end
-
-  def config_file_sort_token
-    first =
-      if object?
-        2
-      elsif required?
-        0
-      else
-        1
-      end
-
-    second =
-      case category
-      when "General"
-        "AA #{category}"
-      when "Requests"
-        "ZZ #{category}"
-      else
-        category
-      end
-
-    third =
-      case name
-      when "inputs"
-        "AAB #{name}"
-      when "strategy", "type"
-        "AAA #{name}"
-      else
-        name
-      end
-
-    [first, second, third]
   end
 
   def context?

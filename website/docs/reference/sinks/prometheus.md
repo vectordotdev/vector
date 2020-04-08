@@ -64,9 +64,9 @@ The Vector `prometheus` sink
   type = "prometheus" # required
   inputs = ["my-source-id"] # required
   address = "0.0.0.0:9598" # required
-  namespace = "service" # required
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # optional, default, seconds
   flush_period_secs = 60 # optional, default, seconds
+  namespace = "service" # required
 ```
 
 </TabItem>
@@ -179,6 +179,7 @@ It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
 <Tabs
   block={true}
   defaultValue="histograms"
+  select={false}
   values={[{"label":"Histograms","value":"histograms"},{"label":"Counters","value":"counters"},{"label":"Gauges","value":"gauges"}]}>
 
 <TabItem value="histograms">

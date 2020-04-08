@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-06"
+last_modified_on: "2020-04-07"
 delivery_guarantee: "best_effort"
 component_title: "Socket"
 description: "The Vector `socket` sink streams `log` events to a socket, such as a TCP, UDP, or UDS socket."
@@ -52,20 +52,20 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Buffer
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.when_full = "block" # optional, default
+
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "tcp" # required
 
-  # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
-  buffer.when_full = "block" # optional, default
-
   # TLS
+  tls.enabled = false # optional, default
   tls.ca_path = "/path/to/certificate_authority.crt" # optional, no default
   tls.crt_path = "/path/to/host_certificate.crt" # optional, no default
-  tls.enabled = false # optional, default
   tls.key_pass = "${KEY_PASS_ENV_VAR}" # optional, no default
   tls.key_path = "/path/to/host_certificate.key" # optional, no default
   tls.verify_certificate = true # optional, default
@@ -86,15 +86,15 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Buffer
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.when_full = "block" # optional, default
+
   # General
   address = "92.12.333.224:5000" # required, required when mode = "tcp" or mode = "udp"
   mode = "udp" # required
-
-  # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
-  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>
@@ -111,45 +111,21 @@ The Vector `socket` sink
 
 ```toml title="vector.toml"
 [sinks.my_sink_id]
+  # Buffer
+  buffer.type = "memory" # optional, default
+  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
+  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
+  buffer.when_full = "block" # optional, default
+
   # General
   mode = "unix" # required
   path = "/path/to/socket" # required, required when mode = "unix"
-
-  # Buffer
-  buffer.max_size = 104900000 # required, bytes, required when type = "disk"
-  buffer.type = "memory" # optional, default
-  buffer.max_events = 500 # optional, default, events, relevant when type = "memory"
-  buffer.when_full = "block" # optional, default
 ```
 
 </TabItem>
 </Tabs>
 
 <Fields filters={true}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["92.12.333.224:5000"]}
-  groups={["tcp","udp"]}
-  name={"address"}
-  path={null}
-  relevantWhen={{"mode":["tcp","udp"]}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-### address
-
-The address to connect to. The address _must_ include a port.
-
-
-
-
-</Field>
 <Field
   common={false}
   defaultValue={null}
@@ -173,6 +149,30 @@ Configures the sink specific buffer behavior.
 
 
 <Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={"memory"}
+  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
+  examples={["memory","disk"]}
+  groups={["tcp","udp","unix"]}
+  name={"type"}
+  path={"buffer"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The buffer's type and storage mechanism.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={500}
@@ -216,30 +216,6 @@ The maximum number of [events][docs.data-model] allowed in the buffer.
 #### max_size
 
 The maximum size of the buffer on the disk.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={"memory"}
-  enumValues={{"memory":"Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully.","disk":"Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."}}
-  examples={["memory","disk"]}
-  groups={["tcp","udp","unix"]}
-  name={"type"}
-  path={"buffer"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  warnings={[]}
-  >
-
-#### type
-
-The buffer's type and storage mechanism.
 
 
 
@@ -392,6 +368,30 @@ How to format event timestamps.
 
 </Field>
 </Fields>
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["92.12.333.224:5000"]}
+  groups={["tcp","udp"]}
+  name={"address"}
+  path={null}
+  relevantWhen={{"mode":["tcp","udp"]}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### address
+
+The address to connect to. The address _must_ include a port.
+
+
+
 
 </Field>
 <Field
@@ -627,14 +627,13 @@ DER or PEM format (PKCS#8). If this is set, [`crt_path`](#crt_path) must also be
   templateable={false}
   type={"bool"}
   unit={null}
-  warnings={[]}
+  warnings={[{"visibility_level":"option","text":"Setting this to `false` means the certificate will be loaded and checked for validity, but the handshake will not attempt to verify the certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.","option_name":"verify_certificate"}]}
   >
 
 #### verify_certificate
 
 If `true` (the default), Vector will validate the TLS certificate of the remote
-host. Do NOT set this to `false` unless you understand the risks of not
-verifying the remote certificate.
+host.
 
 
 
@@ -718,10 +717,17 @@ If you'd like to disable health checks for this sink you can set the
 The `socket` sink streams data on a real-time
 event-by-event basis. It does not batch data.
 
+### TLS
+
+Vector uses [Openssl][urls.openssl] for TLS protocols for it's battle-tested
+and reliable security. You can enable and adjust TLS behavior via the [`tls.*`](#tls)
+options.
+
 
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model]: /docs/about/data-model/
+[urls.openssl]: https://www.openssl.org/
 [urls.socket]: https://en.wikipedia.org/wiki/Network_socket
 [urls.tcp]: https://en.wikipedia.org/wiki/Transmission_Control_Protocol
 [urls.udp]: https://en.wikipedia.org/wiki/User_Datagram_Protocol
