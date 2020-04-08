@@ -247,6 +247,30 @@ installations easily upgradable.
 Everything we need to do to achieve this is outlined at the
 [The Chart Repository Guide].
 
+### Deployment Variants
+
+We have two ways to deploy vector:
+
+- as a [`DaemonSet`][daemonset];
+- as a [sidecar `Container`][sidecar_container].
+
+Deploying as a [`DaemonSet`][daemonset] is trivial, applies cluster-wide and
+makes sense to as default scenario for the most use cases.
+
+Sidecar container deployments make sense when cluster-wide deployment is not
+available. This can generally occur when users are not in control of the whole
+cluster (for instance in shared clusters, or in highly isolated clusters).
+We should provide recommendations for this deployment variant, however, since
+people generally know what they're doing in such use cases, and because those
+cases are often very custom, we probably don't have to go deeper than explaining
+the generic concerns. We should provide enough flexibility at the Vector code
+level for those use cases to be possible.
+
+It is possible to implement a sidecar deployment via implementing an operator
+to automatically inject Vector `Container` into `Pod`s (via admission
+controller), but that doesn't make a lot of sense for us to work on, since
+[`DaemonSet`][daemonset] works for most of use cases already.
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
@@ -386,5 +410,6 @@ See [motivation](#motivation).
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
+[sidecar_container]: https://github.com/kubernetes/enhancements/blob/a8262db2ce38b2ec7941bdb6810a8d81c5141447/keps/sig-apps/sidecarcontainers.md
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
