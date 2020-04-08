@@ -365,6 +365,10 @@ See [motivation](#motivation).
   - [ ] Don't exit when there are configuration errors. See [issue#1816].
   - [ ] Test this. See [issue#2224].
 - [ ] Add `kubernetes` source reference documentation.
+- [ ] Prepare YAML deployment config.
+- [ ] Prepare Heml Chart.
+- [ ] Prepare Heml Chart Repository.
+- [ ] Integrate kubernetes configuration snapshotting into the release process.
 - [ ] Add Kubernetes setup/integration guide.
 - [ ] Release `0.10.0` and announce.
 
