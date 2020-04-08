@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-05"
+last_modified_on: "2020-04-08"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
@@ -30,6 +30,8 @@ dns_servers = ["0.0.0.0:53"] # optional, no default
 log_schema.host_key = "host" # optional, default
 log_schema.kubernetes_key = "kubernetes" # optional, default
 log_schema.message_key = "message" # optional, default
+log_schema.source_key = "source" # optional, default
+log_schema.source_type_key = "source_type" # optional, default
 log_schema.timestamp_key = "timestamp" # optional, default
 ```
 
@@ -187,6 +189,56 @@ page][docs.data-model.log#message] for more info.
 </Field>
 <Field
   common={false}
+  defaultValue={"source"}
+  enumValues={null}
+  examples={["source","@source","src"]}
+  groups={[]}
+  name={"source_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### source_key
+
+The key used to hold the log source. See the [log data model
+page][docs.data-model.log#source] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"source_type"}
+  enumValues={null}
+  examples={["source_type","@source_type","src_ty"]}
+  groups={[]}
+  name={"source_type_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### source_type_key
+
+The key used to hold the log source type. See the [log data model
+page][docs.data-model.log#source_type] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
   defaultValue={"timestamp"}
   enumValues={null}
   examples={["timestamp","@timestamp","datetime"]}
@@ -227,6 +279,8 @@ specify a [`data_dir`](#data_dir).
 
 [docs.data-model.log#host]: /docs/about/data-model/log/#host
 [docs.data-model.log#message]: /docs/about/data-model/log/#message
+[docs.data-model.log#source]: /docs/about/data-model/log/#source
+[docs.data-model.log#source_type]: /docs/about/data-model/log/#source_type
 [docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.sinks]: /docs/reference/sinks/
