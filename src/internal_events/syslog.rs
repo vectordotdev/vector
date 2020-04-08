@@ -18,7 +18,7 @@ impl InternalEvent for SyslogEventReceived {
         );
         counter!("bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
-            "component_kind" => "syslog",
+            "component_type" => "syslog",
         );
     }
 }
