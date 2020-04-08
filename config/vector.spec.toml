@@ -544,14 +544,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   group_id = "consumer-group-name"
 
-  # The log field name to use for the topic key. If unspecified, the key would
-  # not be added to the log event. If the message has null key, then this field
-  # would not be added to the log event.
+  # The log field name to use for the Kafka message key. If unspecified, the key
+  # would not be added to the log event. If the message has null key, then this
+  # field would not be added to the log event.
   #
   # * optional
   # * no default
   # * type: string
-  key_field = "topic"
+  key_field = "message_key"
 
   # The Kafka session timeout in milliseconds.
   #

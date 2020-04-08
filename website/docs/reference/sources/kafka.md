@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-08"
 delivery_guarantee: "at_least_once"
 component_title: "Kafka"
 description: "The Vector `kafka` source ingests data through Kafka and outputs `log` events."
@@ -53,7 +53,7 @@ ingests data through [Kafka][urls.kafka] and outputs
   type = "kafka" # required
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   group_id = "consumer-group-name" # required
-  key_field = "topic" # optional, no default
+  key_field = "message_key" # optional, no default
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
 ```
 
@@ -68,7 +68,7 @@ ingests data through [Kafka][urls.kafka] and outputs
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required
   fetch_wait_max_ms = 100 # optional, default, milliseconds
   group_id = "consumer-group-name" # required
-  key_field = "topic" # optional, no default
+  key_field = "message_key" # optional, no default
   session_timeout_ms = 10000 # optional, default, milliseconds
   socket_timeout_ms = 60000 # optional, default, milliseconds
   topics = ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"] # required
@@ -245,7 +245,7 @@ The consumer group name to be used to consume events from Kafka.
   common={true}
   defaultValue={null}
   enumValues={null}
-  examples={["topic"]}
+  examples={["message_key"]}
   groups={[]}
   name={"key_field"}
   path={null}
@@ -259,9 +259,9 @@ The consumer group name to be used to consume events from Kafka.
 
 ### key_field
 
-The log field name to use for the topic key. If unspecified, the key would not
-be added to the log event. If the message has null key, then this field would
-not be added to the log event.
+The log field name to use for the Kafka message key. If unspecified, the key
+would not be added to the log event. If the message has null key, then this
+field would not be added to the log event.
 
 
 
