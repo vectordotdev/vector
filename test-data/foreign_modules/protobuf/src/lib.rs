@@ -1,6 +1,6 @@
 use prost::Message;
 use foreign_modules::guest::{hostcall::{get, insert}, Registration};
-use foreign_modules::roles;
+use foreign_modules::{Role};
 use foreign_modules::guest::hostcall::ffi::FfiResult;
 
 pub mod items {
@@ -8,11 +8,9 @@ pub mod items {
 }
 
 #[no_mangle]
-pub extern "C" fn init() -> usize {
-    Registration::<roles::Transform>::default()
-        .set_wasi(true)
-        .register();
-    Default::default()
+pub extern "C" fn init() -> *mut Registration {
+    &mut Registration::transform()
+        .set_wasi(true) as *mut Registration
 }
 
 #[no_mangle]

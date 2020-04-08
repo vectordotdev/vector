@@ -38,3 +38,5 @@
 //! }
 //! ```
 
+#[repr(transparent)]
+struct GuestPointer<E>(E);

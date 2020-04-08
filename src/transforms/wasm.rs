@@ -44,7 +44,7 @@ impl TransformConfig for WasmConfig {
 
 #[derive(Debug)]
 pub struct Wasm {
-    module: WasmModule<foreign_modules::roles::Transform>,
+    module: WasmModule,
 }
 
 impl Wasm {

@@ -20,6 +20,8 @@ mod util;
 use context::ForeignModuleContext;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use foreign_modules::guest::Registration;
+use foreign_modules::Role;
 
 pub mod hostcall; // Pub is required for lucet.
 mod defaults {
@@ -34,6 +36,8 @@ mod defaults {
 #[derivative(Default)]
 pub struct WasmModuleConfig {
     path: PathBuf,
+    #[derivative(Default(value = "Role::Transform"))]
+    role: Role,
     #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
     artifact_cache: PathBuf,
     #[derivative(Default(value = "defaults::HEAP_MEMORY_SIZE"))]
@@ -46,6 +50,7 @@ impl WasmModuleConfig {
             path: path.into(),
             artifact_cache: artifact_cache.into(),
             heap_memory_size: defaults::HEAP_MEMORY_SIZE,
+            role: Role::Transform,
         }
     }
 
@@ -73,16 +78,16 @@ fn compile(input: impl AsRef<Path> + Debug, output: impl AsRef<Path> + Debug) ->
 /// A foreign module that is operating as a WASM guest.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct WasmModule<Archetype> {
+pub struct WasmModule {
     /// A stored version of the config for later referencing.
     config: WasmModuleConfig,
     /// The handle to the Lucet instance.
     #[derivative(Debug="ignore")]
     instance: InstanceHandle,
-    archetype: PhantomData<Archetype>,
+    role: Role,
 }
 
-impl<Archetype> WasmModule<Archetype> {
+impl WasmModule {
     /// Build the WASM instance from a given config.
     #[instrument]
     pub fn build(config: impl Into<WasmModuleConfig> + Debug) -> Result<Self> {
@@ -113,19 +118,27 @@ impl<Archetype> WasmModule<Archetype> {
         let mut wasm_module = Self {
             config,
             instance,
-            archetype: Default::default(),
+            role: Role::Transform,
         };
         event!(Level::TRACE, "instantiated");
 
         event!(Level::TRACE, "registering");
-        let _worked = wasm_module.instance.run("init", &[])?;
+        let worked = wasm_module.instance.run("init", &[])?;
+        let registration_ptr: *mut Registration = worked.returned()?.as_mut();
+        println!("{:?}", registration_ptr);
+        // This is a pointer into the WASM Heap!
+        let mut heap = wasm_module.instance.heap_mut();
+        let registration = heap[registration_ptr as usize..].as_mut_ptr() as *mut Registration;
+        println!("{:?}", registration);
+        println!("{:?}", unsafe { *registration });
+
         event!(Level::TRACE, "registered");
         Ok(wasm_module)
     }
 }
 
 
-impl WasmModule<foreign_modules::roles::Transform> {
+impl WasmModule {
     #[instrument]
     pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
         event!(Level::TRACE, "processing");

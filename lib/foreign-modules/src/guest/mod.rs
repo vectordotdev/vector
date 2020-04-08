@@ -12,43 +12,30 @@
 //! pub extern "C" fn process() -> Result<usize, usize> {}
 //! ```
 
-use crate::{Role, roles};
+use crate::{Role};
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 
 pub mod hostcall;
 
 /// A module registration.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[must_use]
 #[repr(C)]
-pub struct Registration<R> where R: Role + Serialize + DeserializeOwned {
-    #[serde(bound(deserialize = "R: DeserializeOwned"))]
-    role: R,
+pub struct Registration {
+    role: Role,
     wasi: bool,
 }
 
-impl<R> Registration<R> where R: Role + Serialize + DeserializeOwned  {
+impl Registration {
+    pub fn transform() -> Self {
+        Self {
+            role: Role::Transform,
+            wasi: Default::default(),
+        }
+    }
     pub fn set_wasi(mut self, enabled: bool) -> Self {
         self.wasi = enabled;
         self
-    }
-}
-
-impl Registration<roles::Transform> {
-    pub fn register(self) -> Result<(), hostcall::Error> {
-        hostcall::register_transform(self)
-    }
-}
-
-impl Registration<roles::Sink> {
-    pub fn register(self) -> Result<(), hostcall::Error> {
-        hostcall::register_sink(self)
-    }
-}
-
-impl Registration<roles::Source> {
-    pub fn register(self) -> Result<(), hostcall::Error> {
-        hostcall::register_source(self)
     }
 }

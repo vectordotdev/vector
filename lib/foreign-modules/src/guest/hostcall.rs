@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 use std::str;
 use snafu::{Snafu, ResultExt};
 use super::Registration;
-use crate::{Role, roles};
+use crate::{Role};
 
 #[derive(Debug, Snafu)]
 #[repr(C)]
@@ -65,25 +65,25 @@ pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     unsafe { Ok(ffi::insert(field_ptr, value_ptr)) }
 }
 
-pub fn register_transform(mut registration: Registration<roles::Transform>) -> Result<()> {
-    let _result = unsafe { ffi::register_transform(&mut registration as *mut Registration<roles::Transform>) };
+pub fn register_transform(mut registration: Registration) -> Result<()> {
+    let _result = unsafe { ffi::register_transform(&mut registration as *mut Registration) };
     Ok(())
 }
 
-pub fn register_sink(mut registration: Registration<roles::Sink>) -> Result<()> {
-    let _result = unsafe { ffi::register_sink(&mut registration as *mut Registration<roles::Sink>) };
+pub fn register_sink(mut registration: Registration) -> Result<()> {
+    let _result = unsafe { ffi::register_sink(&mut registration as *mut Registration) };
     Ok(())
 }
 
-pub fn register_source(mut registration: Registration<roles::Source>) -> Result<()> {
-    let _result= unsafe { ffi::register_source(&mut registration as *mut Registration<roles::Source>) };
+pub fn register_source(mut registration: Registration) -> Result<()> {
+    let _result= unsafe { ffi::register_source(&mut registration as *mut Registration) };
     Ok(())
 }
 
 
 pub mod ffi {
     use crate::guest::Registration;
-    use crate::{Role, roles};
+    use crate::Role;
     use super::Result;
 
     #[must_use]
@@ -109,13 +109,13 @@ pub mod ffi {
 
         // Foreign items can't be generic, so we expose specialized ones.
         pub(super) fn register_transform(
-            registration_ptr: *const Registration<roles::Transform>
+            registration_ptr: *const Registration
         ) -> u32;
         pub(super) fn register_sink(
-            registration_ptr: *const Registration<roles::Sink>
+            registration_ptr: *const Registration
         ) -> u32;
         pub(super) fn register_source(
-            registration_ptr: *const Registration<roles::Source>
+            registration_ptr: *const Registration
         ) -> u32;
     }
 }
