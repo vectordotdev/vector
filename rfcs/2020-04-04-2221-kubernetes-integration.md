@@ -111,10 +111,9 @@ TODO: insert diagram
 
 2.  Deploy Vector!
 
-    Now that you have your custom `ConfigMap` ready it's time to deploy
-    Vector. To ensure Vector is isolated and has the necessary permissions
-    we must create a `Namespace`, `ServiceAccount`, `ClusterRole`, and
-    `ClusterRoleBinding`:
+    Now that you have your custom `ConfigMap` ready it's time to deploy Vector.
+    Create a `Namespace` and apply your `ConfigMap` and our recommended
+    deployment configuration into it:
 
     ```shell
     kubectl create namespace vector
