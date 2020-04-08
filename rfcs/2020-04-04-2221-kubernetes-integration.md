@@ -210,7 +210,7 @@ should be able to use reliably.
 We can read container logs directly from the host filesystem. Kubernetes stores
 logs such that they're accessible from the following locations:
 
-- [`/var/log/pods`][var_log_pods_src];
+- [`/var/log/pods`][k8s_src_var_log_pods];
 - `/var/log/containers` - legacy location, kept for backward compatibility
   with pre `1.14` clusters.
 
@@ -382,11 +382,11 @@ See [motivation](#motivation).
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
 [k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
+[k8s_src_var_log_pods]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
 [pr#2134]: https://github.com/timberio/vector/pull/2134
 [pr#2188]: https://github.com/timberio/vector/pull/2188
 [the chart repository guide]: https://helm.sh/docs/topics/chart_repository/
-[var_log_pods_src]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
 [vector_daemonset]: 2020-04-04-2221-kubernetes-integration/vector-daemonset.yaml
