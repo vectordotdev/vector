@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-08"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -186,7 +186,9 @@ break backward compatibility.
 
 ### search_dirs
 
-A list of directories search when loading a Lua file via the `require` function.
+A list of directories search when loading a Lua file via the `require`
+function. If not specified, the modules would looked up in the directories of
+Vector's configs.
 
  See [Search Directories](#search-directories) for more info.
 

@@ -35,7 +35,8 @@ groups = ["module"]
 required = false
 description = """\
 A list of directories search when loading a Lua file via the `require` \
-function.\
+function. If not specified, the modules would looked up in the directories \
+of Vector's configs.\
 """
 sort = 2
 
