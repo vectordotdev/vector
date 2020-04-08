@@ -6,6 +6,7 @@ use crate::{
 };
 use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
+use futures::compat::{Compat01As03Sink, Future01CompatExt};
 use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,7 @@ use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
+use stream_cancel::Tripwire;
 
 mod line_agg;
 use line_agg::LineAgg;
@@ -222,8 +224,6 @@ pub fn file_source(
     shutdown: ShutdownSignal,
     out: mpsc::Sender<Event>,
 ) -> super::Source {
-    let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
-
     let ignore_before = config
         .ignore_older
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
@@ -278,6 +278,8 @@ pub fn file_source(
                 Box::new(rx)
             };
 
+        // Once file server ends this will run until it has finished processing remaining
+        // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
         tokio01::spawn(
@@ -296,19 +298,22 @@ pub fn file_source(
                 .instrument(span),
         );
 
+        let (trigger_server, tripwire_source) = Tripwire::new();
+        let (trigger_source, tripwire_server) = Tripwire::new();
         let span = info_span!("file_server");
         thread::spawn(move || {
             let _enter = span.enter();
-            file_server.run(
-                futures::compat::Compat01As03Sink::new(tx.sink_map_err(drop)),
-                shutdown_rx,
+            let _ = file_server.run(
+                Compat01As03Sink::new(tx.sink_map_err(drop)),
+                shutdown.select2(tripwire_server).compat(),
             );
+            // File server can end on it's own without any shutdown, so we need to
+            // properly signal this to the topology.
+            drop(trigger_server);
         });
 
-        // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,
-        // so it needs to be held onto until shutdown has started. This will also stop the message
-        // processing task once file server drops it's sender end of the channel.
-        shutdown.map(|_| drop(shutdown_tx))
+        // File source should also end if this is dropped so we need to stop the file server.
+        tripwire_source.map(|_| drop(trigger_source))
     }))
 }
 
@@ -337,6 +342,7 @@ mod tests {
     use super::*;
     use crate::{
         event, runtime,
+        shutdown::ShutdownSignal,
         sources::file,
         test_util::{block_on, shutdown_on_idle},
         topology::Config,
@@ -476,7 +482,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -537,7 +548,12 @@ mod tests {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -606,7 +622,12 @@ mod tests {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -678,7 +699,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -740,7 +766,12 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
 
             rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
 
@@ -770,7 +801,12 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
 
             rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
 
@@ -800,7 +836,12 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
 
             rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
 
@@ -846,7 +887,12 @@ mod tests {
         // First time server runs it picks up existing lines.
         {
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -868,7 +914,12 @@ mod tests {
         // Restart server, read file from checkpoint.
         {
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -895,7 +946,12 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -931,7 +987,12 @@ mod tests {
         // Run server first time, collect some lines.
         {
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -957,7 +1018,12 @@ mod tests {
         // even though it has a new name.
         {
             let (tx, rx) = futures01::sync::mpsc::channel(10);
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+            let source = file::file_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                ShutdownSignal::noop(),
+                tx,
+            );
             let mut rt = runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -996,7 +1062,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -1081,7 +1152,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -1142,7 +1218,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -1219,7 +1300,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
 
         let mut rt = runtime::Runtime::new().unwrap();
 
@@ -1311,7 +1397,12 @@ mod tests {
 
         sleep();
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -1376,7 +1467,12 @@ mod tests {
 
         sleep();
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -1420,7 +1516,12 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let source = file::file_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        );
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 

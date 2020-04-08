@@ -1,13 +1,19 @@
 use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition};
 use bytes::Bytes;
-use futures::{executor::block_on, stream, stream::StreamExt, Sink};
+use futures::{
+    executor::block_on,
+    future::{select, Either},
+    stream,
+    stream::StreamExt,
+    Future, Sink,
+};
+use futures_timer::Delay;
 use glob::{glob, Pattern};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::RecvTimeoutError;
 use std::time;
 use tracing::field;
 
@@ -49,11 +55,11 @@ pub struct FileServer {
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
 impl FileServer {
-    pub fn run(
+    pub fn run<F: Future + Unpin>(
         self,
         mut chans: impl Sink<(Bytes, String), Error = ()> + Unpin,
-        shutdown: std::sync::mpsc::Receiver<()>,
-    ) {
+        mut shutdown: F,
+    ) -> Option<F::Output> {
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
@@ -263,7 +269,7 @@ impl FileServer {
             let result = block_on(stream.forward(&mut chans));
             if result.is_err() {
                 debug!("Output channel closed.");
-                return;
+                return None;
             }
 
             // When no lines have been read we kick the backup_cap up by twice,
@@ -282,10 +288,12 @@ impl FileServer {
             }
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
-            match shutdown.recv_timeout(time::Duration::from_millis(backoff as u64)) {
-                Ok(()) => unreachable!(), // The sender should never actually send
-                Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => return,
+            match block_on(select(
+                shutdown,
+                Delay::new(time::Duration::from_millis(backoff as u64)),
+            )) {
+                Either::Left((output, _)) => return Some(output),
+                Either::Right((_, future)) => shutdown = future,
             }
         }
     }

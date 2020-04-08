@@ -16,6 +16,7 @@ indexmap = {version = "1.0.2", features = ["serde-1"]}
 flate2 = "1.0.6"
 winapi = { version = "0.3", features = ["winioctl"] }
 libc =  "0.2"
+futures-timer = "3.0.2"
 
 [dev-dependencies]
 quickcheck = "0.6"
