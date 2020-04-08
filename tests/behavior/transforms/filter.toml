@@ -72,9 +72,9 @@
     insert_at = "filter_a"
     type = "metric"
     metric.name = "count"
-    metric.type = "counter"
-    metric.val = 1
+    metric.kind = "absolute"
     metric.tags.message = "test filter 1"
+    metric.counter.value = 1
   [[tests.outputs]]
     extract_from = "filter_a"
     [[tests.outputs.conditions]]
