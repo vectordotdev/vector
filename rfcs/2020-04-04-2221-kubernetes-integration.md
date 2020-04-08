@@ -119,11 +119,8 @@ TODO: insert diagram
 
     ```shell
     kubectl create namespace logging
-    kubectl create -f vector-service-account.yaml
-    kubectl create -f vector-role.yaml
-    kubectl create -f vector-role-binding.yaml
-    kubectl create -f vector-configmap.yaml
-    kubectl create -f vector-daemonset.yaml
+    kubectl apply -f vector-configmap.yaml
+    kubectl apply -f https://packages.timber.io/vector/latest/kubernetes/vector.yaml
     ```
 
     - _See [outstanding questions 3, 4, 5, 6, and 7](#outstanding-questions)._
