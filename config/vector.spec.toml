@@ -5107,10 +5107,11 @@ require('custom_module')
   #
 
   # Predefined ACL to apply to the created objects. For more information, see
-  # Predefined ACLs.
+  # Predefined ACLs. If this is not set, GCS will apply a default ACL when the
+  # object is created.
   #
   # * optional
-  # * default: "projectPrivate"
+  # * no default
   # * type: string
   # * enum: "authenticatedRead", "bucketOwnerFullControl", "bucketOwnerRead", "private", "projectPrivate", and "publicRead"
   acl = "authenticatedRead"
