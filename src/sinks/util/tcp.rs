@@ -1,67 +1,44 @@
 use crate::{
     dns::Resolver,
-    sinks::util::{
-        encode_event,
-        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
-        Encoding, SinkExt,
+    emit,
+    internal_events::{
+        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed, TcpEventSent,
+        TcpFlushError,
     },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, RouterSink},
+    tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
     topology::config::SinkContext,
 };
 use bytes::Bytes;
-use futures::{
+use futures01::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
+use std::io::{ErrorKind, Read};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
-use tokio::{
+use tokio01::{
     codec::{BytesCodec, FramedWrite},
-    net::tcp::{ConnectFuture, TcpStream},
+    net::tcp::TcpStream,
     timer::Delay,
 };
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_tls::{Connect as TlsConnect, TlsConnector, TlsStream};
-use tracing::field;
-
-#[derive(Debug, Snafu)]
-enum TcpBuildError {
-    #[snafu(display("Must specify both TLS key_file and crt_file"))]
-    MissingCrtKeyFile,
-    #[snafu(display("Could not build TLS connector: {}", source))]
-    TlsBuildError { source: native_tls::Error },
-    #[snafu(display("Could not set TCP TLS identity: {}", source))]
-    TlsIdentityError { source: native_tls::Error },
-    #[snafu(display("Could not export identity to DER: {}", source))]
-    DerExportError { source: openssl::error::ErrorStack },
-    #[snafu(display("Missing host in address field"))]
-    MissingHost,
-    #[snafu(display("Missing port in address field"))]
-    MissingPort,
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    pub encoding: Encoding,
+    pub encoding: EncodingConfig<Encoding>,
     pub tls: Option<TlsConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct TlsConfig {
-    pub enabled: Option<bool>,
-    #[serde(flatten)]
-    pub options: TlsOptions,
-}
-
 impl TcpSinkConfig {
-    pub fn new(address: String) -> Self {
+    pub fn new(address: String, encoding: EncodingConfig<Encoding>) -> Self {
         Self {
             address,
-            encoding: Encoding::Text,
+            encoding,
             tls: None,
         }
     }
@@ -69,19 +46,10 @@ impl TcpSinkConfig {
     pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
-        let host = uri.host().ok_or(TcpBuildError::MissingHost)?.to_string();
-        let port = uri.port_u16().ok_or(TcpBuildError::MissingPort)?;
+        let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
+        let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
-        let tls = match self.tls {
-            Some(ref tls) => {
-                if tls.enabled.unwrap_or(false) {
-                    Some(TlsSettings::from_options(&Some(tls.options.clone()))?)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        };
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
         let sink = raw_tcp(host.clone(), port, cx.clone(), self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(host, port, cx.resolver());
@@ -94,7 +62,7 @@ pub struct TcpSink {
     host: String,
     port: u16,
     resolver: Resolver,
-    tls: Option<TlsSettings>,
+    tls: MaybeTlsSettings,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
     span: tracing::Span,
@@ -103,19 +71,15 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     ResolvingDns(crate::dns::ResolverFuture),
-    Connecting(ConnectFuture),
-    TlsConnecting(TlsConnect<TcpStream>),
+    Connecting(MaybeTlsConnector),
     Connected(TcpOrTlsStream),
     Backoff(Delay),
 }
 
-type TcpOrTlsStream = MaybeTlsStream<
-    FramedWrite<TcpStream, BytesCodec>,
-    FramedWrite<TlsStream<TcpStream>, BytesCodec>,
->;
+type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
 
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver, tls: Option<TlsSettings>) -> Self {
+    pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
         let span = info_span!("connection", %host, %port);
         Self {
             host,
@@ -154,7 +118,13 @@ impl TcpSink {
                             let addr = SocketAddr::new(ip, self.port);
 
                             debug!(message = "connecting", %addr);
-                            TcpSinkState::Connecting(TcpStream::connect(&addr))
+                            match self.tls.connect(self.host.clone(), addr) {
+                                Ok(connector) => TcpSinkState::Connecting(connector),
+                                Err(error) => {
+                                    error!(message = "unable to connect", %error);
+                                    TcpSinkState::Backoff(self.next_delay())
+                                }
+                            }
                         } else {
                             error!("DNS resolved but there were no IP addresses.");
                             TcpSinkState::Backoff(self.next_delay())
@@ -176,57 +146,20 @@ impl TcpSink {
                     }
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
-                    Ok(Async::Ready(socket)) => {
-                        debug!(message = "connected");
+                    Ok(Async::Ready(stream)) => {
+                        emit!(TcpConnectionEstablished {
+                            peer_addr: stream.peer_addr().ok(),
+                        });
                         self.backoff = Self::fresh_backoff();
-                        match self.tls {
-                            Some(ref tls) => match native_tls::TlsConnector::builder()
-                                .use_tls_settings(tls.clone())
-                                .build()
-                                .context(TlsBuildError)
-                            {
-                                Ok(connector) => TcpSinkState::TlsConnecting(
-                                    TlsConnector::from(connector).connect(&self.host, socket),
-                                ),
-                                Err(err) => {
-                                    error!(message = "unable to establish TLS connection.", error = %err);
-                                    TcpSinkState::Backoff(self.next_delay())
-                                }
-                            },
-                            None => TcpSinkState::Connected(MaybeTlsStream::Raw(FramedWrite::new(
-                                socket,
-                                BytesCodec::new(),
-                            ))),
-                        }
+                        TcpSinkState::Connected(FramedWrite::new(stream, BytesCodec::new()))
                     }
-                    Ok(Async::NotReady) => {
-                        return Ok(Async::NotReady);
-                    }
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
-                        error!(message = "unable to connect.", %error);
+                        emit!(TcpConnectionFailed { error });
                         TcpSinkState::Backoff(self.next_delay())
                     }
                 },
-                TcpSinkState::TlsConnecting(ref mut connect_future) => {
-                    match connect_future.poll() {
-                        Ok(Async::Ready(socket)) => {
-                            debug!(message = "negotiated TLS.");
-                            self.backoff = Self::fresh_backoff();
-                            TcpSinkState::Connected(MaybeTlsStream::Tls(FramedWrite::new(
-                                socket,
-                                BytesCodec::new(),
-                            )))
-                        }
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Err(error) => {
-                            error!(message = "unable to negotiate TLS.", %error);
-                            TcpSinkState::Backoff(self.next_delay())
-                        }
-                    }
-                }
-                TcpSinkState::Connected(ref mut connection) => {
-                    return Ok(Async::Ready(connection));
-                }
+                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
             };
         }
     }
@@ -242,17 +175,27 @@ impl Sink for TcpSink {
 
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
-                debug!(
-                    message = "sending event.",
-                    bytes = &field::display(line.len())
-                );
-                match connection.start_send(line) {
-                    Err(error) => {
-                        error!(message = "connection disconnected.", %error);
+                let mut dummy = [0; 0];
+                // Test if the remote has issued a disconnect
+                match connection.get_mut().read(&mut dummy) {
+                    Err(error) if error.kind() != ErrorKind::WouldBlock => {
+                        emit!(TcpConnectionDisconnected { error });
                         self.state = TcpSinkState::Disconnected;
-                        Ok(AsyncSink::Ready)
+                        Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(ok) => Ok(ok),
+                    _ => {
+                        emit!(TcpEventSent {
+                            byte_size: line.len()
+                        });
+                        match connection.start_send(line) {
+                            Err(error) => {
+                                error!(message = "connection disconnected.", %error);
+                                self.state = TcpSinkState::Disconnected;
+                                Ok(AsyncSink::Ready)
+                            }
+                            Ok(ok) => Ok(ok),
+                        }
+                    }
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
@@ -274,7 +217,7 @@ impl Sink for TcpSink {
 
         match connection.poll_complete() {
             Err(error) => {
-                error!(message = "unable to flush connection.", %error);
+                emit!(TcpFlushError { error });
                 self.state = TcpSinkState::Disconnected;
                 Ok(Async::Ready(()))
             }
@@ -287,14 +230,12 @@ pub fn raw_tcp(
     host: String,
     port: u16,
     cx: SinkContext,
-    encoding: Encoding,
-    tls: Option<TlsSettings>,
+    encoding: EncodingConfig<Encoding>,
+    tls: MaybeTlsSettings,
 ) -> RouterSink {
-    Box::new(
-        TcpSink::new(host, port, cx.resolver(), tls)
-            .stream_ack(cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-    )
+    let tcp = TcpSink::new(host, port, cx.resolver(), tls);
+    let sink = StreamSink::new(tcp, cx.acker());
+    Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))))
 }
 
 #[derive(Debug, Snafu)]
@@ -326,32 +267,4 @@ pub fn tcp_healthcheck(host: String, port: u16, resolver: Resolver) -> Healthche
     });
 
     Box::new(check)
-}
-
-enum MaybeTlsStream<R, T> {
-    Raw(R),
-    Tls(T),
-}
-
-impl<R, T, I, E> Sink for MaybeTlsStream<R, T>
-where
-    R: Sink<SinkItem = I, SinkError = E>,
-    T: Sink<SinkItem = I, SinkError = E>,
-{
-    type SinkItem = I;
-    type SinkError = E;
-
-    fn start_send(&mut self, item: I) -> futures::StartSend<I, E> {
-        match self {
-            MaybeTlsStream::Raw(r) => r.start_send(item),
-            MaybeTlsStream::Tls(t) => t.start_send(item),
-        }
-    }
-
-    fn poll_complete(&mut self) -> futures::Poll<(), E> {
-        match self {
-            MaybeTlsStream::Raw(r) => r.poll_complete(),
-            MaybeTlsStream::Tls(t) => t.poll_complete(),
-        }
-    }
 }

@@ -2,21 +2,21 @@
 
 <%= component_header(component) %>
 
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
-
-<%- if !component.requirements.nil? -%>
-## Requirements
-
-<Alert type="danger" fill={true} icon={false}>
-
-<%= component.requirements %>
-
-</Alert>
-
-<%- end -%>
-## Options
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
@@ -26,10 +26,13 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-## Output
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
 
-<%= component_output(component, component.output.metric, heading_depth: 3) %>
+<%= component_examples(component) %>
 
+<%- end -%>
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>

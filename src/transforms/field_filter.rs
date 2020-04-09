@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -20,7 +19,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        warn!(
+            message =
+                r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#
+        );
         Ok(Box::new(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),

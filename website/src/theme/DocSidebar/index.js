@@ -1,16 +1,17 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
 import React, {useState} from 'react';
-import classnames from 'classnames';
 
 import Link from '@docusaurus/Link';
+import SVG from 'react-inlinesvg';
+
+import classnames from 'classnames';
+import isInternalUrl from '@docusaurus/utils';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import useLockBodyScroll from '@theme/hooks/useLockBodyScroll';
+import useLogo from '@theme/hooks/useLogo';
 
 import styles from './styles.module.css';
+import './styles.css';
 
 const MOBILE_TOGGLE_SIZE = 24;
 
@@ -103,10 +104,18 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
       return (
         <li className={classnames('menu__list-item', (hidden && 'menu__list-item-hidden'))} key={label}>
           <Link
-            activeClassName="menu__link--active"
             className="menu__link"
             to={href + "/"}
-            onClick={onItemClick}>
+            {...(isInternalUrl(href)
+              ? {
+                  activeClassName: 'menu__link--active',
+                  exact: true,
+                  onClick: onItemClick,
+                }
+              : {
+                  target: '_blank',
+                  rel: 'noreferrer noopener',
+                })}>
             {processedLabel}
             {eventTypes.length > 0 &&
               <span className="badges">
@@ -121,13 +130,13 @@ function DocSidebarItem({item, level, onItemClick, collapsible}) {
 
 // Calculate the category collapsing state when a page navigation occurs.
 // We want to automatically expand the categories which contains the current page.
-function mutateSidebarCollapsingState(item, location) {
+function mutateSidebarCollapsingState(item, path) {
   const {items, href, type} = item;
   switch (type) {
     case 'category': {
       const anyChildItemsActive =
         items
-          .map(childItem => mutateSidebarCollapsingState(childItem, location))
+          .map(childItem => mutateSidebarCollapsingState(childItem, path))
           .filter(val => val).length > 0;
       // eslint-disable-next-line no-param-reassign
       item.collapsed = !anyChildItemsActive;
@@ -136,19 +145,27 @@ function mutateSidebarCollapsingState(item, location) {
 
     case 'link':
     default:
-      return href === location.pathname.replace(/\/$/, '');
+      return href === path;
   }
 }
 
 function DocSidebar(props) {
   const [showResponsiveSidebar, setShowResponsiveSidebar] = useState(false);
+  const {
+    siteConfig: {themeConfig: {navbar: {title} = {}}} = {},
+    isClient,
+  } = useDocusaurusContext();
+  const {logoLink, logoLinkProps, logoImageUrl, logoAlt} = useLogo();
+
 
   const {
     docsSidebars,
-    location,
+    path,
     sidebar: currentSidebar,
     sidebarCollapsible,
   } = props;
+
+  useLockBodyScroll(showResponsiveSidebar);
 
   if (!currentSidebar) {
     return null;
@@ -164,14 +181,20 @@ function DocSidebar(props) {
 
   if (sidebarCollapsible) {
     sidebarData.forEach(sidebarItem =>
-      mutateSidebarCollapsingState(sidebarItem, location),
+      mutateSidebarCollapsingState(sidebarItem, path),
     );
   }
 
   return (
-    <div className={styles.sidebar}>
+    <div className={classnames('docs-sidebar', styles.sidebar)}>
+      <Link className={styles.sidebarLogo} to={logoLink} {...logoLinkProps}>
+        {logoImageUrl != null && (
+          <SVG key={isClient} src={logoImageUrl} alt={logoAlt} />
+        )}
+        {title != null && <strong>{title}</strong>}
+      </Link>
       <div
-        className={classnames('menu', 'menu--responsive', {
+        className={classnames('menu', 'menu--responsive', styles.menu, {
           'menu--show': showResponsiveSidebar,
         })}>
         <button

@@ -30,6 +30,7 @@ for i in $(git ls-files); do
     *sig) continue;;
     test-data*) continue;;
     tests/data*) continue;;
+    website/plugins/*) continue;;
     website/sidebars.js) continue;;
   esac
 

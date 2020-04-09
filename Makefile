@@ -4,6 +4,14 @@ _latest_version := $(shell scripts/version.sh true)
 _version := $(shell scripts/version.sh)
 export USE_CONTAINER ?= docker
 
+# Begin OS detection
+ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
+    export OPERATING_SYSTEM := Windows
+    export DEFAULT_FEATURES = default-msvc
+else
+    export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
+    export DEFAULT_FEATURES = default
+endif
 
 help:
 	@echo "                                      __   __  __"
@@ -22,17 +30,20 @@ help:
 bench: ## Run internal benchmarks
 	@cargo bench --all
 
-build: ## Build the project
-	@cargo build --no-default-features --features="$${FEATURES:-default}"
+build: ## Build the project in release mode
+	@cargo build --no-default-features --features="$${FEATURES:-default}" --release
 
 check: check-code check-fmt check-generate check-examples
 
 check-code: ## Checks code for compilation errors (only default features)
-	@scripts/run.sh checker cargo check --all --all-targets
+	@scripts/run.sh checker cargo check --all --all-targets --features docker,kubernetes
 
 check-fmt: ## Checks code formatting correctness
 	@scripts/run.sh checker scripts/check-style.sh
 	@scripts/run.sh checker cargo fmt -- --check
+
+check-markdown: ## Check Markdown style
+	@scripts/run.sh checker-markdown markdownlint .
 
 check-generate: ## Checks for pending `make generate` changes
 	@scripts/run.sh checker scripts/check-generate.sh
@@ -45,6 +56,9 @@ check-version: ## Checks that the version in Cargo.toml is up-to-date
 
 check-blog: ## Checks that all blog articles are signed by their authors
 	@scripts/run.sh checker scripts/check-blog-signatures.rb
+
+check-component-features: ## Checks that all component are behind corresponding features
+	@scripts/run.sh checker-component-features scripts/check-component-features.sh
 
 export CHECK_URLS ?= true
 generate: ## Generates files across the repo using the data in /.meta
@@ -63,17 +77,22 @@ release-push: ## Push new Vector version
 	@scripts/release-push.sh
 
 run: ## Starts Vector in development mode
-	@cargo run
+	@cargo run --no-default-features --features ${DEFAULT_FEATURES}
 
 signoff: ## Signsoff all previous commits since branch creation
 	@scripts/signoff.sh
 
+export ARTICLE ?= true
 sign-blog: ## Sign newly added blog articles using GPG
 	@scripts/sign-blog.sh
 
 test: ## Spins up Docker resources and runs _every_ test
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker --no-run
 	@docker-compose up -d test-runtime-deps
-	@cargo test --all --features docker -- --test-threads 4
+	@cargo test --no-default-features --features ${DEFAULT_FEATURES} --all --features docker -- --test-threads 4
+
+test-behavior: ## Runs behavioral tests
+	@cargo run --no-default-features --features ${DEFAULT_FEATURES} -- test tests/behavior/**/*.toml
 
 clean: ## Remove build artifacts
 	@cargo clean
@@ -86,7 +105,7 @@ build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh
 
-build-docker: ## Build the Vector docker images, but do not push
+build-docker: ## Build the Vector docker images from artifacts created via `package-deb`, but do not push
 	@scripts/build-docker.sh
 
 package-deb: ## Create a .deb package from artifacts created via `build`

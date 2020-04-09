@@ -1,17 +1,27 @@
-.codeBlock {
-  margin-bottom: 0;
-  overflow: hidden;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-.codeBlockWrapper {
+.codeBlockContent {
   position: relative;
 }
 
-.codeBlockWrapper:hover > .copyButton {
-  visibility: visible;
-  opacity: 1;
+.codeBlockTitle {
+  border-top-left-radius: var(--ifm-global-radius);
+  border-top-right-radius: var(--ifm-global-radius);
+  border-bottom: 1px solid var(--ifm-hr-border-color);
+  color: var(--ifm-color-emphasis-400);
+  font-size: 0.95em;
+  font-weight: bold;
+  padding: calc( var(--ifm-pre-padding) / 2 ) var(--ifm-pre-padding);
+}
+
+.codeBlock {
+  overflow: auto;
+  display: block;
+  padding: 0;
+  margin: 0;
+}
+
+.codeBlockWithTitle {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .copyButton {
@@ -38,4 +48,23 @@
   box-shadow: var(--ifm-panel-box-shadow-active);
   color: var(--ifm-panel-color-active);
   text-decoration: none;
+}
+
+.copyButtonWithTitle {
+  top: calc(var(--ifm-pre-padding));
+}
+
+.codeBlockTitle:hover + .codeBlockContent .copyButton,
+.codeBlockContent:hover > .copyButton {
+  visibility: visible;
+  opacity: 1;
+}
+
+.codeBlockLines {
+  background-color: transparent;
+  border-radius: 0;
+  margin-bottom: 0;
+  float: left;
+  min-width: 100%;
+  padding: var(--ifm-pre-padding);
 }

@@ -1,0 +1,30 @@
+[transforms.ansi_stripper_simple]
+  inputs = []
+  type = "ansi_stripper"
+  field = "message"
+[[tests]]
+  name = "ansi_stripper_simple"
+  [tests.input]
+    insert_at = "ansi_stripper_simple"
+    type = "raw"
+    value = "hello\r123"
+  [[tests.outputs]]
+    extract_from = "ansi_stripper_simple"
+    [[tests.outputs.conditions]]
+      "message.equals" = "hello123"
+
+[transforms.ansi_stripper_nested]
+  inputs = []
+  type = "ansi_stripper"
+  field = "a.b"
+[[tests]]
+  name = "ansi_stripper_nested"
+  [tests.input]
+    insert_at = "ansi_stripper_nested"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b" = "hello\r123"
+  [[tests.outputs]]
+    extract_from = "ansi_stripper_nested"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = "hello123"

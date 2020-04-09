@@ -1,9 +1,11 @@
 use crate::{
     buffers::Acker,
+    emit,
     event::{self, Event},
+    internal_events::BlackholeEventReceived,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 
 pub struct BlackholeSink {
@@ -62,7 +64,7 @@ impl Sink for BlackholeSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let message_len = match item {
             Event::Log(log) => log
-                .get(&event::MESSAGE)
+                .get(&event::log_schema().message_key())
                 .map(|v| v.as_bytes().len())
                 .unwrap_or(0),
             Event::Metric(metric) => serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0),
@@ -71,7 +73,9 @@ impl Sink for BlackholeSink {
         self.total_events += 1;
         self.total_raw_bytes += message_len;
 
-        trace!(raw_bytes_counter = message_len, events_counter = 1);
+        emit!(BlackholeEventReceived {
+            byte_size: message_len
+        });
 
         if self.total_events % self.config.print_amount == 0 {
             info!({

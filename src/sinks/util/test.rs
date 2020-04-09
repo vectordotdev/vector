@@ -2,7 +2,7 @@ use crate::{
     runtime::Runtime,
     topology::config::{SinkConfig, SinkContext},
 };
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures01::{sync::mpsc, Future, Sink, Stream};
 use hyper::{service::service_fn_ok, Body, Request, Response, Server};
 use serde::Deserialize;
 
@@ -31,7 +31,7 @@ pub fn build_test_server(
             let (parts, body) = req.into_parts();
 
             let tx = tx.clone();
-            tokio::spawn(
+            tokio01::spawn(
                 body.concat2()
                     .map_err(|e| panic!(e))
                     .and_then(|body| tx.send((parts, body)))

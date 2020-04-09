@@ -20,7 +20,7 @@
 .vector-components--grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  grid-gap: 1rem;
+  grid-gap: 1em;
   margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
 }
 
@@ -29,10 +29,10 @@
   border: 1px solid var(--ifm-panel-border-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: var(--ifm-panel-box-shadow);
-  color: var(--ifm-panel-color);
+  color: var(--ifm-heading-color);
   font-weight: 500;
   padding: var(--ifm-spacing-vertical) var(--ifm-spacing-horizontal);
-  transition: var(--ifm-transition-fast) ease;
+  transition: all var(--ifm-transition-fast) ease;
 }
 
 .vector-component:hover {
@@ -50,8 +50,16 @@
 
 .vector-component--name {
   font-size: 1.1em;
+  font-weight: 600;
   line-height: 1;
   margin-bottom: calc( var(--ifm-spacing-vertical) / 2 );
+}
+
+.vector-component--name svg {
+  height: 1em;
+  margin-right: 0.5em;
+  vertical-align: bottom;
+  width: 1em;
 }
 
 .vector-component--badges {
@@ -64,6 +72,13 @@
   padding: calc( var(--ifm-badge-padding-vertical) / 1.5 ) calc( var(--ifm-badge-padding-horizontal) / 1.5 );
 }
 
+.vector-component--badges .badge--right {
+  float: right;
+  margin-left: 5px;
+  margin-right: 0;
+  margin-top: 0.75em;
+}
+
 @media (min-width: 996px) {
   .vector-components {
     margin: 0;
@@ -74,11 +89,11 @@
   }
 
   .vector-components--cols .filters {
-    border-right: 1px solid var(--ifm-hr-border-color);
-    flex: 0 0 25%;
-    margin-left: calc( var(--ifm-spacing-horizontal) * -1 );
-    max-width: calc( var(--ifm-sidebar-width) - var(--ifm-spacing-horizontal) );
+    --ifm-sidebar-width: 225px;
+    flex: 0 0 var(--ifm-sidebar-width);
+    max-width: var(--ifm-sidebar-width);
     padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
+    padding-left: 0;
   }
 
   .vector-components--cols .filters .search {
@@ -111,8 +126,8 @@
 
   .vector-components--cols .vector-components--results {
     flex: 1 0;
-    margin-right: calc( var(--ifm-spacing-horizontal) * -1 );
     max-width: 100%;
-    padding: calc( var(--ifm-spacing-vertical) * 2 ) calc( var(--ifm-spacing-horizontal) * 3 );
+    padding: calc( var(--ifm-spacing-vertical) * 2 ) var(--ifm-spacing-horizontal);
+    padding-right: 0;
   }
 }

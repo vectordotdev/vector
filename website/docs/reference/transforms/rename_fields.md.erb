@@ -1,0 +1,89 @@
+<%- component = metadata.transforms.rename_fields -%>
+
+<%= component_header(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list, heading_depth: 3) %>
+
+<%- end -%>
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+### Conflicts
+
+#### Key Conflicts
+
+Keys specified in this transform will replace existing keys.
+
+<Alert type="warning">
+
+Please note. Vector makes no guarantee on the order of execution. If two rename
+operations must be performed in a specific order, it is recommended to split
+them up across two separate rename transforms.
+
+</Alert>
+
+#### Nested Key Conflicts
+
+Keys are renamed in a deep fashion. They will not replace any ancestor
+objects. For example, given the following `log` event:
+
+```javascript
+{
+  "root": "value2",
+  "parent": {
+    "child1": "value1"
+  }
+}
+```
+
+And the following configuration:
+
+```toml
+[transforms.rename_nested_field]
+  type = "rename_fields"
+  fields.root = "parent.child2"
+```
+
+Will result in the following log event:
+
+```javascript
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```
+
+Notice that `parent.child1` field was preserved.
+
+<%= component_sections(component) %>
+
+

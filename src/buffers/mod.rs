@@ -1,5 +1,5 @@
 use crate::Event;
-use futures::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{
@@ -189,7 +189,7 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 mod test {
     use super::{Acker, DropWhenFull};
     use crate::test_util::block_on;
-    use futures::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
+    use futures01::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
     use std::sync::{atomic::AtomicUsize, Arc};
     use tokio01_test::task::MockTask;
 

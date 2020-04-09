@@ -1,15 +1,16 @@
-use futures::future::{ExecuteError, Executor, Future};
+use futures01::future::{ExecuteError, Executor, Future};
 use std::io;
-use tokio::runtime::Builder;
+use std::pin::Pin;
+use tokio_compat::runtime::{Builder, Runtime as TokioRuntime, TaskExecutor as TokioTaskExecutor};
 
 pub struct Runtime {
-    rt: tokio::runtime::Runtime,
+    rt: TokioRuntime,
 }
 
 impl Runtime {
     pub fn new() -> io::Result<Self> {
         Ok(Runtime {
-            rt: tokio::runtime::Runtime::new()?,
+            rt: TokioRuntime::new()?,
         })
     }
 
@@ -51,7 +52,7 @@ impl Runtime {
         F: std::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        use futures03::future::{FutureExt, TryFutureExt};
+        use futures::future::{FutureExt, TryFutureExt};
 
         self.rt
             .block_on(future.unit_error().boxed().compat())
@@ -69,7 +70,7 @@ impl Runtime {
 
 #[derive(Clone, Debug)]
 pub struct TaskExecutor {
-    inner: tokio::runtime::TaskExecutor,
+    inner: TokioTaskExecutor,
 }
 
 impl TaskExecutor {
@@ -78,7 +79,7 @@ impl TaskExecutor {
     }
 
     pub fn spawn_std(&self, f: impl std::future::Future<Output = ()> + Send + 'static) {
-        use futures03::future::{FutureExt, TryFutureExt};
+        use futures::future::{FutureExt, TryFutureExt};
 
         self.spawn(f.unit_error().boxed().compat());
     }
@@ -92,3 +93,25 @@ where
         self.inner.execute(future)
     }
 }
+
+impl tokio01::executor::Executor for TaskExecutor {
+    fn spawn(
+        &mut self,
+        fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
+    ) -> Result<(), tokio01::executor::SpawnError> {
+        Ok(self.inner.spawn(fut))
+    }
+}
+
+pub trait FutureExt: futures::TryFuture {
+    /// Used to compat a `!Unpin` type from 0.3 futures to 0.1
+    fn boxed_compat(self) -> futures::compat::Compat<Pin<Box<Self>>>
+    where
+        Self: Sized,
+    {
+        let fut = Box::pin(self);
+        futures::compat::Compat::new(fut)
+    }
+}
+
+impl<T: futures::TryFuture> FutureExt for T {}

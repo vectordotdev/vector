@@ -1,0 +1,44 @@
+<%- component = metadata.sinks.honeycomb -%>
+
+<%= component_header(component) %>
+
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
+## Configuration
+
+<%= component_config_example(component) %>
+
+<%= fields(component.specific_options_list, heading_depth: 3) %>
+
+<%- if component.env_vars_list.any? -%>
+## Env Vars
+
+<%= fields(component.env_vars_list) %>
+
+<%- end -%>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
+
+<%- end -%>
+## How It Works [[sort]]
+
+### Obtaining a Honeycomb API key
+
+1. Register for a free account at [honeycomb.io](https://ui.honeycomb.io/signup)
+
+2. Once registered, create a new dataset and when presented with log shippers select the
+curl option and use the key provided with the curl example.
+
+<%= component_sections(component) %>

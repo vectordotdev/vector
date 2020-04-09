@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -24,8 +23,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let field = self
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
@@ -72,7 +74,9 @@ impl Transform for Logfmt {
 
                 if let Some(conv) = self.conversions.get(&key) {
                     match conv.convert(val.as_bytes().into()) {
-                        Ok(value) => event.as_mut_log().insert(key, value),
+                        Ok(value) => {
+                            event.as_mut_log().insert(key, value);
+                        }
                         Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
@@ -94,6 +98,7 @@ impl Transform for Logfmt {
             debug!(
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
+                rate_limit_secs = 30
             );
         };
 
@@ -107,7 +112,7 @@ mod tests {
     use crate::{
         event::{LogEvent, Value},
         test_util,
-        topology::config::TransformConfig,
+        topology::config::{TransformConfig, TransformContext},
         Event,
     };
 
@@ -120,7 +125,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

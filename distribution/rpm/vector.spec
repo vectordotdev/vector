@@ -9,7 +9,7 @@
 %define _username %{_name}
 
 Name: %{_name}
-Summary: A High-Performance Logs, Metrics, and Events Routing Layer
+Summary: A lightweight and ultra-fast tool for building observability pipelines
 Version: %{_cleaned_version}
 Release: %{_release}
 License: ASL 2.0

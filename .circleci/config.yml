@@ -188,6 +188,7 @@ jobs:
     <<: *docker-machine
     environment:
       RUST_BACKTRACE: full
+      TEST_LOG: debug
       AWS_ACCESS_KEY_ID: fake-aws-key
       AWS_SECRET_ACCESS_KEY: fake-aws-key
       TARGET: x86_64-unknown-linux-musl
@@ -200,6 +201,7 @@ jobs:
       - run:
           name: Start dependencies
           command: |
+            docker-compose pull
             docker-compose up -d splunk
             sleep 30 # Splunk crashes when started simultaneously with other services
             docker-compose up -d test-runtime-deps
@@ -535,6 +537,8 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Build & verify Docker
+          environment:
+            PLATFORM: "linux/amd64,linux/arm64,linux/arm"
           command: |
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
@@ -613,7 +617,7 @@ jobs:
       - checkout
       - run:
           name: Install Homebrew
-          command: /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+          command: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
       - *install-vector
       - *test-install-script
 
@@ -722,6 +726,8 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Release Docker
+          environment:
+            PLATFORM: "linux/amd64,linux/arm64,linux/arm"
           command: |
             ./scripts/upgrade-docker.sh
             export VERSION=$(make version)
@@ -820,7 +826,6 @@ require-tests-checks-and-verifications: &require-tests-checks-and-verifications
     - verify-deb-artifact-on-ubuntu-19-04
     - verify-zip-artifact-on-wine
     - verify-docker
-    - verify-nixos
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
@@ -900,8 +905,6 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos:
-          <<: *prerelease-filters
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl
@@ -991,8 +994,6 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos:
-          <<: *release-filters
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
           requires:
@@ -1031,7 +1032,7 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          cron: "0 11 * * *"
+          cron: "0 14 * * *"
           <<: *master-filters
 
     jobs:
@@ -1088,7 +1089,6 @@ workflows:
             - build-x86_64-unknown-linux-musl-archive-and-deb-package
             - build-aarch64-unknown-linux-musl-archive-and-deb-package
             - build-armv7-unknown-linux-musleabihf-archive-and-deb-package
-      - verify-nixos
       - verify-rpm-artifact-on-amazon-linux-1:
           requires:
             - package-rpm-x86_64-unknown-linux-musl

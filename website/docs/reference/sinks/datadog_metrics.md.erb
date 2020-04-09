@@ -2,21 +2,21 @@
 
 <%= component_header(component) %>
 
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
-
-<%- if !component.requirements.nil? -%>
-## Requirements
-
-<Alert type="danger" fill={true} icon={false}>
-
-<%= component.requirements %>
-
-</Alert>
-
-<%- end -%>
-## Options
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
@@ -26,10 +26,11 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.output -%>
-## Output
 
-<%= component_output(component, component.output) %>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
 
 <%- end -%>
 ## How It Works [[sort]]
@@ -37,9 +38,10 @@
 ### Metric Types
 
 Datadog accepts the following types for [submission via API](https://docs.datadoghq.com/developers/metrics/#submission-types-and-datadog-in-app-types):
-- Count
-- Gauge
-- Rate
+
+* Count
+* Gauge
+* Rate
 
 The following matrix outlines how Vector metric types are mapped into Datadog metrics types.
 

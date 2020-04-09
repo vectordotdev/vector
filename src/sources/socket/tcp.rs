@@ -1,5 +1,9 @@
-use crate::event::{self, Event};
-use crate::sources::util::{SocketListenAddr, TcpSource};
+use crate::{
+    event::{self, Event},
+    internal_events::TcpEventReceived,
+    sources::util::{SocketListenAddr, TcpSource},
+    tls::TlsConfig,
+};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use serde::{Deserialize, Serialize};
@@ -15,6 +19,7 @@ pub struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     pub host_key: Option<Atom>,
+    pub tls: Option<TlsConfig>,
 }
 
 fn default_max_length() -> usize {
@@ -32,6 +37,7 @@ impl TcpConfig {
             max_length: default_max_length(),
             host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            tls: Default::default(),
         }
     }
 }
@@ -48,23 +54,24 @@ impl TcpSource for RawTcpSource {
         BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
     }
 
-    fn build_event(&self, frame: Bytes, host: Option<Bytes>) -> Option<Event> {
+    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
+        let byte_size = frame.len();
         let mut event = Event::from(frame);
 
         let host_key = if let Some(key) = &self.config.host_key {
             key
         } else {
-            &event::HOST
+            &event::log_schema().host_key()
         };
 
-        if let Some(host) = host {
-            event.as_mut_log().insert(host_key.clone(), host);
-        }
+        event.as_mut_log().insert(host_key.clone(), host);
 
         trace!(
             message = "Received one event.",
             event = field::debug(&event)
         );
+        emit!(TcpEventReceived { byte_size });
+
         Some(event)
     }
 }

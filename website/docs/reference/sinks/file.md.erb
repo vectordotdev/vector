@@ -2,21 +2,21 @@
 
 <%= component_header(component) %>
 
+<%- if component.requirements.any? -%>
+## Requirements
+
+<%= component_requirements(component) %>
+
+<%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
-
-<%- if !component.requirements.nil? -%>
-## Requirements
-
-<Alert type="danger" fill={true} icon={false}>
-
-<%= component.requirements %>
-
-</Alert>
-
-<%- end -%>
-## Options
 
 <%= fields(component.specific_options_list, heading_depth: 3) %>
 
@@ -26,15 +26,16 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.output -%>
-## Output
 
-<%= component_output(component, component.output) %>
+<%- if component.examples.any? -%>
+## Examples
+
+<%= component_examples(component) %>
 
 <%- end -%>
 ## How It Works [[sort]]
 
-### Dynamic file and directory creation
+### Dynamic File And Directory Creation
 
 Vector will attempt to create the entire directory structure and the file when
 emitting events to the file sink. This requires that the Vector agent have

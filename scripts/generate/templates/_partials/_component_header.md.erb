@@ -2,8 +2,10 @@
 <%- if component.respond_to?(:delivery_guarantee) -%>
 delivery_guarantee: <%= component.delivery_guarantee.to_json %>
 <%- end -%>
-description: <%= "The Vector `#{component.name}` #{component.type} #{component_description(component).continuize}".remove_markdown_links.to_json %>
+component_title: <%= component.title.to_json %>
+description: <%= "The Vector `#{component.name}` #{component.type} #{component_short_description(component).continuize}".remove_markdown_links.to_json %>
 event_types: <%= component.event_types.to_json %>
+function_category: <%= component.function_category.to_json %>
 issues_url: <%= metadata.links.fetch("urls.#{component.id}_issues") %>
 <%- if !component.transform? -%>
 operating_systems: <%= component.operating_systems.to_json %>
@@ -20,4 +22,5 @@ unsupported_operating_systems: <%= component.unsupported_operating_systems.to_js
 <%- end -%>
 ---
 
-The Vector `<%= component.name %>` <%= component.type %> <%= component_description(component).continuize %>
+The Vector `<%= component.name %>` <%= component.type %>
+<%= component_short_description(component).continuize.wrap(80) %>

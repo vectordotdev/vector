@@ -1,11 +1,12 @@
+use super::service::Elapsed;
 use crate::Error;
-use futures::{try_ready, Async, Future, Poll};
+use futures01::{try_ready, Async, Future, Poll};
 use std::{
     cmp,
     time::{Duration, Instant},
 };
-use tokio::timer::Delay;
-use tower::{retry::Policy, timeout::error::Elapsed};
+use tokio01::timer::Delay;
+use tower::retry::Policy;
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -186,7 +187,7 @@ impl RetryAction {
 mod tests {
     use super::*;
     use crate::test_util::trace_init;
-    use futures::Future;
+    use futures01::Future;
     use std::{fmt, time::Duration};
     use tokio01_test::{assert_err, assert_not_ready, assert_ready, clock};
     use tower::{retry::Retry, Service};
@@ -260,7 +261,7 @@ mod tests {
             assert_ready!(svc.poll_ready());
 
             let mut fut = svc.call("hello");
-            assert_request_eq!(handle, "hello").send_error(tower::timeout::error::Elapsed::new());
+            assert_request_eq!(handle, "hello").send_error(super::super::service::Elapsed::new());
             assert_not_ready!(fut.poll());
 
             clock.advance(Duration::from_secs(2));

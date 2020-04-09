@@ -1,0 +1,34 @@
+[transforms.tokenizer_simple]
+  inputs = []
+  type = "tokenizer"
+  field_names = ["timestamp", "level", "message", "trailer"]
+[[tests]]
+  name = "tokenizer_simple"
+  [tests.input]
+    insert_at = "tokenizer_simple"
+    type = "raw"
+    value = "2020-01-01T12:34:56Z INFO \"hello, world\"    \"this is a trailer field\""
+  [[tests.outputs]]
+    extract_from = "tokenizer_simple"
+    [[tests.outputs.conditions]]
+      "timestamp.equals" = "2020-01-01T12:34:56Z"
+      "level.equals" = "INFO"
+      "message.equals" = "hello, world"
+      "trailer.equals" = "this is a trailer field"
+
+[transforms.tokenizer_nested]
+  inputs = []
+  type = "tokenizer"
+  field_names = ["nested.timestamp", "nested.level", "nested.message"]
+[[tests]]
+  name = "tokenizer_nested"
+  [tests.input]
+    insert_at = "tokenizer_nested"
+    type = "raw"
+    value = "2020-01-01T12:34:56Z INFO hello"
+  [[tests.outputs]]
+    extract_from = "tokenizer_nested"
+    [[tests.outputs.conditions]]
+      "nested.timestamp.equals" = "2020-01-01T12:34:56Z"
+      "nested.level.equals" = "INFO"
+      "nested.message.equals" = "hello"

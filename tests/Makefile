@@ -1,7 +1,7 @@
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/../scripts/docker-compose-run.sh)
 
 # run all tests, checks, and verifications
-all: check build-all package-all test-docker verify
+all: check build-all package-all test-docker test-behavior verify
 
 # default target, build the project in debug mode
 build: build-x86_64
@@ -26,22 +26,36 @@ bench: build
 test: build
 	$(RUN) test
 
+# run behaviorial tests
+test-behavior: build
+	$(RUN) test-behavior
+
 # run tests which use Docker
 test-docker: build
 	$(RUN) test-docker
 
+# run tests for Kubernetes
+test-kubernetes: build-x86_64
+	$(RUN) test-kubernetes
+
 # checks
 
-check: check-code check-fmt check-style check-generate check-blog check-version check-examples
+check: check-code check-fmt check-style check-markdown check-generate check-blog check-version check-examples check-component-features
 
 check-code:
 	$(RUN) check-code
+
+check-component-features:
+	$(RUN) check-component-features
 
 check-fmt:
 	$(RUN) check-fmt
 
 check-style:
 	$(RUN) check-style
+
+check-markdown:
+	$(RUN) check-markdown
 
 check-generate:
 	$(RUN) check-generate
@@ -101,7 +115,7 @@ package-rpm-armv7: build-archive-armv7
 	$(RUN) package-rpm-armv7
 
 package-rpm-aarch64: build-archive-aarch64
-	$(RUN) package-rpm-armv7
+	$(RUN) package-rpm-aarch64
 
 # verifications
 verify: verify-rpm verify-deb

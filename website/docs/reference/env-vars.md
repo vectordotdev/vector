@@ -1,8 +1,13 @@
 ---
+last_modified_on: "2020-04-05"
 title: Environment Variables
-description: "A full list of Vector's supported environment variables."
+description: "A full list of Vector's supported environment variables and how to use them."
 sidebar_label: Env Vars
 ---
+
+import Alert from '@site/src/components/Alert';
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 You can control Vector's behavior through select environment variables:
 
@@ -21,20 +26,15 @@ options][docs.global-options] as well.
      website/docs/reference/env-vars.md.erb
 -->
 
-## Variables
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
+## Special Variables
 
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
   examples={["AKIAIOSFODNN7EXAMPLE"]}
+  groups={[]}
   name={"AWS_ACCESS_KEY_ID"}
   path={null}
   relevantWhen={null}
@@ -42,21 +42,24 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_ACCESS_KEY_ID
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+Used for AWS authentication when communicating with AWS services. See relevant
+[AWS components][pages.aws_components] for more info.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
   examples={["wJalrXUtnFEMI/K7MDENG/FD2F4GJ"]}
+  groups={[]}
   name={"AWS_SECRET_ACCESS_KEY"}
   path={null}
   relevantWhen={null}
@@ -64,28 +67,32 @@ Used for AWS authentication when communicating with AWS services. See relevant [
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### AWS_SECRET_ACCESS_KEY
 
-Used for AWS authentication when communicating with AWS services. See relevant [AWS components][pages.aws_components] for more info.
+Used for AWS authentication when communicating with AWS services. See relevant
+[AWS components][pages.aws_components] for more info.
+
+
 
 
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={"unix:///var/run/docker.sock"}
   enumValues={null}
   examples={["unix://path/to/socket","tcp://host:2375/path"]}
+  groups={[]}
   name={"DOCKER_HOST"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### DOCKER_HOST
@@ -93,36 +100,41 @@ Used for AWS authentication when communicating with AWS services. See relevant [
 The docker host to connect to.
 
 
+
+
 </Field>
-
-
 <Field
-  common={true}
+  common={false}
   defaultValue={true}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"DOCKER_VERIFY_TLS"}
   path={null}
   relevantWhen={null}
-  required={true}
+  required={false}
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### DOCKER_VERIFY_TLS
 
-If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+If `true` (the default), Vector will validate the TLS certificate of the remote
+host. Do NOT set this to `false` unless you understand the risks of not
+verifying the remote certificate.
+
+
 
 
 </Field>
-
-
 <Field
-  common={false}
+  common={true}
   defaultValue={null}
   enumValues={null}
   examples={["/path/to/credentials.json"]}
+  groups={[]}
   name={"GOOGLE_APPLICATION_CREDENTIALS"}
   path={null}
   relevantWhen={null}
@@ -130,21 +142,24 @@ If `true` (the default), Vector will validate the TLS certificate of the remote 
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### GOOGLE_APPLICATION_CREDENTIALS
 
-The [GCP api key][urls.gcp_authentication_api_key] used for authentication.
+The filename for a Google Cloud service account credentials JSON file used to
+authenticate access to the Stackdriver Logging API.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
   examples={["debug"]}
+  groups={[]}
   name={"LOG"}
   path={null}
   relevantWhen={null}
@@ -152,21 +167,24 @@ The [GCP api key][urls.gcp_authentication_api_key] used for authentication.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### LOG
 
-Sets Vector's log level. See the [log section in the monitoring guide][docs.monitoring#levels] for more information on the available levels.
+Sets Vector's log level. See the [log section in the monitoring
+guide][docs.monitoring#levels] for more information on the available levels.
+
+
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
   examples={[true,false]}
+  groups={[]}
   name={"RUST_BACKTRACE"}
   path={null}
   relevantWhen={null}
@@ -174,20 +192,82 @@ Sets Vector's log level. See the [log section in the monitoring guide][docs.moni
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### RUST_BACKTRACE
 
-Enables backtraces when errors are logged. Use this when debugging only since it can degrade performance.
+Enables backtraces when errors are logged. Use this when debugging only since
+it can degrade performance.
+
+
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["minikube"]}
+  groups={[]}
+  name={"VECTOR_NODE_NAME"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### VECTOR_NODE_NAME
+
+The name of the node whose Pod's log should be enriched. If you're using the
+[provided daemon set][urls.kubernetes_limit_resources] then this environment
+variable is set for you.
 
 
+
+
+</Field>
 </Fields>
 
+## Custom Variables
 
+As noticed in the [configuration document][docs.configuration#environment-variables],
+Vector supports custom environment variables via the `${...}` syntax:
+
+```toml
+option = "${ENV_VAR}"
+```
+
+<Alert type="info">
+
+Interpolation is done before parsing the configuration file. This is done when
+[starting][docs.process-management#starting] and
+[reloading][docs.process-management#reloading] Vector.
+
+</Alert>
+
+### Default Values
+
+Default values can be supplied via the `:-` syntax:
+
+```toml
+option = "${ENV_VAR:-default}"
+```
+
+### Escaping
+
+You can escape environment variable by preceding them with a `$` character. For
+example `$${HOSTNAME}` will be treated _literally_ in the above environment
+variable example.
+
+
+[docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.global-options]: /docs/reference/global-options/
 [docs.monitoring#levels]: /docs/administration/monitoring/#levels
+[docs.process-management#reloading]: /docs/administration/process-management/#reloading
+[docs.process-management#starting]: /docs/administration/process-management/#starting
 [pages.aws_components]: /components?providers%5B%5D=aws/
-[urls.gcp_authentication_api_key]: https://cloud.google.com/docs/authentication/api-keys
+[urls.kubernetes_limit_resources]: https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/

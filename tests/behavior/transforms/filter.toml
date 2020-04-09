@@ -1,0 +1,81 @@
+[transforms.filter_a]
+  inputs = ["ignored"]
+  type = "filter"
+  [transforms.filter_a.condition]
+    "message.eq" = "test filter 1"
+[transforms.filter_b]
+  inputs = ["ignored"]
+  type = "filter"
+  [transforms.filter_b.condition]
+    type = "check_fields"
+    "message.contains" = "test filter"
+    "message.contains" = "2"
+[transforms.filter_c]
+  inputs = ["ignored"]
+  type = "filter"
+  [transforms.filter_c.condition]
+    type = "is_metric"
+
+[[tests]]
+  name = "filter test 1a"
+  no_outputs_from = []
+  [[tests.inputs]]
+    insert_at = "filter_a"
+    value = "test filter 1"
+  [[tests.outputs]]
+    extract_from = "filter_a"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test filter 1"
+
+[[tests]]
+  name = "filter test 1b"
+  no_outputs_from = [ "filter_b" ]
+  [[tests.inputs]]
+    insert_at = "filter_b"
+    value = "test filter 1"
+
+[[tests]]
+  name = "filter test 1c"
+  no_outputs_from = [ "filter_c" ]
+  [[tests.inputs]]
+    insert_at = "filter_c"
+    value = "test filter 1"
+
+[[tests]]
+  name = "filter test 2a"
+  no_outputs_from = [ "filter_a" ]
+  [[tests.inputs]]
+    insert_at = "filter_a"
+    value = "test filter 2"
+
+[[tests]]
+  name = "filter test 2b"
+  no_outputs_from = []
+  [[tests.inputs]]
+    insert_at = "filter_b"
+    value = "test filter 2"
+  [[tests.outputs]]
+    extract_from = "filter_b"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test filter 2"
+
+[[tests]]
+  name = "filter test 2c"
+  no_outputs_from = [ "filter_c" ]
+  [[tests.inputs]]
+    insert_at = "filter_c"
+    value = "test filter 2"
+
+[[tests]]
+  name = "filter test 3a"
+  [[tests.inputs]]
+    insert_at = "filter_a"
+    type = "metric"
+    metric.name = "count"
+    metric.kind = "absolute"
+    metric.tags.message = "test filter 1"
+    metric.counter.value = 1
+  [[tests.outputs]]
+    extract_from = "filter_a"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test filter 1"

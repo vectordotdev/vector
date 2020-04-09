@@ -1,8 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -26,8 +25,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    fn build(&self, _exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let field = self
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
@@ -100,7 +102,9 @@ impl Transform for Split {
                 .zip(split(value, self.separator.clone()).into_iter())
             {
                 match conversion.convert(value.as_bytes().into()) {
-                    Ok(value) => event.as_mut_log().insert(name.clone(), value),
+                    Ok(value) => {
+                        event.as_mut_log().insert(name.clone(), value);
+                    }
                     Err(error) => {
                         debug!(
                             message = "Could not convert types.",
@@ -138,7 +142,10 @@ mod tests {
     use super::split;
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{topology::config::TransformConfig, Event};
+    use crate::{
+        topology::config::{TransformConfig, TransformContext},
+        Event,
+    };
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -182,7 +189,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             ..Default::default()
         }
-        .build(rt.executor())
+        .build(TransformContext::new_test(rt.executor()))
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

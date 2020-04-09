@@ -1,12 +1,16 @@
 use crate::{
     dns::Resolver,
     event::{self, Event},
-    sinks::util::http::{https_client, Auth, BatchedHttpSink, HttpSink},
-    sinks::util::tls::TlsSettings,
-    sinks::util::{BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde},
+    sinks::util::http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+    sinks::util::{
+        encoding::EncodingConfigWithDefault, BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
+        TowerRequestConfig, UriSerde,
+    },
+    tls::TlsSettings,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures03::{compat::Future01CompatExt, TryFutureExt};
+use futures::TryFutureExt;
+use futures01::Sink;
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -28,6 +32,12 @@ pub struct LogdnaConfig {
     ip: Option<String>,
     tags: Option<Vec<String>>,
 
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
+
     default_app: Option<String>,
 
     #[serde(default)]
@@ -39,6 +49,14 @@ pub struct LogdnaConfig {
 
 inventory::submit! {
     SinkDescription::new_without_default::<LogdnaConfig>("logdna")
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[typetag::serde(name = "logdna")]
@@ -54,7 +72,8 @@ impl SinkConfig for LogdnaConfig {
             batch_settings,
             None,
             &cx,
-        );
+        )
+        .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
         let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
 
@@ -77,9 +96,11 @@ impl HttpSink for LogdnaConfig {
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
 
-        let line = log.remove(&event::MESSAGE).unwrap_or_else(|| "".into());
+        let line = log
+            .remove(&event::log_schema().message_key())
+            .unwrap_or_else(|| "".into());
         let timestamp = log
-            .remove(&event::TIMESTAMP)
+            .remove(&event::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -103,9 +124,8 @@ impl HttpSink for LogdnaConfig {
             }
         }
 
-        let unflatten = log.unflatten();
-        if !unflatten.is_empty() {
-            map.insert("meta".to_string(), json!(unflatten));
+        if !log.is_empty() {
+            map.insert("meta".into(), json!(&log));
         }
 
         Some(map.into())
@@ -176,11 +196,11 @@ impl LogdnaConfig {
 async fn healthcheck(config: LogdnaConfig, resolver: Resolver) -> Result<(), crate::Error> {
     let uri = config.build_uri("");
 
-    let client = https_client(resolver, TlsSettings::from_options(&None)?)?;
+    let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
 
     let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
 
-    let res = client.request(req).compat().await?;
+    let res = client.send(req).await?;
 
     if res.status().is_server_error() {
         return Err(format!("Server returned a server error").into());
@@ -200,7 +220,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use crate::topology::config::SinkConfig;
-    use futures::{Sink, Stream};
+    use futures01::{Sink, Stream};
     use serde_json::json;
 
     #[test]
@@ -235,6 +255,7 @@ mod tests {
 
     #[test]
     fn smoke() {
+        crate::test_util::trace_init();
         let (mut config, cx, mut rt) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -277,7 +298,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures::stream::iter_ok(events));
+        let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = rt.block_on(pump).unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();

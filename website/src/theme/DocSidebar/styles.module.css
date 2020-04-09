@@ -1,18 +1,34 @@
-/**
- * Copyright (c) 2017-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+.sidebar {
+  font-size: 1.1em;
+}
 
 @media (min-width: 997px) {
   .sidebar {
-    height: calc(100vh - var(--ifm-navbar-height));
+    font-size: 0.85em;
+    font-weight: bold;
+    height: 100vh;
     overflow-y: auto;
-    padding: 0.5rem;
     position: sticky;
-    top: var(--ifm-navbar-height);
+    top: 0;
   }
+
+  .sidebarLogo {
+    color: inherit !important;
+    display: flex !important;
+    align-items: center;
+    height: var(--ifm-navbar-height);
+    max-width: var(--ifm-navbar-logo-width);
+    text-decoration: none !important;
+  }
+
+  .menu {
+    font-weight: inherit;
+    padding-top: var(--ifm-spacing-vertical);
+  }
+}
+
+.sidebarLogo {
+  display: none;
 }
 
 .sidebarMenuIcon {
@@ -20,9 +36,11 @@
 }
 
 .sidebarMenuCloseIcon {
-  display: inline-block;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
   height: 24px;
-  font-size: 1.5rem;
+  font-size: 2em;
   font-weight: var(--ifm-font-weight-bold);
   line-height: 0.9;
   width: 24px;

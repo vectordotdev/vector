@@ -1,0 +1,37 @@
+[transforms.concat_simple]
+  inputs = []
+  type = "concat"
+  items = ["first[0..2]", "second[-2..]", "third[2..4]"]
+  target = "concatenated"
+[[tests]]
+  name = "concat_simple"
+  [tests.input]
+    insert_at = "concat_simple"
+    type = "log"
+    [tests.input.log_fields]
+      first = "one"
+      second = "two"
+      third = "three"
+  [[tests.outputs]]
+    extract_from = "concat_simple"
+    [[tests.outputs.conditions]]
+      "concatenated.equals" = "on wo re"
+
+[transforms.concat_nested]
+  inputs = []
+  type = "concat"
+  items = ["a.b", "c.d", "e.f[..3]"]
+  target = "nested.concatenated.field"
+[[tests]]
+  name = "concat_nested"
+  [tests.input]
+    insert_at = "concat_nested"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b" = "ababab"
+      "c.d" = "cdcdcd"
+      "e.f" = "efefef"
+  [[tests.outputs]]
+    extract_from = "concat_nested"
+    [[tests.outputs.conditions]]
+      "nested.concatenated.field.equals" = "ababab cdcdcd efe"

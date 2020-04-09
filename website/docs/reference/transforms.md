@@ -5,14 +5,14 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
+import VectorComponents from '@site/src/components/VectorComponents';
+
 Transforms are responsible for parsing, enriching, or transforming your
 [log][docs.data-model.log] and [metric][docs.data-model.metric] data
 in-flight. They can be chained together, forming a network of transforms within
 your topology, ultimately flowing into a [sink][docs.sinks].
 
 ---
-
-import VectorComponents from '@site/src/components/VectorComponents';
 
 <VectorComponents titles={false} sinks={false} sources={false} />
 

@@ -2,12 +2,13 @@ use crate::{
     buffers::Acker,
     conditions,
     dns::Resolver,
-    event::{Event, Metric},
+    event::{self, Event, Metric},
     runtime::TaskExecutor,
+    shutdown::ShutdownSignal,
     sinks, sources, transforms,
 };
 use component::ComponentDescription;
-use futures::sync::mpsc;
+use futures01::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -40,6 +41,11 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(default)]
     pub dns_servers: Vec<String>,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub log_schema: event::LogSchema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -112,7 +118,7 @@ impl GlobalOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
     Any,
     Log,
@@ -125,6 +131,7 @@ pub trait SourceConfig: core::fmt::Debug {
         &self,
         name: &str,
         globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<sources::Source>;
 
@@ -161,6 +168,7 @@ pub trait SinkConfig: core::fmt::Debug {
 pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) resolver: Resolver,
+    pub(super) exec: TaskExecutor,
 }
 
 impl SinkContext {
@@ -168,7 +176,8 @@ impl SinkContext {
     pub fn new_test(exec: TaskExecutor) -> Self {
         Self {
             acker: Acker::Null,
-            resolver: Resolver::new(Vec::new(), exec).unwrap(),
+            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            exec,
         }
     }
 
@@ -176,8 +185,16 @@ impl SinkContext {
         self.acker.clone()
     }
 
+    pub fn exec(&self) -> TaskExecutor {
+        self.exec.clone()
+    }
+
     pub fn resolver(&self) -> Resolver {
         self.resolver.clone()
+    }
+
+    pub fn executor(&self) -> &TaskExecutor {
+        &self.exec
     }
 }
 
@@ -194,13 +211,43 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn transforms::Transform>>;
+    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 
     fn output_type(&self) -> DataType;
 
     fn transform_type(&self) -> &'static str;
+
+    /// Allows a transform configuration to expand itself into multiple "child"
+    /// transformations to replace it. This allows a transform to act as a macro
+    /// for various patterns.
+    fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TransformContext {
+    pub(super) exec: TaskExecutor,
+    pub(super) resolver: Resolver,
+}
+
+impl TransformContext {
+    pub fn new_test(exec: TaskExecutor) -> Self {
+        Self {
+            resolver: Resolver::new(Vec::new(), exec.clone()).unwrap(),
+            exec,
+        }
+    }
+
+    pub fn executor(&self) -> &TaskExecutor {
+        &self.exec
+    }
+
+    pub fn resolver(&self) -> Resolver {
+        self.resolver.clone()
+    }
 }
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
@@ -211,8 +258,13 @@ inventory::collect!(TransformDescription);
 #[serde(deny_unknown_fields)]
 pub struct TestDefinition {
     pub name: String,
-    pub input: TestInput,
+    pub input: Option<TestInput>,
+    #[serde(default)]
+    pub inputs: Vec<TestInput>,
+    #[serde(default)]
     pub outputs: Vec<TestOutput>,
+    #[serde(default)]
+    pub no_outputs_from: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -249,8 +301,9 @@ pub struct TestOutput {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum TestCondition {
-    String(String),
     Embedded(Box<dyn conditions::ConditionConfig>),
+    NoTypeEmbedded(conditions::CheckFieldsConfig),
+    String(String),
 }
 
 // Helper methods for programming construction during tests
@@ -260,6 +313,7 @@ impl Config {
             global: GlobalOptions {
                 data_dir: None,
                 dns_servers: Vec::new(),
+                log_schema: event::LogSchema::default(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
@@ -299,6 +353,48 @@ impl Config {
         self.transforms.insert(name.to_string(), transform);
     }
 
+    /// Some component configs can act like macros and expand themselves into
+    /// multiple replacement configs. Returns a map of components to their
+    /// expanded child names.
+    pub fn expand_macros(&mut self) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
+        let mut expanded_transforms = IndexMap::new();
+        let mut expansions = IndexMap::new();
+        let mut errors = Vec::new();
+
+        while let Some((k, mut t)) = self.transforms.pop() {
+            if let Some(expanded) = match t.inner.expand() {
+                Ok(e) => e,
+                Err(err) => {
+                    errors.push(format!("failed to expand transform '{}': {}", k, err));
+                    continue;
+                }
+            } {
+                let mut children = Vec::new();
+                for (name, child) in expanded {
+                    let full_name = format!("{}.{}", k, name);
+                    expanded_transforms.insert(
+                        full_name.clone(),
+                        TransformOuter {
+                            inputs: t.inputs.clone(),
+                            inner: child,
+                        },
+                    );
+                    children.push(full_name);
+                }
+                expansions.insert(k.clone(), children);
+            } else {
+                expanded_transforms.insert(k, t);
+            }
+        }
+        self.transforms = expanded_transforms;
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(expansions)
+        }
+    }
+
     pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {
         let mut source_string = String::new();
         input
@@ -331,6 +427,40 @@ impl Config {
         self.global.dns_servers.append(&mut with.global.dns_servers);
         self.global.dns_servers.sort();
         self.global.dns_servers.dedup();
+
+        // If the user has multiple config files, we must *merge* log schemas until we meet a
+        // conflict, then we are allowed to error.
+        let default_schema = event::LogSchema::default();
+        if with.global.log_schema != default_schema {
+            // If the set value is the default, override it. If it's already overridden, error.
+            if self.global.log_schema.host_key() != default_schema.host_key()
+                && self.global.log_schema.host_key() != with.global.log_schema.host_key()
+            {
+                errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_host_key(with.global.log_schema.host_key().clone());
+            }
+            if self.global.log_schema.message_key() != default_schema.message_key()
+                && self.global.log_schema.message_key() != with.global.log_schema.message_key()
+            {
+                errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_message_key(with.global.log_schema.message_key().clone());
+            }
+            if self.global.log_schema.timestamp_key() != default_schema.timestamp_key()
+                && self.global.log_schema.timestamp_key() != with.global.log_schema.timestamp_key()
+            {
+                errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
+            } else {
+                self.global
+                    .log_schema
+                    .set_timestamp_key(with.global.log_schema.timestamp_key().clone());
+            }
+        }
 
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {
@@ -385,7 +515,7 @@ fn healthcheck_default() -> bool {
     true
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod test {
     use super::Config;
     use std::path::PathBuf;
@@ -410,6 +540,64 @@ mod test {
             Some(PathBuf::from("/var/lib/vector")),
             config.global.data_dir
         )
+    }
+
+    #[test]
+    fn default_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!("host", config.global.log_schema.host_key().to_string());
+        assert_eq!(
+            "message",
+            config.global.log_schema.message_key().to_string()
+        );
+        assert_eq!(
+            "timestamp",
+            config.global.log_schema.timestamp_key().to_string()
+        );
+    }
+
+    #[test]
+    fn custom_schema() {
+        let config: Config = toml::from_str(
+            r#"
+      [log_schema]
+      host_key = "this"
+      message_key = "that"
+      timestamp_key = "then"
+      kubernetes_key = "when"
+
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      encoding = "json"
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!("this", config.global.log_schema.host_key().to_string());
+        assert_eq!("that", config.global.log_schema.message_key().to_string());
+        assert_eq!("then", config.global.log_schema.timestamp_key().to_string());
+        assert_eq!(
+            "when",
+            config.global.log_schema.kubernetes_key().to_string()
+        );
     }
 
     #[test]

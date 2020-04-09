@@ -1,19 +1,17 @@
 #[macro_use]
 extern crate tracing;
 
-use futures::{future, Future, Stream};
+use futures01::{future, Future, Stream};
 use std::{
-    cmp::{max, min},
+    cmp::max,
     fs::File,
-    net::SocketAddr,
     path::{Path, PathBuf},
 };
 use structopt::{clap::AppSettings, StructOpt};
 #[cfg(unix)]
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
-use tracing_futures::Instrument;
-use vector::{config_paths, generate, list, metrics, runtime, topology, trace, unit_test};
+use vector::{config_paths, event, generate, list, metrics, runtime, topology, trace, unit_test};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -42,10 +40,6 @@ struct RootOpts {
     #[structopt(short, long)]
     dry_run: bool,
 
-    /// Serve internal metrics from the given address
-    #[structopt(short, long)]
-    metrics_addr: Option<SocketAddr>,
-
     /// Number of threads to use for processing (default is number of available cores)
     #[structopt(short, long)]
     threads: Option<usize>,
@@ -57,6 +51,10 @@ struct RootOpts {
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
+
+    /// Set the logging format. Options are "text" or "json". Defaults to "text".
+    #[structopt(long)]
+    log_format: Option<LogFormat>,
 
     /// Control when ANSI terminal formatting is used.
     ///
@@ -115,6 +113,12 @@ enum Color {
     Never,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum LogFormat {
+    Text,
+    Json,
+}
+
 impl std::str::FromStr for Color {
     type Err = String;
 
@@ -131,27 +135,24 @@ impl std::str::FromStr for Color {
     }
 }
 
-fn get_version() -> String {
-    #[cfg(feature = "nightly")]
-    let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
-    #[cfg(not(feature = "nightly"))]
-    let pkg_version = built_info::PKG_VERSION;
+impl std::str::FromStr for LogFormat {
+    type Err = String;
 
-    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
-    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
-        .unwrap()
-        .format("%Y-%m-%d");
-    let built_string = if let Some(commit_hash) = commit_hash {
-        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
-    } else {
-        built_info::TARGET.into()
-    };
-    format!("{} ({})", pkg_version, built_string)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "text" => Ok(LogFormat::Text),
+            "json" => Ok(LogFormat::Json),
+            s => Err(format!(
+                "{} is not a valid option, expected `text` or `json`",
+                s
+            )),
+        }
+    }
 }
 
 fn main() {
     openssl_probe::init_ssl_cert_env_vars();
-    let version = get_version();
+    let version = vector::get_version();
     let app = Opts::clap().version(&version[..]).global_settings(&[
         AppSettings::ColoredHelp,
         AppSettings::InferSubcommands,
@@ -168,20 +169,24 @@ fn main() {
             2..=255 => "trace",
         },
         1 => "warn",
-        2..=255 => "error",
+        2 => "error",
+        3..=255 => "off",
     };
 
-    let levels = if let Ok(level) = std::env::var("LOG") {
-        level
-    } else {
-        [
-            format!("vector={}", level),
-            format!("codec={}", level),
-            format!("file_source={}", level),
-            format!("tower_limit=trace"),
-        ]
-        .join(",")
-        .to_string()
+    let levels = match std::env::var("LOG").ok() {
+        Some(level) => level,
+        None => match level {
+            "off" => "off".to_string(),
+            _ => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("file_source={}", level),
+                format!("tower_limit=trace"),
+                format!("rdkafka={}", level),
+            ]
+            .join(",")
+            .to_string(),
+        },
     };
 
     let color = match opts.color.clone().unwrap_or(Color::Auto) {
@@ -193,13 +198,14 @@ fn main() {
         Color::Never => false,
     };
 
-    let (metrics_controller, metrics_sink) = metrics::build();
+    let json = match &opts.log_format.unwrap_or(LogFormat::Text) {
+        LogFormat::Text => false,
+        LogFormat::Json => true,
+    };
 
-    trace::init(
-        color,
-        levels.as_str(),
-        opts.metrics_addr.map(|_| metrics_sink),
-    );
+    trace::init(color, json, levels.as_str());
+
+    metrics::init().expect("metrics initialization failed");
 
     sub_command.map(|s| {
         std::process::exit(match s {
@@ -213,8 +219,8 @@ fn main() {
     info!("Log level {:?} is enabled.", level);
 
     if let Some(threads) = opts.threads {
-        if threads < 1 || threads > 4 {
-            error!("The `threads` argument must be between 1 and 4 (inclusive).");
+        if threads < 1 {
+            error!("The `threads` argument must be greater or equal to 1.");
             std::process::exit(exitcode::CONFIG);
         }
     }
@@ -224,6 +230,9 @@ fn main() {
     });
     config_paths.sort();
     config_paths.dedup();
+    config_paths::CONFIG_PATHS
+        .set(config_paths.clone())
+        .expect("Cannot set global config paths");
 
     if opts.watch_config {
         // Start listening for config changes immediately.
@@ -247,26 +256,14 @@ fn main() {
     let config = config.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
+    event::LOG_SCHEMA
+        .set(config.global.log_schema.clone())
+        .expect("Couldn't set schema");
 
     let mut rt = {
         let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
-        let num_threads = min(4, threads);
-        runtime::Runtime::with_thread_count(num_threads).expect("Unable to create async runtime")
+        runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
     };
-
-    let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
-
-    if let Some(metrics_addr) = opts.metrics_addr {
-        debug!("Starting metrics server");
-
-        rt.spawn(
-            metrics::serve(&metrics_addr, metrics_controller)
-                .instrument(info_span!("metrics", addr = ?metrics_addr))
-                .select(metrics_tripwire)
-                .map(|_| ())
-                .map_err(|_| ()),
-        );
-    }
 
     info!(
         message = "Vector is starting.",
@@ -290,7 +287,7 @@ fn main() {
     }
 
     let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
-    let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
+    let (topology, mut graceful_crash) = result.unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
@@ -301,6 +298,7 @@ fn main() {
 
     #[cfg(unix)]
     {
+        let mut topology = topology;
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
         let sigquit = Signal::new(SIGQUIT).flatten_stream();
@@ -348,11 +346,10 @@ fn main() {
         };
 
         if signal == SIGINT || signal == SIGTERM {
-            use futures::future::Either;
+            use futures01::future::Either;
 
             info!("Shutting down.");
             let shutdown = topology.stop();
-            metrics_trigger.cancel();
 
             match rt.block_on(shutdown.select2(signals.into_future())) {
                 Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
@@ -379,7 +376,7 @@ fn main() {
             .map_err(|_| ())
             .expect("Neither stream errors");
 
-        use futures::future::Either;
+        use futures01::future::Either;
 
         let ctrl_c = match interruption {
             Either::A(((_, ctrl_c_stream), _)) => ctrl_c_stream.into_future(),
@@ -438,6 +435,10 @@ fn read_configs(config_paths: &Vec<PathBuf>) -> Result<Config, Vec<String>> {
         };
     });
 
+    if let Err(mut errs) = config.expand_macros() {
+        errors.append(&mut errs);
+    }
+
     if !errors.is_empty() {
         Err(errors)
     } else {
@@ -483,13 +484,18 @@ fn validate(opts: &Validate) -> exitcode::ExitCode {
 
         let config = vector::topology::Config::load(file);
         let config = handle_config_errors(config);
-        let config = config.unwrap_or_else(|| {
+        let mut config = config.unwrap_or_else(|| {
             error!(
                 message = "Failed to parse config file.",
                 path = ?config_path
             );
             std::process::exit(exitcode::CONFIG);
         });
+        if let Err(errs) = config.expand_macros() {
+            for error in errs {
+                error!("Parse error: {}", error);
+            }
+        }
 
         if opts.topology {
             let exit = match topology::builder::check(&config) {

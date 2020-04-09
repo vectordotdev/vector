@@ -3,19 +3,21 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    shutdown::ShutdownSignal,
+    tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
-use tokio::{
+use tokio01::{
     self,
     codec::{BytesCodec, LinesCodec},
     net::{UdpFramed, UdpSocket},
@@ -38,6 +40,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     Tcp {
         address: SocketListenAddr,
+        tls: Option<TlsConfig>,
     },
     Udp {
         address: SocketAddr,
@@ -72,18 +75,23 @@ impl SourceConfig for SyslogConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(event::log_schema().host_key().to_string());
 
         match self.mode.clone() {
-            Mode::Tcp { address } => {
+            Mode::Tcp { address, tls } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
                     host_key,
                 };
                 let shutdown_secs = 30;
-                source.run(address, shutdown_secs, out)
+                let tls = MaybeTlsSettings::from_config(&tls, true)?;
+                source.run(address, shutdown_secs, tls, shutdown, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             #[cfg(unix)]
@@ -119,8 +127,8 @@ impl TcpSource for SyslogTcpSource {
         LinesCodec::new_with_max_length(self.max_length)
     }
 
-    fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
-        event_from_str(&self.host_key, host, &frame).map(|event| {
+    fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
+        event_from_str(&self.host_key, Some(host), &frame).map(|event| {
             trace!(
                 message = "Received one event.",
                 event = field::debug(&event)
@@ -163,7 +171,7 @@ pub fn udp(
                         .ok()
                         .and_then(|s| event_from_str(&host_key, Some(received_from), s))
                 })
-                .map_err(|e| error!("error reading line: {:?}", e));
+                .map_err(|error| emit!(SyslogUdpReadError { error }));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
         }),
@@ -190,10 +198,9 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
-    trace!(
-        message = "Received line.",
-        bytes = &field::display(line.len())
-    );
+    emit!(SyslogEventReceived {
+        byte_size: line.len()
+    });
 
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
@@ -211,7 +218,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .unwrap_or_else(Utc::now);
     event
         .as_mut_log()
-        .insert(event::TIMESTAMP.clone(), timestamp);
+        .insert(event::log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
 
@@ -317,7 +324,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert("host", "74794bfb6795");
@@ -353,10 +360,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert("host", "74794bfb6795");
+            expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -442,10 +449,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(20, 7, 26),
             );
-            expected.insert("host", "74794bfb6795");
+            expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("appname", "root");
@@ -470,7 +477,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(21, 31, 56),
             );
             expected.insert("host", "74794bfb6795");
@@ -501,7 +508,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::TIMESTAMP.clone(),
+                event::log_schema().timestamp_key().clone(),
                 chrono::Utc
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),

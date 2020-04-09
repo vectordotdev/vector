@@ -5,43 +5,46 @@ provide everything you need to start contributing to Vector. The
 following TOC is sorted progressively, starting with the basics and
 expanding into more specifics.
 
-<!-- MarkdownTOC autolink="true" indent="   " -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-- [Assumptions](#assumptions)
-- [Workflow](#workflow)
-   - [Git Branches](#git-branches)
-   - [Git Commits](#git-commits)
-      - [Style](#style)
-      - [Cryptographically Signing](#cryptographically-signing)
-      - [Signing-off](#signing-off)
-   - [Github Pull Requests](#github-pull-requests)
-      - [Title](#title)
-      - [Single Concern](#single-concern)
-      - [Reviews & Approvals](#reviews--approvals)
-      - [Merge Style](#merge-style)
-   - [CI](#ci)
-- [Development](#development)
-   - [Setup](#setup)
-   - [The Basics](#the-basics)
-      - [Directory Structure](#directory-structure)
-      - [Makefile](#makefile)
-      - [Code Style](#code-style)
-      - [Documentation](#documentation)
-      - [Changelog](#changelog)
-   - [Dependencies](#dependencies)
-   - [Guidelines](#guidelines)
-      - [Sink Healthchecks](#sink-healthchecks)
-   - [Testing](#testing)
-      - [Sample Logs](#sample-logs)
-   - [Benchmarking](#benchmarking)
-- [Security](#security)
-- [Legal](#legal)
-   - [DCO](#dco)
-      - [Trivial changes](#trivial-changes)
-   - [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-   - [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-   - [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
-   - [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
+1. [Assumptions](#assumptions)
+1. [Your First Contribution](#your-first-contribution)
+1. [Workflow](#workflow)
+   1. [Git Branches](#git-branches)
+   1. [Git Commits](#git-commits)
+      1. [Style](#style)
+      1. [Signing-off](#signing-off)
+   1. [Github Pull Requests](#github-pull-requests)
+      1. [Title](#title)
+      1. [Single Concern](#single-concern)
+      1. [Reviews & Approvals](#reviews--approvals)
+      1. [Merge Style](#merge-style)
+   1. [CI](#ci)
+1. [Development](#development)
+   1. [Setup](#setup)
+   1. [The Basics](#the-basics)
+      1. [Directory Structure](#directory-structure)
+      1. [Makefile](#makefile)
+      1. [Code Style](#code-style)
+      1. [Feature flags](#feature-flags)
+      1. [Documentation](#documentation)
+      1. [Changelog](#changelog)
+   1. [Dependencies](#dependencies)
+   1. [Guidelines](#guidelines)
+      1. [Sink Healthchecks](#sink-healthchecks)
+   1. [Testing](#testing)
+      1. [Sample Logs](#sample-logs)
+      1. [Tips and Tricks](#tips-and-tricks)
+   1. [Benchmarking](#benchmarking)
+1. [Security](#security)
+1. [Legal](#legal)
+   1. [DCO](#dco)
+      1. [Trivial changes](#trivial-changes)
+   1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
+1. [FAQ](#faq)
+   1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
+   1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
+   1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
 
 <!-- /MarkdownTOC -->
 
@@ -52,6 +55,20 @@ expanding into more specifics.
 2. **You've read Vector's [docs](https://vector.dev/docs/).**
 3. **You know about the [Vector community](https://vector.dev/community/).
    Please use this for help.**
+
+## Your First Contribution
+
+1. Ensure your change has an issue! Find an
+   [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
+   * This is where you can get a feel if the change will be accepted or not.
+     Changes that are questionable will have a `needs: approval` label.
+2. One approved, [fork the Vector repository][urls.fork_repo] in your own
+   Github account.
+3. [Create a new Git branch][urls.create_branch].
+4. Review the Vector [workflow](#workflow) and [development](#development).
+5. Make your changes.
+6. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
+   repo.
 
 ## Workflow
 
@@ -69,19 +86,13 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
-#### Cryptographically Signing
-
-Vector requires all commits to be cryptographically signed as part of our
-[security policy](/SECURITY.md). You can read more about how to do that
-on [Githubs signing commits guide][urls.github_sign_commits].
-
 #### Signing-off
 
 Your commits must include a [DCO](https://developercertificate.org/) signature.
 This is simpler than it sounds; it just means that all of your commits
 must contain:
 
-```
+```text
 Signed-off-by: Joe Smith <joe.smith@email.com>
 ```
 
@@ -115,7 +126,7 @@ A list of allowed sub-categories is defined
 
 The following are all good examples of pull request titles:
 
-```
+```text
 feat(new sink): new `xyz` sink
 feat(tcp source): add foo bar baz feature
 fix(tcp source): fix foo bar baz bug
@@ -211,6 +222,24 @@ rustup component add rustfmt
 make fmt
 ```
 
+#### Feature flags
+
+When a new component (a source, transform, or sink) is added, it has to be put
+behind a feature flag with the corresponding name. This ensures that it is
+possible to customize Vector builds. See the `features` section in `Cargo.toml`
+for examples.
+
+In addition, during development of a particular component it is useful to
+disable all other components to speed up compilation. For example, it is
+possible to build and run tests only for `console` sink using
+
+```bash
+cargo test --lib --no-default-features --features sinks-console sinks::console
+```
+
+In case if the tests are already built and only the component file changed, it
+is around 4 times faster than rebuilding tests with all features.
+
 #### Documentation
 
 Documentation is extremely important to the Vector project. Ideally, all
@@ -234,7 +263,11 @@ by the use of [conventional commit](#what-is-conventional-commits) titles.
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
-[Reviewing guide](/REVIEWING.md#dependencies)
+[Reviewing guide](/REVIEWING.md#dependencies).
+
+If a dependency is required only by one or multiple components, but not by
+Vector's core, make it optional and add it to the list of dependencies of
+the features corresponding to these components in `Cargo.toml`.
 
 ### Guidelines
 
@@ -265,9 +298,10 @@ them leads to some limitations here. The most obvious example of this is with
 sinks where the exact target of a write depends on the value of some field in
 the event (e.g. an interpolated Kinesis stream name). It also pops up for sinks
 where incoming events are expected to conform to a specific schema. In both
-cases, random test data is reasonably likely to trigger a potentially false-negative result. Even in simpler cases, we need to think about the effects of
-writing test data and whether the user would find that surprising or invasive.
-The answer usually depends on the system we're interfacing with.
+cases, random test data is reasonably likely to trigger a potentially
+false-negative result. Even in simpler cases, we need to think about the effects
+of writing test data and whether the user would find that surprising or
+invasive. The answer usually depends on the system we're interfacing with.
 
 In some cases, like the Kinesis example above, the right thing to do might be
 nothing at all. If we require dynamic information to figure out what entity
@@ -279,9 +313,9 @@ doing nothing when there is a data dependency like this.
 With all that in mind, here is a simple checklist to go over when writing a new
 health check:
 
-- [ ] Does this check perform different fallible operations from the sink itself?
-- [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
-- [ ] Are there situations where this check would fail but the sink would operate normally?
+* [ ] Does this check perform different fallible operations from the sink itself?
+* [ ] Does this check have side effects the user would consider undesirable (e.g. data pollution)?
+* [ ] Are there situations where this check would fail but the sink would operate normally?
 
 Not all of the answers need to be a hard "no", but we should think about the
 likelihood that any "yes" would lead to false negatives and balance that against
@@ -309,6 +343,35 @@ flog --bytes $((100 * 1024 * 1024)) > sample.log
 ```
 
 This will create a `100MiB` sample log file in the `sample.log` file.
+
+#### Tips and Tricks
+
+If you are developing a particular component and want to quickly iterate on unit
+tests related only to this component, the following approach can reduce waiting
+times:
+
+1. Install [cargo-watch](https://github.com/passcod/cargo-watch).
+2. (Only for GNU/Linux) Install LLVM 9 (for example, package `llvm-9` on Debian)
+   and set `RUSTFLAGS` environment variable to use `lld` as the linker:
+
+   ```sh
+   export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
+   ```
+
+3. Run in the root directory of Vector's source
+
+   ```sh
+   cargo watch -s clear -s \
+     'cargo test --lib --no-default-features --features=<component type>-<component name> <component type>::<component name>'
+   ```
+
+   For example, if the component is `add_fields` transform, the command above
+   turns into
+
+   ```sh
+   cargo watch -s clear -s \
+     'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
+   ```
 
 ### Benchmarking
 
@@ -351,6 +414,8 @@ license that provides this. The Apache License provides very generous
 copyright permissions from contributors, and contributors explicitly grant
 patent licenses as well. These rights are granted to everyone.
 
+## FAQ
+
 ### Why a DCO instead of a CLA?
 
 It's simpler, clearer, and still protects users of Vector. We believe the DCO
@@ -379,5 +444,10 @@ If you prefer to do this manually:
 https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
 
 
+[urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
+[urls.existing_issues]: https://github.com/timberio/vector/issues
+[urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
+[urls.new_issue]: https://github.com/timberio/vector/issues/new
+[urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/

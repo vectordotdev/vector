@@ -1,19 +1,18 @@
 use super::Transform;
 use crate::{
     event::Event,
-    runtime::TaskExecutor,
-    topology::config::{DataType, TransformConfig, TransformDescription},
+    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
-use futures::Stream;
-use futures03::compat::Future01CompatExt;
+use futures::compat::Future01CompatExt;
+use futures01::Stream;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{client::connect::HttpConnector, Body, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
-use tokio::timer::Delay;
+use tokio01::timer::Delay;
 use tracing_futures::Instrument;
 
 type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
@@ -109,7 +108,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, exec: TaskExecutor) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
         let keys = Keys::new(&self.namespace);
@@ -129,7 +128,7 @@ impl TransformConfig for Ec2Metadata {
             .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        exec.spawn_std(
+        cx.executor().spawn_std(
             async move {
                 let mut client = MetadataClient::new(host, keys, write, refresh_interval, fields);
 
@@ -321,33 +320,6 @@ impl MetadataClient {
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
         // Fetch all resources, _then_ add them to the state map.
         let identity_document = self.get_document().await?;
-        let availability_zone = self.get_metadata(&AVAILABILITY_ZONE).await?;
-        let local_hostname = self.get_metadata(&LOCAL_HOSTNAME).await?;
-        let local_ipv4 = self.get_metadata(&LOCAL_IPV4).await?;
-        let public_hostname = self.get_metadata(&PUBLIC_HOSTNAME).await?;
-        let public_ipv4 = self.get_metadata(&PUBLIC_IPV4).await?;
-
-        // Fetch the main mac address and use that to fetch the overall subnet-id and vpc-id.
-        let (subnet_id, vpc_id) = if let Some(mac) = self.get_metadata(&MAC).await? {
-            let mac = String::from_utf8_lossy(&mac[..]);
-
-            let subnet_path = format!(
-                "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                mac
-            )
-            .parse()?;
-            let vpc_path =
-                format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
-
-            let subnet_id = self.get_metadata(&subnet_path).await?;
-            let vpc_id = self.get_metadata(&vpc_path).await?;
-
-            (subnet_id, vpc_id)
-        } else {
-            (None, None)
-        };
-
-        let role_names = self.get_metadata(&ROLE_NAME).await?;
 
         if let Some(document) = identity_document {
             if self.fields.contains(&AMI_ID_KEY) {
@@ -368,56 +340,70 @@ impl MetadataClient {
             }
         }
 
-        if let Some(availability_zone) = availability_zone {
-            if self.fields.contains(&AVAILABILITY_ZONE_KEY) {
+        if self.fields.contains(&AVAILABILITY_ZONE_KEY) {
+            if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
                 self.state
                     .update(self.keys.availability_zone_key.clone(), availability_zone);
             }
         }
 
-        if let Some(local_hostname) = local_hostname {
-            if self.fields.contains(&LOCAL_HOSTNAME_KEY) {
+        if self.fields.contains(&LOCAL_HOSTNAME_KEY) {
+            if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
                 self.state
                     .update(self.keys.local_hostname_key.clone(), local_hostname);
             }
         }
 
-        if let Some(local_ipv4) = local_ipv4 {
-            if self.fields.contains(&LOCAL_IPV4_KEY) {
+        if self.fields.contains(&LOCAL_IPV4_KEY) {
+            if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
                 self.state
                     .update(self.keys.local_ipv4_key.clone(), local_ipv4);
             }
         }
 
-        if let Some(public_hostname) = public_hostname {
-            if self.fields.contains(&PUBLIC_HOSTNAME_KEY) {
+        if self.fields.contains(&PUBLIC_HOSTNAME_KEY) {
+            if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
                 self.state
                     .update(self.keys.public_hostname_key.clone(), public_hostname);
             }
         }
 
-        if let Some(public_ipv4) = public_ipv4 {
-            if self.fields.contains(&PUBLIC_IPV4_KEY) {
+        if self.fields.contains(&PUBLIC_IPV4_KEY) {
+            if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
                 self.state
                     .update(self.keys.public_ipv4_key.clone(), public_ipv4);
             }
         }
 
-        if let Some(subnet_id) = subnet_id {
-            if self.fields.contains(&SUBNET_ID_KEY) {
-                self.state
-                    .update(self.keys.subnet_id_key.clone(), subnet_id);
+        if self.fields.contains(&SUBNET_ID_KEY) || self.fields.contains(&VPC_ID_KEY) {
+            if let Some(mac) = self.get_metadata(&MAC).await? {
+                let mac = String::from_utf8_lossy(&mac[..]);
+
+                let subnet_path = format!(
+                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
+                    mac
+                )
+                .parse()?;
+                let vpc_path =
+                    format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
+
+                if self.fields.contains(&SUBNET_ID_KEY) {
+                    if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
+                        self.state
+                            .update(self.keys.subnet_id_key.clone(), subnet_id);
+                    }
+                }
+
+                if self.fields.contains(&VPC_ID_KEY) {
+                    if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
+                        self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
+                    }
+                }
             }
         }
 
-        if let Some(vpc_id) = vpc_id {
-            if self.fields.contains(&VPC_ID_KEY) {
-                self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
-            }
-        }
-
-        if let Some(role_names) = role_names {
-            if self.fields.contains(&ROLE_NAME_KEY) {
+        if self.fields.contains(&ROLE_NAME_KEY) {
+            if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
                 let role_names = String::from_utf8_lossy(&role_names[..]);
 
                 for (i, role_name) in role_names.lines().enumerate() {
@@ -498,7 +484,9 @@ mod tests {
             host: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform = config.build(rt.executor()).unwrap();
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -545,7 +533,9 @@ mod tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config.build(rt.executor()).unwrap();
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -574,7 +564,9 @@ mod tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config.build(rt.executor()).unwrap();
+        let mut transform = config
+            .build(TransformContext::new_test(rt.executor()))
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
         std::thread::sleep(std::time::Duration::from_secs(1));

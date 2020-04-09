@@ -1,7 +1,11 @@
 ---
+last_modified_on: "2020-04-08"
 title: Global Options
 description: "Vector's global options, allowing you configure global Vector-wide behavior."
 ---
+
+import Fields from '@site/src/components/Fields';
+import Field from '@site/src/components/Field';
 
 In addition to [sources][docs.sources], [transforms][docs.transforms], and
 [sinks][docs.sinks], Vector accepts global options that serve to configure
@@ -17,29 +21,27 @@ Vector as a whole and set defaults for component options.
 
 ## Configuration
 
-import CodeHeader from '@site/src/components/CodeHeader';
+```toml title="vector.toml"
+# General
+data_dir = "/var/lib/vector" # optional, no default
+dns_servers = ["0.0.0.0:53"] # optional, no default
 
-<CodeHeader fileName="vector.toml" />
-
-```toml
-data_dir = "/var/lib/vector" # example, no default
-  dns_servers = ["0.0.0.0:53"] # example, no default
+# Log schema
+log_schema.host_key = "host" # optional, default
+log_schema.kubernetes_key = "kubernetes" # optional, default
+log_schema.message_key = "message" # optional, default
+log_schema.source_key = "source" # optional, default
+log_schema.source_type_key = "source_type" # optional, default
+log_schema.timestamp_key = "timestamp" # optional, default
 ```
 
-## Options
-
-import Fields from '@site/src/components/Fields';
-
-import Field from '@site/src/components/Field';
-
 <Fields filters={true}>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
   examples={["/var/lib/vector"]}
+  groups={[]}
   name={"data_dir"}
   path={null}
   relevantWhen={null}
@@ -47,21 +49,25 @@ import Field from '@site/src/components/Field';
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### data_dir
 
-The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
+The directory used for persisting Vector state, such as on-disk buffers, file
+checkpoints, and more. Please make sure the Vector project has write
+permissions to this dir.
+
+ See [Data Directory](#data-directory) for more info.
 
 
 </Field>
-
-
 <Field
   common={false}
   defaultValue={null}
   enumValues={null}
   examples={[["0.0.0.0:53"]]}
+  groups={[]}
   name={"dns_servers"}
   path={null}
   relevantWhen={null}
@@ -69,16 +75,196 @@ The directory used for persisting Vector state, such as on-disk buffers, file ch
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### dns_servers
 
-The list of DNS servers Vector will use to resolve DNS requests. When set Vector will ignore the system configuration and use only the list of DNS servers provided. If this option is not set then Vector will attempt to use the system configuration.
+The list of DNS servers Vector will use to resolve DNS requests. When set
+Vector will ignore the system configuration and use only the list of DNS
+servers provided. If this option is not set then Vector will attempt to use the
+system configuration.
+
+
 
 
 </Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"log_schema"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+### log_schema
+
+The default log schema that all Vector components operate on. See the [log data
+model page][docs.data-model.log] for more info.
 
 
+
+<Fields filters={false}>
+<Field
+  common={false}
+  defaultValue={"host"}
+  enumValues={null}
+  examples={["host","@host","instance","machine"]}
+  groups={[]}
+  name={"host_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### host_key
+
+The key used to hold the log host. See the [log data model
+page][docs.data-model.log#host] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"kubernetes"}
+  enumValues={null}
+  examples={["kubernetes","kube","k8s"]}
+  groups={[]}
+  name={"kubernetes_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### kubernetes_key
+
+The key under which Kubernetes related fields are nested.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"message"}
+  enumValues={null}
+  examples={["message","@message","msg"]}
+  groups={[]}
+  name={"message_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### message_key
+
+The key used to hold the log message. See the [log data model
+page][docs.data-model.log#message] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"source"}
+  enumValues={null}
+  examples={["source","@source","src"]}
+  groups={[]}
+  name={"source_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### source_key
+
+The key used to hold the log source. See the [log data model
+page][docs.data-model.log#source] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"source_type"}
+  enumValues={null}
+  examples={["source_type","@source_type","src_ty"]}
+  groups={[]}
+  name={"source_type_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### source_type_key
+
+The key used to hold the log source type. See the [log data model
+page][docs.data-model.log#source_type] for more info.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={"timestamp"}
+  enumValues={null}
+  examples={["timestamp","@timestamp","datetime"]}
+  groups={[]}
+  name={"timestamp_key"}
+  path={"log_schema"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### timestamp_key
+
+The key used to represent when the log was generated. See the [log data model
+page][docs.data-model.log#timestamp] for more info.
+
+
+
+
+</Field>
+</Fields>
+
+</Field>
 </Fields>
 
 ## How It Works
@@ -91,6 +277,12 @@ default, are memory-based, but if you switch them to disk-based you'll need to
 specify a [`data_dir`](#data_dir).
 
 
+[docs.data-model.log#host]: /docs/about/data-model/log/#host
+[docs.data-model.log#message]: /docs/about/data-model/log/#message
+[docs.data-model.log#source]: /docs/about/data-model/log/#source
+[docs.data-model.log#source_type]: /docs/about/data-model/log/#source_type
+[docs.data-model.log#timestamp]: /docs/about/data-model/log/#timestamp
+[docs.data-model.log]: /docs/about/data-model/log/
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms]: /docs/reference/transforms/

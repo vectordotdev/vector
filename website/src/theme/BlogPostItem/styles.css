@@ -20,8 +20,8 @@
 }
 
 .blog-post-item .avatar {
-  margin-top: calc( var(--ifm-spacing-vertical) / 1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) / 1 );
+  margin-top: var(--ifm-spacing-vertical);
+  margin-bottom: var(--ifm-spacing-vertical);
 }
 
 .blog-post-item .avatar__name {
@@ -38,11 +38,9 @@
 }
 
 .blog-post-item:hover {
-  box-shadow: 0 0 30px 10px rgba( var(--ifm-color-primary-rgb), 0.4 );
-  color: var(--ifm-panel-color-active);
-  text-decoration: inherit;
   border-color: var(--ifm-panel-border-color-active);
   box-shadow: var(--ifm-panel-box-shadow-active);
+  color: var(--ifm-panel-color-active);
   text-decoration: none;
 }
 

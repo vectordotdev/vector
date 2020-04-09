@@ -1,0 +1,13 @@
+<Tabs
+  centered={true}
+  className="rounded"
+  defaultValue="<%= strategies.first.name.parameterize %>"
+  values={<%= strategies.collect { |strategy| {label: "#{strategy.title}", value: strategy.name.parameterize } }.to_json %>}>
+<%- strategies.each do |strategy| -%>
+<TabItem value="<%= strategy.name.parameterize %>">
+
+<%= deployment_strategy(strategy, describe: false) %>
+
+</TabItem>
+<%- end -%>
+</Tabs>
