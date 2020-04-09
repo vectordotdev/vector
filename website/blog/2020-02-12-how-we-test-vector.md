@@ -29,16 +29,16 @@ This challenge has given us a unique opportunity to apply wide variety of
 testing techniques:
 
 * Example-based testing
-   * Unit tests
-   * Integration tests
+  * Unit tests
+  * Integration tests
 * Generative testing
-   * Property-based testing
-   * Model-based testing
-   * Fuzz testing
+  * Property-based testing
+  * Model-based testing
+  * Fuzz testing
 * Black-box testing
-   * Performance tests
-   * Correctness tests
-   * Reliability tests
+  * Performance tests
+  * Correctness tests
+  * Reliability tests
 
 While there's no one perfect solution to overcome these difficulties, we've
 found that the combination of these techniques at different layers of the stack
