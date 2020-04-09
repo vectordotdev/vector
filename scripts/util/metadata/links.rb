@@ -25,7 +25,7 @@ require 'net/http'
 # implement dynamic readers that can be found in the `#fetch_dynamic_url`
 # method.
 class Links
-  CATEGORIES = ["assets", "docs", "pages", "urls"].freeze
+  CATEGORIES = ["assets", "docs", "guides", "pages", "urls"].freeze
   VECTOR_ROOT = "https://github.com/timberio/vector".freeze
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit".freeze
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues".freeze

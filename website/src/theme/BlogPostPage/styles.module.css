@@ -18,7 +18,12 @@
 
 .headerContainer h1 {
   margin-top: calc( var(--ifm-spacing-vertical) * 1 );
-  margin-bottom: calc( var(--ifm-spacing-vertical) * 1 );
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 0.5 );
+}
+
+.description {
+  font-size: 1.25em;
+  margin-bottom: calc( var(--ifm-spacing-vertical) * 0.75 );
 }
 
 .headerTags {

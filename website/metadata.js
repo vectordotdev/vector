@@ -2914,18 +2914,17 @@ module.exports = {
     }
   },
   "latest_post": {
-    "author_github": "https://github.com/Jeffail",
-    "date": "2020-01-07",
-    "description": "We love Prometheus, but we also love options\nand so we've added a `prometheus` source to let you\nsend Prometheus format metrics anywhere you like.",
-    "id": "prometheus-source",
-    "path": "website/blog/2020-01-07-prometheus-source.md",
-    "permalink": "https://vector.dev/blog/prometheus-source",
+    "author_github": "https://github.com/lukesteensen",
+    "date": "2020-04-09",
+    "description": "When we set out to build Vector, we knew that reliability and performance were\ntwo of our top priorities. We also knew that even the best of intentions would\nnot be enough to make certain those qualities were realized and reflected in our\nusers' production deployments. Since then, we've been continuously evolving and\nexpanding our approach to achieving that level of quality.",
+    "id": "how-we-test-vector",
+    "path": "website/blog/2020-04-09-how-we-test-vector.md",
+    "permalink": "https://vector.dev/blog/how-we-test-vector",
     "tags": [
-      "type: announcement",
-      "domain: sources",
-      "source: prometheus"
+      "type: post",
+      "domain: testing"
     ],
-    "title": "Prometheus Source"
+    "title": "How we test Vector"
   },
   "latest_release": {
     "commits": [
@@ -3041,7 +3040,9 @@ module.exports = {
     "domain: transforms",
     "transform: ec2_metadata",
     "domain: sources",
-    "source: prometheus"
+    "source: prometheus",
+    "type: post",
+    "domain: testing"
   ],
   "posts": [
     {
@@ -3151,6 +3152,19 @@ module.exports = {
         "source: prometheus"
       ],
       "title": "Prometheus Source"
+    },
+    {
+      "author_github": "https://github.com/lukesteensen",
+      "date": "2020-04-09",
+      "description": "When we set out to build Vector, we knew that reliability and performance were\ntwo of our top priorities. We also knew that even the best of intentions would\nnot be enough to make certain those qualities were realized and reflected in our\nusers' production deployments. Since then, we've been continuously evolving and\nexpanding our approach to achieving that level of quality.",
+      "id": "how-we-test-vector",
+      "path": "website/blog/2020-04-09-how-we-test-vector.md",
+      "permalink": "https://vector.dev/blog/how-we-test-vector",
+      "tags": [
+        "type: post",
+        "domain: testing"
+      ],
+      "title": "How we test Vector"
     }
   ],
   "releases": {

@@ -710,6 +710,10 @@ ul.connected-list.connected-list--hover > li:hover {
   background-image: url(/img/circuit-bg-light.svg);
 }
 
+.domain-bg.domain-bg--testing {
+  background-image: url(/img/testing-bg-light.svg);
+}
+
 .domain-bg.domain-bg--vector {
   background-image: url(/img/vector-bg-light.svg);
 }
@@ -2138,6 +2142,10 @@ html[data-theme='dark'] .domain-bg.domain-bg--observability {
 
 html[data-theme='dark'] .domain-bg.domain-bg--operations {
   background-image: url(/img/circuit-bg-dark.svg);
+}
+
+html[data-theme='dark'] .domain-bg.domain-bg--testing {
+  background-image: url(/img/testing-bg-dark.svg);
 }
 
 html[data-theme='dark'] .domain-bg.domain-bg--vector {
