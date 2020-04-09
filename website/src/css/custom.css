@@ -2143,20 +2143,13 @@ html[data-theme='dark'] .domain-bg.domain-bg--observability {
 html[data-theme='dark'] .domain-bg.domain-bg--operations {
   background-image: url(/img/circuit-bg-dark.svg);
 }
-<<<<<<< HEAD
+
 html[data-theme='dark'] .domain-bg.domain-bg--testing {
   background-image: url(/img/testing-bg-dark.svg);
 }
-html[data-theme='dark'] .domain-bg.domain-bg--networking,
-html[data-theme='dark'] .domain-bg.domain-bg--sinks,
-html[data-theme='dark'] .domain-bg.domain-bg--sources,
-html[data-theme='dark'] .domain-bg.domain-bg--transforms {
-  background-image: url(/img/nodes-bg-dark.svg);
-=======
 
 html[data-theme='dark'] .domain-bg.domain-bg--vector {
   background-image: url(/img/vector-bg-dark.svg);
->>>>>>> master
 }
 
 /*
