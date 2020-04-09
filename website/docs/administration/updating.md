@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 title: Updating
 description: How to update Vector to a newer version.
 ---

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Syslog to New Relic"
 description: "A simple guide to send logs from Syslog to New Relic in just a few minutes."

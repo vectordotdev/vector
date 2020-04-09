@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics to Statsd"
 description: "A simple guide to send metrics to Statsd in just a few minutes."

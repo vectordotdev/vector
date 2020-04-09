@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 title: Install Vector via Nix
 sidebar_label: Nix
 description: Install Vector through the Nix package manager

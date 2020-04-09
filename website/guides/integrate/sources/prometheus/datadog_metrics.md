@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send metrics from Prometheus to Datadog"
 description: "A simple guide to send metrics from Prometheus to Datadog in just a few minutes."

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs to an HTTP endpoint"
 description: "A simple guide to send logs to an HTTP endpoint in just a few minutes."

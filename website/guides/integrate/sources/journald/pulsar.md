@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Send logs from Journald to Apache Pulsar"
 description: "A simple guide to send logs from Journald to Apache Pulsar in just a few minutes."

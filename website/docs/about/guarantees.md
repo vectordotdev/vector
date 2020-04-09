@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 title: Guarantees
 description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
 ---

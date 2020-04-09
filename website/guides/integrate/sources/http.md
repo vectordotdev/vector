@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-01"
 $schema: "/.meta/.schemas/guides.json"
 title: "Collect logs from HTTP and send them anywhere"
 description: "A simple guide to collect logs from HTTP and send them anywhere in just a few minutes."
