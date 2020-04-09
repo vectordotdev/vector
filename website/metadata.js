@@ -122,6 +122,15 @@ module.exports = {
         {
           "author_github": "https://github.com/binarylogic",
           "description": null,
+          "id": "/integrate/sources/generator",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator.md",
+          "series_position": null,
+          "title": "Collect logs from Generator and send them anywhere"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
           "id": "/integrate/sources/http",
           "last_modified_on": null,
           "path": "website/guides/integrate/sources/http.md",
@@ -415,6 +424,213 @@ module.exports = {
           "path": "website/guides/integrate/platforms/docker/http.md",
           "series_position": null,
           "title": "Send logs from Docker to an HTTP endpoint"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/aws_cloudwatch_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/aws_cloudwatch_logs.md",
+          "series_position": null,
+          "title": "Send logs from Generator to AWS Cloudwatch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/aws_kinesis_streams",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/aws_kinesis_streams.md",
+          "series_position": null,
+          "title": "Send logs from Generator to AWS Kinesis Data Streams"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/aws_kinesis_firehose",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/aws_kinesis_firehose.md",
+          "series_position": null,
+          "title": "Send logs from Generator to AWS Kinesis Firehose"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/aws_s3",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/aws_s3.md",
+          "series_position": null,
+          "title": "Send logs from Generator to AWS S3"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/pulsar",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/pulsar.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Apache Pulsar"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/clickhouse",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/clickhouse.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Clickhouse"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/datadog_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/datadog_logs.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Datadog"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/elasticsearch",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/elasticsearch.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Elasticsearch"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/gcp_cloud_storage",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/gcp_cloud_storage.md",
+          "series_position": null,
+          "title": "Send logs from Generator to GCP Cloud Storage (GCS)"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/gcp_pubsub",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/gcp_pubsub.md",
+          "series_position": null,
+          "title": "Send logs from Generator to GCP PubSub"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/gcp_stackdriver_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/gcp_stackdriver_logs.md",
+          "series_position": null,
+          "title": "Send logs from Generator to GCP Stackdriver"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/honeycomb",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/honeycomb.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Honeycomb"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/humio_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/humio_logs.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Humio"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/kafka",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/kafka.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Kafka"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/logdna",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/logdna.md",
+          "series_position": null,
+          "title": "Send logs from Generator to LogDNA"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/loki",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/loki.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Loki"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/new_relic_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/new_relic_logs.md",
+          "series_position": null,
+          "title": "Send logs from Generator to New Relic"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/papertrail",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/papertrail.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Papertrail"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/sematext_logs",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/sematext_logs.md",
+          "series_position": null,
+          "title": "Send logs from Generator to Sematext"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/splunk_hec",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/splunk_hec.md",
+          "series_position": null,
+          "title": "Send logs from Generator to a Splunk HEC"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/socket",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/socket.md",
+          "series_position": null,
+          "title": "Send logs from Generator to a TCP, UDP, or UDS socket"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/file",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/file.md",
+          "series_position": null,
+          "title": "Send logs from Generator to a file"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "description": null,
+          "id": "/integrate/sources/generator/http",
+          "last_modified_on": null,
+          "path": "website/guides/integrate/sources/generator/http.md",
+          "series_position": null,
+          "title": "Send logs from Generator to an HTTP endpoint"
         },
         {
           "author_github": "https://github.com/binarylogic",
@@ -25368,6 +25584,44 @@ module.exports = {
       "status": "prod-ready",
       "through_description": "one or more local files",
       "title": "File",
+      "type": "source",
+      "unsupported_operating_systems": [
+
+      ]
+    },
+    "generator": {
+      "beta": false,
+      "config_examples": {
+        "toml": "[sources.in]\n  type = \"generator\" # required\n  lines = [\"Line 1\", \"Line 2\"] # required"
+      },
+      "delivery_guarantee": "at_least_once",
+      "description": null,
+      "event_types": [
+        "log"
+      ],
+      "features": [
+        "Generate fixed log data for testing."
+      ],
+      "function_category": "test",
+      "id": "generator_source",
+      "logo_path": null,
+      "name": "generator",
+      "noun": "Generator",
+      "operating_systems": [
+        "Linux",
+        "MacOS",
+        "Windows"
+      ],
+      "output_types": [
+        "log"
+      ],
+      "service_providers": [
+
+      ],
+      "short_description": "Ingests data through an internal data generator and outputs log events.",
+      "status": "prod-ready",
+      "through_description": "an internal data generator",
+      "title": "Generator",
       "type": "source",
       "unsupported_operating_systems": [
 
