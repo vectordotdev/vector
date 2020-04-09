@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-08"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -186,7 +186,9 @@ break backward compatibility.
 
 ### search_dirs
 
-A list of directories search when loading a Lua file via the `require` function.
+A list of directories to search when loading a Lua file via the `require`
+function. If not specified, the modules are looked up in the directories of
+Vector's configs.
 
  See [Search Directories](#search-directories) for more info.
 
@@ -725,8 +727,9 @@ end
 ### Search Directories
 
 Vector provides a [`search_dirs`](#search_dirs) option that allows you to specify absolute
-paths that will searched when using the [Lua `require`
-function][urls.lua_require].
+paths that will be searched when using the [Lua `require`
+function][urls.lua_require]. If this option is not set, the directories of
+the [configuration files][docs.setup.configuration] will be used instead.
 
 ### Lua Version
 
@@ -745,6 +748,7 @@ first chapters of [the official book][urls.lua_pil] or consulting
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.sources.stdin]: /docs/reference/sources/stdin/
 [urls.externally_tagged_representation]: https://serde.rs/enum-representations.html#externally-tagged
 [urls.lua]: https://www.lua.org/

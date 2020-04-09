@@ -230,6 +230,9 @@ fn main() {
     });
     config_paths.sort();
     config_paths.dedup();
+    config_paths::CONFIG_PATHS
+        .set(config_paths.clone())
+        .expect("Cannot set global config paths");
 
     if opts.watch_config {
         // Start listening for config changes immediately.
