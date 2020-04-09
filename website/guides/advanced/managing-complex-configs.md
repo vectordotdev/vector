@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-03-30"
 $schema: "/.meta/.schemas/guides.json"
 title: Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
