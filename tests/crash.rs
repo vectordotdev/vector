@@ -1,7 +1,10 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
 use futures01::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
+use lazy_static::lazy_static;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 use vector::{
     shutdown::ShutdownSignal,
     test_util::{
@@ -14,6 +17,30 @@ use vector::{
     },
     Event, {sinks, sources},
 };
+
+// Returns a unit of time that is approximately equal to 1ms of a busy loop for debug build on a CPU from 2020.
+fn quantum_of_time() -> Duration {
+    let init: u64 = rand::thread_rng().gen(); // A random value is used to avoid unrolling the loop at compile time.
+                                              // When https://doc.rust-lang.org/std/hint/fn.black_box.html is
+                                              // stabilized, it would be possible to use it instead.
+    let start = Instant::now();
+    let mut value = init;
+    for n in 0..10_000_000 {
+        value ^= n;
+    }
+
+    if value % 2 == (init & 1) {
+        // The last bit was swapped an even number of times, so it is the same as it was initially.
+        // However, the optimizer doesn't infer this and makes all iterations actually happen.
+        start.elapsed() / 360
+    } else {
+        unreachable!()
+    }
+}
+
+lazy_static! {
+    static ref QUANTUM_OF_TIME: Duration = quantum_of_time();
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PanicSink;
@@ -78,18 +105,18 @@ fn test_sink_panic() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     let _ = std::panic::take_hook();
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -160,17 +187,17 @@ fn test_sink_error() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -228,17 +255,17 @@ fn test_source_error() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -299,18 +326,18 @@ fn test_source_panic() {
     let (topology, crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
     let _ = std::panic::take_hook();
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(*QUANTUM_OF_TIME * 100);
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
