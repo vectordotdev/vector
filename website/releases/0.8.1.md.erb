@@ -1,0 +1,11 @@
+<%- release = metadata.releases.send("0.8.1") -%>
+<%= release_header(release) %>
+
+<%- if release.highlights.any? -%>
+<%= release_highlights(release, heading_depth: 2) %>
+
+<%- end -%>
+## Changelog
+
+<Changelog version={<%= release.version.to_json %>} />
+

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-14"
 title: Install Vector On Ubuntu
 sidebar_label: Ubuntu
 description: Install Vector on the Ubuntu operating system
@@ -92,7 +92,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>
@@ -138,7 +138,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>
@@ -184,7 +184,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>

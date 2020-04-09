@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-14"
 title: Install Vector On MacOS
 sidebar_label: MacOS
 description: Install Vector on MacOS
@@ -111,7 +111,7 @@ brew services start vector
 <ConfigExample
   format="toml"
   path={"vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -141,7 +141,7 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"file"}
+  sourceName={"journald"}
   sinkName={null} />
 
 </li>
@@ -152,14 +152,12 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-  -v /var/log \
   timberio/vector:latest-alpine
 ```
 
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `-v /var/log` flag ensures that Vector has access to your app's logging directory, adjust as necessary.
 * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>

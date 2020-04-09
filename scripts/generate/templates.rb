@@ -275,6 +275,10 @@ class Templates
     render("#{partials_path}/_full_config_spec.toml", binding).strip.gsub(/ *$/, '')
   end
 
+  def highlights(highlights, author: true, heading_depth: 3, size: nil, style: nil)
+    render("#{partials_path}/_highlights.md", binding).strip
+  end
+
   def installation_tutorial(interfaces, strategies, platform: nil, heading_depth: 3, show_deployment_strategy: true)
     render("#{partials_path}/_installation_tutorial.md", binding).strip
   end
@@ -482,6 +486,18 @@ class Templates
 
   def pluralize(count, word)
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
+  end
+
+  def release_breaking_changes(release, heading_depth: 3)
+    render("#{partials_path}/_release_breaking_changes.md", binding).strip
+  end
+
+  def release_header(release)
+    render("#{partials_path}/_release_header.md", binding).strip
+  end
+
+  def release_highlights(release, heading_depth: 3)
+    render("#{partials_path}/_release_highlights.md", binding).strip
   end
 
   def release_summary(release)

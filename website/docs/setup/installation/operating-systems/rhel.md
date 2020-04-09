@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-14"
 title: Install Vector On Red Hat Enterprise Linux
 sidebar_label: RHEL
 description: Install Vector on Red Hat Enterprise Linux
@@ -178,7 +178,7 @@ The following diagram demonstrates how it works.
 <ConfigExample
   format="toml"
   path={"vector.toml"}
-  sourceName={"journald"}
+  sourceName={"file"}
   sinkName={null} />
 
 </li>

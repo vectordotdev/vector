@@ -55,7 +55,7 @@
         "enum": <%= (
           ["type: guide", "type: post", "type: tutorial"] +
           metadata.domains.collect { |d| "domain: #{d.name}" } +
-          metadata.installation.platforms_list.collect { |p| "platform: #{p.name}" } +
+          metadata.platform_names.collect { |p| "platform: #{p.downcase}" } +
           metadata.sources_list.collect { |s| "source: #{s.name}" } +
           metadata.transforms_list.collect { |t| "transform: #{t.name}" } +
           metadata.sinks_list.collect { |s| "sink: #{s.name}" }

@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/guides/getting-started/">Getting Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://twitter.com/vectordotdev">@vectordotdev<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download">Download v0.8.2<a/>
+    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/blog/">Blog<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/community/">Community<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/releases/latest/download/">Download v0.8.2<a/>
   </strong>
 </p>
 
@@ -14,7 +14,7 @@
 
 <p align="center">
   <strong>
-    New post! <a href="https://vector.dev/blog/how-we-test-vector">How We Test Vector</a>
+    New post! <a href="https://vector.dev/blog/how-we-test-vector/">How We Test Vector</a>
   </strong>
 </p>
 
@@ -192,15 +192,15 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 Or use your own [preferred method][docs.installation].
 
 
-## Latest Posts & Announcements
+## Latest Highlights
 
-* [How We Test Vector](https://vector.dev/blog/how-we-test-vector)
-* [Prometheus Source](https://vector.dev/blog/prometheus-source)
-* [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
-* [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
-* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
+* [~36% Performance Improvement](https://vector.dev/highlights/2020-04-11-overall-performance-increase/)
+* [The Vector Source Now Accepts Metrics](https://vector.dev/highlights/2020-04-07-vector-to-vector-metrics/)
+* [Lua Transform v2](https://vector.dev/highlights/2020-04-07-lua-transform-version-2/)
+* [More Condition Predicates](https://vector.dev/highlights/2020-04-01-more-condition-predicates/)
+* [New Kubernetes Pod Metdata Transform](https://vector.dev/highlights/2020-04-01-kubernetes-pod-metadata-transform/)
 
-[view all...][urls.vector_blog]
+[view all...][urls.vector_highlights]
 
 ---
 
@@ -278,15 +278,15 @@ Or use your own [preferred method][docs.installation].
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
 [urls.v0.8.2]: https://vector.dev/releases/0.8.2/download
-[urls.vector_blog]: https://vector.dev/blog
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
-[urls.vector_community]: https://vector.dev/community
-[urls.vector_enriching_transforms]: https://vector.dev/components?functions%5B%5D=enrich
-[urls.vector_parsing_transforms]: https://vector.dev/components?functions%5B%5D=parse
+[urls.vector_community]: https://vector.dev/community/
+[urls.vector_enriching_transforms]: https://vector.dev/components/?functions%5B%5D=enrich
+[urls.vector_highlights]: https://vector.dev/highlights/
+[urls.vector_parsing_transforms]: https://vector.dev/components/?functions%5B%5D=parse
 [urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
-[urls.vector_releases]: https://vector.dev/releases/latest
+[urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy

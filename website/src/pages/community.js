@@ -30,7 +30,7 @@ function Community() {
 
             <div className="row">
               <div className="col">
-                <a href="https://chat.vector.dev" target="_blank" className="panel panel--link text--center">
+                <a href="https://chat.vector.dev" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-message-circle"></i>
                   </div>
@@ -39,7 +39,7 @@ function Community() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel panel--link text--center">
+                <a href="https://twitter.com/vectordotdev" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-twitter" title="Twitter"></i>
                   </div>
@@ -48,7 +48,7 @@ function Community() {
                 </a>
               </div>
               <div className="col">
-                <a href="https://github.com/timberio/vector" target="_blank" className="panel panel--link text--center">
+                <a href="https://github.com/timberio/vector" target="_blank" className="panel text--center">
                   <div className="panel--icon">
                     <i className="feather icon-github"></i>
                   </div>

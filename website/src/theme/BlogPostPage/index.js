@@ -36,10 +36,18 @@ function BlogPostPage(props) {
       <article className={styles.blogPost}>
         <header className={classnames('hero', 'domain-bg', `domain-bg--${domain}`, styles.header)}>
           <div className={classnames('container', styles.headerContainer)}>
-            <Avatar github={author_github} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
+            <div class="hero--avatar">
+              <Avatar
+                github={author_github}
+                size="lg"
+                nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>}
+                rel="author"
+                subTitle={false}
+                vertical={true} />
+            </div>
             <h1>{title}</h1>
-            <div className={styles.description}>{metadata.description}</div>
-            <div className={styles.headerTags}>
+            <div className="hero--subtitle">{metadata.description}</div>
+            <div className="hero--tags">
               <Tags colorProfile="blog" tags={tags} />
             </div>
           </div>

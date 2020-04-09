@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-10"
+last_modified_on: "2020-04-12"
 $schema: "/.meta/.schemas/guides.json"
 title: Parsing CSV logs with Lua
 description: Parse structured application logs in CSV format using Lua transform
@@ -258,8 +258,8 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [docs.reference.transforms.lua]: /docs/reference/transforms/lua/
 [guides.advanced.custom-aggregations-with-lua]: /guides/advanced/custom-aggregations-with-lua/
 [guides.getting-started.your-first-pipeline]: /guides/getting-started/your-first-pipeline/
-[pages.parse_transforms]: /components?functions%5B%5D=parse/
-[pages.program_transforms]: /components?functions%5B%5D=program/
+[pages.parse_transforms]: /components/?functions%5B%5D=parse/
+[pages.program_transforms]: /components/?functions%5B%5D=program/
 [urls.lua_csv_repo]: https://github.com/geoffleyland/lua-csv
 [urls.lua_csv_view]: https://github.com/geoffleyland/lua-csv/blob/09557e4608b02d136b9ae39a8fa0f36328fa1cec/lua/csv.lua
 [urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
