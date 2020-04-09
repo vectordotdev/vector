@@ -127,7 +127,6 @@ impl Lua {
             .map(|d| format!("{}/?.lua", d.to_string_lossy()))
             .collect::<Vec<_>>()
             .join(";");
-        println!("additional_paths: {:?}", additional_paths);
 
         let mut timers = Vec::new();
         lua.context(|ctx| -> crate::Result<()> {
