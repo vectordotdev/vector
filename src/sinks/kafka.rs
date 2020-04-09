@@ -331,7 +331,7 @@ mod integration_test {
         use futures::compat::Future01CompatExt;
         let jh = rt.spawn_handle(super::healthcheck(config).compat());
 
-        rt.block_on_std(jh).unwrap();
+        rt.block_on_std(jh).unwrap().unwrap();
     }
 
     const TEST_CA: &str = "tests/data/Vector_CA.crt";
