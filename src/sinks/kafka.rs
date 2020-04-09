@@ -311,6 +311,29 @@ mod integration_test {
         kafka_happy_path("localhost:9092", None, None);
     }
 
+    #[test]
+    fn healthcheck() {
+        let topic = format!("test-{}", random_string(10));
+
+        let config = KafkaSinkConfig {
+            bootstrap_servers: "localhost:9092".into(),
+            topic: topic.clone(),
+            compression: None,
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            key_field: None,
+            tls: None,
+            socket_timeout_ms: 60000,
+            message_timeout_ms: 300000,
+            ..Default::default()
+        };
+
+        let mut rt = crate::test_util::runtime();
+        use futures::compat::Future01CompatExt;
+        let jh = rt.spawn_handle(super::healthcheck(config).compat());
+
+        rt.block_on_std(jh).unwrap();
+    }
+
     const TEST_CA: &str = "tests/data/Vector_CA.crt";
 
     #[test]
