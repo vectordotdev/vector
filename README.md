@@ -14,7 +14,7 @@
 
 <p align="center">
   <strong>
-    New post! <a href="https://vector.dev/blog/unit-testing-vector-config-files">Unit Testing Your Vector Config Files</a>
+    New post! <a href="https://vector.dev/blog/how-we-test-vector">How we test Vector</a>
   </strong>
 </p>
 
@@ -194,11 +194,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Posts & Announcements
 
-* [Unit Testing Your Vector Config Files](https://vector.dev/blog/unit-testing-vector-config-files)
 * [How we test Vector](https://vector.dev/blog/how-we-test-vector)
 * [Prometheus Source](https://vector.dev/blog/prometheus-source)
 * [EC2 Metadata Enrichments](https://vector.dev/blog/ec2-metadata)
 * [Alpha Kubernetes Source](https://vector.dev/blog/kubernetes-source-alpha)
+* [Use Custom DNS Servers](https://vector.dev/blog/custom-dns)
 
 [view all...][urls.vector_blog]
 

@@ -2914,17 +2914,17 @@ module.exports = {
     }
   },
   "latest_post": {
-    "author_github": "https://github.com/binarylogic",
+    "author_github": "https://github.com/lukesteensen",
     "date": "2020-04-09",
-    "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-    "id": "unit-testing-vector-config-files",
-    "path": "website/blog/2020-04-09-unit-testing-vector-config-files.md",
-    "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+    "description": "When we set out to build Vector, we knew that reliability and performance were\ntwo of our top priorities. We also knew that even the best of intentions would\nnot be enough to make certain those qualities were realized and reflected in our\nusers' production deployments. Since then, we've been continuously evolving and\nexpanding our approach to achieving that level of quality.",
+    "id": "how-we-test-vector",
+    "path": "website/blog/2020-04-09-how-we-test-vector.md",
+    "permalink": "https://vector.dev/blog/how-we-test-vector",
     "tags": [
-      "type: announcement",
-      "domain: config"
+      "type: post",
+      "domain: testing"
     ],
-    "title": "Unit Testing Your Vector Config Files"
+    "title": "How we test Vector"
   },
   "latest_release": {
     "commits": [
@@ -3034,6 +3034,7 @@ module.exports = {
     "domain: platforms",
     "platform: arm",
     "platform: windows",
+    "domain: config",
     "domain: networking",
     "platform: kubernetes",
     "domain: transforms",
@@ -3041,8 +3042,7 @@ module.exports = {
     "domain: sources",
     "source: prometheus",
     "type: post",
-    "domain: testing",
-    "domain: config"
+    "domain: testing"
   ],
   "posts": [
     {
@@ -3084,6 +3084,19 @@ module.exports = {
         "platform: windows"
       ],
       "title": "Windows Support Is Here!"
+    },
+    {
+      "author_github": "https://github.com/binarylogic",
+      "date": "2019-11-25",
+      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+      "id": "unit-testing-vector-config-files",
+      "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
+      "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+      "tags": [
+        "type: announcement",
+        "domain: config"
+      ],
+      "title": "Unit Testing Your Vector Config Files"
     },
     {
       "author_github": "https://github.com/Jeffail",
@@ -3142,29 +3155,16 @@ module.exports = {
     },
     {
       "author_github": "https://github.com/lukesteensen",
-      "date": "2020-02-12",
+      "date": "2020-04-09",
       "description": "When we set out to build Vector, we knew that reliability and performance were\ntwo of our top priorities. We also knew that even the best of intentions would\nnot be enough to make certain those qualities were realized and reflected in our\nusers' production deployments. Since then, we've been continuously evolving and\nexpanding our approach to achieving that level of quality.",
       "id": "how-we-test-vector",
-      "path": "website/blog/2020-02-12-how-we-test-vector.md",
+      "path": "website/blog/2020-04-09-how-we-test-vector.md",
       "permalink": "https://vector.dev/blog/how-we-test-vector",
       "tags": [
         "type: post",
         "domain: testing"
       ],
       "title": "How we test Vector"
-    },
-    {
-      "author_github": "https://github.com/binarylogic",
-      "date": "2020-04-09",
-      "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
-      "id": "unit-testing-vector-config-files",
-      "path": "website/blog/2020-04-09-unit-testing-vector-config-files.md",
-      "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
-      "tags": [
-        "type: announcement",
-        "domain: config"
-      ],
-      "title": "Unit Testing Your Vector Config Files"
     }
   ],
   "releases": {
@@ -15594,6 +15594,19 @@ module.exports = {
             "platform: windows"
           ],
           "title": "Windows Support Is Here!"
+        },
+        {
+          "author_github": "https://github.com/binarylogic",
+          "date": "2019-11-25",
+          "description": "Today we're excited to announce beta support for unit testing Vector\nconfigurations, allowing you to define tests directly within your Vector\nconfiguration file. These tests are used to assert the output from topologies of\ntransform components given certain input events, ensuring\nthat your configuration behavior does not regress; a very powerful feature for\nmission-critical production pipelines that are collaborated on.",
+          "id": "unit-testing-vector-config-files",
+          "path": "website/blog/2019-11-25-unit-testing-vector-config-files.md",
+          "permalink": "https://vector.dev/blog/unit-testing-vector-config-files",
+          "tags": [
+            "type: announcement",
+            "domain: config"
+          ],
+          "title": "Unit Testing Your Vector Config Files"
         }
       ],
       "subtitle": "",
