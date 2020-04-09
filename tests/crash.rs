@@ -18,14 +18,14 @@ use vector::{
     Event, {sinks, sources},
 };
 
-// Returns a unit of time that is approximately equal to 1ms of a busy loop for debug build on a CPU from 2020.
+// Returns a unit of time that is approximately equal to 5ms of a busy loop for debug build on a CPU from 2020.
 fn quantum_of_time() -> Duration {
     let init: u64 = rand::thread_rng().gen(); // A random value is used to avoid unrolling the loop at compile time.
                                               // When https://doc.rust-lang.org/std/hint/fn.black_box.html is
                                               // stabilized, it would be possible to use it instead.
     let start = Instant::now();
     let mut value = init;
-    for n in 0..10_000_000 {
+    for n in 0..50_000_000 {
         value ^= n;
     }
 
