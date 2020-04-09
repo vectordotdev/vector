@@ -342,3 +342,4 @@ deploy Vector. Onto the next guide!
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.transforms.regex_parser]: /docs/reference/transforms/regex_parser/
 [docs.transforms]: /docs/reference/transforms/
+[guides.advanced.unit_testing]: /guides/advanced/unit-testing/

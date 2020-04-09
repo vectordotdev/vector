@@ -134,7 +134,7 @@ flexibility of Vector:
   <div className="sub-title">Vector is free and open-source!</div>
 </Jump>
 
-<Jump to="[[[guides.getting-started]]]" leftIcon="book">
+<Jump to="/guides/getting-started/" leftIcon="book">
   <div className="title">Vector getting started series</div>
   <div className="sub-title">Go from zero to production in under 10 minutes!</div>
 </Jump>

@@ -157,4 +157,5 @@ Please refer to our troubleshooting guide:
 [docs.process-management#flags]: /docs/administration/process-management/#flags
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
+[guides.advanced.troubleshooting]: /guides/advanced/troubleshooting/
 [urls.issue_230]: https://github.com/timberio/vector/issues/230

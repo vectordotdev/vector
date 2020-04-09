@@ -187,4 +187,5 @@ If you're running Vector in environments where it's not possible to issue
 automatically gobble up changes whenever the file is written to.
 
 
-
+[guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[guides.unit-testing]: /guides/advanced/unit-testing/

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-09"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment

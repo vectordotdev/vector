@@ -74,7 +74,7 @@ The key thing to notice above is the use of the `inputs` option. This connects
 Vector's component to create a pipeline. For a simple introduction, please
 refer to the:
 
-<Jump to="[[[guides.getting-started.your-first-pipeline]]]">Getting Started Guide</Jump>
+<Jump to="/guides/getting-started/your-first-pipeline/">Getting Started Guide</Jump>
 
 ## Reference
 

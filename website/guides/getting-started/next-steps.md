@@ -17,12 +17,12 @@ want to extract the full potential of Vector then proceed to the
 [advanced guides][guides.advanced]. We recommend the following to get you
 started:
 
-<Jump to="[[[guides.managing-complex-configs]]]" leftIcon="book">
+<Jump to="/guides/advanced/managing-complex-configs/" leftIcon="book">
   Managing Complex Configs
 </Jump>
-<Jump to="[[[guides.unit-testing]]]" leftIcon="book">
+<Jump to="/guides/advanced/unit-testing/" leftIcon="book">
   Unit Testing Your Configs
 </Jump>
 
 
-
+[guides.advanced]: /guides/advanced/
