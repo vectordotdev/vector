@@ -1,20 +1,20 @@
+use super::Registration;
+use crate::Role;
 use serde_json::Value;
+use snafu::{ResultExt, Snafu};
 use std::ffi::CString;
 use std::os::raw::c_char;
 use std::str;
-use snafu::{Snafu, ResultExt};
-use super::Registration;
-use crate::{Role};
 
 #[derive(Debug, Snafu)]
 #[repr(C)]
 pub enum Error {
     #[snafu(display("Codec error: {}", source))]
-    Codec { source: serde_json::error::Error, },
+    Codec { source: serde_json::error::Error },
     #[snafu(display("Null error: {}", source))]
-    Nul { source: std::ffi::NulError, },
+    Nul { source: std::ffi::NulError },
     #[snafu(display("UTF-8 error: {}", source))]
-    Utf8 { source: std::str::Utf8Error, },
+    Utf8 { source: std::str::Utf8Error },
     #[snafu(display("Foreign Module error"))]
     Foreign,
 }
@@ -24,8 +24,7 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 /// Get a field from the event type.
 pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
     let field_str = field.as_ref();
-    let field_cstring = CString::new(field_str)
-        .context(Nul)?;
+    let field_cstring = CString::new(field_str).context(Nul)?;
     let field_ptr: *const c_char = field_cstring.as_ptr();
 
     let hinted_value_len = unsafe { ffi::hint_field_length(field_ptr) };
@@ -40,10 +39,8 @@ pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
     unsafe { ffi::get(field_ptr, value_buffer_ptr) };
 
     let ret_cstring = unsafe { CString::from_raw(value_buffer_ptr) };
-    let ret_str = ret_cstring.to_str()
-        .context(Utf8)?;
-    let ret_value: Value = serde_json::de::from_str(ret_str)
-        .context(Codec)?;
+    let ret_str = ret_cstring.to_str().context(Utf8)?;
+    let ret_value: Value = serde_json::de::from_str(ret_str).context(Codec)?;
 
     Ok(Some(ret_value))
     // Ok(None)
@@ -51,15 +48,12 @@ pub fn get(field: impl AsRef<str>) -> Result<Option<Value>> {
 
 pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     let field_str = field.as_ref();
-    let field_cstring = CString::new(field_str)
-        .context(Nul)?;
+    let field_cstring = CString::new(field_str).context(Nul)?;
     let field_ptr = field_cstring.as_ptr();
 
     let value = value.into();
-    let value_serialized = serde_json::to_string(&value)
-        .context(Codec)?;
-    let value_cstring = CString::new(value_serialized)
-        .context(Nul)?;
+    let value_serialized = serde_json::to_string(&value).context(Codec)?;
+    let value_cstring = CString::new(value_serialized).context(Nul)?;
 
     let value_ptr = value_cstring.as_ptr();
     unsafe { Ok(ffi::insert(field_ptr, value_ptr)) }
@@ -76,15 +70,14 @@ pub fn register_sink(mut registration: Registration) -> Result<()> {
 }
 
 pub fn register_source(mut registration: Registration) -> Result<()> {
-    let _result= unsafe { ffi::register_source(&mut registration as *mut Registration) };
+    let _result = unsafe { ffi::register_source(&mut registration as *mut Registration) };
     Ok(())
 }
 
-
 pub mod ffi {
+    use super::Result;
     use crate::guest::Registration;
     use crate::Role;
-    use super::Result;
 
     #[must_use]
     #[repr(C)]
@@ -108,14 +101,8 @@ pub mod ffi {
         pub(super) fn hint_field_length(field_ptr: *const i8) -> usize;
 
         // Foreign items can't be generic, so we expose specialized ones.
-        pub(super) fn register_transform(
-            registration_ptr: *const Registration
-        ) -> u32;
-        pub(super) fn register_sink(
-            registration_ptr: *const Registration
-        ) -> u32;
-        pub(super) fn register_source(
-            registration_ptr: *const Registration
-        ) -> u32;
+        pub(super) fn register_transform(registration_ptr: *const Registration) -> u32;
+        pub(super) fn register_sink(registration_ptr: *const Registration) -> u32;
+        pub(super) fn register_source(registration_ptr: *const Registration) -> u32;
     }
 }

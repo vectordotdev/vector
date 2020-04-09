@@ -13,10 +13,10 @@ pub mod buffers;
 pub mod conditions;
 pub mod config_paths;
 pub mod dns;
-#[cfg(feature = "foreign_modules")]
-pub mod foreign_modules;
 pub mod event;
 pub mod expiring_hash_map;
+#[cfg(feature = "foreign_modules")]
+pub mod foreign_modules;
 pub mod generate;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;

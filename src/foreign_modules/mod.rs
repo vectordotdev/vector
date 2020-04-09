@@ -18,10 +18,11 @@ use tracing::{instrument, Level};
 mod context;
 mod util;
 use context::ForeignModuleContext;
-use std::fmt::Debug;
-use std::marker::PhantomData;
 use foreign_modules::guest::Registration;
 use foreign_modules::Role;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use util::GuestPointer;
 
 pub mod hostcall; // Pub is required for lucet.
 mod defaults {
@@ -82,7 +83,7 @@ pub struct WasmModule {
     /// A stored version of the config for later referencing.
     config: WasmModuleConfig,
     /// The handle to the Lucet instance.
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     instance: InstanceHandle,
     role: Role,
 }
@@ -123,42 +124,46 @@ impl WasmModule {
         event!(Level::TRACE, "instantiated");
 
         event!(Level::TRACE, "registering");
-        let worked = wasm_module.instance.run("init", &[])?;
-        let registration_ptr: *mut Registration = worked.returned()?.as_mut();
-        println!("{:?}", registration_ptr);
         // This is a pointer into the WASM Heap!
-        let mut heap = wasm_module.instance.heap_mut();
-        let registration = heap[registration_ptr as usize..].as_mut_ptr() as *mut Registration;
-        println!("{:?}", registration);
-        println!("{:?}", unsafe { *registration });
-
+        let registration_ptr: *mut Registration = wasm_module.instance.run("init", &[])?.returned()?.as_mut();
+        let registration_ptr = GuestPointer::<Registration>::from(registration_ptr);
+        let registration = registration_ptr.deref(wasm_module.instance.heap_mut())?;
+        if registration.wasi() {
+            let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build()?;
+            wasm_module.instance.insert_embed_ctx(wasi_ctx);
+        }
         event!(Level::TRACE, "registered");
+
         Ok(wasm_module)
     }
-}
 
-
-impl WasmModule {
     #[instrument]
     pub fn process(&mut self, event: Event) -> Result<Option<Event>> {
         event!(Level::TRACE, "processing");
-
-        // The instance context is essentially an anymap, so this these aren't colliding!
-        let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build()?;
-        self.instance.insert_embed_ctx(wasi_ctx);
 
         let engine_context = ForeignModuleContext::new(event);
         self.instance.insert_embed_ctx(engine_context);
 
         let _worked = self.instance.run("process", &[])?;
 
-        let engine_context: ForeignModuleContext = self.instance
+        let engine_context: ForeignModuleContext = self
+            .instance
             .remove_embed_ctx()
             .ok_or("Could not retrieve context after processing.")?;
         let ForeignModuleContext { event: out } = engine_context;
 
         event!(Level::TRACE, "processed");
         Ok(out)
+    }
+
+    #[instrument]
+    pub fn shutdown(&mut self) -> Result<()> {
+        event!(Level::TRACE, "shutting down");
+
+        let _worked = self.instance.run("shutdown", &[])?;
+
+        event!(Level::TRACE, "processed");
+        Ok(())
     }
 }
 
@@ -181,10 +186,12 @@ fn protobuf() -> Result<()> {
     json_fixture.write(event_string.as_bytes());
 
     // Run the test.
-    println!("NOT BUILT");
-    let mut module = WasmModule::build(WasmModuleConfig::new("target/wasm32-wasi/release/protobuf.wasm", "cache", ))?;
-    println!("BUILT");
+    let mut module = WasmModule::build(WasmModuleConfig::new(
+        "target/wasm32-wasi/release/protobuf.wasm",
+        "cache",
+    ))?;
     let out = module.process(event.clone())?;
+    module.shutdown();
 
     let retval = out.unwrap();
     assert_eq!(

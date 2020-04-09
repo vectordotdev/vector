@@ -204,57 +204,35 @@ serialization to JSON. We're investigating ways to speed this up.
  * Other serialization options may be much faster but less compatible.
 
 
-### Setup
+### Initialization
 
 
 Regardless of whether of not the module uses WASI, or has access to a language specific binding, it can interact with
 Vector. Vector works by invoking the modules public interface. First, as soon as the module is loaded, `register` is
-called once, globally, per module. In this call, the module can configure how Vector sees it and talks to it.
+called once, globally, per module. In this call, the module can configure how Vector sees it and talks to it. During
+this time, the module can do any one time setup it needs. (Eg. Opening a socket, a file).
 
 If using the Vector guest API this can be done via:
 
 ```rust
 use foreign_modules::guest::{Registration, roles::Sink};
 
-// TODO: Add better FFI error handling!
 #[no_mangle]
-pub extern "C" fn register() {
-    let stub = Default::default();
-    Registration::<Sink>::default()
-        .blanket_option(stub)
-        .sink_only_option(stub)
-        .register();
+pub extern "C" fn init() -> *mut Registration {
+ &mut Registration::transform()
+    .set_wasi(true) as *mut Registration
 }
 ```
 
-Then, when each module is instantiated for the first time `initialize` is called. During this time, the module can do
-any one time setup it needs. (Eg. Opening a socket, a file).
-
-```rust
-const ONE_TIME_INIT: Once = Once::new();
-
-// TODO: Add better FFI error handling!
-#[no_mangle]
-pub extern "C" fn initialize() {
-    ONE_TIME_INIT.call_once(|| {
-        println!("One time init");
-    })
-}
-```
-
-What happens next depends on which type of module you register.
+What happens next depends on which type of module it is.
 
 ### Module types
-
-An avid Rust hacker will note the below APIs are not very idiomatic!
-
-> TODO: Reflect some of the practice from
-https://michael-f-bryan.github.io/rust-ffi-guide/errors/return_types.html
 
 * `Transform`: Modules of this role can be used as a transform `type`.
 
   ```rust
   use foreign_modules::guest::hostcall;
+
   // TODO: Add better FFI error handling!
   #[no_mangle]
   pub extern "C" fn process() -> usize {
@@ -265,12 +243,13 @@ https://michael-f-bryan.github.io/rust-ffi-guide/errors/return_types.html
   }
   ```
 
-> The rest are still a big TODO. How can we handle batching and partitioning etc? How do we handle all the knobs?
+> **TODO:** Sources, sinks, and codecs have no POC or formal specification, below is a work in progress.
 
 * `Source`: Modules of this role can be used as a source `type`.
 
   ```rust
   use foreign_modules::guest::hostcall;
+
   // TODO: Add better FFI error handling!
   #[no_mangle]
   pub extern "C" fn start() {
@@ -282,6 +261,7 @@ https://michael-f-bryan.github.io/rust-ffi-guide/errors/return_types.html
 
   ```rust
   use foreign_modules::guest::hostcall;
+
   #[no_mangle]
   // TODO: Add better FFI error handling!
   pub extern "C" fn process() {
@@ -328,31 +308,25 @@ crate-type = ["cdylib"]
 
 [dependencies]
 foreign_modules = { path = "/path/to/your/clone/of/vector/lib/foreign-modules"}
+serde = { version = "1", features = ["derive"] }
 ```
 
 Next, in your `lib.rs` file:
 
 ```rust
-use vector::api::guest::{Registration, roles::Transform, hostcall};
+use foreign_modules::{Registration, hostcall};
+use serde::{Serialize, Deserialize};
 
 #[no_mangle]
-pub extern "C" fn register() {
-    Registration::<Transform>::default()
-        // TODO: Options here
-        .register();
-}
-
-#[no_mangle]
-pub extern "C" fn initialize() {
-    // Relax! Nothing needed.
+pub extern "C" fn init() -> *mut Registration {
+ &mut Registration::transform()
+    .set_wasi(true) as *mut Registration
 }
 
 // TODO: Add better FFI error handling!
 #[no_mangle]
 pub extern "C" fn process() -> usize {
     let result = hostcall::get("message");
-
-    // TODO: Do your stuff
 
     match result.unwrap() {
         Some(value) => {
@@ -364,6 +338,11 @@ pub extern "C" fn process() -> usize {
         },
     }
 }
+
+#[no_mangle]
+pub extern "C" fn shutdown() {
+    ();
+}
 ```
 
 Now to build it:
@@ -373,8 +352,6 @@ cargo +nightly build --target wasm32-wasi --release
 ```
 
 In your `target/wasm-wasi/release/` verify that the `echo.wasm` file exists. Next edit your Vector `config.toml`:
-
-> TODO: Talk more about this!
 
 ```toml
 data_dir = "/var/lib/vector/"
@@ -387,7 +364,7 @@ type = "stdin"
 [transforms.demo]
 inputs = ["source0"]
 type = "wasm"
-source = "$TARGET_DIRECTORY/echo.wasm"
+module = "target/wasm32-wasi/release/echo.wasm"
 
 [sinks.sink0]
 healthcheck = true
@@ -415,10 +392,12 @@ Now try `vector test config.toml` and Vector will go ahead and build an optimize
 for a unit test.
 
 ```bash
-Running test.toml tests
-test test.toml: demo-tester ... passed
+$ vector test config.toml
+Running config.toml tests
+test config.toml: demo-tester ... passed
 ```
 
+Congratulations, you're ready for a new frontier!
 
 ### Resources & templates
 
@@ -429,9 +408,9 @@ test test.toml: demo-tester ... passed
 
 ## Sales Pitch
 
-Integrating a flexible, practical, simple WASM engine means we can:
+Integrating a flexible, practical, simple WASM module support means we can:
 
-* Expose one common interface to any existing and future languages.
+* Expose one common interface to any existing and future languages supported by WASM.
 * Allow large-scale users to use custom encodings.
 * Support and advertise a plugin system.
 * Empower us to modularize Vector's components and increase maintainability.

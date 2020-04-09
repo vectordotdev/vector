@@ -1,8 +1,8 @@
-use super::{Transform};
+use super::Transform;
 use crate::{
     event::Event,
+    foreign_modules::{WasmModule, WasmModuleConfig},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    foreign_modules::{WasmModuleConfig, WasmModule},
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -51,9 +51,7 @@ impl Wasm {
     pub fn new(config: WasmConfig) -> crate::Result<Self> {
         let module = WasmModule::build(config)?;
 
-        Ok(Self {
-            module
-        })
+        Ok(Self { module })
     }
 }
 
@@ -65,10 +63,12 @@ impl Transform for Wasm {
 
 #[cfg(test)]
 mod tests {
-    use super::{Wasm};
-    use crate::{event::Event, transforms::Transform, topology::config::TransformConfig, event::LogEvent};
+    use super::Wasm;
+    use crate::{
+        event::Event, event::LogEvent, topology::config::TransformConfig, transforms::Transform,
+    };
+    use serde_json::Value;
     use std::collections::HashMap;
-    use serde_json::{Value};
     use std::{fs, io::Read, path::Path};
 
     fn parse_config(s: &str) -> crate::Result<Wasm> {
@@ -100,7 +100,10 @@ mod tests {
         let mut input = parse_event_artifact("test-data/foreign_modules/protobuf/demo.json")?;
 
         let mut expected = input.clone();
-        expected.as_mut_log().insert("processed", "{\"people\":[{\"name\":\"Foo\",\"id\":1,\"email\":\"foo@test.com\",\"phones\":[]}]}");
+        expected.as_mut_log().insert(
+            "processed",
+            "{\"people\":[{\"name\":\"Foo\",\"id\":1,\"email\":\"foo@test.com\",\"phones\":[]}]}",
+        );
 
         let new_event = transform.transform(input);
 

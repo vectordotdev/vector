@@ -6,14 +6,16 @@
 //! ```
 
 use super::context::ForeignModuleContext;
+use foreign_modules::{
+    guest::{hostcall::ffi::FfiResult, Registration},
+    Role,
+};
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
 use std::ffi::{CStr, CString};
 use std::io::Write;
 use std::os::raw::c_char;
 use std::str::FromStr;
 use tracing::{event, Level};
-use foreign_modules::{Role, guest::{Registration, hostcall::ffi::FfiResult}};
-
 
 #[lucet_hostcall]
 #[no_mangle]
@@ -40,8 +42,6 @@ pub unsafe fn hint_field_length(vmctx: &mut Vmctx, key_ptr: *const c_char) -> us
     event!(Level::TRACE, "returning from hostcall");
     ret
 }
-
-
 
 #[lucet_hostcall]
 #[no_mangle]
@@ -74,7 +74,6 @@ pub unsafe fn get(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c
     ret
 }
 
-
 #[lucet_hostcall]
 #[no_mangle]
 pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *const c_char) {
@@ -100,35 +99,4 @@ pub unsafe fn insert(vmctx: &mut Vmctx, key_ptr: *const c_char, value_ptr: *cons
     event.as_mut_log().insert(key_str, value_val);
 
     event!(Level::TRACE, "returning from hostcall");
-}
-
-#[lucet_hostcall]
-#[no_mangle]
-unsafe fn register_transform(vmctx: &mut Vmctx, registration_ptr: *const Registration) -> u32 {
-    event!(Level::TRACE, "recieved hostcall");
-
-    let mut heap = vmctx.heap_mut();
-    let registration = heap[registration_ptr as usize..].as_mut_ptr() as *mut Registration;
-
-    event!(Level::TRACE, "returning from hostcall");
-    Default::default()
-}
-
-#[lucet_hostcall]
-#[no_mangle]
-unsafe fn register_sink(vmctx: &mut Vmctx, registration_ptr: *const Registration) -> u32 {
-    unimplemented!();
-    Default::default()
-}
-
-#[lucet_hostcall]
-#[no_mangle]
-unsafe fn register_source(vmctx: &mut Vmctx, registration_ptr: *const Registration) -> u32 {
-    event!(Level::TRACE, "recieved hostcall");
-
-    let mut heap = vmctx.heap_mut();
-    let registration = heap[registration_ptr as usize..].as_mut_ptr() as *mut Registration;
-
-    event!(Level::TRACE, "returning from hostcall");
-    Default::default()
 }

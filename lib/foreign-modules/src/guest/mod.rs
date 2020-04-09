@@ -12,9 +12,8 @@
 //! pub extern "C" fn process() -> Result<usize, usize> {}
 //! ```
 
-use crate::{Role};
-use serde::{Serialize, Deserialize};
-use serde::de::DeserializeOwned;
+use crate::Role;
+use serde::{Deserialize, Serialize};
 
 pub mod hostcall;
 
@@ -34,8 +33,14 @@ impl Registration {
             wasi: Default::default(),
         }
     }
+    pub fn role(&self) -> Role {
+        self.role
+    }
     pub fn set_wasi(mut self, enabled: bool) -> Self {
         self.wasi = enabled;
         self
+    }
+    pub fn wasi(&self) -> bool {
+        self.wasi
     }
 }
