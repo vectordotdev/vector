@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-05"
 title: Guarantees
 description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
 ---
@@ -32,8 +32,8 @@ support specific guarantees.
 
 ## Delivery Guarantees
 
-<div class="section-list">
-<div class="section">
+<ul class="connected-list">
+<li>
 
 ### At-Least-Once
 
@@ -62,11 +62,9 @@ Refer to each [sink's][docs.sinks] documentation for further guidance on its
 buffer options.
 
 </Alert>
-
 <Jump to="/components/?at-least-once=true">View all at-least-once components</Jump>
-
-</div>
-<div class="section">
+</li>
+<li>
 
 ### Best-Effort
 
@@ -81,13 +79,13 @@ info, see the
 Note that this is _not_ the same as at-most-once delivery, as it is still
 possible for Vector to introduce duplicates under extreme circumstances.
 
-</div>
-</div>
+</li>
+</ul>
 
 ## Reliability Guarantee
 
-<div class="section-list">
-<div class="section">
+<ul class="connected-list">
+<li>
 
 ### Prod-Ready
 
@@ -103,9 +101,8 @@ environments. A feature is `prod-ready` if it meets the following criteria:
 4. There are no major [open bugs][urls.vector_bug_issues] for the feature.
 
 <Jump to="/components/?prod-ready=true">View all prod-ready components</Jump>
-
-</div>
-<div class="section">
+</li>
+<li>
 
 ### Beta
 
@@ -113,8 +110,8 @@ The `beta` status means that a feature has not met the criteria outlined in
 the [Prod-Ready](#prod-ready) section and therefore should be used with caution
 in production environments.
 
-</div>
-</div>
+</li>
+</ul>
 
 ## FAQs
 

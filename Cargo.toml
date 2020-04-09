@@ -30,7 +30,6 @@ members = [
   ".",
   "lib/codec",
   "lib/file-source",
-  "lib/tracing-metrics",
   "lib/tracing-limit",
 ]
 
@@ -38,7 +37,6 @@ members = [
 # Internal libs
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
-tracing-metrics = { path = "lib/tracing-metrics" }
 tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
@@ -61,7 +59,9 @@ tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809fcc726b8187db85b23c42e32ef5dce" }
 
 # Metrics
-hotmic = "0.8"
+metrics = "0.12.1"
+metrics-core = "0.5.2"
+metrics-runtime = "0.13.0"
 
 # Aws
 rusoto_core = { version = "0.41.0", optional = true }
@@ -210,6 +210,7 @@ sources = [
   "sources-docker",
   "sources-file",
   "sources-http",
+  "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes",
@@ -226,6 +227,7 @@ sources = [
 sources-tls = ["sources-http", "sources-logplex", "sources-socket", "sources-splunk_hec"]
 sources-docker = ["shiplift"]
 sources-file = ["bytesize"]
+sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["owning_ref"]
 sources-kubernetes = ["sources-file", "transforms-json_parser", "transforms-regex_parser"]

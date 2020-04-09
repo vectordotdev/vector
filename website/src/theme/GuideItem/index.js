@@ -16,10 +16,8 @@ import './styles.css';
 
 function GuideItem(props) {
   const {
-    children,
     frontMatter,
     metadata,
-    truncated,
     isGuidePage = false,
   } = props;
   const {categories, description, permalink, readingTime, seriesPosition, tags} = metadata;
@@ -59,19 +57,21 @@ function GuideItem(props) {
 
   return (
     <Link to={permalink + '/'} className={`guide-item`}>
-      <article className={`domain-bg domain-bg--${domainBG} domain-bg--hover`}>
-        <header>
-          <div className="category">{categories[0].name}</div>
-          <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{coverLabel || title}</h2>
-        </header>
-        <footer>
-          {sourceLogoPath && <SVG src={sourceLogoPath} className="logo" />}
-          {!sourceLogoPath && sourceIcon && <div className="logo"><i className="feather icon-server" /></div>}
-          {sinkLogoPath && <SVG src={sinkLogoPath} className="logo" />}
-          {!sinkLogoPath && sinkIcon && <div className="logo"><i className="feather icon-server" /></div>}
-          {!sourceLogoPath && !sinkLogoPath && !sourceIcon && !sinkIcon && <Tags colorProfile="guides" tags={tags} />}
-          <div className="action">read now</div>
-        </footer>
+      <article>
+        <div className={`domain-bg domain-bg--${domainBG} domain-bg--hover`}>
+          <header>
+            <div className="category">{categories[0].name}</div>
+            <h2 title={title}>{seriesPosition && (seriesPosition + '. ')}{coverLabel || title}</h2>
+          </header>
+          <footer>
+            {sourceLogoPath && <SVG src={sourceLogoPath} className="logo" />}
+            {!sourceLogoPath && sourceIcon && <div className="logo"><i className="feather icon-server" /></div>}
+            {sinkLogoPath && <SVG src={sinkLogoPath} className="logo" />}
+            {!sinkLogoPath && sinkIcon && <div className="logo"><i className="feather icon-server" /></div>}
+            {!sourceLogoPath && !sinkLogoPath && !sourceIcon && !sinkIcon && <Tags colorProfile="guides" tags={tags} />}
+            <div className="action">read now</div>
+          </footer>
+        </div>
       </article>
     </Link>
   );

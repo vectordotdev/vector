@@ -8,7 +8,6 @@ description: Install Vector through the Windows Installer
 import ConfigExample from '@site/src/components/ConfigExample';
 import DaemonDiagram from '@site/src/components/DaemonDiagram';
 import Jump from '@site/src/components/Jump';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
 import Steps from '@site/src/components/Steps';
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -28,7 +27,7 @@ Vector can be installed from an MSI package through the Windows Installer.
 <Tabs
   block={true}
   defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Service","value":"service"}]}>
+  values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -91,83 +90,6 @@ The following diagram demonstrates how it works.
       format="toml"
       path={"config\\vector.toml"}
       sourceName={"file"}
-      sinkName={null} />
-
-5.  ### Start Vector
-
-    ```bat
-    .\bin\vector --config config\vector.toml
-    ```
-
-</TabItem>
-</Tabs>
-</Steps>
-
-</TabItem>
-</Tabs>
-</TabItem>
-<TabItem value="service">
-
-The [service deployment strategy][docs.strategies#service] treats Vector like a
-separate service. It is desigend to receive data from an upstream source and
-fan-out to one or more destinations.
-Typically, upstream sources are other Vector instances sending data via the
-[`vector` sink][docs.sinks.vector], but can be collected through any of Vector's
-[sources][docs.sources].
-The following diagram demonstrates how it works.
-
-<ServiceDiagram
-  platformName={null}
-  sourceName={null}
-  sinkName={null} />
-
----
-
-<Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"msi"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"MSI","value":"msi"}]}>
-<TabItem value="msi">
-
-<Steps headingDepth={3}>
-<Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"}]}>
-
-<TabItem value="x86_64">
-
-1.  ### Download the Vector `.msi` file
-
-    ```bat
-    powershell Invoke-WebRequest https://packages.timber.io/vector/0.8.X/vector-x64.msi -OutFile vector-x64.msi
-    ```
-
-    [Looking for a specific version?][docs.package_managers.msi#versions]
-
-2.  ### Install the Vector `.msi` package using `msiexec` command
-
-    ```bat
-    msiexec /i vector-x64.msi /quiet
-    ```
-
-3.  ### Navigate to the Vector directory
-
-    ```bat
-    cd "C:\Program Files\Vector"
-    ```
-
-4.  ### Configure Vector
-
-    <ConfigExample
-      format="toml"
-      path={"config\\vector.toml"}
-      sourceName={"vector"}
       sinkName={null} />
 
 5.  ### Start Vector
@@ -260,11 +182,9 @@ Vector's MSI source files are located in
 [docs.configuration]: /docs/setup/configuration/
 [docs.deployment]: /docs/setup/deployment/
 [docs.package_managers.msi#versions]: /docs/setup/installation/package-managers/msi/#versions
-[docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources]: /docs/reference/sources/
 [docs.strategies#daemon]: /docs/setup/deployment/strategies/#daemon
-[docs.strategies#service]: /docs/setup/deployment/strategies/#service
 [urls.vector_msi_source_files]: https://github.com/timberio/vector/tree/master/distribution/msi
 [urls.vector_releases]: https://vector.dev/releases/latest
 [urls.windows_service]: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service

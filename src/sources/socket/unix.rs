@@ -1,6 +1,8 @@
-use crate::event::Event;
-use crate::sources::util::build_unix_source;
-use crate::sources::Source;
+use crate::{
+    event::Event,
+    internal_events::UnixSocketEventReceived,
+    sources::{util::build_unix_source, Source},
+};
 use bytes::Bytes;
 use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
@@ -34,11 +36,12 @@ impl UnixConfig {
 * Takes a single line of a received message and builds an Event object.
 **/
 fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
+    let byte_size = line.len();
     let mut event = Event::from(line);
     if let Some(host) = received_from {
         event.as_mut_log().insert(host_key, host);
     }
-    trace!(message = "Received one event.", ?event);
+    emit!(UnixSocketEventReceived { byte_size });
     Some(event)
 }
 

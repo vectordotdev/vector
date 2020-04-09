@@ -36,23 +36,14 @@ The metric timestamp, representing when the metric was created/ingested within \
 Vector.\
 """
 
-[data_model.metric.schema.type]
-type = "struct"
-required = true
-description = """\
-The metric value. The value is an enumeration and will be comprised of \
-different attributes depending on the value type.\
-"""
-
-
-[data_model.metric.schema.type.children.counter]
+[data_model.metric.schema.counter]
 type = "struct"
 description = """\
 A single value that can _only_ be incremented or reset to zero value, it \
 cannot be decremented.\
 """
 
-[data_model.metric.schema.type.children.counter.children.value]
+[data_model.metric.schema.counter.children.value]
 type = "double"
 examples = [2.6, 5.0]
 required = true
@@ -61,7 +52,7 @@ The value to increment the counter by. Can only be positive.\
 """
 
 
-[data_model.metric.schema.type.children.gauge]
+[data_model.metric.schema.gauge]
 type = "struct"
 description = """\
 A gauge represents a point-in-time value that can increase and decrease. \
@@ -69,7 +60,7 @@ Vector's internal gauge type represents changes to that value. Gauges should be 
 used to track fluctuations in values, like current memory or CPU usage.\
 """
 
-[data_model.metric.schema.type.children.gauge.children.value]
+[data_model.metric.schema.gauge.children.value]
 type = "double"
 examples = [554222.0]
 required = true
@@ -77,14 +68,13 @@ description = """\
 A specific point-in-time value for the gauge.\
 """
 
-
-[data_model.metric.schema.type.children.set]
+[data_model.metric.schema.set]
 type = "struct"
 description = """\
 A set represents a count of unique values, AKA the cardinality.\
 """
 
-[data_model.metric.schema.type.children.set.children.values]
+[data_model.metric.schema.set.children.values]
 type = "[string]"
 examples = [["unique item 1", "unique item 2"]]
 required = true
@@ -93,13 +83,13 @@ The list of unique values.\
 """
 
 
-[data_model.metric.schema.type.children.distribution]
+[data_model.metric.schema.distribution]
 type = "struct"
 description = """\
 A distribution represents a distribution of sampled values.\
 """
 
-[data_model.metric.schema.type.children.distribution.children.values]
+[data_model.metric.schema.distribution.children.values]
 type = "[double]"
 examples = [[12.0, 43.3, 25.2]]
 required = true
@@ -107,7 +97,7 @@ description = """\
 The list of values contained within the distribution.\
 """
 
-[data_model.metric.schema.type.children.distribution.children.sample_rates]
+[data_model.metric.schema.distribution.children.sample_rates]
 type = "[int]"
 examples = [[12, 43, 25]]
 required = true
@@ -116,7 +106,7 @@ The rate at which each individual value was sampled.\
 """
 
 
-[data_model.metric.schema.type.children.aggregated_histogram]
+[data_model.metric.schema.aggregated_histogram]
 type = "struct"
 description = """\
 Also called a "timer". A `aggregated_histogram` samples observations (usually \
@@ -124,7 +114,7 @@ things like request durations or response sizes) and counts them in \
 configurable buckets. It also provides a sum of all observed values.\
 """
 
-[data_model.metric.schema.type.children.aggregated_histogram.children.buckets]
+[data_model.metric.schema.aggregated_histogram.children.buckets]
 type = "[double]"
 examples = [[1, 2, 5, 10, 25]]
 required = true
@@ -132,7 +122,7 @@ description = """\
 The buckets contained within this histogram.\
 """
 
-[data_model.metric.schema.type.children.aggregated_histogram.children.counts]
+[data_model.metric.schema.aggregated_histogram.children.counts]
 type = "[int]"
 examples = [[1, 5, 25, 2, 5]]
 required = true
@@ -140,7 +130,7 @@ description = """\
 The number of values contained within each bucket.\
 """
 
-[data_model.metric.schema.type.children.aggregated_histogram.children.count]
+[data_model.metric.schema.aggregated_histogram.children.count]
 type = "int"
 examples = [54]
 required = true
@@ -148,7 +138,7 @@ description = """\
 The total number of values contained within the histogram.\
 """
 
-[data_model.metric.schema.type.children.aggregated_histogram.children.sum]
+[data_model.metric.schema.aggregated_histogram.children.sum]
 type = "double"
 examples = [524.0]
 required = true
@@ -157,7 +147,7 @@ The sum of all values contained within the histogram.\
 """
 
 
-[data_model.metric.schema.type.children.aggregated_summary]
+[data_model.metric.schema.aggregated_summary]
 type = "struct"
 description = """\
 Similar to a histogram, a summary samples observations (usually things like \
@@ -166,7 +156,7 @@ of observations and a sum of all observed values, it calculates configurable \
 quantiles over a sliding time window.
 """
 
-[data_model.metric.schema.type.children.aggregated_summary.children.quantiles]
+[data_model.metric.schema.aggregated_summary.children.quantiles]
 type = "[double]"
 examples = [[0.1, 0.5, 0.75, 1.0]]
 required = true
@@ -174,7 +164,7 @@ description = """\
 The quantiles contained within the summary, where 0 ≤ quantile ≤ 1.\
 """
 
-[data_model.metric.schema.type.children.aggregated_summary.children.values]
+[data_model.metric.schema.aggregated_summary.children.values]
 type = "[double]"
 examples = [[2.1, 4.68, 23.02, 120.1]]
 required = true
@@ -182,7 +172,7 @@ description = """\
 The values contained within the summary that align with the `quantiles`.\
 """
 
-[data_model.metric.schema.type.children.aggregated_summary.children.count]
+[data_model.metric.schema.aggregated_summary.children.count]
 type = "int"
 examples = [54]
 required = true
@@ -190,7 +180,7 @@ description = """\
 The total number of values contained within the summary.\
 """
 
-[data_model.metric.schema.type.children.aggregated_summary.children.sum]
+[data_model.metric.schema.aggregated_summary.children.sum]
 type = "double"
 examples = [524.0]
 required = true

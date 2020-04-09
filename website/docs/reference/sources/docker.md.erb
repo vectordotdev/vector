@@ -8,6 +8,12 @@
 <%= component_requirements(component) %>
 
 <%- end -%>
+<%- if component.warnings.any? -%>
+## Warnings
+
+<%= component_warnings(component) %>
+
+<%- end -%>
 ## Configuration
 
 <%= component_config_example(component) %>
@@ -20,10 +26,11 @@
 <%= fields(component.env_vars_list, heading_depth: 3) %>
 
 <%- end -%>
-<%- if component.output.log -%>
-## Output
+<%= component_fields(component, heading_depth: 2) -%>
+<%- if component.examples.any? -%>
+## Examples
 
-<%= component_output(component, component.output.log, heading_depth: 3) %>
+<%= component_examples(component) %>
 
 <%- end -%>
 ## How It Works [[sort]]

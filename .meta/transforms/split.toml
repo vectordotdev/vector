@@ -48,7 +48,7 @@ description = "If `true` the `field` will be dropped after parsing."
 
 <%= render("_partials/fields/_types_options.toml", namespace: "transforms.split.options", common: true) %>
 
-[[transforms.split.output.log.examples]]
+[[transforms.split.examples]]
 label = "CSV"
 body = """\
 Given the following log line:

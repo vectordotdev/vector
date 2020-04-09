@@ -75,7 +75,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
           {Object.values(platforms).map((platform, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/platforms/${platform.id}/`}> {platform.title}</Link>
+              <Link to={`/docs/setup/installation/platforms/${platform.name}/`}> {platform.title}</Link>
             </span>
           ))}
         </div>
@@ -86,7 +86,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
           {Object.values(packageManagers).map((packageManager, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/package-managers/${packageManager.id}/`}>{packageManager.title}</Link>
+              <Link to={`/docs/setup/installation/package-managers/${packageManager.name}/`}>{packageManager.title}</Link>
             </span>
           ))}
         </div>
@@ -97,7 +97,7 @@ function DownloadTable({browsePath, date, downloads, releaseNotesPath, version})
           {Object.values(operatingSystems).map((operatingSystem, idx) => (
             <span key={idx}>
               {idx > 0 ? " • " : ""}
-              <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.id}/`}>{operatingSystem.title}</Link>
+              <Link to={`/docs/setup/installation/operating-systems/${operatingSystem.name}/`}>{operatingSystem.title}</Link>
             </span>
           ))}
         </div>

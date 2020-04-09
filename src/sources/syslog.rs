@@ -3,11 +3,11 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
-
 use bytes::Bytes;
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -171,7 +171,7 @@ pub fn udp(
                         .ok()
                         .and_then(|s| event_from_str(&host_key, Some(received_from), s))
                 })
-                .map_err(|e| error!("error reading line: {:?}", e));
+                .map_err(|error| emit!(SyslogUdpReadError { error }));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
         }),
@@ -198,10 +198,9 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
-    trace!(
-        message = "Received line.",
-        bytes = &field::display(line.len())
-    );
+    emit!(SyslogEventReceived {
+        byte_size: line.len()
+    });
 
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);

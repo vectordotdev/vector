@@ -62,7 +62,7 @@
   width: 55px;
   height: 32px;
   padding: 0;
-  border-radius: 2rem;
+  border-radius: 2em;
   background-color: var(--ifm-navbar-search-input-background-color);
   -webkit-transition: all 0.2s ease;
   -moz-transition: all 0.2s ease;

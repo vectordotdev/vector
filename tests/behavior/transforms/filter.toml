@@ -65,3 +65,17 @@
   [[tests.inputs]]
     insert_at = "filter_c"
     value = "test filter 2"
+
+[[tests]]
+  name = "filter test 3a"
+  [[tests.inputs]]
+    insert_at = "filter_a"
+    type = "metric"
+    metric.name = "count"
+    metric.kind = "absolute"
+    metric.tags.message = "test filter 1"
+    metric.counter.value = 1
+  [[tests.outputs]]
+    extract_from = "filter_a"
+    [[tests.outputs.conditions]]
+      "message.equals" = "test filter 1"

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 delivery_guarantee: "best_effort"
 component_title: "File"
 description: "The Vector `file` sink streams `log` events to a file."
@@ -36,7 +36,6 @@ The Vector `file` sink
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
@@ -44,8 +43,8 @@ The Vector `file` sink
   # General
   type = "file" # required
   inputs = ["my-source-id"] # required
-  path = "vector-%Y-%m-%d.log" # required
   healthcheck = true # optional, default
+  path = "vector-%Y-%m-%d.log" # required
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -59,9 +58,9 @@ The Vector `file` sink
   # General
   type = "file" # required
   inputs = ["my-source-id"] # required
-  path = "vector-%Y-%m-%d.log" # required
   healthcheck = true # optional, default
   idle_timeout_secs = "30" # optional, default
+  path = "vector-%Y-%m-%d.log" # required
 
   # Encoding
   encoding.codec = "ndjson" # required
@@ -87,6 +86,7 @@ The Vector `file` sink
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 ### encoding
@@ -109,6 +109,7 @@ Configures the encoding specific sink behavior.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### codec
@@ -132,6 +133,7 @@ The encoding codec used to serialize the events before outputting.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### except_fields
@@ -155,6 +157,7 @@ Prevent the sink from encoding the specified labels.
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 #### only_fields
@@ -178,6 +181,7 @@ Limit the sink to only encoding the specified labels.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### timestamp_format
@@ -204,6 +208,7 @@ How to format event timestamps.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ### healthcheck
@@ -227,6 +232,7 @@ Enables/disables the sink healthcheck upon start.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### idle_timeout_secs
@@ -251,6 +257,7 @@ events for this timeout, the file will be flushed and closed.
   templateable={true}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### path
@@ -262,6 +269,7 @@ File name to write events to.
 
 </Field>
 </Fields>
+
 
 ## How It Works
 

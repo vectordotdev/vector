@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 title: Process Management
 description: "How to manage the Vector process, such as starting, stopping, and reloading."
 ---
@@ -107,19 +107,20 @@ vector --config vector.toml
 
 ### Flags
 
-| Flag                    | Description                                                                                                         |  |
-|:------------------------|:--------------------------------------------------------------------------------------------------------------------|:-|
-| **Required**            |                                                                                                                     |  |
-| `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |  |
-| **Optional**            |                                                                                                                     |  |
-| `-d, --dry-run`         | Vector will [validate configuration][docs.validating] and exit.                                                     |  |
-| `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |  |
-| `-qq`                   | Raises the log level to `error`, the highest level possible.                                                        |  |
-| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks.                                             |  |
-| `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |  |
-| `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |  |
-| `-vv`                   | Drops the log level to `trace`, the lowest level possible.                                                          |  |
-| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |  |
+| Flag                    | Description                                                                                                         |    |
+|:------------------------|:--------------------------------------------------------------------------------------------------------------------|:---|
+| **Required**            |                                                                                                                     |    |
+| `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |    |
+| **Optional**            |                                                                                                                     |    |
+| `-d, --dry-run`         | Vector will [validate configuration][docs.validating] and exit.                                                     |    |
+| `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |    |
+| `-qq`                   | Raises the log level to `error`.                                                                                    |    |
+| `-qqq`                  | Turns logging off.                                                                                                  |    |
+| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks.                                             |    |
+| `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |    |
+| `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |    |
+| `-vv`                   | Drops the log level to `trace`, the lowest level possible.                                                          |    |
+| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |    |
 
 ### Daemonizing
 

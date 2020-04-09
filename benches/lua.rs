@@ -1,5 +1,6 @@
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
+use transforms::lua::v2::LuaConfig;
 use vector::{
     topology::config::{TransformConfig, TransformContext},
     transforms::{self, Transform},
@@ -55,8 +56,18 @@ fn add_fields(c: &mut Criterion) {
         .with_function("v2", move |b| {
             b.iter_with_setup(
                 || {
-                    let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::v2::Lua::new(&source, vec![]).unwrap()
+                    let config = format!(
+                        r#"
+                        hooks.process = """
+                            function (event, emit)
+                                event['{}'] = '{}'
+                            end
+                        """
+                        "#,
+                        key, value
+                    );
+                    transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
+                        .unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
@@ -126,12 +137,14 @@ fn field_filter(c: &mut Criterion) {
         .with_function("v2", move |b| {
             b.iter_with_setup(
                 || {
-                    let source = r#"
-                      if event["the_field"] ~= "0" then
-                        event = nil
-                      end
+                    let config = r#"
+                        hooks.proces = """
+                            if event["the_field"] ~= "0" then
+                              event = nil
+                            end
+                        """
                     "#;
-                    transforms::lua::v2::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap()
                 },
                 |mut transform| {
                     let num = (0..num_events)

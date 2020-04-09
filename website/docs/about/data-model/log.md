@@ -102,6 +102,7 @@ changed via the
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### host
@@ -128,6 +129,7 @@ or the source-level `host_key` option for relevant sources.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### message
@@ -144,6 +146,63 @@ source-level `message_key` option for relevant sources.
   common={true}
   defaultValue={null}
   enumValues={null}
+  examples={["/var/log/myapp/logfile.log","197.23.0.8","/api/v1/pods/some-name"]}
+  groups={[]}
+  name={"source"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source
+
+The source from which the log originated. This is a specific source that is
+chosen and set by each [Vector source][docs.sources]. For example, this the
+[`file` source][docs.sources.file] sets this to the file name, and the
+[`docker` source][docs.sources.docker] sets this to the container name. Change
+this field name via the [global `source_key`
+option][docs.reference.global-options#source_key] or the source-level
+`source_key` option for relevant sources.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={["file","socket","http","kubernetes"]}
+  groups={[]}
+  name={"source_type"}
+  path={null}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### source_type
+
+The official `type` of [Vector's source component][docs.sources] from which the
+log originates. Change this field name via the [global `source_type_key`
+option][docs.reference.global-options#source_type_key] or the source-level
+`source_type_key` option for relevant sources.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
   examples={["2019-11-01T21:15:47+00:00"]}
   groups={[]}
   name={"timestamp"}
@@ -153,6 +212,7 @@ source-level `message_key` option for relevant sources.
   templateable={false}
   type={"timestamp"}
   unit={null}
+  warnings={[]}
   >
 
 ### timestamp
@@ -179,6 +239,7 @@ option][docs.reference.global-options#message_key] or the source-level
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ### `[custom-key]`
@@ -236,7 +297,7 @@ The dot notation also supports accessing array fields using by placing the index
 array[0]
 ```
 
-The indexes start from 0, missing value are auto-filled by [null values](#null-values).
+The indexes start from 0, missing values are auto-filled by [null values](#null-values).
 
 <Alert type="warning">
 
@@ -296,7 +357,11 @@ Array fields are sequences of values of any type.
 [docs.reference.global-options#host_key]: /docs/reference/global-options/#host_key
 [docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
 [docs.reference.global-options#message_key]: /docs/reference/global-options/#message_key
+[docs.reference.global-options#source_key]: /docs/reference/global-options/#source_key
+[docs.reference.global-options#source_type_key]: /docs/reference/global-options/#source_type_key
 [docs.reference.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
+[docs.sources.docker]: /docs/reference/sources/docker/
+[docs.sources.file]: /docs/reference/sources/file/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms.coercer]: /docs/reference/transforms/coercer/
 [urls.ieee_754]: https://en.wikipedia.org/wiki/IEEE_754

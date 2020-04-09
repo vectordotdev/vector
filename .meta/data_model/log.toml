@@ -1,6 +1,7 @@
 [data_model.log.schema.host]
 type = "string"
 examples = ["my.host.com"]
+required = false
 description = """\
 Represents the originating host of the log. This is automatically set within \
 select [sources][docs.sources] if the key does not exist. Change this field \
@@ -29,12 +30,38 @@ field name via the \
 the source-level `timestamp_key` option for relevant sources.
 """
 
+[data_model.log.schema.source]
+type = "string"
+examples = ["/var/log/myapp/logfile.log", "197.23.0.8", "/api/v1/pods/some-name"]
+required = true
+description = """\
+The source from which the log originated. This is a specific source that is \
+chosen and set by each [Vector source][docs.sources]. For example, this the \
+[`file` source][docs.sources.file] sets this to the file name, and the \
+[`docker` source][docs.sources.docker] sets this to the container name. Change \
+this field name via the \
+[global `source_key` option][docs.reference.global-options#source_key] or the \
+source-level `source_key` option for relevant sources.
+"""
+
+[data_model.log.schema.source_type]
+type = "string"
+examples = ["file", "socket", "http", "kubernetes"]
+required = false
+description = """\
+The official `type` of [Vector's source component][docs.sources] from which \
+the log originates. Change this field name via the \
+[global `source_type_key` option][docs.reference.global-options#source_type_key] \
+or the source-level `source_type_key` option for relevant sources.
+"""
+
 [data_model.log.schema."`[custom-key]`"]
 type = "*"
 examples = [
   {my-key = "my-value"},
   {parent.child = "child-value"}
 ]
+required = false
 description = """\
 In addition to the defined fields, a log event can have any number of \
 additional fields. This includes nested fields.

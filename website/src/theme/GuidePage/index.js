@@ -203,41 +203,39 @@ function GuidePage(props) {
         </div>
       </header>
       <main className={classnames('container', 'container--l', styles.container)}>
-        <div className="row">
-          <aside className="col col--2-5">
-            <section className={styles.avatar}>
-              <Avatar
-                bio={true}
-                github={authorGithub}
-                size="lg"
-                rel="author"
-                subTitle={false}
-                vertical={true} />
-            </section>
-            <section className={classnames('table-of-contents', styles.tableOfContents)}>
-              <div className="section">
-                <div className="title">Stats</div>
+        <aside className={styles.sidebar}>
+          <section className={styles.avatar}>
+            <Avatar
+              bio={true}
+              github={authorGithub}
+              size="lg"
+              rel="author"
+              subTitle={false}
+              vertical={true} />
+          </section>
+          <section className={classnames('table-of-contents', styles.tableOfContents)}>
+            <div className="section">
+              <div className="title">Stats</div>
 
-                <div className="text--secondary text--bold"><i className="feather icon-book"></i> {readingTime}</div>
-                <div className="text--secondary text--bold"><i className="feather icon-clock"></i> Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></div>
+              <div className="text--secondary text--bold"><i className="feather icon-book"></i> {readingTime}</div>
+              <div className="text--secondary text--bold"><i className="feather icon-clock"></i> Updated <time pubdate="pubdate" dateTime={lastModifiedOn}>{dateFormat(lastModified, "mmm dS, yyyy")}</time></div>
+            </div>
+            {GuideContents.rightToc.length > 0 && (
+              <div className="section">
+                <div className="title">Contents</div>
+                <Headings headings={GuideContents.rightToc} />
               </div>
-              {GuideContents.rightToc.length > 0 && (
-                <div className="section">
-                  <div className="title">Contents</div>
-                  <Headings headings={GuideContents.rightToc} />
-                </div>
-              )}
-            </section>
-          </aside>
-          <div className={classnames('col', 'col--7-2', styles.rightCol)}>
-            <article>
-              <div className="markdown">
-                <a aria-hidden="true" tabIndex="-1" className="anchor" id="overview"></a>
-                <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
-              </div>
-            </article>
-            {!frontMatter.hide_pagination && <PagePaginator previous={metadata.prevItem} next={metadata.nextItem} className={styles.paginator} />}
-          </div>
+            )}
+          </section>
+        </aside>
+        <div className={styles.article}>
+          <article>
+            <div className="markdown">
+              <a aria-hidden="true" tabIndex="-1" className="anchor" id="overview"></a>
+              <MDXProvider components={MDXComponents}><GuideContents /></MDXProvider>
+            </div>
+          </article>
+          {!frontMatter.hide_pagination && <PagePaginator previous={metadata.prevItem} next={metadata.nextItem} className={styles.paginator} />}
         </div>
       </main>
     </Layout>

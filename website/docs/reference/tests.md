@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 title: Unit Tests
 description: Vector's unit test configuration options, allowing you to unit test your Vector configuration files.
 status: beta
@@ -53,21 +53,22 @@ vector test /etc/vector/*.toml
 
   # Inputs
   [[tests.inputs]]
-    type = "raw" # required
     insert_at = "foo" # required
+    type = "raw" # required
     value = "some message contents" # required, required when type = "raw"
 
   # Outputs
   [[tests.outputs]]
-    # General
-    extract_from = "foo" # required
-
     # Conditions
     conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
     conditions."message.contains" = "foo" # example
     conditions."environment.ends_with" = "-staging" # example
+    conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
+
+    # General
+    extract_from = "foo" # required
 ```
 
 </TabItem>
@@ -86,8 +87,8 @@ vector test /etc/vector/*.toml
   # Inputs
   [[tests.inputs]]
     # General
-    type = "raw" # required
     insert_at = "foo" # required
+    type = "raw" # required
     value = "some message contents" # required, required when type = "raw"
 
     # Log fields
@@ -96,12 +97,12 @@ vector test /etc/vector/*.toml
 
     # Metric
     # General
-    metric.type = "counter" # required
-    metric.name = "duration_total" # required
-    metric.timestamp = "2019-11-01T21:15:47.443232Z" # required
-    metric.val = 10.2 # required
     metric.direction = "plus" # optional, no default
+    metric.name = "duration_total" # required
     metric.sample_rate = 1 # optional, no default
+    metric.timestamp = "2019-11-01T21:15:47.443232Z" # required
+    metric.type = "counter" # required
+    metric.val = 10.2 # required
 
     # Tags
     metric.tags.host = "foohost" # example
@@ -109,9 +110,6 @@ vector test /etc/vector/*.toml
 
   # Outputs
   [[tests.outputs]]
-    # General
-    extract_from = "foo" # required
-
     # Conditions
     conditions.type = "check_fields" # optional, default
     conditions."message.eq" = "this is the content to match against" # example
@@ -119,7 +117,11 @@ vector test /etc/vector/*.toml
     conditions."method.neq" = "POST" # example
     conditions."message.contains" = "foo" # example
     conditions."environment.ends_with" = "-staging" # example
+    conditions."message.regex" = " (any|of|these|five|words) " # example
     conditions."environment.starts_with" = "staging-" # example
+
+    # General
+    extract_from = "foo" # required
 ```
 
 </TabItem>
@@ -128,9 +130,55 @@ vector test /etc/vector/*.toml
 
 For more information about unit tests check out [this guide][guides.advanced.unit-testing].
 
-## Options
-
 <Fields filters={true}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["foo test"]}
+  groups={[]}
+  name={"name"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+### name
+
+A unique identifier for this test.
+
+
+
+
+</Field>
+<Field
+  common={false}
+  defaultValue={null}
+  enumValues={null}
+  examples={[["foo"]]}
+  groups={[]}
+  name={"no_outputs_from"}
+  path={null}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"[string]"}
+  unit={null}
+  warnings={[]}
+  >
+
+### no_outputs_from
+
+A list of transforms that must NOT output events in order for the test to pass.
+
+
+
+
+</Field>
 <Field
   common={true}
   defaultValue={null}
@@ -144,6 +192,7 @@ For more information about unit tests check out [this guide][guides.advanced.uni
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### inputs
@@ -166,12 +215,61 @@ A table that defines a unit test input event.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### insert_at
 
 The name of a transform, the input event will be delivered to this transform in
 order to begin the test.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
+  examples={["raw","log","metric"]}
+  groups={[]}
+  name={"type"}
+  path={"inputs"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### type
+
+The event type.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={["some message contents"]}
+  groups={[]}
+  name={"value"}
+  path={"inputs"}
+  relevantWhen={{"type":"raw"}}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+#### value
+
+Specifies the log message field contents when the input type is 'raw'.
 
 
 
@@ -190,6 +288,7 @@ order to begin the test.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 #### log_fields
@@ -212,6 +311,7 @@ Specifies the log fields when the input type is 'log'.
   templateable={false}
   type={"*"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`
@@ -238,6 +338,7 @@ A key/value pair representing a field to be added to the input event.
   templateable={false}
   type={"table"}
   unit={null}
+  warnings={[]}
   >
 
 #### metric
@@ -260,6 +361,7 @@ Specifies the metric type when the input type is 'metric'.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### direction
@@ -283,6 +385,7 @@ The direction to increase or decrease the gauge value.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### name
@@ -307,6 +410,7 @@ for `gauge`.
   templateable={false}
   type={"float"}
   unit={null}
+  warnings={[]}
   >
 
 ##### sample_rate
@@ -315,54 +419,6 @@ The bucket/distribution the metric is a part of.
 
 
 
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[]}
-  groups={[]}
-  name={"tags"}
-  path={"inputs.metric"}
-  relevantWhen={null}
-  required={false}
-  templateable={false}
-  type={"table"}
-  unit={null}
-  >
-
-##### tags
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
-
-
-<Fields filters={false}>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
-  groups={[]}
-  name={"`[tag-name]`"}
-  path={"inputs.metric.tags"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-###### `[tag-name]`
-
-Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-
-
-
-
-</Field>
-</Fields>
 
 </Field>
 <Field
@@ -378,6 +434,7 @@ Key/value pairs representing [metric tags][docs.data-model.metric#tags].
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### timestamp
@@ -401,6 +458,7 @@ Time metric was created/ingested.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### type
@@ -424,6 +482,7 @@ The metric type.
   templateable={false}
   type={"float"}
   unit={null}
+  warnings={[]}
   >
 
 ##### val
@@ -434,102 +493,60 @@ Amount to increment/decrement or gauge.
 
 
 </Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[]}
+  groups={[]}
+  name={"tags"}
+  path={"inputs.metric"}
+  relevantWhen={null}
+  required={false}
+  templateable={false}
+  type={"table"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### tags
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+
+
+
+<Fields filters={false}>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"host":"foohost"},{"region":"us-east-1"}]}
+  groups={[]}
+  name={"`[tag-name]`"}
+  path={"inputs.metric.tags"}
+  relevantWhen={null}
+  required={true}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+###### `[tag-name]`
+
+Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+
+
+
+
+</Field>
 </Fields>
 
 </Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={{"raw":"Creates a log event where the message contents are specified in the field 'value'.","log":"Creates a log event where log fields are specified in the table 'log_fields'.","metric":"Creates a metric event, where its type and fields are specified in the table 'metric'."}}
-  examples={["raw","log","metric"]}
-  groups={[]}
-  name={"type"}
-  path={"inputs"}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### type
-
-The event type.
-
-
-
-
-</Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["some message contents"]}
-  groups={[]}
-  name={"value"}
-  path={"inputs"}
-  relevantWhen={{"type":"raw"}}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-#### value
-
-Specifies the log message field contents when the input type is 'raw'.
-
-
-
-
-</Field>
 </Fields>
 
 </Field>
-<Field
-  common={true}
-  defaultValue={null}
-  enumValues={null}
-  examples={["foo test"]}
-  groups={[]}
-  name={"name"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"string"}
-  unit={null}
-  >
-
-### name
-
-A unique identifier for this test.
-
-
-
-
-</Field>
-<Field
-  common={false}
-  defaultValue={null}
-  enumValues={null}
-  examples={[["foo"]]}
-  groups={[]}
-  name={"no_outputs_from"}
-  path={null}
-  relevantWhen={null}
-  required={true}
-  templateable={false}
-  type={"[string]"}
-  unit={null}
-  >
-
-### no_outputs_from
-
-A list of transforms that must NOT output events in order for the test to pass.
-
-
-
+</Fields>
 
 </Field>
 <Field
@@ -545,6 +562,7 @@ A list of transforms that must NOT output events in order for the test to pass.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 ### outputs
@@ -567,6 +585,7 @@ A table that defines a unit test expected output.
   templateable={false}
   type={"[table]"}
   unit={null}
+  warnings={[]}
   >
 
 #### conditions
@@ -593,6 +612,7 @@ target without checking its values.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### type
@@ -616,6 +636,7 @@ The type of the condition to execute.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.eq
@@ -639,6 +660,7 @@ Check whether a fields contents exactly matches the value specified.
   templateable={false}
   type={"bool"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.exists
@@ -663,6 +685,7 @@ being `true` or `false` respectively.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field-name]`.neq
@@ -686,6 +709,7 @@ Check whether a fields contents does not match the value specified.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.contains
@@ -709,11 +733,40 @@ Checks whether a string field contains a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.ends_with
 
 Checks whether a string field ends with a string argument.
+
+
+
+
+</Field>
+<Field
+  common={true}
+  defaultValue={null}
+  enumValues={null}
+  examples={[{"message.regex":" (any|of|these|five|words) "}]}
+  groups={[]}
+  name={"`[field_name]`.regex"}
+  path={"outputs.conditions"}
+  relevantWhen={{"type":"check_fields"}}
+  required={false}
+  templateable={false}
+  type={"string"}
+  unit={null}
+  warnings={[]}
+  >
+
+##### `[field_name]`.regex
+
+Checks whether a string field matches a [regular expression][urls.regex].
+Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note
+that this condition is considerably more expensive than a regular string match
+(such as `starts_with` or `contains`) so the use of those conditions are
+preferred where possible.
 
 
 
@@ -732,6 +785,7 @@ Checks whether a string field ends with a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ##### `[field_name]`.starts_with
@@ -758,6 +812,7 @@ Checks whether a string field starts with a string argument.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 #### extract_from
@@ -781,3 +836,5 @@ transform will be checked against a table of conditions.
 [docs.data-model.metric#set]: /docs/about/data-model/metric/#set
 [docs.data-model.metric#tags]: /docs/about/data-model/metric/#tags
 [guides.advanced.unit-testing]: /guides/advanced/unit-testing/
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.3.6/regex/#syntax

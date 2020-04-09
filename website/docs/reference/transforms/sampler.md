@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-06"
 component_title: "Sampler"
 description: "The Vector `sampler` transform accepts and outputs `log` events allowing you to sample events with a configurable rate."
 event_types: ["log"]
@@ -34,15 +34,14 @@ events with a configurable rate.
   block={true}
   defaultValue="common"
   values={[{"label":"Common","value":"common"},{"label":"Advanced","value":"advanced"}]}>
-
 <TabItem value="common">
 
 ```toml title="vector.toml"
 [transforms.my_transform_id]
   type = "sampler" # required
   inputs = ["my-source-id"] # required
-  rate = 10 # required
   pass_list = ["[error]", "field2"] # optional, no default
+  rate = 10 # required
 ```
 
 </TabItem>
@@ -52,9 +51,9 @@ events with a configurable rate.
 [transforms.my_transform_id]
   type = "sampler" # required
   inputs = ["my-source-id"] # required
-  rate = 10 # required
   key_field = "message" # optional, no default
   pass_list = ["[error]", "field2"] # optional, no default
+  rate = 10 # required
 ```
 
 </TabItem>
@@ -74,6 +73,7 @@ events with a configurable rate.
   templateable={false}
   type={"string"}
   unit={null}
+  warnings={[]}
   >
 
 ### key_field
@@ -99,6 +99,7 @@ option][docs.reference.global-options#message_key].
   templateable={false}
   type={"[string]"}
   unit={null}
+  warnings={[]}
   >
 
 ### pass_list
@@ -124,6 +125,7 @@ _not_ be sampled.
   templateable={false}
   type={"int"}
   unit={null}
+  warnings={[]}
   >
 
 ### rate

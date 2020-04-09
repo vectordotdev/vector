@@ -4,8 +4,10 @@
 }
 
 .blog-list--filters {
-  flex: 0 0 400px;
+  --ifm-sidebar-width: 400px;
+  flex: 0 0 var(--ifm-sidebar-width);
   margin-right: calc( var(--ifm-spacing-horizontal) * 3 );
+  max-width: var(--ifm-sidebar-width);
   padding-top: calc( var(--ifm-spacing-vertical) + 2px );
 }
 
@@ -43,6 +45,7 @@
 
   .blog-list--filters {
     margin-right: 0;
+    max-width: none;
     text-align: center;
   }
 
