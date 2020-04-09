@@ -38,7 +38,7 @@ function BlogPostPage(props) {
           <div className={classnames('container', styles.headerContainer)}>
             <Avatar github={author_github} size="lg" nameSuffix={<> / <time pubdate="pubdate" dateTime={date.toISOString()}>{dateFormat(date, "mmm dS")}</time> / {readingStats.text}</>} rel="author" subTitle={false} vertical={true} />
             <h1>{title}</h1>
-            <div className={styles.description}>{description}</div>
+            <div className={styles.description}>{metadata.description}</div>
             <div className={styles.headerTags}>
               <Tags colorProfile="blog" tags={tags} />
             </div>
