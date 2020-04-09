@@ -153,8 +153,25 @@ decisions that involve MSKV, as well as documentation. A good candidate for
 such location is a file at `.meta` dir of the Vector repo. `.meta/mskv` for
 instance.
 
-For the moment, the discussion on the initial MSKV is in progress. The proposed
-version is Kubernetes `1.14`.
+#### Initial Minimal Supported Kubernetes Version
+
+Kubernetes 1.14 introduced some significant improvements to how logs files are
+organized, putting more useful metadata into the log file path. This allows us
+to implement more high-efficient flexible ways to filter what log files we
+consume, which is important for preventing Vector from consuming logs that
+it itself produces - which is bad since it can potentially result in an
+flood-kind DoS.
+
+We can still offer support for Kubernetes 1.13 and earlier, but it will be
+limiting our high-efficient filtering capabilities significantly. It will
+also increase the maintenance costs and code complexity.
+
+On the other hand, Kubernetes pre-1.14 versions are quite rare these days.
+At the time of writing, the latest Kubernetes version is 1.18, and, according
+to the [Kubernetes version and version skew support policy], only versions
+1.18, 1.17 and 1.16 are currently maintained.
+
+Considering all of the above, we assign **1.14** as the initial MSKV.
 
 ### Helm vs raw YAML files
 
@@ -409,6 +426,7 @@ See [motivation](#motivation).
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
 [k8s_src_read_logs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L277
 [k8s_src_var_log_pods]: https://github.com/kubernetes/kubernetes/blob/58596b2bf5eb0d84128fa04d0395ddd148d96e51/pkg/kubelet/kuberuntime/kuberuntime_manager.go#L60
+[kubernetes version and version skew support policy]: https://kubernetes.io/docs/setup/release/version-skew-policy/
 [kubernetes_version_comment]: https://github.com/timberio/vector/pull/2188#discussion_r403120481
 [logdna k8s integration]: https://docs.logdna.com/docs/kubernetes
 [logdna_daemonset]: https://raw.githubusercontent.com/logdna/logdna-agent/master/logdna-agent-ds.yaml
