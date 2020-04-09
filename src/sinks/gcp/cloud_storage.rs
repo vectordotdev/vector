@@ -299,7 +299,7 @@ impl Service<RequestWrapper> for GcsSink {
         settings
             .content_encoding
             .map(|ce| headers.insert("content-encoding", ce));
-        headers.insert("x-goog-acl", settings.acl);
+        settings.acl.map(|acl| headers.insert("x-goog-acl", acl));
         headers.insert("x-goog-storage-class", settings.storage_class);
         for (p, v) in settings.metadata {
             headers.insert(p, v);
@@ -363,7 +363,7 @@ impl RequestWrapper {
 // producing a request.
 #[derive(Clone, Debug)]
 struct RequestSettings {
-    acl: HeaderValue,
+    acl: Option<HeaderValue>,
     content_type: HeaderValue,
     content_encoding: Option<HeaderValue>,
     storage_class: HeaderValue,
@@ -375,8 +375,9 @@ struct RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
-        let acl = config.acl.unwrap_or(GcsPredefinedAcl::default());
-        let acl = HeaderValue::from_str(&to_string(acl)).unwrap();
+        let acl = config
+            .acl
+            .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
         let content_type = HeaderValue::from_str(config.encoding.codec.content_type()).unwrap();
         let content_encoding = config
             .compression

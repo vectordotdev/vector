@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-07"
+last_modified_on: "2020-04-09"
 delivery_guarantee: "at_least_once"
 component_title: "GCP Cloud Storage (GCS)"
 description: "The Vector `gcp_cloud_storage` sink batches `log` events to Google Cloud Platform's Cloud Storage service via the XML Interface."
@@ -91,7 +91,7 @@ the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview).
   encoding.timestamp_format = "rfc3339" # optional, default
 
   # Object Attributes
-  acl = "projectPrivate" # optional, default
+  acl = "authenticatedRead" # optional, no default
   metadata.Key1 = "Value1" # example
   storage_class = "STANDARD" # optional, no default
 
@@ -541,7 +541,7 @@ Enables/disables the sink healthcheck upon start.
 </Field>
 <Field
   common={false}
-  defaultValue={"projectPrivate"}
+  defaultValue={null}
   enumValues={{"authenticatedRead":"Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission.","bucketOwnerFullControl":"Gives the object and bucket owners OWNER permission.","bucketOwnerRead":"Gives the object owner OWNER permission, and gives the bucket owner READER permission.","private":"Gives the bucket or object owner OWNER permission for a bucket or object.","projectPrivate":"Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default.","publicRead":"Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."}}
   examples={["authenticatedRead","bucketOwnerFullControl","bucketOwnerRead","private","projectPrivate","publicRead"]}
   groups={[]}
@@ -558,7 +558,8 @@ Enables/disables the sink healthcheck upon start.
 ### acl
 
 Predefined ACL to apply to the created objects. For more information, see
-[Predefined ACLs][urls.gcs_predefined_acl].
+[Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply
+a default ACL when the object is created.
 
  See [Object access control list (ACL)](#object-access-control-list-acl) for more info.
 

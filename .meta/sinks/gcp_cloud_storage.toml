@@ -67,8 +67,11 @@ type = "string"
 category = "Object Attributes"
 common = false
 required = false
-description = "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs][urls.gcs_predefined_acl]."
-default = "projectPrivate"
+description = """
+Predefined ACL to apply to the created objects. \
+For more information, see [Predefined ACLs][urls.gcs_predefined_acl]. \
+If this is not set, GCS will apply a default ACL when the object is created.\
+"""
 
 [sinks.gcp_cloud_storage.options.acl.enum]
 authenticatedRead = "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
