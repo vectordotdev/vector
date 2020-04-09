@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-03-31"
 id: unit-testing-vector-config-files
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
@@ -89,10 +89,6 @@ in an early phase and we need case studies and comments in order to ensure it
 works well for everyone. Please let us know what you think either in our
 [community chat](https://chat.vector.dev/) or by
 [raising an issue](https://github.com/timberio/vector/issues/new).
-
-
-
-[guides.advanced.unit_testing]:/guides/advanced/unit-testing/
 
 
 [docs.reference.tests]: /docs/reference/tests/
