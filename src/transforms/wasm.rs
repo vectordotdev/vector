@@ -65,7 +65,7 @@ impl Transform for Wasm {
 mod tests {
     use super::Wasm;
     use crate::{
-        event::Event, event::LogEvent, topology::config::TransformConfig, transforms::Transform,
+        event::Event, transforms::Transform,
     };
     use serde_json::Value;
     use std::collections::HashMap;
@@ -77,7 +77,7 @@ mod tests {
 
     fn parse_event_artifact(path: impl AsRef<Path>) -> crate::Result<Event> {
         let mut event = Event::new_empty_log();
-        let mut test_file = fs::File::open("test-data/foreign_modules/protobuf/demo.json")?;
+        let mut test_file = fs::File::open(path)?;
 
         let mut buf = String::new();
         test_file.read_to_string(&mut buf)?;
@@ -97,7 +97,7 @@ mod tests {
             "#,
         )?;
 
-        let mut input = parse_event_artifact("test-data/foreign_modules/protobuf/demo.json")?;
+        let input = parse_event_artifact("test-data/foreign_modules/protobuf/demo.json")?;
 
         let mut expected = input.clone();
         expected.as_mut_log().insert(

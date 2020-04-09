@@ -1,5 +1,3 @@
-use super::Registration;
-use crate::Role;
 use serde_json::Value;
 use snafu::{ResultExt, Snafu};
 use std::ffi::CString;
@@ -59,50 +57,10 @@ pub fn insert(field: impl AsRef<str>, value: impl Into<Value>) -> Result<()> {
     unsafe { Ok(ffi::insert(field_ptr, value_ptr)) }
 }
 
-pub fn register_transform(mut registration: Registration) -> Result<()> {
-    let _result = unsafe { ffi::register_transform(&mut registration as *mut Registration) };
-    Ok(())
-}
-
-pub fn register_sink(mut registration: Registration) -> Result<()> {
-    let _result = unsafe { ffi::register_sink(&mut registration as *mut Registration) };
-    Ok(())
-}
-
-pub fn register_source(mut registration: Registration) -> Result<()> {
-    let _result = unsafe { ffi::register_source(&mut registration as *mut Registration) };
-    Ok(())
-}
-
 pub mod ffi {
-    use super::Result;
-    use crate::guest::Registration;
-    use crate::Role;
-
-    #[must_use]
-    #[repr(C)]
-    pub enum FfiResult<T, E> {
-        Ok(T),
-        Err(E),
-    }
-
-    impl<T, E> Into<Result<T, super::Error>> for FfiResult<T, E> {
-        fn into(self) -> Result<T, super::Error> {
-            match self {
-                FfiResult::Ok(t) => Ok(t),
-                FfiResult::Err(e) => Err(super::Error::Foreign),
-            }
-        }
-    }
-
     extern "C" {
         pub(super) fn get(field_ptr: *const i8, output_ptr: *const i8) -> usize;
         pub(super) fn insert(field_ptr: *const i8, value_ptr: *const i8);
         pub(super) fn hint_field_length(field_ptr: *const i8) -> usize;
-
-        // Foreign items can't be generic, so we expose specialized ones.
-        pub(super) fn register_transform(registration_ptr: *const Registration) -> u32;
-        pub(super) fn register_sink(registration_ptr: *const Registration) -> u32;
-        pub(super) fn register_source(registration_ptr: *const Registration) -> u32;
     }
 }

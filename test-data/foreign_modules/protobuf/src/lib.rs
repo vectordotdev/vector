@@ -1,9 +1,7 @@
-use foreign_modules::guest::hostcall::ffi::FfiResult;
-use foreign_modules::guest::{
+use foreign_modules::{
     hostcall,
     Registration,
 };
-use foreign_modules::Role;
 use prost::Message;
 
 pub mod items {
@@ -22,13 +20,12 @@ pub extern "C" fn process() -> usize {
         Some(value) => {
             let value_str = value.as_str().expect("Protobuf field not a str");
             let decoded = crate::items::AddressBook::decode(value_str.as_bytes()).unwrap();
-            let reencoded = serde_json::to_string(&decoded).unwrap();
-            hostcall::insert("processed", reencoded).unwrap();
+            let recoded = serde_json::to_string(&decoded).unwrap();
+            hostcall::insert("processed", recoded).unwrap();
             true
         }
         None => false,
     };
-    let result = hostcall::get("processed");
     Default::default()
 }
 

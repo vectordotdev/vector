@@ -6,10 +6,6 @@
 //! ```
 
 use super::context::ForeignModuleContext;
-use foreign_modules::{
-    guest::{hostcall::ffi::FfiResult, Registration},
-    Role,
-};
 use lucet_runtime::{lucet_hostcall, vmctx::Vmctx};
 use std::ffi::{CStr, CString};
 use std::io::Write;

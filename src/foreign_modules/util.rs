@@ -1,4 +1,4 @@
-use foreign_modules::guest::Registration;
+use foreign_modules::Registration;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 

@@ -14,17 +14,18 @@ use lucetc::{Lucetc, LucetcOpts};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{instrument, Level};
+use serde::{Deserialize, Serialize};
 
 mod context;
 mod util;
 use context::ForeignModuleContext;
-use foreign_modules::guest::Registration;
+use foreign_modules::Registration;
 use foreign_modules::Role;
 use std::fmt::Debug;
-use std::marker::PhantomData;
 use util::GuestPointer;
 
 pub mod hostcall; // Pub is required for lucet.
+
 mod defaults {
     pub(super) const ARTIFACT_CACHE: &str = "cache";
     pub(super) const HEAP_MEMORY_SIZE: usize = 16 * 64 * 1024 * 10; // 10MB
@@ -33,16 +34,22 @@ mod defaults {
 /// The base configuration required for a WasmModule.
 ///
 /// If you're designing a module around the WasmModule type, you need to build it with one of these.
-#[derive(Derivative, Clone, Debug)]
+#[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
 #[derivative(Default)]
 pub struct WasmModuleConfig {
-    path: PathBuf,
+    /// The path to the module's `wasm` file.
+    pub path: PathBuf,
+    /// The role which the module will play.
     #[derivative(Default(value = "Role::Transform"))]
-    role: Role,
+    pub role: Role,
+    /// The cache location where an optimized `so` file shall be placed.
     #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
-    artifact_cache: PathBuf,
+    pub artifact_cache: PathBuf,
+    /// The maximum size of the heap the module may grow to.
+    // TODO: The module may also declare it's minimum heap size, and they will be compared before
+    //       the module begins processing.
     #[derivative(Default(value = "defaults::HEAP_MEMORY_SIZE"))]
-    heap_memory_size: usize,
+    pub max_heap_memory_size: usize,
 }
 
 impl WasmModuleConfig {
@@ -50,13 +57,13 @@ impl WasmModuleConfig {
         Self {
             path: path.into(),
             artifact_cache: artifact_cache.into(),
-            heap_memory_size: defaults::HEAP_MEMORY_SIZE,
+            max_heap_memory_size: defaults::HEAP_MEMORY_SIZE,
             role: Role::Transform,
         }
     }
 
-    pub fn set_heap_memory_size(&mut self, heap_memory_size: usize) -> &mut Self {
-        self.heap_memory_size = heap_memory_size;
+    pub fn set_max_heap_memory_size(&mut self, max_heap_memory_size: usize) -> &mut Self {
+        self.max_heap_memory_size = max_heap_memory_size;
         self
     }
 }
@@ -109,7 +116,7 @@ impl WasmModule {
         let region = &MmapRegion::create(
             1,
             &Limits {
-                heap_memory_size: config.heap_memory_size,
+                heap_memory_size: config.max_heap_memory_size,
                 ..Limits::default()
             },
         )?;
@@ -183,7 +190,7 @@ fn protobuf() -> Result<()> {
     // Refresh the test json.
     let event_string = serde_json::to_string(&event.as_log())?;
     let mut json_fixture = fs::File::create("test-data/foreign_modules/protobuf/demo.json")?;
-    json_fixture.write(event_string.as_bytes());
+    json_fixture.write(event_string.as_bytes())?;
 
     // Run the test.
     let mut module = WasmModule::build(WasmModuleConfig::new(
@@ -191,7 +198,7 @@ fn protobuf() -> Result<()> {
         "cache",
     ))?;
     let out = module.process(event.clone())?;
-    module.shutdown();
+    module.shutdown()?;
 
     let retval = out.unwrap();
     assert_eq!(

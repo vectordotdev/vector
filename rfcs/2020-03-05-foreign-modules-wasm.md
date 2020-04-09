@@ -215,7 +215,7 @@ this time, the module can do any one time setup it needs. (Eg. Opening a socket,
 If using the Vector guest API this can be done via:
 
 ```rust
-use foreign_modules::guest::{Registration, roles::Sink};
+use foreign_modules::{Registration, roles::Sink};
 
 #[no_mangle]
 pub extern "C" fn init() -> *mut Registration {
@@ -231,7 +231,7 @@ What happens next depends on which type of module it is.
 * `Transform`: Modules of this role can be used as a transform `type`.
 
   ```rust
-  use foreign_modules::guest::hostcall;
+  use foreign_modules::hostcall;
 
   // TODO: Add better FFI error handling!
   #[no_mangle]
@@ -248,10 +248,10 @@ What happens next depends on which type of module it is.
 * `Source`: Modules of this role can be used as a source `type`.
 
   ```rust
-  use foreign_modules::guest::hostcall;
+  use foreign_modules::hostcall;
 
-  // TODO: Add better FFI error handling!
   #[no_mangle]
+  // TODO: Add better FFI error handling!
   pub extern "C" fn start() {
       // TODO
   }
@@ -260,7 +260,7 @@ What happens next depends on which type of module it is.
 * `Sink`: Modules of this role can be used as a sink `type`.
 
   ```rust
-  use foreign_modules::guest::hostcall;
+  use foreign_modules::hostcall;
 
   #[no_mangle]
   // TODO: Add better FFI error handling!
@@ -274,7 +274,7 @@ What happens next depends on which type of module it is.
 * `Codec`:
 
   ```rust
-  use foreign_modules::guest::hostcall;
+  use foreign_modules::hostcall;
   // TODO: Add better FFI error handling!
   #[no_mangle]
   pub extern "C" fn process() {
