@@ -1,6 +1,6 @@
 ---
 id: how-we-test-vector
-title: "How we test Vector"
+title: "How We Test Vector"
 description: "A survey of techniques we've found useful"
 author_github: https://github.com/lukesteensen
 tags: ["type: post", "domain: testing"]
@@ -102,7 +102,7 @@ Takeaways:
 
 The category of integration tests is a bit of a catch-all. Roughly defined,
 they're example-based tests that are explicitly not isolated and focus on the
-interaction between one or more components.
+interaction between two or more components.
 
 Given Vector's focus on integrating with a wide variety of external systems, we
 have a higher ratio of integration tests than your average system. Even once
@@ -387,6 +387,3 @@ challenge as the project grows and matures.
 [14]: https://github.com/timberio/vector/blob/9fe1eeb4786b27843673c05ff012f6b5cf5c3e45/src/transforms/tokenizer.rs#L240-L249
 [15]: https://www.youtube.com/watch?v=4fFDFbi3toc
 [16]: https://www.hillelwayne.com/post/metamorphic-testing/
-
-
-
