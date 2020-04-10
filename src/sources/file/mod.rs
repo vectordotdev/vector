@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
-use std::thread;
 use std::time::{Duration, SystemTime};
 use stream_cancel::Tripwire;
+use tokio::task::spawn_blocking;
 
 mod line_agg;
 use line_agg::LineAgg;
@@ -300,7 +300,7 @@ pub fn file_source(
 
         let (trigger_source, tripwire_server) = Tripwire::new();
         let span = info_span!("file_server");
-        thread::spawn(move || {
+        let _ = spawn_blocking(move || {
             let _enter = span.enter();
             file_server.run(
                 Compat01As03Sink::new(tx.sink_map_err(drop)),

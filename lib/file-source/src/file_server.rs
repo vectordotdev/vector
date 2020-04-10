@@ -7,7 +7,6 @@ use futures::{
     stream::StreamExt,
     Future, Sink,
 };
-use futures_timer::Delay;
 use glob::{glob, Pattern};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
@@ -15,6 +14,7 @@ use std::fs::{self, File};
 use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::time;
+use tokio::time::delay_for;
 use tracing::field;
 
 use crate::metadata_ext::PortableFileExt;
@@ -290,7 +290,7 @@ impl FileServer {
 
             match block_on(select(
                 shutdown,
-                Delay::new(time::Duration::from_millis(backoff as u64)),
+                delay_for(time::Duration::from_millis(backoff as u64)),
             )) {
                 Either::Left((_, _)) => return,
                 Either::Right((_, future)) => shutdown = future,
