@@ -288,6 +288,65 @@ to automatically inject Vector `Container` into `Pod`s (via admission
 controller), but that doesn't make a lot of sense for us to work on, since
 [`DaemonSet`][daemonset] works for most of use cases already.
 
+### Deployment configuration
+
+It is important that provide a well-thought for deployment configuration for
+Vector as part of our Kubernetes integration. We want to ensure good user
+experience, and it includes installation, configuration and upgrading.
+
+We have to make sure that Vector, being itself an app, runs well in Kubernetes,
+and sanely makes use of all the control and monitoring interfaces that
+Kubernetes exposes to manage Vector itself.
+
+We will provide YAML and Helm as deployment options. While Helm configuration is
+templated and more generic, and YAML is intended for manual configuration, a lot
+of design considerations apply to both of them.
+
+#### Managing Object
+
+For the reasons discussed above, we'll be using [`DaemonSet`][daemonset].
+
+#### Data directory
+
+Vector needs a location to keep the disk buffers and other data it requires for
+operation at runtime. This directory has to persist across restarts, since it's
+essential for some features to function (i.e. not losing buffered data if/while
+the sink is gone).
+
+We'll be using [`DaemonSet`][daemonset], so, naturally, we can leverage
+[`hostPath`][k8s_api_host_path_volume_source] volumes.
+
+We'll be using `hostPath` volumes at our YAML config, and at the Helm Chart
+we'll be using this by default, but we'll also allow configuring this to provide
+the flexibility users will expect.
+
+An alternative to `hostPath` volumes would be a user-provided
+[persistent volume][k8s_doc_persistent_volumes] of some kind. The only
+requirement is that it has to have a `ReadWriteMany` access mode.
+
+#### Vector config files
+
+Vector configuration in the Kubernetes environment can generally be split into
+two logical parts: a common Kubernetes-related configuration, and a custom
+user-supplied configuration.
+
+A common Kubernetes-related configuration is a part that is generally expected
+to be the same (or very similar) across all of the Kubernetes environments.
+Things like `kubernetes` source and `kubernetes_pod_metadata` transform belong
+there.
+
+A custom user-supplied configuration specifies a part of the configuration that
+contains parameters like what sink to use or what additional filtering or
+transformation to apply. This part is expected to be a unique custom thing for
+every user.
+
+Vector supports multiple configuration files, and we can rely on that to ship
+a config file with the common configuration part in of our YAML / Helm suite,
+and let users keep their custom config part in a separate file.
+
+We will then mount two `ConfigMap`s into a container, and start Vector in
+multiple configuration files mode.
+
 ## Prior Art
 
 1. [Filebeat k8s integration]
@@ -424,6 +483,8 @@ See [motivation](#motivation).
 [issue#2225]: https://github.com/timberio/vector/issues/2225
 [json file logging driver]: https://docs.docker.com/config/containers/logging/json-file/
 [jsonlines]: http://jsonlines.org/
+[k8s_api_host_path_volume_source]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#hostpathvolumesource-v1-core
+[k8s_doc_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_log_path_location_docs]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [k8s_src_build_container_logs_directory]: https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L173
 [k8s_src_parse_funcs]: https://github.com/kubernetes/kubernetes/blob/e74ad388541b15ae7332abf2e586e2637b55d7a7/pkg/kubelet/kuberuntime/logs/logs.go#L116
