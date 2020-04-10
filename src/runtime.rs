@@ -32,6 +32,14 @@ impl Runtime {
         self
     }
 
+    pub fn spawn_std<F>(&mut self, future: F) -> &mut Self
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        self.rt.spawn_std(future);
+        self
+    }
+
     pub fn executor(&self) -> TaskExecutor {
         TaskExecutor {
             inner: self.rt.executor(),

@@ -75,6 +75,7 @@ rusoto_sts = { version = "0.41.0", optional = true }
 
 # Tower
 tower = "0.1.1"
+tower03 = { package = "tower", version = "0.3" }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
@@ -95,9 +96,12 @@ chrono = "0.4.6"
 rand = "0.5.5"
 regex = "1.3.5"
 bytes = { version = "0.4.10", features = ["serde"] }
+bytes05 = { package = "bytes", version = "0.5", features = ["serde"] }
 stream-cancel = "0.4.3"
 hyper = "0.12.35"
+hyper13 = { package = "hyper", version = "0.13" }
 hyper-openssl = "0.7"
+hyper-openssl08 = { package = "hyper-openssl", version = "0.8" }
 native-tls = "0.2.3"
 openssl = "0.10.26"
 openssl-probe = "0.1.2"
@@ -106,6 +110,8 @@ flate2 = "1.0.6"
 structopt = "0.2.16"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
+http02 = { package = "http", version = "0.2" }
+http-body = "0.3"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
@@ -115,6 +121,7 @@ derive_is_enum_variant = "0.1.1"
 leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.2.1"
+headers03 = { package = "headers", version = "0.3" }
 rdkafka = { version = "0.23.1", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.1.5"
 seahash = { version = "3.0.6", optional = true }
