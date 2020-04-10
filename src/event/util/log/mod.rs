@@ -7,7 +7,7 @@ mod keys;
 mod path_iter;
 mod remove;
 
-pub(self) use super::{Atom, Value};
+pub(self) use super::Value;
 pub(self) use path_iter::{PathComponent, PathIter};
 
 pub use all_fields::all_fields;
@@ -20,11 +20,11 @@ pub use remove::remove;
 
 #[cfg(test)]
 pub(self) mod test {
-    use super::{Atom, Value};
+    use super::Value;
     use serde_json::Value as JsonValue;
     use std::collections::BTreeMap;
 
-    pub fn fields_from_json(json_value: JsonValue) -> BTreeMap<Atom, Value> {
+    pub fn fields_from_json(json_value: JsonValue) -> BTreeMap<String, Value> {
         match Value::from(json_value) {
             Value::Map(map) => map,
             something => panic!("Expected a map, got {:?}", something),
