@@ -358,6 +358,9 @@ See [motivation](#motivation).
    [etc][container_runtimes]. Some even use [gVisor] or [Firecracker]. There
    might be differences in how different container runtimes handle logs.
 1. How do we want to approach Helm Chart Repository management.
+1. How do we implement liveness, readiness and startup probes?
+1. Can we populate file at `terminationMessagePath` with some meaningful
+   information when we exit or crash?
 
 ## Plan Of Attack
 
