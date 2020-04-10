@@ -42,11 +42,11 @@ impl SourceConfig for LogplexConfig {
         &self,
         _: &str,
         _: &GlobalOptions,
-        _: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
-        source.run(self.address, "events", &self.tls, out)
+        source.run(self.address, "events", &self.tls, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
