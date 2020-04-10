@@ -23,7 +23,7 @@
 <%- interfaces.each do |interface| -%>
 <TabItem value="<%= interface.name.parameterize %>">
 
-<%- source = metadata.sources.send(strategy.source) -%>
+<%- source = strategy.respond_to?(:source) ? metadata.sources.send(strategy.source) : nil -%>
 <%= interface_installation_tutorial(interface, source: source, heading_depth: heading_depth) %>
 
 </TabItem>

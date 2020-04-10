@@ -11,8 +11,8 @@ pub struct Timer {
 }
 
 /// A trait representing a runtime running user-defined code.
-pub trait ScriptedRuntime {
-    /// Call user-defind "init" hook.
+pub trait RuntimeTransform {
+    /// Call user-defined "init" hook.
     fn hook_init<F>(&mut self, _emit_fn: F)
     where
         F: FnMut(Event) -> (),
@@ -52,9 +52,9 @@ enum Message {
     Timer(Timer),
 }
 
-impl<Runtime> Transform for Runtime
+impl<T> Transform for T
 where
-    Runtime: ScriptedRuntime + Send,
+    T: RuntimeTransform + Send,
 {
     // used only in config tests (cannot be put behind `#[cfg(test)`])
     fn transform(&mut self, event: Event) -> Option<Event> {

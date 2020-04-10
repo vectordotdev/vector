@@ -1,6 +1,8 @@
 use crate::Event;
 use snafu::Snafu;
 
+mod util;
+
 #[cfg(feature = "transforms-add_fields")]
 pub mod add_fields;
 #[cfg(feature = "transforms-add_tags")]

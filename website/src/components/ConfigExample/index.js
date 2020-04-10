@@ -10,7 +10,7 @@ import _ from 'lodash';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 function Command({format, path, source, sink}) {
-  let command = `cat <<-VECTORCFG > ${path}\n${source.config_examples.toml}\n\n${sink.config_examples.toml}\nVECTORCFG'`;
+  let command = `cat <<-VECTORCFG > ${path}\n${source.config_examples.toml}\n\n${sink.config_examples.toml}\nVECTORCFG`;
 
   return (
     <>
