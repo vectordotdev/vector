@@ -5,6 +5,9 @@ title: Parsing CSV logs with Lua
 description: Parse structured application logs in CSV format using Lua transform
 author_github: https://github.com/a-rodin
 tags: ["type: guide", "domain: transforms", "transform: lua"]
+assumptions:
+- You understand the [basic Lua concepts][docs.reference.transforms.lua].
+- You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][guides.getting-started.your-first-pipeline].
 ---
 
 Vector has many built-in [parsers][pages.parse_transforms] for structured logs formats. However, when you need to ship
@@ -241,6 +244,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [parse timestamps][docs.reference.transforms.coercer#timestamps].
 
 
+[docs.about.concepts]: /docs/about/concepts/
 [docs.administration.process-management#automatic-reload-on-changes]: /docs/administration/process-management/#automatic-reload-on-changes
 [docs.meta.glossary#pipeline]: /docs/meta/glossary/#pipeline
 [docs.reference.sinks.console]: /docs/reference/sinks/console/
@@ -253,6 +257,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [docs.reference.transforms.lua#source]: /docs/reference/transforms/lua/#source
 [docs.reference.transforms.lua]: /docs/reference/transforms/lua/
 [guides.advanced.custom-aggregations-with-lua]: /guides/advanced/custom-aggregations-with-lua/
+[guides.getting-started.your-first-pipeline]: /guides/getting-started/your-first-pipeline/
 [pages.parse_transforms]: /components?functions%5B%5D=parse/
 [pages.program_transforms]: /components?functions%5B%5D=program/
 [urls.lua_csv_repo]: https://github.com/geoffleyland/lua-csv
