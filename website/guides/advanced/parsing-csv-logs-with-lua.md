@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-09"
+last_modified_on: "2020-04-10"
 $schema: "/.meta/.schemas/guides.json"
 title: Parsing CSV logs with Lua
 description: Parse structured application logs in CSV format using Lua transform
@@ -69,9 +69,9 @@ transform (which currently is configured to just pass the events through), and d
 At this point, running `vector --config vector.toml` results in the following output:
 
 ```json
-{"file":"log.csv","host":"dev","message":"2020-04-09 12:48:49.661 UTC,,,1,,localhost.1,1,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"ending log output to stderr\",,\"Future log output will go to log destination \"\"csvlog\"\".\",,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
-{"file":"log.csv","host":"dev","message":"2020-04-09 12:48:49.669 UTC,,,27,,localhost.1b,1,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"database system was shut down at 2020-04-09 12:48:25 UTC\",,,,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
-{"file":"log.csv","host":"dev","message":"2020-04-09 12:48:49.683 UTC,,,1,,localhost.1,2,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"database system is ready to accept connections\",,,,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
+{"file":"log.csv","host":"localhost","message":"2020-04-09 12:48:49.661 UTC,,,1,,localhost.1,1,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"ending log output to stderr\",,\"Future log output will go to log destination \"\"csvlog\"\".\",,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
+{"file":"log.csv","host":"localhost","message":"2020-04-09 12:48:49.669 UTC,,,27,,localhost.1b,1,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"database system was shut down at 2020-04-09 12:48:25 UTC\",,,,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
+{"file":"log.csv","host":"localhost","message":"2020-04-09 12:48:49.683 UTC,,,1,,localhost.1,2,,2020-04-09 12:48:49 UTC,,0,LOG,00000,\"database system is ready to accept connections\",,,,,,,,,\"\"","timestamp":"2020-04-09T14:33:28Z"}
 ```
 
 ## Adding the CSV Module
@@ -99,7 +99,7 @@ be used through the global variable `csv`.
 
 ## Implementing Custom Parsing
 
-With `csv` module, the [`hooks.process`][docs.reference.transforms.lua#process] can be changed to the following:
+With the `csv` module, the [`hooks.process`][docs.reference.transforms.lua#process] can be changed to the following:
 
 ```toml
 hooks.process = """
@@ -178,9 +178,9 @@ the whole transform:
 Trying to run `vector --config vector.toml` with the same input file results in structured events being output:
 
 ```json
-{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"Future log output will go to log destination \"csvlog\".","host":"dev","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.661 UTC","message":"ending log output to stderr","process_id":"1","query":"","query_pos":"","session_id":"localhost.1","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
-{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"dev","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.669 UTC","message":"database system was shut down at 2020-04-09 12:48:25 UTC","process_id":"27","query":"","query_pos":"","session_id":"localhost.1b","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
-{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"dev","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.683 UTC","message":"database system is ready to accept connections","process_id":"1","query":"","query_pos":"","session_id":"localhost.1","session_line_num":"2","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
+{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"Future log output will go to log destination \"csvlog\".","host":"localhost","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.661 UTC","message":"ending log output to stderr","process_id":"1","query":"","query_pos":"","session_id":"localhost.1","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
+{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"localhost","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.669 UTC","message":"database system was shut down at 2020-04-09 12:48:25 UTC","process_id":"27","query":"","query_pos":"","session_id":"localhost.1b","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
+{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"localhost","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.683 UTC","message":"database system is ready to accept connections","process_id":"1","query":"","query_pos":"","session_id":"localhost.1","session_line_num":"2","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
 ```
 
 Or, applying pretty formatting to one of the output events:
@@ -196,7 +196,7 @@ Or, applying pretty formatting to one of the output events:
   "error_severity": "LOG",
   "file": "log.csv",
   "hint": "Future log output will go to log destination \"csvlog\".",
-  "host": "dev",
+  "host": "localhost",
   "internal_query": "",
   "internal_query_pos": "",
   "location": "",
@@ -226,16 +226,19 @@ CSV supports line breaks in strings. However, by default `file` source creates a
 
 There are two options to deal with this:
 
-1. For simple cases it is possible to use [`multiline`][docs.reference.sources.file#multiline] configuration option
-  in the `file` source.
-2. For more complex cases it is possible to concatenate messages from multiple lines in the Lua code. See
+1. For simple cases it might be possible to use the [`multiline`][docs.reference.sources.file#multiline] configuration
+  option in the `file` source.
+2. For more complex cases the messages from multiple events can be conditionally concatenated in the Lua code. See
   [the aggregations guide][guides.advanced.custom-aggregations-with-lua] for more details on this.
 
 
 ### Change Fields Types
 
-By default, all columns are parsed as strings. It is possible to change fields types right in the Lua code using
-built-in functions, such as `tonumber`.
+By default, all columns are parsed as strings. It is possible to convert them to other
+[data types][docs.reference.transforms.lua#data-types] right in the Lua code using
+built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it is possible to add the
+[`coercer`][docs.reference.transforms.coercer] transform after the `lua` transform, for example, to
+[parse timestamps][docs.reference.transforms.coercer#timestamps].
 
 
 [docs.administration.process-management#automatic-reload-on-changes]: /docs/administration/process-management/#automatic-reload-on-changes
@@ -243,6 +246,9 @@ built-in functions, such as `tonumber`.
 [docs.reference.sinks.console]: /docs/reference/sinks/console/
 [docs.reference.sources.file#multiline]: /docs/reference/sources/file/#multiline
 [docs.reference.sources.file]: /docs/reference/sources/file/
+[docs.reference.transforms.coercer#timestamps]: /docs/reference/transforms/coercer/#timestamps
+[docs.reference.transforms.coercer]: /docs/reference/transforms/coercer/
+[docs.reference.transforms.lua#data-types]: /docs/reference/transforms/lua/#data-types
 [docs.reference.transforms.lua#process]: /docs/reference/transforms/lua/#process
 [docs.reference.transforms.lua#source]: /docs/reference/transforms/lua/#source
 [docs.reference.transforms.lua]: /docs/reference/transforms/lua/
@@ -252,4 +258,5 @@ built-in functions, such as `tonumber`.
 [urls.lua_csv_repo]: https://github.com/geoffleyland/lua-csv
 [urls.lua_csv_view]: https://github.com/geoffleyland/lua-csv/blob/09557e4608b02d136b9ae39a8fa0f36328fa1cec/lua/csv.lua
 [urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
+[urls.lua_tonumber]: https://www.lua.org/manual/5.3/manual.html#pdf-tonumber
 [urls.postgresql_csvlog]: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG
