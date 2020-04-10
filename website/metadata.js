@@ -2924,7 +2924,7 @@ module.exports = {
       "type: post",
       "domain: testing"
     ],
-    "title": "How we test Vector"
+    "title": "How We Test Vector"
   },
   "latest_release": {
     "commits": [
@@ -3164,7 +3164,7 @@ module.exports = {
         "type: post",
         "domain: testing"
       ],
-      "title": "How we test Vector"
+      "title": "How We Test Vector"
     }
   ],
   "releases": {

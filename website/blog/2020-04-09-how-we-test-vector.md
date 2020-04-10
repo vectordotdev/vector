@@ -1,6 +1,7 @@
 ---
+last_modified_on: "2020-04-10"
 id: how-we-test-vector
-title: "How we test Vector"
+title: "How We Test Vector"
 description: "A survey of techniques we've found useful"
 author_github: https://github.com/lukesteensen
 tags: ["type: post", "domain: testing"]
@@ -102,7 +103,7 @@ Takeaways:
 
 The category of integration tests is a bit of a catch-all. Roughly defined,
 they're example-based tests that are explicitly not isolated and focus on the
-interaction between one or more components.
+interaction between two or more components.
 
 Given Vector's focus on integrating with a wide variety of external systems, we
 have a higher ratio of integration tests than your average system. Even once
