@@ -106,24 +106,12 @@ impl LogEvent {
         util::log::get(&self.fields, key)
     }
 
-    pub fn get_flat(&self, key: &Atom) -> Option<&Value> {
-        self.fields.get(&key.to_string())
-    }
-
     pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
         util::log::get_mut(&mut self.fields, key)
     }
 
-    pub fn get_flat_mut(&mut self, key: &Atom) -> Option<&mut Value> {
-        self.fields.get_mut(&key.to_string())
-    }
-
     pub fn contains(&self, key: &Atom) -> bool {
         util::log::contains(&self.fields, key)
-    }
-
-    pub fn contains_flat(&self, key: &Atom) -> bool {
-        self.fields.contains_key(&key.to_string())
     }
 
     pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
@@ -150,16 +138,8 @@ impl LogEvent {
         util::log::remove(&mut self.fields, &key, prune)
     }
 
-    pub fn remove_flat(&mut self, key: &Atom) -> Option<Value> {
-        self.fields.remove(&key.to_string())
-    }
-
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         util::log::keys(&self.fields)
-    }
-
-    pub fn keys_flat<'a>(&'a self) -> impl Iterator<Item = &'a String> {
-        self.fields.keys()
     }
 
     pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (String, &'a Value)> + Serialize {
