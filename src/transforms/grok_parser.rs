@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event::{self, Event},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    types::{parse_conversion_map, Conversion},
+    types::{parse_conversion_map_no_atoms, Conversion},
 };
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ pub struct GrokParserConfig {
     pub field: Option<Atom>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -42,7 +42,7 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map_no_atoms(&self.types)?;
 
         Ok(grok
             .compile(&self.pattern, true)
@@ -74,7 +74,7 @@ pub struct GrokParser {
     pattern: Pattern,
     field: Atom,
     drop_field: bool,
-    types: HashMap<Atom, Conversion>,
+    types: HashMap<String, Conversion>,
 }
 
 impl Transform for GrokParser {
@@ -86,8 +86,7 @@ impl Transform for GrokParser {
             if let Some(matches) = self.pattern.match_against(&value) {
                 let drop_field = self.drop_field && !matches.get(&self.field).is_some();
                 for (name, value) in matches.iter() {
-                    let name: Atom = name.into();
-                    let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
+                    let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
                         Ok(value) => {
                             event.insert(name, value);
@@ -95,7 +94,7 @@ impl Transform for GrokParser {
                         Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
-                                name = &name[..],
+                                %name,
                                 %error,
                                 rate_limit_secs = 30,
                             );

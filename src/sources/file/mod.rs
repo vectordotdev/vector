@@ -815,9 +815,9 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
-                    event::log_schema().host_key().clone(),
-                    event::log_schema().message_key().clone(),
-                    event::log_schema().timestamp_key().clone()
+                    event::log_schema().host_key().to_string(),
+                    event::log_schema().message_key().to_string(),
+                    event::log_schema().timestamp_key().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

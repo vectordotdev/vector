@@ -1,10 +1,9 @@
-use super::Atom;
 use std::{mem, str::Chars};
 
 #[derive(Debug, PartialEq)]
 pub enum PathComponent {
     /// For example, in "a.b[0].c[2]" the keys are "a", "b", and "c".
-    Key(Atom),
+    Key(String),
     /// For example, in "a.b[0].c[2]" the indexes are 0 and 2.
     Index(usize),
     /// Indicates that a parsing error occurred.
