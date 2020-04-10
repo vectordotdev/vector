@@ -2,6 +2,7 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
+    stream::StreamExt,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
 };
 use bytes::{Bytes, BytesMut};
@@ -105,12 +106,13 @@ impl SourceConfig for DockerConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: Sender<Event>,
     ) -> crate::Result<super::Source> {
         DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
             out,
+            shutdown,
         )
         .map(Box::new)
         .map(|source| source as Box<_>)
@@ -228,6 +230,7 @@ impl DockerSource {
     fn new(
         config: DockerConfig,
         out: Sender<Event>,
+        shutdown: ShutdownSignal,
     ) -> crate::Result<impl Future<Item = (), Error = ()>> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
@@ -260,7 +263,7 @@ impl DockerSource {
         // t2 -- outside: container stoped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
-        let esb = EventStreamBuilder::new(core, out, main_send);
+        let esb = EventStreamBuilder::new(core, out, main_send, shutdown.clone());
 
         // Construct, capture currently running containers, and do main future(self)
         Ok(DockerSource {
@@ -272,7 +275,8 @@ impl DockerSource {
             exclude_self,
         }
         .running_containers()
-        .and_then(|source| source))
+        // Once this ShutdownSignal resolves it will drop DockerSource and by extension it's ShutdownSignal.
+        .and_then(move |source| source.select(shutdown.map(|_| ())).then(|_| Ok(()))))
     }
 
     /// Future that captures currently running containers, and starts event streams for them.
@@ -491,6 +495,8 @@ struct EventStreamBuilder {
     out: Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: UnboundedSender<ContainerLogInfo>,
+    /// Self and event streams will end on this.
+    shutdown: ShutdownSignal,
 }
 
 impl EventStreamBuilder {
@@ -498,15 +504,17 @@ impl EventStreamBuilder {
         core: DockerSourceCore,
         out: Sender<Event>,
         main_send: UnboundedSender<ContainerLogInfo>,
+        shutdown: ShutdownSignal,
     ) -> Self {
         EventStreamBuilder {
             core: Arc::new(core),
             out,
             main_send,
+            shutdown,
         }
     }
 
-    /// Constructs and runs event stream
+    /// Constructs and runs event stream until shutdown.
     fn start(&self, id: ContainerId) -> ContainerState {
         let metadata_fetch = self
             .core
@@ -530,7 +538,7 @@ impl EventStreamBuilder {
         ContainerState::new()
     }
 
-    /// If info is present, restarts event stream
+    /// If info is present, restarts event stream which will run until shutdown.
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             tokio01::spawn(self.start_event_stream(info));
@@ -618,6 +626,7 @@ impl EventStreamBuilder {
 
             Ok(Async::Ready(None))
         })
+        .take_until(self.shutdown.clone())
         .forward(self.out.clone().sink_map_err(|_| ()))
         .map(|_| ())
     }
