@@ -1,4 +1,5 @@
 ---
+last_modified_on: "2020-04-10"
 id: how-we-test-vector
 title: "How We Test Vector"
 description: "A survey of techniques we've found useful"
@@ -387,3 +388,6 @@ challenge as the project grows and matures.
 [14]: https://github.com/timberio/vector/blob/9fe1eeb4786b27843673c05ff012f6b5cf5c3e45/src/transforms/tokenizer.rs#L240-L249
 [15]: https://www.youtube.com/watch?v=4fFDFbi3toc
 [16]: https://www.hillelwayne.com/post/metamorphic-testing/
+
+
+
