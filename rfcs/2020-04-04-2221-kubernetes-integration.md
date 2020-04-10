@@ -85,23 +85,12 @@ TODO: insert diagram
     data:
       vector.toml: |
         # Docs: https://vector.dev/docs/
-
-        # Set global options
-        data_dir = "/var/tmp/vector"
-
-        # Ingest logs from Kubernetes
-        [sources.kubernetes]
-          type = "kubernetes"
-
-        # Enrich logs with Pod metadata
-        [transforms.pod_metadata]
-          type = "kubernetes_pod_metadata"
-          inputs = ["kubernetes"]
+        # Container logs are available from "kubernetes" input.
 
         # Send data to one or more sinks!
         [sinks.aws_s3]
           type = "aws_s3"
-          inputs = ["pod_metadata"]
+          inputs = ["kubernetes"]
           bucket = "my-bucket"
           compression = "gzip"
           region = "us-east-1"
