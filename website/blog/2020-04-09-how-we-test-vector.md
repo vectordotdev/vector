@@ -105,11 +105,11 @@ they're example-based tests that are explicitly not isolated and focus on the
 interaction between one or more components.
 
 Given Vector's focus on integrating with a wide variety of external systems, we
-have a higher ratio integration tests than your average system. Even once we've
-done all we can to isolate logic into small, unit-testable functions, we still
-need to ensure the component as a whole does what it's supposed to. If unit
-tests tell you that something works in theory, integration tests tell you that
-it _should_ work in practice.
+have a higher ratio of integration tests than your average system. Even once
+we've done all we can to isolate logic into small, unit-testable functions, we
+still need to ensure the component as a whole does what it's supposed to. If
+unit tests tell you that something works in theory, integration tests tell you
+that it _should_ work in practice.
 
 Similar to unit tests, there are two major downsides to integration tests. The
 first is the same problem unit tests have with exhaustiveness, but intensely
