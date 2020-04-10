@@ -1,6 +1,7 @@
 use futures01::future::{ExecuteError, Executor, Future};
 use std::io;
 use std::pin::Pin;
+use tokio::task::JoinHandle;
 use tokio_compat::runtime::{Builder, Runtime as TokioRuntime, TaskExecutor as TokioTaskExecutor};
 
 pub struct Runtime {
@@ -30,6 +31,14 @@ impl Runtime {
     {
         self.rt.spawn(future);
         self
+    }
+
+    pub fn spawn_handle<F>(&mut self, future: F) -> JoinHandle<F::Output>
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.rt.spawn_handle_std(future)
     }
 
     pub fn executor(&self) -> TaskExecutor {

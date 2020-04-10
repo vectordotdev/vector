@@ -20,6 +20,7 @@ use crate::topology::builder::Pieces;
 use crate::buffers;
 use crate::runtime;
 use crate::shutdown::SourceShutdownCoordinator;
+use futures::compat::Future01CompatExt;
 use futures01::{
     future,
     sync::{mpsc, oneshot},
@@ -237,7 +238,10 @@ impl RunningTopology {
 
         info!("Running healthchecks.");
         if require_healthy {
-            let success = rt.block_on(healthchecks);
+            let jh = rt.spawn_handle(healthchecks.compat());
+            let success = rt
+                .block_on_std(jh)
+                .expect("Task panicked or runtime shutdown unexpectedly");
 
             if success.is_ok() {
                 info!("All healthchecks passed.");
