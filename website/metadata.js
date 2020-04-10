@@ -28,6 +28,15 @@ module.exports = {
           "title": "Managing Complex Configs"
         },
         {
+          "author_github": "https://github.com/a-rodin",
+          "description": null,
+          "id": "/advanced/parsing-csv-logs-with-lua",
+          "last_modified_on": null,
+          "path": "website/guides/advanced/parsing-csv-logs-with-lua.md",
+          "series_position": null,
+          "title": "Parsing CSV logs with Lua"
+        },
+        {
           "author_github": "https://github.com/binarylogic",
           "description": null,
           "id": "/advanced/troubleshooting",

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-08"
+last_modified_on: "2020-04-10"
 component_title: "Lua"
 description: "The Vector `lua` transform accepts and outputs `log` and `metric` events allowing you to transform events with a full embedded Lua engine."
 event_types: ["log","metric"]
@@ -706,6 +706,22 @@ event = {
 </TabItem>
 </Tabs>
 
+#### Data Types
+
+The correspondence between Vector's [data types][docs.about.data-model.log#types] and Lua data type is summarized
+by the following table:
+
+| Vector Type | Lua Type | Comment |
+| :----------- | :-------- | :------- |
+| [`String`][docs.about.data-model.log#strings] | [`string`][urls.lua_string] ||
+| [`Integer`][docs.about.data-model.log#ints] | [`integer`][urls.lua_integer] ||
+| [`Float`][docs.about.data-model.log#floats] | [`number`][urls.lua_number] ||
+| [`Boolean`][docs.about.data-model.log#booleans] | [`boolean`][urls.lua_boolean] ||
+| [`Timestamp`][docs.about.data-model.log#timestamps] | [`table`][urls.lua_table] | There is no dedicated timestamp type in Lua. Because of that timestamps are represented as tables using the convention defined by [`os.date`][urls.lua_os_date] and [`os.time`][urls.lua_os_time]. The table representation of a timestamp  contain fields `year`, `month`, `day`, `hour`, `min`, `sec`, `yday`, `wday`, `isdst`. If such a table is passed from Lua to Vector, the fields  `yday`, `wday`, and `isdst` can be omitted. |
+| [`Null`][docs.about.data-model.log#null-values] | empty string | In Lua setting the value of a table field to `nil` means deletion of this field. In addition, the length operator `#` does not work in the expected way with sequences containing nulls. Because of that `Null` values are encoded as empty strings. |
+| [`Map`][docs.about.data-model.log#maps]| [`table`][urls.lua_table] | |
+| [`Array`][docs.about.data-model.log#arrays] | [`sequence`][urls.lua_sequence] | Sequences are a special case of tables. Indexes start from 1, following the Lua convention. |
+
 ### Iterate Over Fields & Tags
 
 To iterate over all fields of an `event` use the [`pairs`][urls.lua_pairs]
@@ -743,6 +759,15 @@ first chapters of [the official book][urls.lua_pil] or consulting
 [the manual][urls.lua_manual] would suffice.
 
 
+[docs.about.data-model.log#arrays]: /docs/about/data-model/log/#arrays
+[docs.about.data-model.log#booleans]: /docs/about/data-model/log/#booleans
+[docs.about.data-model.log#floats]: /docs/about/data-model/log/#floats
+[docs.about.data-model.log#ints]: /docs/about/data-model/log/#ints
+[docs.about.data-model.log#maps]: /docs/about/data-model/log/#maps
+[docs.about.data-model.log#null-values]: /docs/about/data-model/log/#null-values
+[docs.about.data-model.log#strings]: /docs/about/data-model/log/#strings
+[docs.about.data-model.log#timestamps]: /docs/about/data-model/log/#timestamps
+[docs.about.data-model.log#types]: /docs/about/data-model/log/#types
 [docs.about.data-model.log]: /docs/about/data-model/log/
 [docs.about.data-model.metric]: /docs/about/data-model/metric/
 [docs.configuration#environment-variables]: /docs/setup/configuration/#environment-variables
@@ -752,9 +777,16 @@ first chapters of [the official book][urls.lua_pil] or consulting
 [docs.sources.stdin]: /docs/reference/sources/stdin/
 [urls.externally_tagged_representation]: https://serde.rs/enum-representations.html#externally-tagged
 [urls.lua]: https://www.lua.org/
+[urls.lua_boolean]: https://www.lua.org/pil/2.2.html
+[urls.lua_integer]: https://docs.rs/rlua/0.17.0/rlua/type.Integer.html
 [urls.lua_manual]: https://www.lua.org/manual/5.3/manual.html
+[urls.lua_number]: https://docs.rs/rlua/0.17.0/rlua/type.Number.html
+[urls.lua_os_date]: https://www.lua.org/manual/5.3/manual.html#pdf-os.date
+[urls.lua_os_time]: https://www.lua.org/manual/5.3/manual.html#pdf-os.time
 [urls.lua_pairs]: https://www.lua.org/manual/5.3/manual.html#pdf-pairs
 [urls.lua_pil]: https://www.lua.org/pil/
 [urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
+[urls.lua_sequence]: https://www.lua.org/pil/11.1.html
+[urls.lua_string]: https://www.lua.org/pil/2.4.html
 [urls.lua_table]: https://www.lua.org/pil/2.5.html
 [urls.rlua]: https://github.com/kyren/rlua
