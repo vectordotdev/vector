@@ -52,21 +52,19 @@ struct RootOpts {
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
 
-    /// Set the logging format. Options are "text" or "json". Defaults to "text".
-    #[structopt(long)]
-    log_format: Option<LogFormat>,
+    /// Set the logging format
+    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
+    log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
     ///
     /// By default `vector` will try and detect if `stdout` is a terminal, if it is
     /// ANSI will be enabled. Otherwise it will be disabled. By providing this flag with
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
-    /// will disable all ANSI terminal formatting. `--color auto`, the default option, will attempt
+    /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    ///
-    /// Options: `auto`, `always` or `never`
-    #[structopt(long)]
-    color: Option<Color>,
+    #[structopt(long, default_value = "auto", possible_values = &["auto", "always", "never"])]
+    color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long)]
@@ -189,7 +187,7 @@ fn main() {
         },
     };
 
-    let color = match opts.color.clone().unwrap_or(Color::Auto) {
+    let color = match opts.color.clone() {
         #[cfg(unix)]
         Color::Auto => atty::is(atty::Stream::Stdout),
         #[cfg(windows)]
@@ -198,7 +196,7 @@ fn main() {
         Color::Never => false,
     };
 
-    let json = match &opts.log_format.unwrap_or(LogFormat::Text) {
+    let json = match &opts.log_format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
