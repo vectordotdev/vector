@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-04-01"
+last_modified_on: "2020-04-11"
 $schema: "/.meta/.schemas/guides.json"
 title: Deploying Vector
 description: How to deploy Vector to your target environment
@@ -171,7 +171,7 @@ sudo dpkg -i vector-amd64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={null}
   sinkName={null} />
 
 </li>
@@ -217,7 +217,7 @@ sudo dpkg -i vector-arm64.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={null}
   sinkName={null} />
 
 </li>
@@ -263,7 +263,7 @@ sudo dpkg -i vector-armhf.deb
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={null}
   sinkName={null} />
 
 </li>
@@ -293,7 +293,7 @@ sudo systemctl start vector
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={null}
   sinkName={null} />
 
 </li>
@@ -304,14 +304,12 @@ sudo systemctl start vector
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock \
   timberio/vector:latest-alpine
 ```
 
 <CodeExplanation>
 
 * The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `-v /var/run/docke...` flag ensures that Vector has access to the Docker API.
 * The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
@@ -350,7 +348,7 @@ brew tap timberio/brew && brew install vector
 <ConfigExample
   format="toml"
   path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
+  sourceName={null}
   sinkName={null} />
 
 </li>
@@ -403,7 +401,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"config\\vector.toml"}
-      sourceName={"docker"}
+      sourceName={null}
       sinkName={null} />
 
 5.  ### Start Vector
@@ -442,7 +440,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={null}
       sinkName={null} />
 
 3.  ### Start Vector
@@ -492,7 +490,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={null}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -523,7 +521,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={null}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -554,7 +552,7 @@ brew services start vector
     <ConfigExample
       format="toml"
       path={"/etc/vector/vector.toml"}
-      sourceName={"docker"}
+      sourceName={null}
       sinkName={null} />
 
 4.  ### Start Vector
@@ -586,7 +584,7 @@ brew services start vector
 <ConfigExample
   format="toml"
   path={"vector.toml"}
-  sourceName={"docker"}
+  sourceName={null}
   sinkName={null} />
 
 </li>

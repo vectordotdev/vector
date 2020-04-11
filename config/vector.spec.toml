@@ -80,16 +80,6 @@ dns_servers = ["0.0.0.0:53"]
   message_key = "@message"
   message_key = "msg"
 
-  # The key used to hold the log source. See the log data model page for more
-  # info.
-  #
-  # * optional
-  # * default: "source"
-  # * type: string
-  source_key = "source"
-  source_key = "@source"
-  source_key = "src"
-
   # The key used to hold the log source type. See the log data model page for
   # more info.
   #
